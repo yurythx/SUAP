@@ -190,7 +190,19 @@ O ambiente virtual em `app/.venv` neste Windows é o venv Linux do projeto. `uv 
 
 O comando de migração enxerga centenas de migrações pendentes em apps acadêmicos e administrativos. Ao mesmo tempo, as migrações do `edu` constam como aplicadas, e a tabela `edu_aluno` não tinha as colunas `token_responsavel` e `data_prevista_termino_ciclo`. Aplicar as centenas de migrações pendentes em cima de um banco que já tem as tabelas arrisca recriar estrutura e dados. A saída usada na carga foi pontual: as duas colunas faltantes de `edu_aluno` foram criadas vazias e anuláveis, porque o `save` de pessoa física consulta `aluno_set` e o SQL lista todas as colunas do modelo.
 
-Há outras centenas de colunas que o código atual espera e o banco não tem, em tabelas que já existem. Um sintoma já visto no log, antes desta republicação, é a página de prestador de serviço: falta `comum_ocupacaoprestador.atualizado_por_id` e a resposta é 500. Isso não foi alterado nesta etapa.
+Há outras centenas de colunas que o código atual espera e o banco não tem, em tabelas que já existem. Um sintoma já visto no log, antes desta republicação, é a página de prestador de serviço: falta `comum_ocupacaoprestador.atualizado_por_id` e a resposta é 500. Isso não foi alterado nesta etapa. O alinhamento do esquema e do histórico ficou para o mesmo dia, descrito em "Histórico de migrações".
+
+### Histórico de migrações
+
+Na noite de 31/10/2026 o banco real tinha 667 migrações que o Django considerava pendentes, embora as tabelas e colunas do código já existissem. Um `migrate` comum tentaria criar de novo o que já estava lá.
+
+O ensaio foi uma cópia restaurada do backup, no banco `suap_migrate_prova`. Nela, a consulta de cada modelo gerenciado passou, as 667 migrações foram gravadas com `migrate --fake` (só o histórico, sem SQL) e um `migrate` seguinte respondeu que não havia nada a aplicar. O mesmo registro foi feito no banco `suap`. A cópia de ensaio foi apagada.
+
+Daqui em diante, `migrate` aplica só migração nova, de código que ainda não está neste banco. Não se usa `--fake` de novo, salvo numa cópia, se o histórico voltar a divergir do esquema.
+
+### Backup, banco, Redis e Celery
+
+O `suap-db` gera um dump às 02:30 e guarda sete dias em `/var/backups/suap`. Às 03:10 o `suap-app` puxa esse arquivo para o próprio `/var/backups/suap`, fora do disco do banco. O PostgreSQL ficou com `shared_buffers` de 512 MB e `effective_cache_size` de 1536 MB, na medida dos 2,5 GB do container. O Redis tem teto de 768 MB, recusa gravar quando enche e persiste com AOF. Celery worker e beat sobem com o Gunicorn: a fila é `geral` e o worker usa um processo, porque a máquina tem dois CPUs e o Gunicorn já ocupa dois workers.
 
 ### Passaporte obrigatório no PostgreSQL
 
@@ -208,13 +220,12 @@ O grupo `Servidor` normalmente é atribuído no login. Na importação ele é gr
 
 ### Segredos nos scripts de bootstrap
 
-`scripts/bootstrap-lxc.sh`, `scripts/fix-db.sh` e `scripts/fix-redis.sh` gravam senha inicial de banco e de Redis no próprio arquivo. Esses valores não devem ser copiados para documentação, chat ou commit novo. O passo pendente é tirá-los do repositório, guardá-los só no servidor e trocar as senhas que já circularam.
+`scripts/bootstrap-lxc.sh`, `scripts/fix-db.sh` e `scripts/fix-redis.sh` leem a senha de `DATABASE_PASSWORD` e `REDIS_PASSWORD`. O arquivo com os valores reais continua só no servidor.
 
 ## O que ficou pendente
 
 - Logo da prefeitura no lugar da marca do IFRN.
 - Impedir de fato a assinatura de quem veio como “Colaborador (Básico sem Assinatura)”.
-- Celery worker e beat, previstos no LXC da aplicação e ausentes no systemd.
-- Alinhar o esquema do PostgreSQL ao código sem rodar às cegas as centenas de migrações pendentes. A página de prestador é um caso já quebrado.
-- Retirar senhas iniciais dos scripts de bootstrap.
-- O código do corte acadêmico foi copiado para `/opt/suap/src`. Uma sincronização futura que substitua essa árvore por um pacote antigo faz o menu acadêmico voltar, mesmo com `DISABLE_EDU=True` no `.env`.
+- Publicar `hmlsuap.rondonopolis.mt.gov.br` no proxy `192.168.0.218`, com certificado. Até lá o acesso real é `http://192.168.29.110`.
+- Troca obrigatória de senha no primeiro acesso, depois que o e-mail e o nome público funcionarem.
+- Gunicorn com usuário próprio, escutando só na rede interna.
