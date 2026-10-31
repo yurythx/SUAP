@@ -4,7 +4,9 @@ Base oficial **IFRN COSINF 4.0.5** (Django 5.2 / Python 3.14). Com `DISABLE_EDU=
 
 A instância publicada da Prefeitura Municipal de Rondonópolis está em cinco LXC no Proxmox (balanceador, aplicação, banco, Redis e controle). Esse conjunto é a homologação (`hmlsuap.rondonopolis.mt.gov.br`). A produção (`suap.rondonopolis.mt.gov.br`) ainda não tem máquina. O relato do deploy, do corte acadêmico e do cadastro está em [docs/implantacao-prefeitura.md](docs/implantacao-prefeitura.md). O Compose desta pasta é um desenho alternativo de host único; a instância no ar usa Gunicorn em systemd.
 
-O dia a dia segue a branch `homologacao`. `main` guarda a versão aceita e `producao` recebe o merge quando houver o que publicar. As três começam no mesmo commit.
+O dia a dia da prefeitura segue a branch `homologacao`. `main` guarda a versão aceita e `producao` recebe o merge quando houver o que publicar. As três começam no mesmo commit.
+
+A branch `coder` é outro órgão, com banco, usuários e regras próprios. O roteiro está em [docs/implantacao-coder.md](docs/implantacao-coder.md). Ela não entra no fluxo da prefeitura.
 
 ## Layout
 

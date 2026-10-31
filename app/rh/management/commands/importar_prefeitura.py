@@ -7,6 +7,8 @@ Uso, dentro do container web::
 
 from __future__ import annotations
 
+import os
+
 from django.contrib.auth.models import Group
 from django.core.management.base import CommandError
 from django.db import transaction
@@ -29,15 +31,23 @@ DESCRICOES = {
 
 class Command(BaseCommandPlus):
     help = 'Importa organograma e servidores da prefeitura. Pode ser executado de novo sem duplicar.'
+    recusa_orgao_coder = True
 
     def add_arguments(self, parser) -> None:
         parser.add_argument('unidades', help='CSV de unidades (exemploUnidades).')
         parser.add_argument('usuarios', help='CSV de usuários (exemploUsuarios).')
 
     def handle(self, *args, **options) -> None:
+        if self.recusa_orgao_coder and os.environ.get('SUAP_ORGAO', '').strip().lower() == 'coder':
+            raise CommandError('Esta instância é do órgão Coder. Use importar_orgao.')
+        self.sigla_raiz = (options.get('sigla') or SIGLA_RAIZ).strip()
+        self.nome_raiz = (options.get('nome') or NOME_RAIZ).strip()
+        self.uf = (options.get('uf') or 'MT').strip().upper()
+        self.municipio_nome = (options.get('municipio') or 'Rondonópolis').strip()
+        self.dominio = (options.get('dominio') or 'rondonopolis.mt.gov.br').strip()
         unidades = ler_unidades(options['unidades'])
         usuarios = ler_usuarios(options['usuarios'])
-        erros = validar(unidades, usuarios)
+        erros = validar(unidades, usuarios, self.sigla_raiz)
         if erros:
             raise CommandError('\n'.join(erros))
 
@@ -51,28 +61,28 @@ class Command(BaseCommandPlus):
         self.stdout.write(f'Setores: {len(setores)}. Servidores criados: {criados}. Atualizados: {atualizados}. Conflitos: {conflitos}.')
 
     def _definir_identidade(self, unidades: list[dict[str, str]]) -> None:
-        _configurar('instituicao_sigla', SIGLA_RAIZ)
-        _configurar('instituicao', NOME_RAIZ)
-        _configurar('reitoria_sigla', SIGLA_RAIZ)
-        _configurar('instituicao_estado', 'MT')
-        _configurar('dominios_institucionais', 'rondonopolis.mt.gov.br')
-        municipio, _ = Municipio.get_or_create('Rondonópolis', 'MT')
-        raiz = _obter_ou_criar_setor(SIGLA_RAIZ, NOME_RAIZ, None, '')
+        _configurar('instituicao_sigla', self.sigla_raiz)
+        _configurar('instituicao', self.nome_raiz)
+        _configurar('reitoria_sigla', self.sigla_raiz)
+        _configurar('instituicao_estado', self.uf)
+        _configurar('dominios_institucionais', self.dominio)
+        municipio, _ = Municipio.get_or_create(self.municipio_nome, self.uf)
+        raiz = _obter_ou_criar_setor(self.sigla_raiz, self.nome_raiz, None, '')
         telefone = next((item['telefone'] for item in unidades if item['telefone']), '')
         uo = UnidadeOrganizacional.objects.filter(setor=raiz).first()
         if uo is None:
-            UnidadeOrganizacional.objects.create(nome=NOME_RAIZ, sigla=SIGLA_RAIZ, setor=raiz, municipio=municipio, telefone=telefone)
+            UnidadeOrganizacional.objects.create(nome=self.nome_raiz, sigla=self.sigla_raiz, setor=raiz, municipio=municipio, telefone=telefone)
             return
-        uo.nome = NOME_RAIZ
+        uo.nome = self.nome_raiz
         uo.municipio = municipio
         uo.telefone = telefone or uo.telefone
         uo.save()
 
     def _gravar_setores(self, unidades: list[dict[str, str]]) -> dict[str, Setor]:
-        raiz = Setor.objects.get(sigla=SIGLA_RAIZ, codigo__isnull=True)
-        setores = {SIGLA_RAIZ: raiz}
+        raiz = Setor.objects.get(sigla=self.sigla_raiz, codigo__isnull=True)
+        setores = {self.sigla_raiz: raiz}
         for item in unidades:
-            superior = setores[item['superior'] or SIGLA_RAIZ]
+            superior = setores[item['superior'] or self.sigla_raiz]
             setores[item['sigla']] = _obter_ou_criar_setor(item['sigla'], item['nome'], superior, item['email'])
         return setores
 

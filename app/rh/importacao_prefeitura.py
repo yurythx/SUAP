@@ -80,18 +80,18 @@ def _usuario(linha: dict[str, str]) -> dict[str, str]:
     return usuario
 
 
-def validar(unidades: list[dict[str, str]], usuarios: list[dict[str, str]]) -> list[str]:
-    erros = _erros_de_unidade(unidades)
+def validar(unidades: list[dict[str, str]], usuarios: list[dict[str, str]], sigla_raiz: str = SIGLA_RAIZ) -> list[str]:
+    erros = _erros_de_unidade(unidades, sigla_raiz)
     erros.extend(_erros_de_usuario(usuarios, {item['sigla'] for item in unidades}))
     return erros
 
 
-def _erros_de_unidade(unidades: list[dict[str, str]]) -> list[str]:
+def _erros_de_unidade(unidades: list[dict[str, str]], sigla_raiz: str) -> list[str]:
     erros: list[str] = []
     siglas = [item['sigla'] for item in unidades]
     conhecidas = set(siglas)
-    if SIGLA_RAIZ in conhecidas:
-        erros.append(f'A sigla {SIGLA_RAIZ} é a raiz da prefeitura e não pode repetir uma unidade.')
+    if sigla_raiz in conhecidas:
+        erros.append(f'A sigla {sigla_raiz} é a raiz do órgão e não pode repetir uma unidade.')
     erros.extend(_duplicados('setor', siglas))
     for item in unidades:
         erros.extend(_limites_unidade(item, conhecidas))
