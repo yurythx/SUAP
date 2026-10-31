@@ -1,0 +1,264 @@
+{% extends super_template %}
+{% load i18n %}
+
+{% block object-status %}
+    {% if base.estado == 'active' %}
+        <span class="status status-success">{{ base.get_estado_display }}</span>
+    {% else %}
+        <span class="status status-error">{{ base.get_estado_display }}</span>
+    {% endif %}
+    <span class="status {{ v.situacao_lai.classe }}"{% if v.situacao_lai.motivo %} aria-label="{{ v.situacao_lai.motivo }}" title="{{ v.situacao_lai.motivo }}"{% endif %}>{{ v.situacao_lai.rotulo }}</span>
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if v.pode_editar %}
+            <li><a class="btn primary" href="{% url 'admin:dados_abertos_basedados_change' base.pk %}">{% icone "edit" %} {% trans "Editar" %}</a></li>
+            <li><a class="btn" href="{% url 'admin:dados_abertos_basedados_sync' base.pk %}">{% icone "sync" %} {% trans "Sincronizar com o CKAN" %}</a></li>
+        {% endif %}
+        {% if v.url_portal %}
+            <li><a class="btn default" href="{{ v.url_portal }}" target="_blank" rel="noopener">{% icone "external-link-alt" %} {% trans "Visualizar no portal" %}</a></li>
+        {% endif %}
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+<div class="tab-pane" data-title="{% trans 'Dados gerais' %}" data-tab="dados">
+
+    {% box "Identificação" %}
+        <dl class="definition-list">
+            <dt>{% trans "Identificador no CKAN" %}</dt><dd>{{ base.nome }}</dd>
+            <dt>{% trans "Organização" %}</dt><dd>{{ base.organizacao|default:"-" }}</dd>
+            <dt>{% trans "Tema" %}</dt><dd>{{ base.tema|default:"-" }}</dd>
+            <dt>{% trans "Licença" %}</dt><dd>{{ base.licenca|default:"-" }}</dd>
+            <dt>{% trans "Versão" %}</dt><dd>{{ base.versao|default:"-" }}</dd>
+            <dt>{% trans "Tags" %}</dt><dd>{{ base.tags|join:", "|default:"-" }}</dd>
+            <dt>{% trans "Descrição" %}</dt><dd>{{ base.notas|linebreaksbr|default:"-" }}</dd>
+        </dl>
+    {% endbox %}
+
+    {% box "Responsáveis" %}
+        <dl class="definition-list">
+            <dt>{% trans "Área técnica" %}</dt>
+            <dd>{{ base.autor|default:"-" }}{% if base.autor_email %} &lt;<a href="mailto:{{ base.autor_email }}">{{ base.autor_email }}</a>&gt;{% endif %}</dd>
+            <dt>{% trans "Mantenedor" %}</dt>
+            <dd>{{ base.mantenedor|default:"-" }}{% if base.mantenedor_email %} &lt;<a href="mailto:{{ base.mantenedor_email }}">{{ base.mantenedor_email }}</a>&gt;{% endif %}</dd>
+        </dl>
+    {% endbox %}
+
+    {% box "Cobertura e observância legal (DCAT-BR)" %}
+        <dl class="definition-list">
+            <dt>{% trans "Cobertura espacial" %}</dt>
+            <dd>{{ base.get_cobertura_espacial_display|default:"-" }}{% if base.valor_cobertura_espacial %} ({{ base.valor_cobertura_espacial }}){% endif %}</dd>
+            <dt>{% trans "Granularidade espacial" %}</dt><dd>{{ base.get_granularidade_espacial_display|default:"-" }}</dd>
+            <dt>{% trans "Cobertura temporal" %}</dt>
+            <dd>
+                {% if base.cobertura_temporal_inicio %}
+                    {{ base.cobertura_temporal_inicio|date:"d/m/Y" }} {% trans "a" %}
+                    {% if base.cobertura_temporal_fim %}{{ base.cobertura_temporal_fim|date:"d/m/Y" }}{% else %}{% trans "atual (em alimentação)" %}{% endif %}
+                {% else %}-{% endif %}
+            </dd>
+            <dt>{% trans "Observância legal" %}</dt><dd>{{ base.get_observancia_legal_display|default:"-" }}</dd>
+            <dt>{% trans "ODS relacionados" %}</dt>
+            <dd>
+                {% if v.ods %}
+                    <ul>{% for o in v.ods %}<li>{{ o }}</li>{% endfor %}</ul>
+                {% else %}-{% endif %}
+            </dd>
+            <dt>{% trans "Contém dados de gênero" %}</dt><dd>{{ base.dados_genero|yesno:"Sim,Não" }}</dd>
+            <dt>{% trans "Contém dados de raça/etnia" %}</dt><dd>{{ base.dados_raca_etnia|yesno:"Sim,Não" }}</dd>
+        </dl>
+    {% endbox %}
+
+    {% box "Integração com o CKAN" %}
+        <dl class="definition-list">
+            <dt>{% trans "ID remoto" %}</dt><dd>{{ base.id_remoto|default:"-" }}</dd>
+            <dt>{% trans "Última sincronização" %}</dt><dd>{{ base.sincronizado_em|date:"d/m/Y H:i"|default:"Nunca sincronizada" }}</dd>
+        </dl>
+        <h4>{% trans "Extras que sobem ao CKAN" %}</h4>
+        <dl class="definition-list">
+            {% for chave, valor in v.extras.items %}
+                <dt>{{ chave }}</dt><dd>{{ valor }}</dd>
+            {% endfor %}
+        </dl>
+    {% endbox %}
+</div>
+
+{% if v.recursos is not None %}
+<div class="tab-pane" data-title="{% trans 'Recursos' %}" data-tab="recursos" data-counter="{{ v.recursos|length }}">
+    <div class="table-responsive">
+        <table>
+            <caption>{% trans "Recursos do conjunto" %}</caption>
+            <thead>
+                <tr>
+                    <th>{% trans "Ações" %}</th>
+                    <th>{% trans "Nome" %}</th>
+                    <th>{% trans "Formato" %}</th>
+                    <th>{% trans "Fonte" %}</th>
+                    <th class="text-end">{% trans "Colunas" %}</th>
+                    <th>{% trans "Última sincronização" %}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in v.recursos %}
+                    <tr>
+                        <td>
+                            {% icon "view" "{{ r.get_absolute_url }}" "Visualizar" %}
+                            {% if v.pode_editar %}{% url 'admin:dados_abertos_recursodados_change' r.pk as url_editar %}{% icon "edit" "{{ url_editar }}" "Editar" %}{% endif %}
+                        </td>
+                        <td>{{ r.nome }}{% if r.descricao %}<br><small>{{ r.descricao|truncatechars:140 }}</small>{% endif %}</td>
+                        <td>{{ r.formato }}</td>
+                        <td>
+                            {% if r.derivado_de %}{% blocktrans with origem=r.derivado_de.nome %}Espelho CSV de {{ origem }}{% endblocktrans %}
+                            {% elif r.url %}{% trans "Coleta automática (URL)" %}
+                            {% elif r.arquivo %}{% trans "Arquivo enviado" %}
+                            {% else %}-{% endif %}
+                        </td>
+                        <td class="text-end">{{ r.esquema|length }}</td>
+                        <td>{{ r.sincronizado_em|date:"d/m/Y H:i"|default:"Nunca" }}</td>
+                    </tr>
+                {% empty %}
+                    <tr class="disabled"><td colspan="6">{% trans "Nenhum recurso cadastrado." %}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{% if v.relacoes is not None %}
+<div class="tab-pane" data-title="{% trans 'PDAs relacionados' %}" data-tab="pdas" data-counter="{{ v.relacoes|length }}">
+    <div class="table-responsive">
+        <table>
+            <caption>{% trans "Planos de Dados Abertos em que a base está" %}</caption>
+            <thead>
+                <tr>
+                    <th>{% trans "PDA" %}</th>
+                    <th>{% trans "Situação no LAI" %}</th>
+                    <th>{% trans "Unidade responsável" %}</th>
+                    <th>{% trans "Responsável" %}</th>
+                    <th>{% trans "Meta de abertura" %}</th>
+                    <th>{% trans "Frequência" %}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for rel in v.relacoes %}
+                    <tr>
+                        <td><a href="{% url 'dados_abertos:dashboard' rel.pda_id %}">{{ rel.pda }}</a></td>
+                        <td>
+                            <span class="status {{ rel.classe_situacao_lai }}">{{ rel.get_situacao_lai_display }}</span>
+                            {% if rel.motivo_reabertura %}<br><small>{{ rel.motivo_reabertura }}</small>{% endif %}
+                        </td>
+                        <td>{{ rel.unidade_responsavel_abertura|default:"-" }}</td>
+                        <td>{{ rel.responsavel_abertura|default:"-" }}</td>
+                        <td>{{ rel.meta_prazo_abertura|date:"d/m/Y"|default:"-" }}</td>
+                        <td>{{ rel.get_frequencia_atualizacao_display|default:"-" }}</td>
+                    </tr>
+                {% empty %}
+                    <tr class="disabled"><td colspan="6">{% trans "A base não está em nenhum PDA." %}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{% if v.avaliacoes is not None %}
+<div class="tab-pane" data-title="{% trans 'Matriz de priorização' %}" data-tab="matriz" data-counter="{{ v.avaliacoes|length }}">
+    <div class="table-responsive">
+        <table>
+            <caption>{% trans "Avaliação da base na matriz de priorização" %}</caption>
+            <thead>
+                <tr>
+                    <th>{% trans "Critério" %}</th>
+                    <th>{% trans "Nota" %}</th>
+                    <th>{% trans "Situação" %}</th>
+                    <th>{% trans "Atualizada em" %}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for a in v.avaliacoes %}
+                    <tr>
+                        <td>{{ a.criterio_matriz }}</td>
+                        <td>{{ a.get_nota_display }}</td>
+                        <td>
+                            {% if a.finalizado %}<span class="status status-success">{% trans "Finalizada" %}</span>
+                            {% else %}<span class="status status-alert">{% trans "Em edição" %}</span>{% endif %}
+                        </td>
+                        <td>{{ a.data_atualizacao|date:"d/m/Y H:i" }}</td>
+                    </tr>
+                {% empty %}
+                    <tr class="disabled"><td colspan="4">{% trans "A base ainda não foi avaliada na matriz." %}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{% if v.eventos_lai is not None %}
+<div class="tab-pane" data-title="{% trans 'Linha do tempo do LAI' %}" data-tab="lai" data-counter="{{ v.eventos_lai|length }}">
+    {% if v.eventos_lai|length >= ULTIMOS_EVENTOS_LAI %}
+        <p class="alert alert-info">
+            {% blocktrans with n=ULTIMOS_EVENTOS_LAI %}Exibindo os {{ n }} eventos mais recentes.{% endblocktrans %}
+            <a href="{% url 'admin:dados_abertos_deliberacaolai_changelist' %}?q={{ base.nome|urlencode }}">{% trans "Visualizar o histórico completo" %}</a>.
+        </p>
+    {% endif %}
+    {% if v.eventos_lai %}
+        <ul class="timeline">
+            {% for evento in v.eventos_lai %}
+                <li class="{{ evento.classe_timeline }}">
+                    <div class="timeline-date">{{ evento.data|date:"d/m/Y H:i" }}</div>
+                    <div class="timeline-icon"></div>
+                    <div class="timeline-content">
+                        <h4>
+                            {{ evento.get_tipo_display }}
+                            <small>
+                                {{ evento.pda_base_dados.pda }} &mdash;
+                                {% if evento.autor %}{% blocktrans with autor=evento.autor.pessoa.nome %}por {{ autor }}{% endblocktrans %}
+                                {% else %}{% trans "registro automático do sistema" %}{% endif %}
+                            </small>
+                        </h4>
+                        {% if evento.texto %}<p>{{ evento.texto|linebreaksbr }}</p>{% endif %}
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="alert alert-info">{% trans "Nenhum evento do LAI registrado para esta base." %}</p>
+    {% endif %}
+</div>
+{% endif %}
+
+{% if v.atualizacoes is not None %}
+<div class="tab-pane" data-title="{% trans 'Atualizações automáticas' %}" data-tab="atualizacoes" data-counter="{{ v.atualizacoes|length }}">
+    <div class="table-responsive">
+        <table>
+            <caption>{% trans "Últimas execuções da rotina de atualização" %}</caption>
+            <thead>
+                <tr>
+                    <th>{% trans "Data" %}</th>
+                    <th>{% trans "Resultado" %}</th>
+                    <th class="text-end">{% trans "Recursos atualizados" %}</th>
+                    <th>{% trans "Detalhe" %}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for at in v.atualizacoes %}
+                    <tr>
+                        <td>{{ at.data|date:"d/m/Y H:i" }}</td>
+                        <td><span class="status {{ at.classe_resultado }}">{{ at.get_resultado_display }}</span></td>
+                        <td class="text-end">{{ at.recursos_atualizados }}</td>
+                        <td>{{ at.detalhe|default:"-" }}</td>
+                    </tr>
+                {% empty %}
+                    <tr class="disabled"><td colspan="4">{% trans "A rotina ainda não processou esta base." %}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

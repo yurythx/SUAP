@@ -1,0 +1,238 @@
+{% extends super_template %}
+
+{% block content %}
+    {% if obj.matriz.inconsistente %}
+        <p class="alert alert-warning">Matriz inconsistente, a carga horária aqui pode estar diferente da carga horária teórica da
+            matriz.</p>
+    {% endif %}
+    {% for item in lista %}
+        {% if item.componentes.exists %}
+            <div class="table-responsive">
+                <table>
+                    <caption>{{ item.descricao }}</caption>
+                    <thead>
+                    <tr>
+                        <th>
+                            Código
+                        </th>
+                        <th>
+                            Descrição
+                        </th>
+                        <th>C.H.</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for componente in item.componentes %}
+                        <tr>
+                            <td>{{ componente.sigla|format }}</td>
+                            <td>{{ componente.descricao_historico|format }}</td>
+                            <td>{{ componente.get_ch_hora_relogio|format }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            {% if tipo_ch == 'cumprida' %}
+                <p class="alert alert-info">Nenhum componente curricular cumprido.</p>
+            {% else %}
+                <p class="alert alert-info">Nenhum componente curricular pendente.</p>
+            {% endif %}
+        {% endif %}
+    {% endfor %}
+
+    {% if obj.matriz.configuracao_creditos_especiais %}
+        {% if tipo_requisito == 'disciplinas_regulares_optativas' and tipo_ch == 'cumprida' %}
+            {% box 'Crédito Especial Lançado' %}
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Ano Letivo</th>
+                        <th>Atividade Acadêmica</th>
+                        <th>Equivalência de Créditos</th>
+                        <th>Carga Horária Equivalente</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for credito_especial in obj.get_creditos_especiais %}
+                        <tr>
+                            <td>{{ credito_especial.matricula_periodo.ano_letivo.ano }}.{{ credito_especial.matricula_periodo.periodo_letivo }}</td>
+                            <td>{{ credito_especial.item_configuracao_creditos_especiais.atividade_academica }}</td>
+                            <td>{{ credito_especial.item_configuracao_creditos_especiais.equivalencia_creditos }}</td>
+                            <td>{{ credito_especial.get_ch_equivalente }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% endbox %}
+        {% endif %}
+    {% endif %}
+
+    {% if tipo_requisito == 'atividades_extensao' %}
+        {% if atividades.exists %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Atividades de extensão</caption>
+                    <thead>
+                    <tr>
+                        <th>Ano Letivo</th>
+                        <th>Período Letivo</th>
+                        <th>Descrição</th>
+                        <th>Carga Horária</th>
+                        {% if obj.matriz.requer_vinculacao_extensao_diarios %}
+                            <th>Distribuição</th>
+                            <th>Informação Complementar</th>
+                        {% endif %}
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for atividade in atividades %}
+                        {% if tipo_extensao == 'outras_atividades' %}
+                            {% if atividade.aacc and atividade.aacc.deferida %}
+                            <tr>
+                                <td>{{ atividade.aacc.ano_letivo }}</td>
+                                <td>{{ atividade.aacc.periodo_letivo }}</td>
+                                <td>{{ atividade.descricao }} - {{ atividade.get_tipo }} - {{ atividade.carga_horaria }} hora(s)</td>
+                                <td>{{ atividade.aacc.carga_horaria }} hora(s)</td>
+                                <td>AACC</td>
+                                <td>{{ atividade.aacc.descricao }}</td>
+                            </tr>
+                            {% endif %}
+                            {% if atividade.atpa and atividade.atpa.deferida %}
+                            <tr>
+                                <td>{{ atividade.atpa.ano_letivo }}</td>
+                                <td>{{ atividade.atpa.periodo_letivo }}</td>
+                                <td>{{ atividade.descricao }} - {{ atividade.get_tipo }} - {{ atividade.carga_horaria }} hora(s)</td>
+                                <td>{{ atividade.atpa.carga_horaria }} hora(s)</td>
+                                <td>ATPA</td>
+                                <td>{{ atividade.atpa.descricao }}</td>
+                            </tr>
+                            {% endif %}
+                            {% if not obj.matriz.requer_vinculacao_extensao_diarios and not atividade.is_componente_tipo_extensao %}
+                            <tr>
+                                <td>{{ atividade.matricula_periodo.ano_letivo }}</td>
+                                <td>{{ atividade.matricula_periodo.periodo_letivo }}</td>
+                                <td>{{ atividade.descricao }}</td>
+                                <td>{{ atividade.carga_horaria }} hora(s)</td>
+                            </tr>
+                            {% endif %}
+                        {% elif tipo_extensao == 'componentes' %}
+                            {% if atividade.is_componente_tipo_extensao %}
+                            <tr>
+                                <td>{{ atividade.matricula_periodo.ano_letivo }}</td>
+                                <td>{{ atividade.matricula_periodo.periodo_letivo }}</td>
+                                <td>{{ atividade.descricao }} - {{ atividade.get_tipo }} - {{ atividade.carga_horaria }} hora(s)</td>
+                                <td>{{ atividade.carga_horaria }} hora(s)</td>
+                                {% if obj.matriz.requer_vinculacao_extensao_diarios %}
+                                    <td>
+                                        {% if atividade.is_diario_associado_extensao %}
+                                        Componente associado
+                                        {% elif atividade.tipo_referencia.model == 'matriculadiario' %}
+                                        Diário
+                                        {% else %}
+                                            {{ atividade.tipo_referencia.name }}
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ atividade.descricao }}</td>
+                                {% endif %}
+                            </tr>
+                            {% endif %}
+                        {% elif tipo_extensao == 'outros_componentes' %}
+                            {% for vinculacao in atividade.vinculacaoatividadeextensao_set.all %}
+                                {% if vinculacao.homologada %}
+                                <tr>
+                                    <td>{{ vinculacao.matricula_diario.diario.ano_letivo }}</td>
+                                    <td>{{ vinculacao.matricula_diario.diario.periodo_letivo }}</td>
+                                    <td>{{ atividade.descricao }} - {{ atividade.get_tipo }} - {{ atividade.carga_horaria }} hora(s)</td>
+                                    <td>{{ vinculacao.carga_horaria }} hora(s)</td>
+                                    <td>Diário</td>
+                                    <td>{{ vinculacao.matricula_diario.diario }}</td>
+                                </tr>
+                                {% endif %}
+                            {% endfor %}
+                            {% if not obj.matriz.requer_vinculacao_extensao_diarios and not atividade.is_componente_tipo_extensao %}
+                            <tr>
+                                <td>{{ atividade.matricula_periodo.ano_letivo }}</td>
+                                <td>{{ atividade.matricula_periodo.periodo_letivo }}</td>
+                                <td>{{ atividade.descricao }}</td>
+                                <td>{{ atividade.carga_horaria }} hora(s)</td>
+                            </tr>
+                            {% elif atividade.is_componente_com_extensao_aproveitado %}
+                            <tr>
+                                <td>{{ atividade.matricula_periodo.ano_letivo }}</td>
+                                <td>{{ atividade.matricula_periodo.periodo_letivo }}</td>
+                                <td>{{ atividade.descricao }} - {{ atividade.get_tipo }} - {{ atividade.carga_horaria }} hora(s)</td>
+                                <td>{{ atividade.carga_horaria }} hora(s)</td>
+                                <td>{{ atividade.tipo_referencia.name }}</td>
+                                <td>{{ atividade.descricao }}</td>
+                            </tr>
+                            {% endif %}
+                        {% endif %}
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Nenhuma atividade curricular de extensão cadastrada até o momento.</p>
+        {% endif %}
+    {% endif %}
+
+    {% if tipo_requisito == 'pratica_como_componente' %}
+        {% with diarios=obj.get_diarios_aulas_pcc %}
+        {% if diarios.exists %}
+            {% box 'Horas Cursadas em Diários' %}
+            <table>
+                <thead>
+                <tr>
+                    <th>Ano Letivo</th>
+                    <th>Período Letivo</th>
+                    <th>Carga Horária</th>
+                    <th>Diário</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for diario in diarios %}
+                    <tr>
+                        <td>{{ diario.ano_letivo }}</td>
+                        <td>{{ diario.periodo_letivo }}</td>
+                        <td>{{ diario.get_carga_horaria_relogio_pcc_contabilizada }} hora(s)</td>
+                        <td>{{ diario }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% endbox %}
+        {% endif %}
+        {% endwith %}
+    {% endif %}
+
+    {% if tipo_requisito == 'visita_tecnica' %}
+        {% with diarios=obj.get_diarios_aulas_visita_tecnica %}
+        {% if diarios.exists %}
+            {% box 'Horas Cursadas em Diários' %}
+            <table>
+                <thead>
+                <tr>
+                    <th>Ano Letivo</th>
+                    <th>Período Letivo</th>
+                    <th>Carga Horária</th>
+                    <th>Diário</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for diario in diarios %}
+                    <tr>
+                        <td>{{ diario.ano_letivo }}</td>
+                        <td>{{ diario.periodo_letivo }}</td>
+                        <td>{{ diario.get_carga_horaria_relogio_visita_tecnica_contabilizada }} hora(s)</td>
+                        <td>{{ diario }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% endbox %}
+        {% endif %}
+        {% endwith %}
+    {% endif %}
+
+{% endblock %}

@@ -1,0 +1,109 @@
+{% load demandas_templatetags %}
+
+<div class="table-responsive">
+    <table class="dashboard">
+        <caption>Demandas prioritárias</caption>
+        <thead>
+            <tr>
+                <th>Área</th>
+                {% for prioridade_ordem in qtd_prioritarias_por_area_range %}
+                    <th>Prioridade {{ prioridade_ordem }}</th>
+                {% endfor %}
+                <th class="no-print text-end">Opções</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for prioridade in prioritarias %}
+                {% ifchanged prioridade.0 %}
+                    {% if not forloop.first %}
+                        </tr>
+                    {% endif %}
+                    <tr>
+                    <td>
+                        <h4>{{ prioridade.0 }}</h4>
+                        <dl class="definition-list compact mt-4">
+                            <dt>Demandante responsável</dt>
+                            <dd>{{ prioridade.5 }}</dd>
+                        </dl>
+                    </td>
+                {% endifchanged %}
+                {% for demanda in prioridade.1 %}
+                    <td class="{{ demanda.situacao|status_dashboard }}">
+                        <h5><a href="{% url 'demanda_visualizar' demanda.pk %}">{{ demanda|truncatewords:10 }}</a></h5>
+                        <p class="d-flex flex-wrap gap-2 mt-1">
+                            <span class="badge ms-0 text-nowrap">{{ demanda.situacao }}</span>
+                            {% if demanda.tags.exists %}
+                                {% for tag in demanda.tags.all %}<span class="badge d-flex align-items-center gap-2 ms-0 text-nowrap">{% icone "th" %} {{ tag.nome }}</span>{% endfor %}
+                            {% endif %}
+                            {% if demanda.em_atraso %}
+                                <span class="badge false ms-0 text-nowrap">Em atraso</span>
+                            {% endif %}
+                            {% if demanda.votos > 0 %}
+                                <span class="badge d-flex align-items-center gap-2 ms-0 text-nowrap" title="Pontuação total">{% icone "heart" %} {{ demanda.votos }}</span>
+                            {% endif %}
+                        </p>
+                        <dl class="definition-list flex compact mt-4 mb-0">
+                            <div class="list-item">
+                                <dt>Demandantes</dt>
+                                <dd class="d-flex flex-wrap gap-2 mt-1">
+                                    {% for demandante in demanda.demandantes.all %}
+                                        <div class="photo-circle smallest m-0">
+                                            <img title="{{ demandante }}" src="{{ demandante.get_vinculo.get_foto_75x100_url }}" alt="Foto de {{ demandante }}">
+                                        </div>
+                                    {% endfor %}
+                                </dd>
+                            </div>
+                            <div class="list-item">
+                                <dt>Analistas</dt>
+                                <dd class="d-flex flex-wrap gap-2 mt-1">
+                                    {% if demanda.analistas.exists %}
+                                        {% for analista in demanda.analistas.all %}
+                                            <div class="photo-circle smallest m-0">
+                                                <img title="{{ analista }}" src="{{ analista.get_vinculo.get_foto_75x100_url }}" alt="Foto de {{ analista }}">
+                                            </div>
+                                        {% endfor %}
+                                    {% else %}
+                                        <span class="false">A definir</span>
+                                    {% endif %}
+                                </dd>
+                            </div>
+                        </dl>
+                    </td>
+                {% endfor %}
+                {% if prioridade.2 > 0 %}
+                    <td colspan="{{ prioridade.2 }}">-</td>
+                {% endif %}
+                <td class="no-print">
+                    <ul class="action-bar">
+                        <li>
+                            <a class="btn default" href="/admin/demandas/demanda/?area__id__exact={{ prioridade.0.pk }}&tab=tab_ativas">
+                                {% icone "eye" %} {{ prioridade.4 }} demanda{{ prioridade.4|pluralize }} ativa{{ prioridade.4|pluralize }}
+                            </a>
+                        </li>
+                        {% if prioridade.3 > 0 %}
+                            <li>
+                                <a class="btn default" href="/admin/demandas/demanda/?area__id__exact={{ prioridade.0.pk }}&situacao__exact=Concluída&data_atualizacao__year={{ ano_atual }}&tab=tab_any_data">
+                                    {% icone "eye" %} {{ prioridade.3 }} demanda{{ prioridade.3|pluralize }} concluída{{ prioridade.3|pluralize }} em {{ ano_atual }}
+                                </a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </td>
+                {% if forloop.last %}
+                    </tr>
+                {% endif %}
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="legenda mt-4">
+    <p>Legenda:</p>
+    <ul>
+        <li class="info">Solicitada</li>
+        <li class="warning">Em andamento</li>
+        <li class="extra">Aguardando feedback</li>
+        <li class="success">Aprovada/Homologada</li>
+        <li class="danger">Suspensa</li>
+    </ul>
+</div>

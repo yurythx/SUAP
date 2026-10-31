@@ -1,0 +1,129 @@
+{% load documento_eletronico_templatetags %}
+
+
+{% if registros_acao_documento.exists %}
+    {% autopaginate registros_acao_documento 32 %}
+    {% paginate %}
+
+    <table>
+        <thead>
+            <tr>
+                <th class="no-print">Ações</th>
+                <th>Documento</th>
+                <th>Assunto</th>
+                {% if ultimo_acao_geral_no_documento %}
+                    <th>Última Ação</th>
+                    <th>Data Última Ação</th>
+                    <th>Usuário Última Ação</th>
+                {% else %}
+                    <th>Ação</th>
+                    <th>Data</th>
+                {% endif %}
+                <th>Situação do Documento</th>
+                <th>Nível de Acesso</th>
+                <th>Setor Dono</th>
+                {% if requisicao %}
+                    <th>Solicitado a</th>
+                {% endif %}
+                <th>Assinado por</th>
+                <th>Autor</th>
+                <th class="no-print">Opções</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for reg_acao_doc in registros_acao_documento %}
+            <tr>
+                <td class="no-print">
+                    {% if reg_acao_doc.documento.pode_ler or reg_acao_doc.documento.pode_editar %}
+                        {% if reg_acao_doc.documento.pode_ler %}
+                            {% icon "view" "/documento_eletronico/visualizar_documento/{{ reg_acao_doc.documento.id }}/" "Ver {{ reg_acao_doc.documento.identificador }}" %}
+                        {% endif %}
+                        {% if reg_acao_doc.documento.pode_editar%}
+                            {% icon "edit" "/documento_eletronico/editar_documento/{{ reg_acao_doc.documento.id }}/" "Editar {{ reg_acao_doc.documento.identificador }}" %}
+                        {% endif %}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td>{{ reg_acao_doc.documento.tipo.nome }} {{ reg_acao_doc.documento.identificador }}</td>
+                <td>{{ reg_acao_doc.documento.assunto }}</td>
+                <td>{{ reg_acao_doc.get_tipo_display }}</td>
+                <td>{{ reg_acao_doc.data }}</td>
+                {% if ultimo_acao_geral_no_documento %}
+                    <td>{{ reg_acao_doc.user }}</td>
+                {% endif %}
+                <td>{{ reg_acao_doc.documento.get_status|status }}</td>
+                <td>{{ reg_acao_doc.documento.get_nivel_acesso_display|status }}</td>
+                <td>{{ reg_acao_doc.documento.setor_dono }}</td>
+                {% if requisicao %}
+                    <td>{{ reg_acao_doc.documento.solicitado_a.all|join:", " }}</td>
+                {% endif %}
+                <td>
+                    {{ reg_acao_doc.documento.assinado_por.all|join:", " }}
+                </td>
+                <td>{{ reg_acao_doc.documento.usuario_criacao|format }}</td>
+                <td class="no-print">
+                    <ul class="action-bar">
+                        {% if reg_acao_doc.documento.pode_compartilhar %}
+                            <li>
+                                {% if reg_acao_doc.documento.estah_compartilhado %}
+                                    <a class="btn popup primary"
+                                       href="/documento_eletronico/gerenciar_compartilhamento_documento/{{ reg_acao_doc.documento.id }}/">
+                                        Editar Compartilhamento
+                                    </a>
+                                {% else %}
+                                    <a class="btn popup success"
+                                       href="/documento_eletronico/gerenciar_compartilhamento_documento/{{ reg_acao_doc.documento.id }}/">
+                                        Compartilhar
+                                    </a>
+                                {% endif %}
+                            </li>
+                        {% endif %}
+                        {% if documento.pode_clonar_documento %}
+                            <li>
+                                <a class="btn primary" href="/documento_eletronico/clonar_documento/{{ reg_acao_doc.documento.id }}/">
+                                    Clonar
+                                </a>
+                            </li>
+                        {% endif %}
+                        {% if reg_acao_doc.documento.tem_permissao_editar and reg_acao_doc.documento.estah_concluido and not reg_acao_doc.documento.estah_assinado %}
+                            <li>
+                                <a class="btn primary confirm" href="/documento_eletronico/retornar_para_minura/{{ reg_acao_doc.documento.id }}/">
+                                    Retornar para minuta
+                                </a>
+                            </li>
+                        {% endif %}
+                        {% if reg_acao_doc.documento.estah_assinado %}
+                            <li><a class="btn" href="/documento_eletronico/verificar_integridade/{{ reg_acao_doc.documento.id }}/">Verificar integridade</a></li>
+                        {% endif %}
+                        <li class="has-child">
+                            <a class="btn" href="#"> Imprimir </a>
+                            <ul>
+                                <li><a href="/documento_eletronico/imprimir_documento_pdf/{{ documento.id }}/carta/"> Carta </a></li>
+                                <li><a href="/documento_eletronico/imprimir_documento_pdf/{{ documento.id }}/paisagem/"> Paisagem </a></li>
+                            </ul>
+                        </li>
+                        {% if reg_acao_doc.documento.tem_permissao_editar and reg_acao_doc.documento.tem_historico_revisoes %}
+                            <li>
+                                <a class="btn default" href="/admin/documento_eletronico/documentotexto/{{ reg_acao_doc.documento.id }}/history/">
+                                    Revisões
+                                </a>
+                            </li>
+                        {% endif %}
+                        {% if reg_acao_doc.documento.tem_solicitacao_pendente %}
+                            <li>
+                                <a class="btn danger" href="/documento_eletronico/rejeitar_solicitacao/{{ reg_acao_doc.documento.id }}/">
+                                    Rejeitar assinatura
+                                </a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% paginate %}
+{% else %}
+    <p class="alert alert-warning">Nenhum documento foi encontrado.</p>
+{% endif %}

@@ -1,0 +1,260 @@
+{% extends super_template %}
+
+{% block object-status %}
+    {% if plano_principal %}<span class="status status-info">Plano de disciplina associado</span>{% endif %}
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        <li class="has-child">
+            {% if pode_editar or pode_editar_dados_basicos %}
+            <a href="#" class="btn primary">{% icone "edit" %} Editar</a>
+            <ul>
+                {% if pode_editar_dados_basicos %}
+                    <li><a class="btn popup" href="/admin/ppc/planodisciplina/{{ plano.plano_disciplina_id }}/change/">Dados Básicos</a></li>
+                {% endif %}
+                {% if pode_editar %}
+                    <li><a class="btn popup" href="/admin/ppc/planodisciplinappc/{{ plano.id }}/change/">Dados do PPC</a></li>
+                {% endif %}
+            </ul>
+            {% endif %}
+        </li>
+        <li class="has-child">
+            <a href="#" class="btn default">{% icone "eye" %} Visualizar</a>
+            <ul>
+                <li><a class="btn" href="{{ plano.plano_disciplina.get_absolute_url }}">Ementa e Programa</a></li>
+                <li><a class="btn" href="{{ plano.matriz_ppc.get_absolute_url }}?tab=matriz">Matriz</a></li>
+                <li><a class="btn" href="{{ plano.matriz_ppc.ppc.get_absolute_url }}?tab=matrizes">PPC</a></li>
+                {% if plano_associado %}
+                    <li><a class="btn" href="/ppc/planodisciplinappc/{{ plano_associado.id }}/">Plano {{ plano_associado.plano_disciplina.nome_disciplina }}</a></li>
+                {% endif %}
+                {% if plano_principal %}
+                    <li><a class="btn" href="/ppc/planodisciplinappc/{{ plano_principal.id }}/">Plano {{ plano_principal.plano_disciplina.nome_disciplina }}</a></li>
+                {% endif %}
+            </ul>
+        </li>
+        <li class="has-child">
+            <a href="#" class="btn default">{% icone "file-pdf" %} Baixar</a>
+            <ul>
+                <li><a class="btn popup" href="{% url 'visualizar_planodisciplinappc' plano.pk %}">HTML</a></li>
+                <li><a class="btn" href="{% url 'imprimir_planodisciplinappc' plano.pk %}">PDF</a></li>
+            </ul>
+        </li>
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+    {% box "Dados gerais" %}
+        <dl class="definition-list flex">
+            <div class="list-item flex-basis-50">
+                <dt>Plano de disciplina</dt>
+                <dd>{{ plano.plano_disciplina }}</dd>
+            </div>
+            <div class="list-item flex-basis-50">
+                <dt>Situação do plano</dt>
+                <dd>{{ plano.plano_disciplina.get_situacao_display|status }}</dd>
+            </div>
+            {% if plano_associado %}
+                <div class="list-item flex-basis-50">
+                    <dt>Plano associado</dt>
+                    <dd>{{ plano_associado.plano_disciplina }}</dd>
+                </div>
+                <div class="list-item flex-basis-50">
+                    <dt>Situação do plano associado</dt>
+                    <dd>{{ plano_associado.plano_disciplina.get_situacao_display|status }}</dd>
+                </div>
+            {% endif %}
+            {% if plano_principal %}
+                <div class="list-item flex-basis-50">
+                    <dt>Associado ao plano</dt>
+                    <dd>{{ plano_principal.plano_disciplina }}</dd>
+                </div>
+                <div class="list-item flex-basis-50">
+                    <dt>Situação do plano</dt>
+                    <dd>{{ plano_principal.plano_disciplina.get_situacao_display|status }}</dd>
+                </div>
+            {% endif %}
+            {% if plano.modalidade_projetointegrador_id %}
+                <div class="list-item flex-basis-50">
+                    <dt>Modalidade de prática profissional associada</dt>
+                    <dd>{{ plano.modalidade_projetointegrador }}</dd>
+                </div>
+                <div class="list-item flex-basis-50">
+                    <dt>Planos associados à modalidade de prática profissional</dt>
+                    <dd>{{ plano.planos_associados_projetointegrador|format }}</dd>
+                </div>
+            {% endif %}
+            {% if plano.qtd_aulas_ead %}
+                <div class="list-item flex-basis-50">
+                    <dt>Quantidade de horas/aulas EAD</dt>
+                    <dd>{{ plano.qtd_aulas_ead }}</dd>
+                </div>
+                <div class="list-item flex-basis-50">
+                    <dt>Carga horária EAD</dt>
+                    <dd>{{ plano.get_info_hora_relogio_ead }}</dd>
+                </div>
+            {% endif %}
+            <div class="list-item flex-basis-50">
+                <dt>Matriz</dt>
+                <dd>{{ plano.matriz_ppc }}</dd>
+            </div>
+            <div class="list-item flex-basis-50">
+                <dt>Situação do matriz</dt>
+                <dd>{{ plano.matriz_ppc.get_situacao_matriz_display|status }}</dd>
+            </div>
+            <div class="list-item flex-basis-50">
+                <dt>PPC</dt>
+                <dd>{{ plano.matriz_ppc.ppc }}</dd>
+            </div>
+            <div class="list-item flex-basis-50">
+                <dt>Situação do PPC</dt>
+                <dd>{{ plano.matriz_ppc.ppc.get_situacao_display|status }}</dd>
+            </div>
+        </dl>
+    {% endbox %}
+
+    <div class="tab-pane" data-title="Matriz" data-tab="matriz_ppc">
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>Período de oferta</dt>
+                <dd>{{ plano.periodo_oferta|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Optativo</dt>
+                <dd>{{ plano.optativo|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Tipo</dt>
+                <dd>{{ plano.get_tipo_display|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Quantidade de etapas</dt>
+                <dd>{{ plano.quantidade_etapas|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Carga horária teórica</dt>
+                <dd>{{ plano.ch_teorica|format }}h</dd>
+            </div>
+            <div class="list-item">
+                <dt>Carga horária de extensão</dt>
+                <dd>{{ plano.ch_extensao|format }}h</dd>
+            </div>
+            {% if plano.matriz_ppc.ppc.is_curso_anual %}
+                <div class="list-item">
+                    <dt>Aulas no 1° semestre</dt>
+                    <dd>{{ plano.get_qtd_aulas_1s|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Aulas no 2° semestre</dt>
+                    <dd>{{ plano.get_qtd_aulas_2s|format }}</dd>
+                </div>
+            {% endif %}
+            <div class="list-item">
+                <dt>Segundo semestre</dt>
+                <dd>{{ plano.segundo_semestre|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Pode fechar com pendência</dt>
+                <dd>{{ plano.pode_fechar_pendencia|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Desconsidera cálculo de créditos</dt>
+                <dd>{{ plano.plano_disciplina.desconsiderar_qtd_credito|format }}</dd>
+            </div>
+
+        </dl>
+    </div>
+
+    <div class="tab-pane" data-title="Requisitos" data-tab="requisitos">
+        {% if pode_editar %}
+            <ul class="action-bar">
+                <li><a class="btn primary popup" href="{% url 'requisitos_planodisciplinappc' plano.id %}">Configurar requisitos</a></li>
+            </ul>
+        {% endif %}
+
+        {% box "Pré-requisitos" %}
+            {% if plano.pre_requisitos.exists %}
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th class="no-print">Ações</th>
+                                <th>Plano de disciplina</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for requisito in plano.pre_requisitos.all %}
+                                <tr>
+                                    <td class="no-print field-get_acoes">
+                                        {% icon "view" "/ppc/plano/{{ requisito.pk }}/" "Visualizar" %}
+                                        {% if pode_editar %}
+                                            {% icon "delete" "/ppc/plano/{{ plano.pk }}/pre/{{ requisito.pk }}/remover/" "Remover requisito" %}
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ requisito }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="alert alert-warning">Sem pré-requisitos vinculados.</p>
+            {% endif %}
+        {% endbox %}
+
+        {% box "Co-requisitos" %}
+            {% if plano.co_requisitos.exists %}
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th class="no-print">Ações</th>
+                                <th>Plano de disciplina</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for requisito in plano.co_requisitos.all %}
+                                <tr>
+                                    <td class="no-print field-get_acoes">
+                                        {% icon "view" "/ppc/plano/{{ requisito.pk }}/" "Visualizar" %}
+                                        {% if pode_editar %}
+                                        {% icon "delete" "/ppc/plano/{{ plano.pk }}/co/{{ requisito.pk }}/remover/" "Remover requisito" %}
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ requisito }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="alert alert-warning">Sem co-requisitos vinculados.</p>
+            {% endif %}
+        {% endbox %}
+    </div>
+
+    <div class="tab-pane" data-title="Ementa e programa" data-tab="programa" data-checked="{{ plano.plano_disciplina.is_aprovado }}">
+        <h4>Ementa</h4>
+        <div class="general-box">
+            <div class="primary-info">
+                <div class="extra-info">
+                    <div class="richtext">{{ plano.plano_disciplina.ementa|safe }}</div>
+                </div>
+            </div>
+        </div>
+        {% if secoes.exists %}
+            <h4>Programa</h4>
+            {% for secao in secoes %}
+                <div class="general-box">
+                    <div class="primary-info">
+                        <h4><small>{{ secao.get_ordem_exibicao }}</small> {{ secao.get_titulo }}</h4>
+                        <div class="extra-info">
+                            <div class="richtext">{{ secao.texto|safe }}</div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        {% endif %}
+    </div>
+{% endblock %}

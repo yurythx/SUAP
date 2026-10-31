@@ -1,0 +1,787 @@
+{% extends super_template %}
+
+{% block extrahead %}
+    <script src="/static/djtools/graficos/highcharts.js"></script>
+    <script src="/static/djtools/graficos/exporting.js"></script>
+    <style>
+        .float-right-btn{
+            float: right;
+            text-decoration: none !important;
+            margin: 3px;
+        }
+    </style>
+{% endblock %}
+
+{% block object-status %}
+    {% if obj.integralizou_ensino_medio %}
+        <span class="status status-success">Integralizado Fase Escolar</span>
+    {% endif %}
+    {% if obj.situacao.pk == 100 %}
+        <span class="status status-error">{{ obj.situacao|format }}</span>
+    {% else %}
+        {% if obj.situacao.pk == 6 %}
+            <span class="status status-success">{{ obj.situacao|format }}</span>
+        {% else %}
+            <span class="status status-info">{{ obj.situacao|format }}</span>
+        {% endif %}
+    {% endif %}
+    {% if obj.possui_certificacao_parcial %}
+        <span class="status status-info">Possui certificação parcial</span>
+    {% endif %}
+    
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if pode_enviar_mensagem %}
+            <li><a href="/edu/enviar_mensagem/?aluno={{ obj.matricula }}&origem=aluno" class="btn success">Enviar Mensagem</a></li>
+        {% endif %}
+
+        {% if perms.ae.add_demandaalunoatendida and obj.caracterizacao and not obj.is_cancelado %}
+            <li><a href="/admin/ae/demandaalunoatendida/add/?aluno={{ obj.pk }}" class="btn success">Adicionar
+                Atendimento</a></li>
+        {% endif %}
+        <li class="has-child">
+            <a href="#" class="btn primary">Editar</a>
+            <ul>
+                {% if aluno_possui_matriz and pode_realizar_procedimentos %}
+                    <li><a class="popup" href="/edu/alterar_matriz_aluno/{{ obj.pk }}/">Matriz Curricular</a></li>
+                {% endif %}
+                {% if pode_alterar_email %}
+                    <li><a class="popup" href="/edu/atualizar_email_secundario/{{ obj.pk }}/">E-mail</a></li>
+                {% endif %}
+                {% if aluno_possui_matriz and is_admin %}
+                    <li><a class="popup" href="/edu/editar_situacao_matricula/{{ obj.pk }}/">Situação</a></li>
+                    <li><a href="/edu/alterar_ano_periodo_ingresso/{{ obj.pk }}/">Ano/Período de Ingresso</a></li>
+                {% endif %}
+                {% if perms.comum.is_operador_de_censo %}
+                    <li><a class="popup" href="/edu/editar_turno/{{ obj.pk }}/">Turno</a></li>
+                {% endif %}
+                {% if is_admin %}
+                    <li><a href="/admin/edu/aluno/{{ obj.pk }}/change/">Aluno</a></li>
+                {% elif tem_permissao_realizar_procedimentos or perms.ae.add_demandaalunoatendida %}
+                    <li><a class="popup" href="/edu/atualizar_dados_pessoais/{{ obj.pk }}/">Dados Pessoais</a></li>
+                {% elif is_proprio_aluno %}
+                    <li><a class="popup" href="/edu/atualizar_meus_dados_pessoais/{{ obj.matricula }}/">Dados Pessoais</a></li>
+                {% endif %}
+                {% if is_cra and is_do_mesmo_campus %}
+                    <li><a class="popup" href="/edu/editar_aluno/{{ obj.pk }}/">Aluno</a></li>
+                {% endif %}
+                {% if perms.edu.change_foto_aluno and is_da_mesma_diretoria_academica and not obj.is_cancelado %}
+                    <li><a href="/edu/atualizar_foto/{{ obj.pk }}/">Foto Estudantil</a></li>
+                {% endif %}
+                {% if perms.edu.efetuar_matricula and is_da_mesma_diretoria_academica %}
+                    <li><a class="popup" href="/edu/atualizar_dados_responsavel/{{ obj.pk }}/">Dados do Responsável</a></li>
+                {% endif %}
+                {% if pode_editar_orientadores_pos %}
+                    <li><a class="popup" href="/edu/editar_orientacao/{{ obj.pk }}/">Orientação</a></li>
+                {% endif %}
+                {% if is_nivel_pos_graduacao and pode_editar_titulo_pesquisa_pos %}
+                    <li><a class="popup" href="/edu/editar_titulo_pesquisa/{{ obj.pk }}/">Título da Pesquisa</a></li>
+                {% endif %}
+                {% if is_proprio_aluno or perms.ae.change_caracterizacao and obj.caracterizacao and not obj.is_cancelado %}
+                    <li><a href="/ae/caracterizacao/{{ obj.pk }}/" class="primary">Caracterização</a></li>
+                {% endif %}
+                {% if perms.rh.pode_cadastrar_digital %}
+                    <li><a class="popup" href="/rh/editar_informacoes_digitais_fracas/{{ obj.pessoa_fisica.pk }}/">Informações de Digitais Fracas</a></li>
+                {% endif %}
+                {% if tem_permissao_realizar_procedimentos %}
+                    <li><a class="popup" href="/edu/editar_dados_sistec/{{ obj.pk }}/">Dados SISTEC</a></li>
+                {% endif %}
+            </ul>
+        </li>
+
+        {% if pode_ver_botao_ldap %}
+            {% ldap_actions obj %}
+        {% endif %}
+
+        {% if obj.possui_historico %}
+            {% if perms.edu.view_log or pode_realizar_procedimentos or perms.edu.efetuar_matricula %}
+                <li class="has-child">
+                    <a class="btn" href="#">Ações</a>
+                    <ul>
+                        {% if pode_realizar_procedimentos and obj.pode_matricula_online %}
+                            {% if obj.is_seriado %}
+                                <li><a href="/edu/pedido_matricula_seriado/{{ ultima_matricula_periodo.aluno.pk }}/">Matrícula Online</a></li>
+                            {% elif obj.is_credito %}
+                                <li><a href="/edu/pedido_matricula_credito/{{ ultima_matricula_periodo.aluno.pk }}/">Matrícula Online</a></li>
+                            {% endif %}
+                        {% endif %}
+                        {% if pode_realizar_transferencia %}
+                            <li><a class="popup" href="/edu/realizar_transferencia_externa/{{ ultima_matricula_periodo.pk }}/">Transferência externa</a></li>
+                            <li><a class="popup" href="/edu/realizar_transferencia_curso/{{ ultima_matricula_periodo.pk }}/Curso/">Transferência de curso</a></li>
+                            <li><a class="popup" href="/edu/realizar_transferencia_curso/{{ ultima_matricula_periodo.pk }}/Intercampus/">Transferência intercampus</a></li>
+                        {% endif %}
+
+                        {% if pode_evadir %}
+                            <li><a class="confirm" data-confirm="Esta operação irá evadir o aluno. Deseja continuar?" href="/edu/evadir_aluno/{{ ultima_matricula_periodo.aluno.pk }}/">Evadir aluno</a></li>
+                        {% endif %}
+
+                        {% if obj.situacao.ativo %}
+
+                            {% if pode_realizar_procedimentos %}
+                                <li><a href="?enviar_comprovante_matricula=1">Enviar comprovante de matrícula por e-mail</a></li>
+                                {% if ultima_matricula_periodo.is_matriculado or ultima_matricula_periodo.is_matricula_vinculo or ultima_matricula_periodo.is_aberto %}
+                                    <li><a class="popup" href="/edu/realizar_cancelamento_matricula/{{ ultima_matricula_periodo.pk }}/">Cancelar matrícula</a></li>
+                                    <li><a class="popup" href="/edu/realizar_trancamento_matricula/{{ ultima_matricula_periodo.pk }}/">Trancar matrícula</a></li>
+                                    {% if pode_integralizar_fase_escolar %}
+                                        <li><a class="popup" href="/edu/integralizar_fase_escolar/{{ ultima_matricula_periodo.pk }}/">Integralizar fase escolar</a></li>
+                                    {% endif %}
+                                {% endif %}
+                            {% endif %}
+
+                            {% if pode_realizar_procedimentos and ultima_matricula_periodo.is_aberto %}
+                                <li><a class="popup" href="/edu/realizar_matricula_vinculo/{{ ultima_matricula_periodo.pk }}/">Realizar matrícula vínculo</a></li>
+                            {% endif %}
+
+                            {% if pode_realizar_procedimentos and ultima_matricula_periodo.pode_matricular_diario %}
+                                <li>
+                                    <a href="/edu/listar_diarios_matricula_aluno/{{ ultima_matricula_periodo.pk }}/">Matricular em diário</a></li>
+                                {% if not ultima_matricula_periodo.turma and obj.matriz.estrutura.tipo_avaliacao == 2 %}
+                                    <li><a class="popup" href="/edu/matricular_aluno_turma/{{ obj.pk }}/">Matricular em turma</a></li>
+                                {% endif %}
+                            {% endif %}
+
+                            {% if obj.data_integralizacao and pode_realizar_procedimentos %}
+                                <li><a class="popup" href="/edu/desfazer_migracao/{{ obj.pk }}/?parcial=1">Desfazer migracão parcial</a></li>
+                                {% if pode_desfazer_migracao %}
+                                    <li><a class="popup" href="/edu/desfazer_migracao/{{ obj.pk }}/">Desfazer migracão completa</a></li>
+                                {% endif %}
+                            {% endif %}
+                        {% else %}
+                            {% if ultima_matricula_periodo.pode_matricular_diario %}
+                                <li><a href="/edu/listar_diarios_matricula_aluno/{{ ultima_matricula_periodo.pk }}/">Matricular em diário</a></li>
+                                {% if not ultima_matricula_periodo.turma and obj.matriz.estrutura.tipo_avaliacao == 2 %}
+                                    <li><a href="/edu/matricular_aluno_turma/{{ obj.pk }}/">Matricular em turma</a></li>
+                                {% endif %}
+                            {% endif %}
+                            {% if pode_realizar_procedimentos and ultima_matricula_periodo.is_cancelado %}
+                                <li><a class="popup" href="/edu/reintegrar_aluno/{{ ultima_matricula_periodo.pk }}/">Reintegrar aluno</a></li>
+                            {% endif %}
+                        {% endif %}
+
+                        {% if pode_ver_dados_sociais %}
+                            <li><a class="popup" href="/rh/pessoa_info_complementar/{{ obj.get_vinculo.id }}/">Exibir informações complementares</a></li>
+                        {% endif %}
+
+                        {% if perms.edu.view_log %}
+                            <li><a href="/edu/log_aluno/{{ obj.pk }}/">Visualizar log</a></li>
+                        {% endif %}
+
+                    </ul>
+                </li>
+            {% endif %}
+        {% endif %}
+        {% if is_proprio_aluno or pode_ver_requisitos_de_conclusao %}
+            {% if obj.possui_historico or obj.possui_vinculo %}
+                {% if not is_responsavel %}
+                    <li class="has-child">
+                        <a class="btn default" href="#">Documentos</a>
+                        <ul>
+                            {% for descricao, url in obj.get_urls_documentos %}
+                                <li><a href="{{ url }}">{{ descricao }}</a></li>
+                            {% endfor %}
+                            {% if matrizppc %}
+                                <li><a class="default" href="/ppc/projetopedagogicocurso/{{ matrizppc.ppc_id }}/pdf/">PPC</a></li>
+                            {% endif %}
+                            {% if obj.possui_historico %}
+                                {% if obj.is_matriculado or obj.is_matricula_vinculo %}
+                                    {% if obj.pode_emitir_declaracao and tem_permissao_para_emitir_docs_matricula %}
+                                        <li><a class="default" href="/edu/comprovante_matricula_pdf/{{ obj.pk }}/">Comprovante de Matrícula</a></li>
+                                        <li><a class="default" href="/edu/atestado_frequencia_fisico/{{ obj.pk }}/">Atestado de Frequência Físico</a></li>
+                                        <li><a class="default" href="/edu/atestado_frequencia_digital/{{ obj.pk }}/">Atestado de Frequência Digital</a></li>
+                                    {% endif %}
+                                    {% if is_proprio_aluno %}
+                                        <li><a class="default" href="/edu/atestado_frequencia_digital/{{ obj.pk }}/">Atestado de Frequência</a></li>
+                                    {% endif %}
+                                {% elif pode_emitir_historico_final %}
+                                    <li><a class="default" href="/edu/emitir_historico_final_pdf/{{ obj.pk }}/">Histórico Final</a></li>
+                                {% endif %}
+                            {% endif %}
+                        </ul>
+                    </li>
+                {% endif %}
+            {% endif %}
+            {% if obj.is_proitec %}
+                {% with urls=obj.get_urls_documentos %}
+                    {% if urls %}
+                        <li class="has-child">
+                            <a class="btn default" href="#">Documentos</a>
+                            <ul>
+                                {% for descricao, url in urls %}
+                                    <li><a href="{{ url }}">{{ descricao }}</a></li>
+                                {% endfor %}
+                            </ul>
+                        </li>
+                    {% endif %}
+                {% endwith %}
+            {% endif %}
+        {% else %}
+            {% if pode_ver_dados_sociais %}
+                {% with pode_emitir_declaracao=obj.pode_emitir_declaracao pode_emitir_declaracao_matricula=obj.pode_emitir_declaracao_matricula %}
+                {% if pode_emitir_declaracao or pode_emitir_declaracao_matricula %}
+                <li class="has-child">
+                    <a class="btn default" href="#">Documentos</a>
+                    <ul>
+                        {% if pode_emitir_declaracao %}
+                            <li><a href="/edu/declaracaovinculo_pdf/{{ obj.pk }}/">Declaração de Vínculo</a></li>
+                        {% endif %}
+                        {% if pode_emitir_declaracao_matricula %}
+                            <li><a href="/edu/declaracaomatricula_pdf/{{ obj.pk }}/">Declaração de Matrícula</a></li>
+                        {% endif %}
+                    </ul>
+                </li>
+                {% endif %}
+                {% endwith %}
+            {% endif %}
+        {% endif %}
+        {% if obj.is_qacademico and not obj.is_sica %}
+        	{% if pode_realizar_operacoes_qacademico %}
+            <li class="has-child">
+                <a class="btn default" href="#">{{ academico_nome_sistema }}</a>
+                <ul>
+            	{% if obj.is_concluido and not urls_diploma_historico or obj.is_integralizado_fase_escolar and not urls_diploma_historico %}
+                    <li><a class="default" href="/edu/emitir_historico_legado_pdf/{{ obj.pk }}/">Imprimir Histórico</a></li>
+	            {% endif %}
+	            {% if perms.edu.importar_aluno %}
+	            <li><a class="default" href="/edu/importar_aluno/{{ obj.pk }}/">Importar Dados</a></li>
+	    		{% endif %}
+                {% if urls_diploma_historico %}
+                    <li><a class="default" target="_blank" href="{{ urls_diploma_historico.0 }}">Histórico</a></li>
+                    <li><a class="default" target="_blank" href="{{ urls_diploma_historico.1 }}">Diploma</a></li>
+                {% endif %}
+                {% if pode_integralizar_fase_escolar %}
+                    <li><a class="popup" href="/edu/integralizar_fase_escolar/{{ ultima_matricula_periodo.pk }}/">Integralizar Fase Escolar</a></li>
+                {% endif %}
+                </ul>
+            </li>
+        	{% endif %}
+        {% endif %}
+
+        {% if is_pedemeia and is_proprio_aluno %}
+            <li><a class="btn default" href="/comum/minha_conta/">{% icone "user" %} Minha conta</a></li>
+        {% endif %}
+
+        {% help_button %}
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+    {% if not request.GET.tab and not obj.solicitacaoautorizacaousoimagem_set.exists %}
+        {% include "includes/autorizacao_uso_imagem.html" %}
+    {% endif %}
+
+    {% if obj.is_concluido_com_dados_incompletos %}
+        <p class="alert alert-warning"><strong>Atenção:</strong> o diploma deste aluno não pode ser emitido, pois a data de
+            nascimento ou naturalidade não foram informados no sistema.</p>
+    {% endif %}
+
+    {% if fazer_avaliacao_biomedica %}
+        <p class="alert alert-warning"><strong>Atenção:</strong> Avaliação Biomédica pendente. Dirija-se ao setor de saúde do
+            campus para agendá-la.</p>
+    {% endif %}
+
+    {% box 'Dados gerais' %}
+        <div class="photo-circle lg">
+            <img src="{{ obj.get_foto_150x200_url }}" alt="Foto de {{ obj.get_nome }}">
+        </div>
+        <dl class="definition-list flex">
+            <div class="list-item flex-basis-50">
+                <dt>Nome</dt>
+                <dd>{{ obj.get_nome|normalizar }}</dd>
+            </div>
+            <div class="list-item flex-basis-50">
+                <dt>Matrícula</dt>
+                <dd>{{ obj.matricula }}</dd>
+            </div>
+            <div class="list-item flex-basis-50">
+                <dt>Ingresso</dt>
+                <dd>{{ obj.ano_letivo|format }}/{{ obj.periodo_letivo|format }}</dd>
+            </div>
+            <div class="list-item flex-basis-50">
+                <dt>E-mail Acadêmico</dt>
+                <dd>{{ obj.email_academico|format }}</dd>
+            </div>
+            <div class="list-item flex-basis-100">
+                <dt>E-mail Google Sala de Aula</dt>
+                <dd>
+                    <p>{{ obj.email_google_classroom|format }}</p>
+                    <p class="obs">O login para este e-mail, e para os recursos do Google for Education, é realizado exclusivamente através do link para o Google Sala de Aula localizado no rodapé de todas as páginas do SUAP. O login através de senha <strong>não está habilitado</strong> para os serviços do Google for Education.</p>
+                </dd>
+            </div>
+            <div class="list-item">
+                <dt>Documento</dt>
+                <dd>{% if pode_ver_cpf %}{{ obj.pessoa_fisica.documento_identificador|format }}{% else %}***.****.***-**{% endif %}</dd>
+            </div>
+            {% if obj.pessoa_fisica.nome_social %}
+                <div class="list-item">
+                    <dt>Nome no Registro</dt>
+                    <dd>{{ obj.pessoa_fisica.nome_registro|format|normalizar }}</dd>
+                </div>
+            {% endif %}
+            <div class="list-item">
+                <dt>Período de Referência</dt>
+                <dd>{{ obj.periodo_atual|format }}º</dd>
+            </div>
+            <div class="list-item">
+                <dt>I.R.A.</dt>
+                <dd>{% if pode_ver_dados_sociais or pode_ver_dados_academicos %}{{ obj.get_ira|format }}{% else %}**{% endif %}</dd>
+            </div>
+            <div class="list-item flex-basis-50">
+                <dt>Curso</dt>
+                <dd>
+                    {% if perms.edu.view_cursocampus %}
+                        <a href="/edu/cursocampus/{{ obj.curso_campus.pk }}/"
+                            title="Visualizar o Curso">
+                    {% endif %}
+                    {{ obj.curso_campus }} {% if obj.habilitacao %} - Habilitação em {{ obj.habilitacao|format }}{% endif %}
+                    {% if perms.edu.view_cursocampus %}
+                        </a>
+                    {% endif %}
+                    </dd>
+            </div>
+            <div class="list-item">
+                <dt>Matriz</dt>
+                <dd>
+                    {% if perms.edu.view_matriz and aluno_possui_matriz %}
+                        <a href="/edu/matriz/{{ obj.matriz_id }}/" title="Visualizar a Matriz">
+                    {% endif %}
+                    {{ obj.matriz|format }}
+                    {% if perms.edu.view_matriz and aluno_possui_matriz %}
+                        </a>
+                    {% endif %}
+                </dd>
+            </div>
+            <div class="list-item">
+                <dt>Qtd. Períodos</dt>
+                <dd>{{ obj.matriz.qtd_periodos_letivos|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Situação Sistêmica</dt>
+                <dd>
+                    <span class="{% if obj.get_situacao_sistemica.0 == 1 %}status status-error{% elif obj.get_situacao_sistemica.0 == 2 %}status status-alert {% else %}status status-success{% endif %}">
+                        {{ obj.get_situacao_sistemica.1 }}
+                    </span>
+                </dd>
+            </div>
+            <div class="list-item">
+                <dt>Data da Migração</dt>
+                <dd>{{ obj.data_integralizacao|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Impressão Digital</dt>
+                <dd>{{ obj.pessoa_fisica.tem_digital|format }}</dd>
+            </div>
+            {% if is_admin %}
+                <div class="list-item">
+                    <dt>Chave Primária</dt>
+                    <dd>{{ obj.pk }}</dd>
+                </div>
+            {% endif %}
+            {% if not aluno.possui_pendencia %}
+                <div class="list-item">
+                    {% if tem_permissao_realizar_procedimentos and diploma.exists %}
+                        <dt>Diploma</dt>
+                        <dd><a href="{{ diploma.0.get_absolute_url }}">{{ diploma|format }}</a></dd>
+                    {% else %}
+                        <dt>Emitiu Diploma</dt>
+                        <dd>{{ emitiu_diploma|format }}</dd>
+                    {% endif %}
+                </div>
+            {% endif %}
+            {% if obj.codigo_educacenso %}
+                <div class="list-item">
+                    <dt>EDUCACENSO</dt>
+                    <dd>{{ obj.codigo_educacenso }}</dd>
+                </div>
+            {% endif %}
+        </dl>
+    {% endbox %}
+
+    <div class="tab-pane ajax-rendered" data-title="Dados acadêmicos" data-tab="dados_academicos">
+        {% if request.GET.tab == "dados_academicos" or not request.GET.tab %}
+            {% include "tabs/aluno_dados_academicos.html" %}
+        {% endif %}
+    </div>
+
+    {% if perms.edu.view_dados_pessoais or is_proprio_aluno %}
+        <div class="tab-pane ajax-rendered" data-title="Dados pessoais" data-tab="dados_pessoais">
+            {% if request.GET.tab == "dados_pessoais" %}
+                {% include "tabs/aluno_dados_pessoais.html" %}
+            {% endif %}
+        </div>
+    {% endif %}
+
+    {% if perms.edu.view_alunoarquivo %}
+        <div class="tab-pane ajax-rendered" data-title="Pasta documental" data-tab="pasta_documental" data-counter="{{ total_aluno_arquivos }}">
+            {% if request.GET.tab == "pasta_documental" %}
+                {% include "tabs/aluno_pasta_documental.html" %}
+            {% endif %}
+        </div>
+    {% endif %}
+
+    {% if pode_ver_requisitos_de_conclusao %}
+        <div class="tab-pane ajax-rendered" data-title="Requisitos de conclusão" data-checked="{% if possui_pendencias_conclusao %}False{% else %}True{% endif %}" data-tab="requisitos">
+            {% if request.GET.tab == "requisitos" %}
+                {% include "tabs/aluno_requisitos_conclusao.html" %}
+            {% endif %}
+        </div>
+
+        {% if obj.matriz.emite_certificacao_parcial %}
+            <div class="tab-pane ajax-rendered" data-title="Certificações parciais" data-counter="{{ diplomas.count }}" data-tab="certificacao_parcial">
+                {% if request.GET.tab == "certificacao_parcial" %}
+                    {% include "tabs/aluno_requisitos_certificacao_parcial.html" %}
+                {% endif %}
+            </div>
+        {% endif %}
+
+    {% endif %}
+
+    {% if pode_ver_dados_academicos %}
+
+        {% if obj.matriz.qtd_periodos_letivos > 1 and obj.get_pedidos_matricula.exists %}
+            <div class="tab-pane ajax-rendered" data-title="Pedidos de renovação de matrícula" data-counter="{{ obj.get_pedidos_matricula.count }}" data-tab="pedidos">
+                {% if request.GET.tab == "pedidos" %}
+                    {% include "tabs/aluno_pedidos_matricula.html" %}
+                {% endif %}
+            </div>
+        {% endif %}
+
+        {% if pode_cadastrar_procedimento_matricula or procedimentos.exists %}
+            <div class="tab-pane ajax-rendered" data-title="Procedimentos de matrícula" data-counter="{{ procedimentos.count }}"
+                data-tab="procedimentos">
+                {% if request.GET.tab == "procedimentos" %}
+                    {% include "tabs/aluno_procedimentos_matricula.html" %}
+                {% endif %}
+            </div>
+        {% endif %}
+        
+        {% if procedimentos_reducao_ch.exists %}
+            <div class="tab-pane ajax-rendered" data-title="Procedimentos com redução de CH integralizada" data-counter="{{ procedimentos_reducao_ch.count }}"
+                data-tab="procedimentos_reducao_ch">
+                {% if request.GET.tab == "procedimentos_reducao_ch" %}
+                    {% include "tabs/aluno_procedimentos_reducao_ch.html" %}
+                {% endif %}
+            </div>
+        {% endif %}
+
+        {% if modalidade_possui_aacc %}
+            <div class="tab-pane ajax-rendered" data-title="Atividades complementares" data-counter="{{ atividades_complementares.count }}" data-tab="acc">
+                {% if request.GET.tab == "acc" %}
+                    {% include "tabs/aluno_atividade_complementar.html" %}
+                {% endif %}
+            </div>
+        {% endif %}
+
+        {% if aluno_possui_matriz and obj.matriz.ch_atividades_aprofundamento %}
+            <div class="tab-pane ajax-rendered" data-title="Atividades de aprofundamento" data-counter="{{ atividades_aprofundamento.count }}" data-tab="aprofundamento">
+                {% if request.GET.tab == "aprofundamento" %}
+                    {% include "tabs/aluno_atividades_aprofundamento.html" %}
+                {% endif %}
+            </div>
+        {% endif %}
+
+        {% if aluno_possui_matriz and obj.matriz.ch_atividades_extensao %}
+            <div class="tab-pane ajax-rendered" data-title="Atividades curriculares de extensão" data-counter="{{ obj.registroatividadeextensao.count }}" data-tab="extensao">
+                {% if request.GET.tab == "extensao" %}
+                    {% include "tabs/aluno_atividades_extensao.html" %}
+                {% endif %}
+            </div>
+        {% endif %}
+
+        {% if possui_pratica_ppc %}
+            <div class="tab-pane ajax-rendered" data-title="Atividades de prática profissional" data-tab="atividades_pratica_profissional">
+                {% if request.GET.tab == "atividades_pratica_profissional" %}
+                    {% if pendencias_atividade_pratica_profissional %}
+                    <div class="alert alert-warning">
+                        <p><strong>Atenção:</strong>.</p>
+                        <ul>
+                            {% for pendencia in pendencias_atividade_pratica_profissional %}
+                                <li>{{ pendencia }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+
+                    {% box "Registros de atividades" %}
+                        <dl class="definition-list flex">
+                            <div class="list-item">
+                                <dt>Carga horária exigida</dt>
+                                <dd>{{ matrizppc.ppc.ch_pratica }}h</dd>
+                            </div>
+                            <div class="list-item">
+                                <dt>Carga horária contabilizada</dt>
+                                <dd>{{ ch_pratica_contabilizada }}h</dd>
+                            </div>
+                            <div class="list-item">
+                                <dt>Média obtida</dt>
+                                <dd {% if not atingiu_media_aprovacao_atividade_pratica_profissional %}class="false"{% endif %}>{{ media_pratica_profissional|format }}</dd>
+                            </div>
+                        </dl>
+                        {% progressbar percentual_pratica_cumprida %}
+                        <div class="table-responsive">
+                            <table>
+                                <caption>Minhas atividades de prática profissional</caption>
+                                <thead>
+                                    <tr>
+                                        <th>Período</th>
+                                        <th>Modalidade</th>
+                                        <th>Descrição</th>
+                                        <th>Situação</th>
+                                        <th>Carga horária</th>
+                                        <th>Nota</th>
+                                        <th class="no-print">Opções</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                {% for atividade in atividades_pratica_profissional %}
+                                    <tr id="{{ atividade.id }}">
+                                        <td>{{ atividade.matricula_periodo.ano_letivo.ano }}.{{ atividade.matricula_periodo.periodo_letivo }}</td>
+                                        <td>{{ atividade.modalidade_pratica_profissional.nome }}</td>
+                                        <td>{{ atividade.descricao }}</td>
+                                        <td>{{ atividade.get_situacao_display|status }}</td>
+                                        <td>{% if atividade.carga_horaria == None %}-{% else %}{{ atividade.carga_horaria }}h{% endif %}</td>
+                                        <td>{{ atividade.nota|format }}</td>
+                                        <td class="no-print">
+                                            {{ atividade|method:"get_acoes"|call:request.user }}
+                                        </td>
+                                    </tr>
+                                {% empty %}
+                                    <tr class="highlight">
+                                        <td colspan="7">Nenhuma atividade de prática profissional registrada.</td>
+                                    </tr>
+                                {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% endbox %}
+
+                    {% box "Modalidades de prática profissional requeridas" %}
+                        {% include "tabs/aluno_requisitos_atividades_pratica_profissional.html" with modalidades=modalidades_obrigatorias title="Obrigatórias" %}
+                        {% include "tabs/aluno_requisitos_atividades_pratica_profissional.html" with modalidades=modalidades_optativas title="Optativas" %}
+                    {% endbox %}
+                {% endif %}
+            </div>
+        {% endif %}
+
+        {% if diplomas.exists %}
+            <div class="tab-pane ajax-rendered" data-title="Diplomas e certificados" data-counter="{{ diplomas.count }}"
+                data-tab="diplomas">
+                {% if request.GET.tab == "diplomas" %}
+                    {% include "tabs/aluno_diplomas.html" %}
+                {% endif %}
+            </div>
+        {% endif %}
+
+    {% endif %}
+
+    {% if perms.edu.view_registroconvocacaoenade and obj.curso_campus.exige_enade %}
+		<div class="tab-pane ajax-rendered" data-title="ENADE" data-counter="{{ qtd_convocacoes_enade }}" data-tab="convocacoes_enade">
+			{% if request.GET.tab == "convocacoes_enade" %}
+				{% include "tabs/aluno_convocacoes_enade.html" %}
+			{% endif %}
+		</div>
+	{% endif %}
+
+    {% if pode_ver_dados_academicos or user|in_group:"Bibliotecário" %}
+        {% if aluno_possui_matriz and not obj.is_fic and not obj.is_proitec %}
+            <div class="tab-pane ajax-rendered" data-title="TCC/Relatórios" data-counter="{{ projetos.count }}" data-tab="projeto">
+                {% if request.GET.tab == "projeto" %}
+                    {% include "tabs/aluno_projeto_final.html" %}
+                {% endif %}
+            </div>
+        {% endif %}
+    {% endif %}
+
+    {% if pode_ver_dados_academicos or user|in_group:"Pedagogo" or is_diretor_geral %}
+        <div class="tab-pane ajax-rendered" data-title="Medidas disciplinares/Premiações" data-tab="medidas_premiacoes">
+            {% if request.GET.tab == "medidas_premiacoes" %}
+                {% include "tabs/aluno_medidas_premiacoes.html" %}
+            {% endif %}
+        </div>
+    {% endif %}
+
+	{% if obj.is_modular %}
+        <div class="tab-pane ajax-rendered" data-title="Módulos" data-tab="modulos">
+            {% if request.GET.tab == "modulos" %}
+                {% include "tabs/aluno_modulos.html" %}
+            {% endif %}
+        </div>
+    {% endif %}
+
+    {% if pode_ver_boletim %}
+        <div class="tab-pane ajax-rendered" data-title="Boletins" data-tab="boletim">
+            {% if request.GET.tab == "boletim" %}
+                {% include "tabs/aluno_boletins.html" %}
+            {% endif %}
+        </div>
+    {% endif %}
+
+    {% if diarios_especiais.exists %}
+        {% if pode_ver_dados_academicos or pode_ver_dados_sociais or perms.edu.emitir_boletim %}
+            <div class="tab-pane ajax-rendered" data-title="Atividades específicas" data-tab="atividades_especificas">
+                {% if request.GET.tab == "atividades_especificas" %}
+                    {% include "tabs/aluno_atividades_especificas.html" %}
+                {% endif %}
+            </div>
+        {% endif %}
+    {% endif %}
+    
+    {% if pode_ver_historico %}
+        <div class="tab-pane ajax-rendered" data-title="Histórico" data-tab="historico">
+            {% if request.GET.tab == "historico" %}
+                {% if obj.matriculaperiodo_set.exists %}
+                    {% include "tabs/aluno_historico.html" %}
+                {% else %}
+                    <p class="alert alert-warning">Este aluno não possui vínculos em período letivo.</p>
+                {% endif %}
+            {% endif %}
+        </div>
+    {% endif %}
+
+    {% if obj.curso_campus.assinatura_digital and obj.historicoescolarparcial_set.exists %}
+        <div class="tab-pane ajax-rendered" data-title="Históricos digitais" data-counter="{{ obj.historicoescolarparcial_set.count }}"
+            data-tab="historicos">
+            {% if request.GET.tab == "historicos" %}
+                {% include "tabs/aluno_historicos.html" %}
+            {% endif %}
+        </div>
+    {% endif %}
+
+    {% if pode_ver_dados_sociais %}
+        <div class="tab-pane ajax-rendered" data-title="Caracterização socioeconômica" data-tab="caracterizacao">
+            {% if request.GET.tab == "caracterizacao" %}
+                {% include "tabs/aluno_caracterizacao.html" %}
+            {% endif %}
+        </div>
+
+        <div class="tab-pane ajax-rendered" data-title="Atividades estudantis" data-tab="atividades_estudantis">
+            {% if request.GET.tab == "atividades_estudantis" %}
+                {% include "tabs/aluno_atividades_estudantis.html" %}
+            {% endif %}
+        </div>
+
+        <div class="tab-pane ajax-rendered" data-title="Dados bancários" data-tab="dados_bancarios" data-counter="{{ obj.get_dados_bancarios.count }}">
+            {% if request.GET.tab == "dados_bancarios" %}
+                {% include "tabs/aluno_dados_bancarios.html" %}
+            {% endif %}
+        </div>
+    {% endif %}
+
+    {% if pode_ver_etep and acompanhamentos.exists %}
+        <div class="tab-pane ajax-rendered" data-title="ETEP" data-tab="acompanhamento_etep">
+            {% if request.GET.tab == "acompanhamento_etep" %}
+                {% include "tabs/aluno_acompanhamento_etep.html" %}
+            {% endif %}
+        </div>
+    {% endif %}
+
+    {% if qtd_participacoes_projetos %}
+        <div class="tab-pane ajax-rendered" data-title="Participações em projetos" data-counter="{{ qtd_participacoes_projetos }}" data-tab="participacoes_projetos">
+            {% if request.GET.tab == "participacoes_projetos" %}
+                {% include "tabs/aluno_participacoes_projetos.html" %}
+            {% endif %}
+        </div>
+    {% endif %}
+
+    {% if obj.matriz.possui_projeto_integrador %}
+        <div class="tab-pane ajax-rendered" data-title="Projetos Integradores" data-tab="pi">
+            {% if request.GET.tab == "pi" %}
+                {% include "tabs/aluno_projetos_integradores.html" %}
+            {% endif %}
+        </div>
+    {% endif %}
+
+    {% if qtd_estagios %}
+        <div class="tab-pane ajax-rendered" data-title="Estágios e afins" data-counter="{{ qtd_estagios }}" data-tab="estagios">
+            {% if request.GET.tab == "estagios" %}
+                {% include "tabs/aluno_estagios.html" %}
+            {% endif %}
+        </div>
+    {% endif %}
+
+    {% if obj.get_participacoes_em_eventos.exists or obj.get_participacoes_em_minicursos.exists %}
+        <div class="tab-pane ajax-rendered" data-title="Eventos, palestras e minicursos" data-tab="eventos_minicursos">
+            {% if request.GET.tab == "eventos_minicursos" %}
+                {% include "tabs/aluno_eventos_minicursos.html" %}
+            {% endif %}
+        </div>
+    {% endif %}
+
+    {% if not eh_minicurso %}
+        <div class="tab-pane ajax-rendered" data-title="Locais e horários de aula/atividades" data-tab="locais_aula_aluno">
+            {% if request.GET.tab == "locais_aula_aluno" %}
+                {% include "tabs/aluno_locais_aula.html" %}
+            {% endif %}
+        </div>
+    {% endif %}
+
+    {% if pode_ver_anotacoes_interdisciplinares %}
+        <div class="tab-pane ajax-rendered" data-title="Anotações interdisciplinares" data-tab="anotacoes_interdisciplinares"
+             data-counter="{{ anotacoes_disciplinares.count }}">
+            {% if request.GET.tab == "anotacoes_interdisciplinares" %}
+                {% include "tabs/aluno_anotacoes_interdisciplinares.html" %}
+            {% endif %}
+        </div>
+    {% endif %}
+
+    <div class="tab-pane ajax-rendered" data-title="Requerimentos" data-tab="requerimentos">
+        {% if request.GET.tab == "requerimentos" %}
+            {% include "tabs/aluno_requerimentos.html" %}
+        {% endif %}
+    </div>
+
+    <div class="tab-pane ajax-rendered" data-title="Justificativas de faltas" data-tab="abono_falta">
+        {% if request.GET.tab == "abono_falta" %}
+            {% include "tabs/aluno_justificativas_falta.html" %}
+        {% endif %}
+    </div>
+
+    <div class="tab-pane ajax-rendered" data-title="Nada consta" data-tab="nada_consta">
+        {% if request.GET.tab == "nada_consta" %}
+            {% include "tabs/aluno_nada_consta.html" %}
+        {% endif %}
+    </div>
+
+    {% if obj.participacaocolacaograu_set.exists %}
+        <div class="tab-pane ajax-rendered" data-title="Colação de grau" data-tab="colacao">
+            {% if request.GET.tab == "colacao" %}
+                {% include "tabs/aluno_dados_colacao.html" %}
+            {% endif %}
+        </div>
+    {% endif %}
+
+    <div class="tab-pane ajax-rendered" data-title="Documentos e processos" data-tab="documentos_processos">
+        {% if request.GET.tab == "documentos_processos" %}
+            {% include "tabs/aluno_documentos_processos.html" %}
+        {% endif %}
+    </div>
+
+    {% if aluno_possui_matriz %}
+        <div class="tab-pane ajax-rendered" data-title="Matriz curricular" data-tab="grade_curricular">
+            {% if request.GET.tab == "grade_curricular" %}
+                {% include "tabs/aluno_grade_curricular.html" %}
+            {% endif %}
+        </div>
+    {% endif %}
+
+    {% if is_proprio_aluno or tem_permissao_realizar_procedimentos or is_admin or is_auxiliar_secretaria %}
+        {% if is_pedemeia %}
+        <div class="tab-pane ajax-rendered" data-title="Pé-de-Meia" data-tab="pedemeia">
+            {% if request.GET.tab == "pedemeia" %}
+                {% include "includes/frequencias_pedemeia.html" with requisicoes=obj.get_frequencias_pedemeia_ultima_atualizacao consultar_cadastro=True %}
+            {% endif %}
+        </div>
+        {% endif %}
+    {% endif %}
+
+    {% if is_proprio_aluno or is_responsavel %}
+        <div class="tab-pane ajax-rendered" data-title="Comunicação Social" data-tab="comunicacao_social">
+            {% if request.GET.tab == "comunicacao_social" %}
+                {% include "includes/comunicacao_social.html" %}
+            {% endif %}
+        </div>
+    {% endif %}
+
+{% endblock %}

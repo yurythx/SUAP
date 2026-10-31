@@ -1,0 +1,150 @@
+{% extends "djtools/templates/adminutils/change_form.html" %}
+{# IFMA/Tássio: html com correções de scripts para funcionarem widgets de data e autocompletar. #}
+{% block inline_field_sets %}
+    {% for inline_admin_formset in inline_admin_formsets %}
+        {% include inline_admin_formset.opts.template %} {# Adiciona forms iniciais #}
+        <a id="botao-{{ inline_admin_formset.formset.prefix }}-group" class="btn add-row" href="#" onclick="return false;">Adicionar {{ inline_admin_formset.opts.verbose_name|capfirst }}</a>
+    {% endfor %}
+
+    <script type="text/javascript">
+        $(function () {
+            $('.add-row').click(function() {  // Adiciona função ao botão de classe add-row
+                return addForm(this.id.replace('botao-','').replace('-group',''));
+            });
+        });
+
+        // Funções para adicionar a máscara de número de processo nos campos de processo físico
+        var v_obj = null
+        var v_fun = null
+
+        // Função para colocar o cursor no fim do campo de texto.
+        $.fn.focusEnd = function() {
+            $(this).focus();
+            var tmp = $('<span />').appendTo($(this)),
+                node = tmp.get(0),
+                range = null,
+                sel = null;
+
+            if (document.selection) {
+                range = document.body.createTextRange();
+                range.moveToElementText(node);
+                range.select();
+            } else if (window.getSelection) {
+                range = document.createRange();
+                range.selectNode(node);
+                sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(range);
+            }
+            tmp.remove();
+            return this;
+        }
+
+        function execmascara(){
+            $(v_obj).text(v_fun($(v_obj).text()));
+            $(v_obj).focusEnd();  // Chamar essa função, senão o cursor volta para o começo do campo de texto.
+        }
+
+        function mascara(o,f){
+            v_obj=o
+            v_fun=f
+            setTimeout("execmascara()",1)
+        }
+
+        function mascara_numero_processo(v){
+            if (v.substr(0,1) == '0')
+            {
+                v = v.substr(1,v.length);
+            }
+
+            if (v.length >= 5 & v.substr(0,5) != '23249')
+            {
+                alert('Codigo que identifica a instituição inválido.');
+                v = "";
+            }
+
+           v=v.replace(/\D/g,"");
+           v=v.replace(/^(\d{5})(\d)/g,"$1.$2");
+           v=v.replace(/(\d{6})(\d)/,"$1.$2");
+           v=v.replace(/^(.{17})(.)/,"$1-$2");
+
+           if (v.length >= 17 & ((parseInt(v.substr(13,4)) < 2013) || (parseInt(v.substr(13,4)) > 2099)))
+            {
+                alert('Ano de protocolo inválido');
+                v = "";
+            }
+
+           if (v.length > 20)
+               v = v.substr(0, 20);
+           return v;
+        }
+
+        function coloca_mascaras_nos_campos_processo(){
+            // IFMA/Tássio: máscara de número de processo.
+            campos = $('div[name$="-processo"]');
+            campos.each(function() {
+                $(this).keyup(function(){
+                    mascara(this, mascara_numero_processo);
+                });
+            });
+        }
+        // FIM - Funções para adicionar a máscara de número de processo nos campos de processo físico
+
+        // Função para atualizar atributos e afins de uma nova linha com o índice correto
+        function updateElementIndex(el, prefix, ndx) {
+            var id_regex = new RegExp("(" + prefix + "-(\\d+|__prefix__))", 'g');
+            var replacement = prefix + '-' + ndx;
+            var termo_script = new RegExp("(" + prefix + "(\\d+|__prefix__))", 'g')
+            var replacement2 = prefix + ndx;
+            // Percorre todos os atributos do elemnto HTML
+            for (var i = 0, atts = el.attributes, n = atts.length, arr = []; i < n; i++){
+                var att = atts[i];
+                $(el).attr(att.nodeName, $(el).attr(att.nodeName).replace(id_regex, replacement).replace(termo_script, replacement2));
+            }
+            $(el).children().each(function() {  // Atualiza todos os filhos também
+                updateElementIndex(this, prefix, ndx);
+            });
+        }
+
+        function addForm(prefix) {
+            var formCount = parseInt($('#id_' + prefix + '-TOTAL_FORMS').val());
+
+            var row = $("#" + prefix + "-empty").clone(true)[0];
+
+            // O campo que for autocompletar precisa passar pelo parseHTML para funcionar.
+            // Se um campo data passar pelo parseHTML, por algum motivo o widget não funciona, por isso não passamos toda a row.
+            $(row).find('.autocomplete').each(function() {
+                var pai = $(this).parent()[0]
+                var field_autocomplete = pai.outerHTML;
+                $(pai).replaceWith($($.parseHTML(field_autocomplete, keepScripts=true)));
+            });
+            // IFMA/Tássio: Não consegui fazer funcionar com o novo widget AutocompleteWidget.
+{#            $(row).find('.select2-container').each(function() {#}
+{#                var pai = $(this).parent()[0];#}
+{#                var field_autocomplete = pai.outerHTML;#}
+{#                $(pai).replaceWith($($.parseHTML(field_autocomplete, keepScripts=true)));#}
+{#            });#}
+            // IFMA/Daniel Lima - Linha a seguir remove Select excedente
+{#            $(row).find(".select2-selection--single[tabindex='0']").each(function(windex, wobj) {#}
+{#                $(wobj).parent().parent().hide();#}
+{#            });#}
+            $(row).removeAttr('id').insertBefore($("#" + prefix + "-empty")).children('.hidden').removeClass('hidden');
+            $(row).removeClass('empty-form').addClass('dynamic-'+prefix);
+            $(row).attr('id', prefix + '-' + formCount);
+            $(row).children().not(':last').each(function() {
+                updateElementIndex(this, prefix, formCount);
+            });
+            $('#id_' + prefix + '-TOTAL_FORMS').val(formCount + 1);
+            coloca_mascaras_nos_campos_processo();
+            return false;
+        }
+
+        // IFMA/Tássio: Coloca botões de adição após tabelas inlines
+        $('.inline-group').each(function() {
+            var inline = this;
+            var botao_add = jQuery("#botao-"+inline.id);
+            $(inline).find("fieldset").first().append(botao_add);
+        });
+    </script>
+
+{% endblock %}

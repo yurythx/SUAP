@@ -1,0 +1,157 @@
+{% extends super_template %}
+
+{% block content %}
+
+    {% for funcionario in funcionarios %}
+        {% box funcionario.funcionario.nome %}
+            
+            <dl class="definition-list flex">
+                <div class="list-item">
+                    <dt>Prestador de Serviço</dt>
+                    <dd>{{ funcionario.funcionario|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Setor/Campus</dt>
+                    <dd>{{ funcionario.funcionario.setor }} - {{ funcionario.funcionario.setor.uo }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Data</dt>
+                    <dd>{{ form.cleaned_data.faixa_0 }} a {{ form.cleaned_data.faixa_1 }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Tempo total</dt>
+                    <dd>{{ funcionario.total_periodo }}</dd>
+                </div>
+            </dl>
+            <ul class="action-bar">
+                <li><button class="btn mostrarTodasObservacoes" data-state="hidden">{% icone "expand-alt" %}&nbsp;&nbsp;<span class="text">Exibir</span> todas as Observações</button></li>
+            </ul>
+            <h4>Frequências</h4>
+            {% if funcionario.frequencias %}
+                <table id="frequencias_pessoa">
+                    <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Registros</th>
+                        <th>Registros Como Servidor</th>
+                        <th>Duração</th>
+                        <th>Observações do Sistema</th>
+                        <th 
+                            rowspan="2"
+                            {% if not mostrar_texto_observacoes %}
+                                class="no-print"
+                            {% endif %}
+                        >
+                            Observações Pessoais
+                        </th>
+                        <th class="no-print">Opções</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for f in funcionario.frequencias %}
+                        <tr>
+                            <td>{{ f.dia|date:"d/m/Y" }} ({{ f.dia|date:"l" }})</td>
+                            <td>
+                                {% for h in f.horarios %}
+                                    {% if h.acao == "E" %}
+                                        <p class="text-nowrap"><strong>{{ h.acao }}</strong>: <span
+                                                class="true">{{ h.horario|date:"H:i:s" }}</span> ({{ h.maquina }})</p>
+                                    {% else %}
+                                        <p class="text-nowrap"><strong>{{ h.acao }}</strong>: <span
+                                                class="false">{{ h.horario|date:"H:i:s" }}</span> ({{ h.maquina }})</p>
+                                    {% endif %}
+                                {% endfor %}
+                            </td>
+                            <td>
+                                {% for key, value in f.horarios_servidor.items %}
+                                    {% for frequencia in value|getkey:'frequencias' %}
+                                        {% if frequencia.acao == "E" %}
+                                            <p class="text-nowrap"><strong>{{ frequencia.acao }}</strong>: <span
+                                                    class="true">{{ frequencia.horario|date:"H:i:s" }}</span>
+                                                ({{ frequencia.maquina }})</p>
+                                        {% else %}
+                                            <p class="text-nowrap"><strong>{{ frequencia.acao }}</strong>: <span
+                                                    class="false">{{ frequencia.horario|date:"H:i:s" }}</span>
+                                                ({{ frequencia.maquina }})</p>
+                                        {% endif %}
+                                    {% endfor %}
+                                {% endfor %}
+                            </td>
+                            <td>{{ f.duracao }}</td>
+                            <td>
+                                {% for l in f.liberacoes %}
+                                    <p>{{ l.descricao }}</p>
+                                {% endfor %}
+                                {% if f.existe_conflitos %}
+                                    <span class="status status-error">{{ f.existe_conflitos }}</span>
+                                {% endif %}
+                            </td>
+                            <td 
+                                {% if not mostrar_texto_observacoes %}
+                                    class="no-print"
+                                {% endif %}
+                            >
+                                {% include "includes/frequencias_observacoes_pessoais.html" %}
+                            </td>
+                            <td class="no-print">
+                                <!-- funcionario.funcionario é uma instância de comum.PrestadorServico -->
+                                {% if funcionario.funcionario.pessoa_fisica.pk == request.user.get_profile.pk %}
+                                    <a class="btn success popup" href='/ponto/observacao_adicionar/{{ f.dia|date:"dmY" }}/'>Adicionar Observação</a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="alert alert-warning">Nenhuma frequência encontrada.</p>
+            {% endif %}
+        {% endbox %}
+        {% empty %}
+        <p class="alert alert-warning">Nenhum funcionário encontrado.</p>
+    {% endfor %}
+
+<script>
+    jQuery(document).ready(function() {
+        $(".mostrarTodasObservacoes").on('click', function() {
+            let state = $(this).data('state');
+            let icones = $(".mostrarObservacoes").find("span.fas");
+            $(this).find("span.fas").toggleClass("fa-expand-alt").toggleClass("fa-compress-alt");
+            if (state == "hidden") {
+                $(this).find("span.text").html("Esconder");
+                jQuery("ul.comments").removeClass("d-none");
+                $(icones).each(function() {
+                    if ($(this).hasClass("fa-expand-alt")) {
+                        $(this).removeClass("fa-expand-alt").addClass("fa-compress-alt");
+                    }
+                });
+                $(this).data('state', 'on');
+            } else {
+                $(this).find("span.text").html("Exibir");
+                jQuery("ul.comments").addClass("d-none");
+                $(icones).each(function() {
+                    if (!$(this).hasClass("fa-expand-alt")) {
+                        $(this).addClass("fa-expand-alt").removeClass("fa-compress-alt");
+                    }
+                });
+                $(this).data('state', 'hidden');
+            }
+        });
+
+        jQuery(".mostrarObservacoes").on('click', function() {
+            jQuery(this).next("ul.comments").toggleClass("d-none");
+            jQuery(this).find("span.fas").toggleClass("fa-expand-alt").toggleClass("fa-compress-alt");
+
+            let anchor = $(this).data('anchor');
+            let alvo = anchor ? $("#" + anchor) : $();
+            // anchor ausente ou elemento inexistente => offset() é undefined e .top
+            // estoura (Sentry SUAP-TD9).
+            if (alvo.length) {
+                $([document.documentElement, document.body]).animate({
+                    scrollTop: alvo.offset().top
+                }, 600);
+            }
+        });
+    });
+</script>
+{% endblock %}

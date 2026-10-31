@@ -1,0 +1,197 @@
+{% extends super_template %}
+
+{% block content %}
+    <ul class="action-bar exibe-outros-dias">
+        <li>
+            <a href="/ponto/ver_compensacao_detalhada/?data_inicio={{ data|date:'Y-m-d'}}&data_fim={{ data|date:'Y-m-d'}}" class="btn default {% if is_popup %}popup{% endif %}">
+                Detalhamento dos cálculos
+            </a>
+        </li>        
+        <li>
+            <a href="/ponto/detalhar_compensacao/{{ matricula }}/{{ dia_anterior|date:'dmY' }}" class="btn {% if is_popup %}popup{% endif %}">
+                <i class="fa fa-arrow-left"></i>&nbsp;{{ dia_anterior|date:'l' }}, {{ dia_anterior }}
+            </a>
+        </li>
+        <li>
+            <a href="/ponto/detalhar_compensacao/{{ matricula }}/{{ dia_seguinte|date:'dmY' }}" class="btn {% if is_popup %}popup{% endif %}">
+                {{ dia_seguinte|date:'l' }}, {{ dia_seguinte }}&nbsp;<i class="fa fa-arrow-right"></i>
+            </a>
+        </li>
+    </ul>
+    
+    {% box 'Dados gerais' %}
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>Servidor</dt>
+                <dd>{{ servidor }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Data</dt>
+                <dd>
+                    {{ data|date:'l' }}, {{ data }}
+                    {% if not is_debito and not is_saldo %}
+                        <span class='status status-alert'>Nenhuma informação sobre débito ou saldo no dia</span>
+                    {% endif %}
+                </dd>
+            </div>
+        </dl>
+    {% endbox %}
+                
+    {% if is_debito %}
+        {% box 'Débito' %}
+            {% if debitos_externos %}
+                <p class="alert alert-info">
+                    <strong>Atenção: </strong> 
+                    Os valores de carga horária a seguir incluem dados originados tanto de frequências (ponto) quanto de débitos externos.
+                </p>
+            {% endif %}
+
+            {% if abonos_parciais %}
+                <div class="alert alert-info">
+                    <p><strong>Há abonos parciais neste dia:</strong></p> 
+                    <ul>
+                        <li>O débito inicialmente calculado foi de <strong>{{ debito_inicial_display }}.</strong></li>
+                        <li>O débito desconsiderado foi de <strong>{{ debito_desconsiderado_display }}.</strong></li>
+                    </ul>
+                </div>
+            {% endif %}
+
+            <dl class="definition-list flex">
+                <div class="list-item">
+                    <dt>Débito Considerado</dt>
+                    <dd class="false">
+                        {{ debito_display }}
+                    </dd>
+                </div>
+                {% if debitos_externos %}
+                    <div class="list-item">
+                        <dt>Débito via Frequências</dt>
+                        <dd>
+                            <a class="popup false" href="/ponto/ver_frequencia/{{ servidor.matricula }}/?datas={{ data|date:'dmY' }}">{{ debito_ponto_display }}</a>
+                        </dd>
+                    </div>
+                {% endif %}    
+                {% for debito_externo in debitos_externos %}
+                    <div class="list-item">
+                        <dt>Débito Externo</dt>
+                        <dd>
+                            <a class="popup false" href="{{ debito_externo.cadastro.get_absolute_url }}">{{ debito_externo.get_valor_debito_display_2 }}</a>
+                            <span class="status status-alert text-nowrap-normal">{{ debito_externo|truncatechars:120 }}</span>
+                        </dd>
+                    </div>
+                {% endfor %}
+                {% for acompanhamento in debito_acompanhamentos_especificos %}
+                    <div class="list-item">
+                        <dt>Compensação Específica</dt>
+                        <dd>
+                            <a class="popup" href="{{ acompanhamento.get_absolute_url }}">{{ acompanhamento }}</a>
+                        </dd>
+                    </div>
+                {% endfor %}
+                <div class="list-item">
+                    <dt>Débito Pago/Compensado</dt>
+                    <dd class="true">{{ total_paga_display }}&nbsp;{% if not debito_restante %}(<strong>100%</strong>){% endif %}</dd>
+                </div>
+                {% if debito_restante %}
+                    <div class="list-item">
+                        <dt>Débito Restante</dt>
+                        <dd class="false">{{ debito_restante_display }}</dd>
+                    </div>
+                {% endif %}
+            </dl>
+        {% endbox %}    
+    {% endif %}    
+
+    {% if compensacoes_paga %}
+        {% box 'Detalhamento da Compensação do Débito' %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Duração</th>
+                            <th>Data da Compensação/Saldo</th>
+                            <th>Saldo Externo Utilizado</th>
+                            <th class="no-print">Opções</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for compensacao in compensacoes_paga %}
+                            <tr>
+                                <td>{{ compensacao.ch_compensada|date:"H:i:s" }}</td>
+                                <td>
+                                    {{ compensacao.data_compensacao|format }}
+                                </td>
+                                <td>
+                                    {% if compensacao.saldo_externo_compensacao %}
+                                        <a class="popup" href="{{ compensacao.saldo_externo_compensacao.get_absolute_url }}">{{ compensacao.saldo_externo_compensacao }}</span>
+                                    {% else %}    
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td class="no-print">
+                                    <ul class="action-bar">
+                                        <li>
+                                            <a class="btn default popup" href="/ponto/abrir_compensacao_horario/{{ compensacao.id }}/"><span class="fa fa-search" aria-hidden="true"></span>Detalhes do Informe</a>
+                                        </li>
+                                    </ul>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endbox %}
+    {% endif %}
+                
+    {% if is_saldo %}
+        {% box 'Saldo' %}
+            <dl class="definition-list flex">
+                <div class="list-item">
+                    <dt>Saldo Considerado</dt>
+                    <dd class="true">{{ saldo_display }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Saldo Utilizado</dt>
+                    <dd class="true">{{ total_utilizada_display }}&nbsp;{% if not saldo_restante %}(<strong>100%</strong>){% endif %}</dd>
+                </div>
+                {% if saldo_restante %}
+                    <div class="list-item">
+                        <dt>Saldo Restante</dt>
+                        <dd class="true">{{ saldo_restante_display }}</dd>
+                    </div>
+                {% endif %}
+            </dl>
+        {% endbox %}
+    {% endif %}
+
+    {% if compensacoes_utilizada %}
+        {% box 'Detalhamento da Utilização do Saldo' %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <th>Duração</th>
+                        <th>Data do Débito</th>
+                        <th class="no-print">Ações</th>
+                    </thead>
+                    <tbody>
+                        {% for compensacao in compensacoes_utilizada %}
+                            <tr>
+                                <td>{{ compensacao.ch_compensada|date:"H:i:s" }}</td>
+                                <td>
+                                    {{ compensacao.data_aplicacao }}
+                                </td>
+                                <td class="no-print">
+                                    <ul class="action-bar">
+                                        <li>
+                                            <a class="btn default popup" href="/ponto/abrir_compensacao_horario/{{ compensacao.id }}/"><span class="fa fa-search" aria-hidden="true"></span>Detalhes do Informe</a>
+                                        </li>
+                                    </ul>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endbox %}
+    {% endif %}
+{% endblock %}

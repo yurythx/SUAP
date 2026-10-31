@@ -1,0 +1,365 @@
+{% extends super_template %}
+
+
+{% block content %}
+
+	{% box "Dados da Oferta de Vaga" %}
+
+		<dl class="definition-list flex">
+			<div class="list-item flex-basis-100">
+				<dt>Edital</dt>
+				<dd><a href="/processo_seletivo/edital/{{ oferta_vaga.oferta_vaga_curso.edital.pk }}/">{{ oferta_vaga.oferta_vaga_curso.edital }}</a></dd>
+			</div>
+			<div class="list-item">
+				<dt>Curso</dt>
+				<dd>{{ oferta_vaga.oferta_vaga_curso.curso_campus.descricao_historico }} - {{ oferta_vaga.oferta_vaga_curso.curso_campus.diretoria.setor.uo.nome }} {% if oferta_vaga.oferta_vaga_curso.turno %}- {{ oferta_vaga.oferta_vaga_curso.turno }}{% endif %} {% if oferta_vaga.ofertavaga.linha_pesquisa_id %}({{ oferta_vaga.ofertavaga.linha_pesquisa|format }}){% endif %}</dd>
+			</div>
+            <div class="list-item">
+                <dt>Lista</dt>
+				<dd>{{ oferta_vaga.lista }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Quantidade de Vagas</dt>
+                <dd>
+                    {{ oferta_vaga.qtd }}
+                    {% if oferta_vaga.get_qtd_vagas_extras %}
+                        + {{ oferta_vaga.get_qtd_vagas_extras }}
+                    {% endif %}
+                </dd>
+            </div>
+            {% if calendario_academico %}
+                <div class="list-item">
+                    <dt>Calendário Acadêmico</dt>
+                    <dd><a class="popup" href="/edu/calendarioacademico/{{ calendario_academico.pk }}/">{{ calendario_academico }}</a></dd>
+                </div>
+                <div class="list-item">
+                    <dt>Início das Aulas</dt>
+                    <dd>{{ calendario_academico.data_inicio_etapa_1|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Fim do Período de Matrícula</dt>
+                    <dd>{{ data_fim_matricula|format }}</dd>
+                </div>
+            {% endif %}
+		</dl>
+
+	{% endbox %}
+
+
+    {% if oferta_vaga.oferta_vaga_curso.edital.permite_adicionar_candidato_classificacao and oferta_vaga.get_criacao_classificacao.exists %}
+    {% box "Inclusão de Candidatos" %}
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Candidato</th>
+                        <th>Data</th>
+                        <th>Responsável</th>
+                        <th>Justificativa</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for criacao in oferta_vaga.get_criacao_classificacao.all %}
+                        <tr>
+                            <td>{{ criacao.candidato_vaga.candidato }}</td>
+                            <td>{{ criacao.data|format }}</td>
+                            <td>{{ criacao.responsavel|format }}</td>
+                            <td>{{ criacao.justificativa }}</td>
+                            <td>
+                                {% if criacao.pode_ser_excluida and criacao.responsavel == request.user %}
+                                <a href="?excluir_criacao_vaga={{ criacao.pk }}" class="btn danger">Excluir</a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endbox %}
+    {% endif %}
+
+    {% if oferta_vaga.oferta_vaga_curso.edital.permite_adicionar_vagas_extras or oferta_vaga.oferta_vaga_curso.edital.permite_adicionar_candidato_classificacao %}
+    {% if oferta_vaga.criacaovagaremanescente_set.exists %}
+    {% box "Criação de Vagas" %}
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Quantidade</th>
+                        <th>Justificativa</th>
+                        <th>Data</th>
+                        <th>Responsável</th>
+                        {% if oferta_vaga.oferta_vaga_curso.edital.permite_adicionar_vagas_extras %}
+                        <th>Ações</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for criacao in oferta_vaga.criacaovagaremanescente_set.all %}
+                        <tr>
+                            <td>{{ criacao.qtd }}</td>
+                            <td>{{ criacao.justificativa }}</td>
+                            <td>{{ criacao.data|format }}</td>
+                            <td>{{ criacao.responsavel|format }}</td>
+                            {% if oferta_vaga.oferta_vaga_curso.edital.permite_adicionar_vagas_extras %}
+                            <td>
+                                {% if criacao.registroajustecriacaovagaremanescente_set.exists %}
+                                    <a href="/processo_seletivo/historico_ajuste_vaga_remanescente/{{ criacao.pk }}/" class="btn default popup">Visualizar Ajustes</a>
+                                {% endif %}
+                                <a href="/processo_seletivo/corrigir_vagas_remanescentes/{{ criacao.pk }}/" class="btn default popup">Corrigir Quantidade de Vagas</a>
+                            </td>
+                            {% endif %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endbox %}
+    {% endif %}
+    {% endif %}
+
+	{% box "Candidatos" %}
+
+        <ul class="action-bar">
+            <li><a href="/processo_seletivo/edital/{{ oferta_vaga.oferta_vaga_curso.edital.pk }}/?tab=vagas&uo_selecionada={{ oferta_vaga.oferta_vaga_curso.curso_campus.diretoria.setor.uo.pk }}{% if polos and polo %}&polo_selecionado={{ polo }}{% endif %}#{{ oferta_vaga.oferta_vaga_curso.pk }}" class="btn default">Voltar para o Edital</a></li>
+            {% if pode_convocar %}
+                {% if oferta_vaga.oferta_vaga_curso.edital.permite_adicionar_vagas_extras %}
+                    <li><a href="/processo_seletivo/criar_vaga_remanescente/{{ oferta_vaga.pk }}/" class="btn success popup">Criar Vaga Remanescente</a></li>
+                {% endif %}
+                {% if oferta_vaga.oferta_vaga_curso.edital.permite_adicionar_candidato_classificacao %}
+                    <li><a href="/processo_seletivo/adicionar_candidato_classificacao/{{ oferta_vaga.pk }}/" class="btn success popup">Adicionar Candidato</a></li>
+                {% endif %}
+            {% endif %}
+        </ul>
+
+        {% if not pode_realizar_acao %}
+            <p class="alert alert-warning">O prazo para realização de matrícula expirou.</p>
+        {% endif %}
+        <p class="alert alert-info">O controle das vagas por polo deve ser realizada pelo Secretário Acadêmico.</p>
+
+        {% if oferta_vaga.qtd_semestre_1 or oferta_vaga.qtd_semestre_2 %}
+            {% if oferta_vaga.qtd_semestre_1 %}
+                <p class="alert alert-info">{{ oferta_vaga.qtd_semestre_1 }}</b> vaga{% if oferta_vaga.qtd_semestre_1 > 1 %}s{% endif %} para o <b>1º SEMESTRE</b></p>
+            {% endif %}
+            {% if oferta_vaga.qtd_semestre_2 %}
+                <p class="alert alert-info">{{ oferta_vaga.qtd_semestre_2 }}</b> vaga{% if oferta_vaga.qtd_semestre_2 > 1 %}s{% endif %} para o <b>2º SEMESTRE</b></p>
+            {% endif %}
+        {% endif %}
+
+        <div class="search-and-filters mt-4" id="polo">
+            <div class="filter">
+                {% if polos %}
+                <label>Polo:</label>
+                <select class="text-center" onchange="document.location.href='/processo_seletivo/classificados/{{ oferta_vaga.pk }}/'+$(this).val()+'/#polo'">
+                    {% for item in polos %}
+                        <option {% if item == polo %}selected{% endif %}>{{ item }}</option>
+                    {% endfor %}
+                </select>
+                {% endif %}
+                <label>Nome/CPF:</label>
+                <input type="text" name="q" id="q" value="{{ request.GET.q|default:'' }}">
+            </div>
+            <script>
+                $('#q').keypress(function(e) {if ((e.keyCode ? e.keyCode : e.which) == '13') window.location.href = window.location.href.split('?q=')[0]+'?q='+this.value;});
+            </script>
+        </div>
+
+        {% if candidatos_vagas.exists and pode_realizar_acao and pode_convocar %}
+            <ul class="action-bar">
+                <li><a href="/processo_seletivo/realizar_acao_lote/{{ oferta_vaga.pk }}/" class="btn popup">Realizar Ação em Lote</a></li>
+                <li><a href="?xls_candidatos=1" class="btn">Exportar Candidatos para Excel</a></li>
+            </ul>
+        {% endif %}
+
+        {% for grupo, candidatos_vagas in grupos_candidatos_vaga %}
+
+            <h4>{{ grupo }}</h4>
+
+            {% if candidatos_vagas.exists %}
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Classificação</th>
+                                <th>Dados do Candidato</th>
+                                <th>Situação</th>
+                                <th>Convocação</th>
+                                {% if oferta_vaga.qtd_semestre_1 or oferta_vaga.qtd_semestre_1 %}
+                                    <th>Semestre</th>
+                                {% endif %}
+                                {% if oferta_vaga.curso_campus.diretoria.ead %}
+                                    <th>Polo</th>
+                                {% endif %}
+                                <th>Situação</th>
+                                {% if pode_realizar_acao and pode_convocar %}
+                                    <th class="no-print">Opções</th>
+                                {% endif %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% autopaginate candidatos_vagas 200 %}
+                            {% for candidatovaga in candidatos_vagas %}
+                            <tr id="{{ candidatovaga.pk }}">
+                                <td class="text-center">
+                                    {% if candidatovaga.classificacao %}
+                                        {{ candidatovaga.classificacao }}º Lugar
+                                        {% if candidatovaga.classificacao_para_divulgacao %}
+                                            <br>({{ candidatovaga.classificacao_para_divulgacao  }}º Lugar)
+                                        {% endif %}
+                                    {% else %}
+                                        -
+                                    {% endif %}</td>
+                                <td>
+                                    <p><strong>{{ candidatovaga.candidato.cpf }}</strong></p>
+                                    <p><strong>{{ candidatovaga.candidato.nome }}</strong></p>
+                                    <p>{{ candidatovaga.candidato.inscricao|format }}</p>
+                                    <p>{{ candidatovaga.candidato.telefone|format }}</p>
+                                    <p>{{ candidatovaga.candidato.email|format }}</p>
+                                    {% if candidatovaga.candidato.campus_polo %}
+                                        <p>Polo {{ candidatovaga.candidato.campus_polo }}</p>
+                                    {% endif %}
+                                    {% with get_banca_avaliacao=candidatovaga.get_banca_avaliacao %}
+                                        <br>
+                                        <dl>
+                                            {% for tipo_banca, situacao, cor in get_banca_avaliacao %}
+                                                <dt>{{ tipo_banca }}:</dt>
+                                                <dd style="color: {{ cor }}">{{ situacao }}</dd>
+                                            {% endfor %}
+                                        </dl>
+                                    {% endwith %}
+                                </td>
+                                <td>
+                                    {% if candidatovaga.aprovado %}
+                                        <span class="status status-success">Aprovado</span>
+                                    {% else %}
+                                        <span class="status status-alert">Em Espera</span>
+                                    {% endif %}
+                                    {% if candidatovaga.convocacao %}
+                                        {% if not candidatovaga.situacao %}
+                                            {% if candidatovaga.vaga and candidatovaga.vaga.oferta_vaga != oferta_vaga %}
+                                                <p>
+                                                    <strong>Origem:</strong>
+                                                    {{ candidatovaga.vaga }}
+                                                    {% if candidatovaga.vaga.oferta_vaga.oferta_vaga_curso.campus_polo != oferta_vaga.oferta_vaga_curso.campus_polo %}
+                                                        (<i>{{ oferta_vaga.oferta_vaga_curso.campus_polo }}.</i>)
+                                                    {% endif %}
+                                                </p>
+                                            {% endif %}
+                                        {% endif %}
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    {% if candidatovaga.convocacao %}
+                                        {{ candidatovaga.convocacao }}ª Chamada <br>
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                {% if oferta_vaga.qtd_semestre_1 or oferta_vaga.qtd_semestre_1 %}
+                                    <td align="center">
+                                    {% with periodo_letivo=candidatovaga.get_periodo_letivo_apto_matricula %}
+                                        {% if periodo_letivo.0 and periodo_letivo.1 %}
+                                            {{ periodo_letivo.0 }}/{{ periodo_letivo.1 }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    {% endwith %}
+                                    </td>
+                                {% endif %}
+                                {% if oferta_vaga.curso_campus.diretoria.ead %}
+                                    <td>{{ candidatovaga.candidato.campus_polo }}</td>
+                                {% endif %}
+                                <td id="situacao{{ candidatovaga.pk }}">
+                                    {% if candidatovaga.situacao %}
+                                        {% with status=candidatovaga.get_status %}
+                                        <span class="status status-{{ status.1 }} {% if status.2 %} hint hint-bottom {% endif %}" {% if status.2 %}aria-label="Matrícula realizada em {{ status.2 }}"{% endif %}>
+                                            {% if candidatovaga.situacao == "1" %}
+                                                {% with aluno=candidatovaga.get_aluno %}
+                                                    {% if aluno %}
+                                                        <a target="_blank" href="/edu/aluno/{{ aluno.matricula }}/">{{ status.0 }}</a>
+                                                    {% else %}
+                                                        {{ status.0 }}
+                                                    {% endif %}
+                                                {% endwith %}
+                                            {% else %}
+                                                {{ status.0 }}
+                                            {% endif %}
+                                            {% if candidatovaga.utilizou_vaga_migrada and candidatovaga.situacao == "1" %}
+                                                <br>(Lista {{ candidatovaga.vaga }})
+                                            {% endif %}
+                                        </span>
+                                        {% endwith %}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                {% if pode_realizar_acao and pode_convocar %}
+                                <td class="no-print" align="center">
+                                    {% if candidatovaga.convocacao %}
+                                        {% if not candidatovaga.situacao %}
+                                            {% if candidatovaga.pode_realizar_acao %}
+                                            <ul class="action-bar">
+                                                <li class='has-child'>
+                                                    <a class="btn" href="#">Ações</a>
+                                                    <ul>
+                                                        {% if candidatovaga.vaga %}
+                                                            {% if not candidatovaga.is_reprovado_banca %}
+                                                                <li><a href="/edu/efetuar_matricula/{{ candidatovaga.pk }}/">Matricular</a></li>
+                                                            {% endif %}
+                                                            {% if is_administrador %}
+                                                                <li><a href="/processo_seletivo/vincular_matricula/{{ candidatovaga.pk }}/">Vincular Matrícula</a></li>
+                                                            {% endif %}
+                                                            {% if is_debug %}
+                                                                <li><a href="?simular={{ candidatovaga.pk }}&{{ request.META.QUERY_STRING }}">Simular Matrícula</a></li>
+                                                            {% endif %}
+                                                            <li><a href="?ausencia={{ candidatovaga.pk }}&{{ request.META.QUERY_STRING }}">Registrar Ausência</a></li>
+                                                            <li><a href="?inaptidao={{ candidatovaga.pk }}&{{ request.META.QUERY_STRING }}">Registrar Inaptidão</a></li>
+                                                            {% if oferta_vaga.is_cota_etnica %}
+                                                                <li><a href="?inaptidao_hetero_identificacao={{ candidatovaga.pk }}&{{ request.META.QUERY_STRING }}">Registrar Inaptidão (Hetero-identificação)</a></li>
+                                                            {% endif %}
+                                                            {% if oferta_vaga.is_cota_quilombola %}
+                                                                <li><a href="?inaptidao_quilombola={{ candidatovaga.pk }}&{{ request.META.QUERY_STRING }}">Registrar Inaptidão (Quilombola)</a></li>
+                                                            {% endif %}
+                                                            {% if oferta_vaga.is_cota_baixa_renda %}
+                                                                <li><a href="?inaptidao_baixa_renda={{ candidatovaga.pk }}&{{ request.META.QUERY_STRING }}">Registrar Inaptidão (Baixa Renda)</a></li>
+                                                            {% endif %}
+                                                            {% if oferta_vaga.is_cota_escola_publica %}
+                                                                <li><a href="?inaptidao_escola_publica={{ candidatovaga.pk }}&{{ request.META.QUERY_STRING }}">Registrar Inaptidão (Escola Pública)</a></li>
+                                                            {% endif %}
+                                                            {% if oferta_vaga.is_cota_deficiencia %}
+                                                                <li><a href="?inaptidao_deficiencia={{ candidatovaga.pk }}&{{ request.META.QUERY_STRING }}">Registrar Inaptidão (Deficiência)</a></li>
+                                                            {% endif %}
+                                                            {% if permite_remanejar %}
+                                                                <li><a href="?remanejamento={{ candidatovaga.pk }}&{{ request.META.QUERY_STRING }}">Remanejar para Geral</a></li>
+                                                            {% endif %}
+                                                        {% endif %}
+                                                        {% if candidatovaga.is_inconsistente and is_administrador %}
+                                                            <li><a href="/processo_seletivo/vincular_vaga/{{ candidatovaga.pk }}/">Vincular Vaga</a></li>
+                                                        {% endif %}
+                                                    </ul>
+                                                </li>
+                                            </ul>
+                                            {% endif %}
+                                        {% else %}
+                                            {% if request.user.is_superuser or candidatovaga.convocacao == ultima_chamada %}
+                                                {% if perms.processo_seletivo.change_edital or not candidatovaga.situacao == '1' %}
+                                                    <a class="btn warning confirm" data-confirm="{% if candidatovaga.situacao == '1' %}Esse procedimento acarretará na exclusão do aluno. Deseje continuar?{% else %}Tem certeza que deseja desfazer o procedimento?{% endif %}" href="?desfazer={{ candidatovaga.pk }}&{{ request.META.QUERY_STRING }}">Desfazer</a>
+                                                {% endif %}
+                                            {% endif %}
+                                        {% endif %}
+                                    {% endif %}
+                                </td>
+                                {% endif %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% paginate %}
+                </div>
+            {% else %}
+                <p class="alert alert-warning">Nenhum candidato na lista de "{{ grupo }}" para esta oferta de vaga.</p>
+            {% endif %}
+        {% endfor %}
+	{% endbox %}
+{% endblock %}

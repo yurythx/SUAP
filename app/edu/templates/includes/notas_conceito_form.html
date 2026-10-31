@@ -1,0 +1,711 @@
+<script>
+    function validar_nota(input, id_avaliacao, etapa) {
+        var valor = input.value.toUpperCase();
+        input.value = valor
+        if (valor.codePointAt(0) < 65 | valor.codePointAt(0) > 90) {
+            input.value = "";
+            alert("O conceito deve ser uma letra.");
+        }
+        else if (valor.length > 1) {
+            input.value = "";
+            alert("O conceito deve ser uma letra.");
+        }
+
+        else {
+            var registrar_nota = false;
+            var faixas = "";
+            if (valor == ""){
+                registrar_nota = true
+            }else{
+                {% for conceito in obj.estrutura_curso.get_representacoesconceituais %}
+                    if (valor == '{{ conceito.descricao }}') {
+                        registrar_nota = true
+                    }
+                    faixas += "{{ conceito.descricao }}\n";
+                {% endfor %}
+            }
+            if (!registrar_nota) {
+                alert('O conceito deve ser em um desses valores:\n' + faixas);
+                input.value = "";
+            }
+            if (registrar_nota & input.oldvalue != input.value) {
+                var n = valor;
+                if (etapa != 0){
+                    if (valor == ''){
+                        var url = "/edu/registrar_conceito_final_ajax/" + id_avaliacao + "/" + etapa + "/";
+                    }
+                    else{
+                        var url = "/edu/registrar_conceito_final_ajax/" + id_avaliacao + "/" + etapa + "/" + n + "/";
+                    }
+                }
+                else{
+                    if (valor == ''){
+                        var url = "/edu/registrar_conceito_ajax/" + id_avaliacao + "/";
+                    }
+                    else{
+                        var url = "/edu/registrar_conceito_ajax/" + id_avaliacao + "/" + n + "/";
+                    }
+                }
+                $.ajax({
+                    url: url,
+                    method: 'GET',
+                    context: input,
+                    error: function(xhr) {
+                        $( input ).val(input.oldvalue).addClass( 'errors' );
+                        // Usa a mensagem do servidor quando houver (ex.: 403 sem permissão);
+                        // senão, assume falha de conexão.
+                        var texto = (xhr && xhr.responseJSON && xhr.responseJSON.erro) || 'Problema ao tentar salvar conceito. Verifique sua conexão com a internet.';
+                        msg = '<span style="position:fixed;top:0;left:0" id="'+id_avaliacao+'" class="alert alert-danger">'+texto+'</span>';
+                    	$('#message').append(msg);
+                    	$('#'+id_avaliacao).delay(5000).fadeOut(500, function() { $(this).remove(); });
+                    },
+                    success: function(retorno) {
+                    	$( input ).removeClass().addClass( 'int filled' );
+                    	msg = '<span style="position:fixed;top:0;left:0" id="'+id_avaliacao+'" class="alert alert-success">Conceito salvo!</span>';
+                    	$('#message').append(msg);
+                    	$('#'+id_avaliacao).delay(2500).fadeOut(500, function() { $(this).remove(); });
+                    	$(input).parent().parent().parent().find('input.int.disabled-input').val(retorno.etapa);
+                    	$(input).parent().parent().parent().parent().parent().parent().find('span.md').html(retorno.media);
+                    	$(input).parent().parent().parent().parent().parent().parent().find('span.mfd').html(retorno.media_final);
+                    	matricula_pk = $(input).attr('name').split(';')[1]
+                    	etapa = $(input).attr('name').split(';')[0]
+                    	if (etapa == 5){
+                    		if(retorno.em_prova_final){
+                    			$('#input_5_'+matricula_pk).removeClass().addClass( 'int filled' );
+                    		}
+                    		else if(retorno.prova_final_invalida){
+                    			$('#input_5_'+matricula_pk).removeClass().addClass( 'int error' );
+                    		}
+                    		else{
+                    			$('#input_5_'+matricula_pk).attr('type', 'hidden')
+                        		$('#label_5_'+matricula_pk).attr('style', 'display:block')
+                        		$('#label_5_'+matricula_pk).html('-')
+                    		}
+                    	}
+                    	else{
+                    		if(retorno.em_prova_final || retorno.prova_final_invalida){
+                        		$('#input_5_'+matricula_pk).attr('type', 'text')
+                        		$('#label_5_'+matricula_pk).attr('style', 'display:none')
+                        	}
+                        	else{
+                        		$('#input_5_'+matricula_pk).attr('type', 'hidden')
+                        		$('#label_5_'+matricula_pk).attr('style', 'display:block')
+                        	}
+                        	if (!retorno.em_prova_final && retorno.prova_final_invalida){
+                        		$('#input_5_'+matricula_pk).removeClass().addClass( 'int error' );
+                        	}
+                        	else{
+                        		$('#input_5_'+matricula_pk).removeClass().addClass( 'int' );
+                        	}
+                    	}
+                        // Sem permissão de lançamento a view responde vazio (sem 'situacao'),
+                        // e retorno.situacao.status estourava (Sentry SUAP-VD7).
+                        if (retorno.situacao) {
+                            $(input).parent().parent().parent().parent().parent().parent().find('span.status').removeClass().addClass('status status-'+retorno.situacao.status);
+                            $(input).parent().parent().parent().parent().parent().parent().find('span.status').html(retorno.situacao.rotulo);
+                        }
+                    }
+                });
+            }
+        }
+    }
+</script>
+<style>
+    .nota {
+        padding-top: 1px;
+        height: 40px;
+        width: 90px;
+    }
+    .disabled-input {
+        background-color: inherit !important;
+        border-width: 0px !important;
+    }
+    table#table_notas.info td {
+        background-color: inherit !important;
+    }
+</style>
+
+<span id="message"></span>
+
+{% if polos %}
+<div class="search-and-filters" id="polo">
+    <div class="filter">
+        <label>Polo:</label>
+        <select class="text-center" onchange="document.location.href={% if professor_diario %}'/edu/meu_diario/{{ obj.pk }}/{{ etapa }}/'+$(this).val()+'/?tab=notas#polo'{% else %}'/edu/diario/{{ obj.pk }}/'+$(this).val()+'/?tab=notas_faltas#polo'{% endif %}">
+            <option {% if 0 == polo_pk %}selected{% endif %} value="0">Todos</option>
+            {% for polo in polos %}
+                <option {% if polo.pk == polo_pk %}selected{% endif %} value="{{ polo.pk }}">{{ polo }}</option>
+            {% endfor %}
+        </select>
+    </div>
+</div>
+{% endif %}
+
+<form method="post" class="mt-2">
+    {% for matriculas in matriculas_diario_por_polo %}
+        {% box matriculas.0.matricula_periodo.aluno.polo|default:'Registro de Conceito' %}
+
+            <div class="alert alert-info">
+                <p><strong>Atenção</strong>:</p>
+                <ul>
+                    <li>O salvamento dos conceitos é realizado de forma individual, para isso, basta remover o foco da caixa de texto relativa ao conceito, seja clicando com o mouse fora da caixa ou utilizando a tecla <code>Tab</code>, e aguardar a mensagem de sucesso: "Conceito salvo!". Esta mensagem somente irá aparecer caso houver uma mudança no conceito ou se o conceito estiver sendo informada pela primeira vez.</li>
+                    <li>Evite utilizar de mais de 1 aba no navegador para o registro de conceito.</li>
+                </ul>
+            </div>
+
+            <div class="alert alert-info">
+                <p>Esta disciplina aceita o registro dos conceitos:</p>
+                <ul>
+                    {% for conceito in obj.estrutura_curso.get_representacoesconceituais %}
+                        <li><strong>{{ conceito.descricao }}</strong></li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            {% csrf_token %}
+            {% if matriculas.exists %}
+                <div id="notas_input_ocultar_msg"></div>
+                <div class="checkbox">
+                    <input id="notas_input_ocultar" type="checkbox" onchange="exibirAlunosInativosNotas(this)"/>
+                    <label for="notas_input_ocultar">
+                    	<span class="negrito">Exibir alunos trancados, cancelados, transferidos ou com período letivo fechado.</span>
+                    </label>
+                </div>
+                <div class="checkbox">
+                    <input id="select_all" type="checkbox" onchange="(function(cb){var is = $('#table_notas').find('input');for(var i=0;i<is.length;i++){if(is[i].name=='del_aluno_diario') is[i].checked = cb.checked; }})(this);">
+                    <label for="select_all">Selecionar todos os alunos</label>
+                </div>
+                <div class="checkbox">
+                    <input id="tab_by_cell" type="checkbox">
+                    <label for="tab_by_cell"><strong>Modo de navegação por Tab:</strong> quando ativo, <em>Tab</em> pula entre provas (colunas) do mesmo aluno; quando desativado, Tab segue a ordem natural do navegador. Pressione <kbd>Ctrl+M</kbd> para alternar.</label>
+                </div>
+                <div class="table-responsive">
+                <table id="table_notas">
+                    <thead>
+                    <tr>
+                        <th>#</th>
+                        {% if pode_realizar_procedimentos %}
+                            <th>
+                                <input type="checkbox" onchange="var is = this.parentNode.parentNode.parentNode.parentNode.getElementsByTagName('input');for(var i=0; i<is.length; i++){ is[i].checked = this.checked;}"/>
+                            </th>
+                        {% endif %}
+                        <th>Aluno</th>
+                        {% if qtd_avaliacoes > 0 %}
+                            <th class="text-center">Etapa {{ obj.get_numero_primeira_etapa }}</th>
+                        {% endif %}
+                        {% if qtd_avaliacoes > 1 %}
+                            <th class="text-center">Etapa {{ obj.get_numero_segunda_etapa }}</th>
+                        {% endif %}
+                        {% if qtd_avaliacoes > 2 %}
+                            <th class="text-center">Etapa 3</th>
+                        {% endif %}
+                        {% if qtd_avaliacoes > 3 %}
+                            <th class="text-center">Etapa 4</th>
+                        {% endif %}
+                        {% if qtd_avaliacoes > 0 %}
+                            {% if not etapa or etapa > 0 %}
+                                <th class="text-center">Conceito Final</th>
+                            {% endif %}
+                        {% endif %}
+                        {% if request.GET.debug or professor_diario %}
+                            {% if qtd_avaliacoes > 0 %}
+                                <th class="text-center">Situação do Aluno no Diário</th>
+                            {% endif %}
+                        {% endif %}
+                        {% if request.GET.debug or not qtd_avaliacoes > 0 %}
+                            <th class="text-center">Freq. (%)</th>
+                        {% endif %}
+                        {% if request.GET.debug or not qtd_avaliacoes > 0 %}
+                            {% if request.GET.debug or professor_diario %}
+                                <th class="text-center">Situação da frequência</th>
+                            {% endif %}
+                        {% endif %}
+                        {% if request.GET.debug or not professor_diario %}
+                            <th class="text-center">Situação Diário</th>
+                        {% endif %}
+                        {% if pode_realizar_procedimentos %}
+                            <th class="no-print">Opções</th>
+                        {% endif %}
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for matriculadiario in matriculas %}
+                        {% with esteve_reprovado=matriculadiario.esteve_reprovado %}
+                            <tr {% if not matriculadiario.habilitada %} class="disabled"
+                                                                        title="Período letivo deste aluno está fechado"
+                                                                        style="display: none;"{% endif %}>
+                                <td>{{ forloop.counter }}</td>
+                                {% if pode_realizar_procedimentos %}
+                                    <td>
+                                        {% if matriculadiario|method:"pode_ser_excluido_do_diario"|call:request.user or request.user|in_group:"edu Administrador" %}
+                                            <input value="{{ matriculadiario.pk }}" name="del_aluno_diario" type="checkbox"/>
+                                        {% endif %}
+                                    </td>
+                                {% endif %}
+                                <td>
+                                    <div class="photo-circle responsive">
+                                        <img src="{{ matriculadiario.matricula_periodo.aluno.get_foto_75x100_url }}" alt="Foto de {{ matriculadiario.matricula_periodo.aluno.get_nome }}" />
+                                    </div>
+                                    <dl>
+                                        <dt class="d-none">Aluno:</dt>
+                                        <dd>
+                                            {{ matriculadiario.matricula_periodo.aluno.get_nome }}
+                                            ({% if perms.edu.view_aluno or professor_diario.ativo %}<a href="{{ matriculadiario.matricula_periodo.aluno.get_absolute_url }}">{% endif %}{{ matriculadiario.matricula_periodo.aluno.matricula|format }}{% if perms.edu.view_aluno or professor_diario.ativo %}</a>{% endif %})
+                                        </dd>
+                                        {% if request.GET.debug %}
+                                            <dt>Situação do Matrícula:</dt>
+                                            <dd>{{ matriculadiario.matricula_periodo.aluno.situacao }}</dd>
+                                            <dt>Situação do Matrícula no Período:</dt>
+                                            <dd>{{ matriculadiario.matricula_periodo.situacao }}</dd>
+                                            <dt>Frequência no Período:</dt>
+                                            <dd>{{ matriculadiario.matricula_periodo.get_percentual_carga_horaria_frequentada }}%</dd>
+                                        {% endif %}
+                                        <dt class="visually-hidden">Situações</dt>
+                                        {% if matriculadiario.data_matricula %}<dd>Data da matrícula: {{ matriculadiario.data_matricula|format }}</dd>{% endif %}
+                                        {% if not matriculadiario.habilitada or not matriculadiario.is_cursando %}<dd class="false">Período letivo fechado</dd>{% endif %}
+                                        {% if esteve_reprovado %}<dd class="false">Já esteve reprovado nesta disciplina ou equivalente</dd>{% endif %}
+                                        {% if esteve_reprovado and matriculadiario.is_em_dependencia %}<dd class="false">Cursando dependência</dd>{% endif %}
+                                        {% if matriculadiario.matricula_periodo.aluno.possui_nee %}<dd class="false">Possui NEE</dd>{% endif %}
+                                    </dl>
+                                </td>
+                                {% if qtd_avaliacoes > 0 %}
+                                    <td class="vertical-align-bottom">
+                                        <table class="info">
+                                            {% for nota_avaliacao in matriculadiario.get_notas_etapa_1 %}
+                                                {% if pode_manipular_etapa_1 and matriculadiario.is_cursando and perms.edu.lancar_nota_diario %}
+                                                    <tr>
+                                                        <td>
+                                                            <label {% if nota_avaliacao.item_configuracao_avaliacao.descricao %}class="hint hint-bottom" aria-label="{{ nota_avaliacao.item_configuracao_avaliacao.descricao }}"{% endif %}>
+                                                                {{ nota_avaliacao.item_configuracao_avaliacao.sigla }}
+                                                            </label>
+                                                        </td>
+                                                        <td>
+                                                            <input
+                                                        		onfocus="this.oldvalue = this.value;"
+                                                                onblur="validar_nota(this, {{ nota_avaliacao.id }}, 0)"
+                                                                tabindex="{{ forloop.counter }}" class="int"
+                                                                name="1;{{ matriculadiario.pk }};{{ nota_avaliacao.item_configuracao_avaliacao.pk }}"
+                                                                type="text" value="{{ nota_avaliacao.get_nota }}"
+                                                            />
+                                                        </td>
+                                                    </tr>
+                                                {% else %}
+                                                    <tr>
+                                                        <td>
+                                                            <span {% if nota_avaliacao.item_configuracao_avaliacao.descricao %}class="hint hint-bottom" aria-label="{{ nota_avaliacao.item_configuracao_avaliacao.descricao }}"{% endif %}>
+                                                                {{ nota_avaliacao.item_configuracao_avaliacao.sigla }}
+                                                            </span>
+                                                        </td>
+                                                        <td>{{ nota_avaliacao.get_nota|format }}</td>
+                                                    </tr>
+                                                {% endif %}
+                                                {% if forloop.last %}
+                                                    <tr>
+                                                        <td>
+                                                            <span class="hint hint-bottom" aria-label="Conceito final da etapa">CF</span>
+                                                        </td>
+                                                        <td class="negrito">
+                                                            {% if pode_manipular_etapa_1 and matriculadiario.is_cursando and perms.edu.lancar_nota_diario %}
+                                                                <input
+                                                                    onfocus="this.oldvalue = this.value;"
+                                                                    onblur="validar_nota(this, {{ matriculadiario.id }}, 1)"
+                                                                    tabindex="{{ forloop.counter }}" class="int"
+                                                                    name="1;{{ matriculadiario.pk }}"
+                                                                    type="text" value="{{ matriculadiario|nota_diario:1 }}"
+                                                                />
+                                                            {% else %}
+                                                                {{ matriculadiario|nota_diario:1|format }}
+                                                            {% endif %}
+                                                        </td>
+                                                    </tr>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </table>
+                                    </td>
+                                {% endif %}
+                                {% if qtd_avaliacoes > 1 %}
+                                    <td class="vertical-align-bottom">
+                                        <table class="info">
+                                            {% for nota_avaliacao in matriculadiario.get_notas_etapa_2 %}
+                                                {% if pode_manipular_etapa_2 and matriculadiario.is_cursando and perms.edu.lancar_nota_diario %}
+                                                    <tr>
+                                                        <td><label class="hint hint-bottom"
+                                                                {% if nota_avaliacao.item_configuracao_avaliacao.descricao %}
+                                                                   aria-label="{{ nota_avaliacao.item_configuracao_avaliacao.descricao }}" {% endif %}>{{ nota_avaliacao.item_configuracao_avaliacao.sigla }}&nbsp;&nbsp;</label>
+                                                        </td>
+                                                        <td><input
+                                                        		onfocus="this.oldvalue = this.value;"
+                                                                onblur="validar_nota(this, {{ nota_avaliacao.id }}, 0)"
+                                                                tabindex="{{ forloop.counter }}" class="int"
+                                                                name="2;{{ matriculadiario.pk }};{{ nota_avaliacao.item_configuracao_avaliacao.pk }}"
+                                                                type="text" value="{{ nota_avaliacao.get_nota }}"/>
+                                                        </td>
+                                                    </tr>
+                                                {% else %}
+                                                    <tr>
+                                                        <td><span class="hint hint-bottom"
+                                                                {% if nota_avaliacao.item_configuracao_avaliacao.descricao %}
+                                                                  aria-label="{{ nota_avaliacao.item_configuracao_avaliacao.descricao }}" {% endif %}>{{ nota_avaliacao.item_configuracao_avaliacao.sigla }}&nbsp;&nbsp;</span>
+                                                        </td>
+                                                        <td>{{ nota_avaliacao.get_nota|format }}</td>
+                                                    </tr>
+                                                {% endif %}
+                                                {% if forloop.last %}
+                                                    <tr>
+                                                        <td>
+                                                            <span class="hint hint-bottom" aria-label="Conceito final da etapa">CF</span>
+                                                        </td>
+                                                        <td class="negrito">
+                                                            {% if pode_manipular_etapa_2 and matriculadiario.is_cursando and perms.edu.lancar_nota_diario %}
+                                                                <input
+                                                                    onfocus="this.oldvalue = this.value;"
+                                                                    onblur="validar_nota(this, {{ matriculadiario.id }}, 2)"
+                                                                    tabindex="{{ forloop.counter }}" class="int"
+                                                                    name="1;{{ matriculadiario.pk }}"
+                                                                    type="text" value="{{ matriculadiario|nota_diario:2 }}"
+                                                                />
+                                                            {% else %}
+                                                                {{ matriculadiario|nota_diario:2|format }}
+                                                            {% endif %}
+                                                        </td>
+                                                    </tr>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </table>
+                                    </td>
+                                {% endif %}
+                                {% if qtd_avaliacoes > 2 %}
+                                    <td class="vertical-align-bottom">
+                                        <table class="info">
+                                            {% for nota_avaliacao in matriculadiario.get_notas_etapa_3 %}
+                                                {% if pode_manipular_etapa_3 and matriculadiario.is_cursando and perms.edu.lancar_nota_diario %}
+                                                    <tr>
+                                                        <td><label class="hint hint-bottom"
+                                                                {% if nota_avaliacao.item_configuracao_avaliacao.descricao %}
+                                                                   aria-label="{{ nota_avaliacao.item_configuracao_avaliacao.descricao }}" {% endif %}>{{ nota_avaliacao.item_configuracao_avaliacao.sigla }}&nbsp;&nbsp;</label>
+                                                        </td>
+                                                        <td><input
+                                                        		onfocus="this.oldvalue = this.value;"
+                                                                onblur="validar_nota(this, {{ nota_avaliacao.id }}, 0)"
+                                                                tabindex="{{ forloop.counter }}" class="int"
+                                                                name="3;{{ matriculadiario.pk }};{{ nota_avaliacao.item_configuracao_avaliacao.pk }}"
+                                                                type="text" value="{{ nota_avaliacao.get_nota }}"/>
+                                                        </td>
+                                                    </tr>
+                                                {% else %}
+                                                    <tr>
+                                                        <td><label class="hint hint-bottom"
+                                                                {% if nota_avaliacao.item_configuracao_avaliacao.descricao %}
+                                                                   aria-label="{{ nota_avaliacao.item_configuracao_avaliacao.descricao }}" {% endif %}>{{ nota_avaliacao.item_configuracao_avaliacao.sigla }}&nbsp;&nbsp;</label>
+                                                        </td>
+                                                        <td>{{ nota_avaliacao.get_nota|format }}</span></td>
+                                                    </tr>
+                                                {% endif %}
+                                                {% if forloop.last %}
+                                                    <tr>
+                                                        <td>
+                                                            <span class="hint hint-bottom" aria-label="Conceito final da etapa">CF</span>
+                                                        </td>
+                                                        <td class="negrito">
+                                                            {% if pode_manipular_etapa_3 and matriculadiario.is_cursando and perms.edu.lancar_nota_diario %}
+                                                                <input
+                                                                    onfocus="this.oldvalue = this.value;"
+                                                                    onblur="validar_nota(this, {{ matriculadiario.id }}, 3)"
+                                                                    tabindex="{{ forloop.counter }}" class="int"
+                                                                    name="1;{{ matriculadiario.pk }}"
+                                                                    type="text" value="{{ matriculadiario|nota_diario:3 }}"
+                                                                />
+                                                            {% else %}
+                                                                {{ matriculadiario|nota_diario:3|format }}
+                                                            {% endif %}
+                                                        </td>
+                                                    </tr>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </table>
+                                    </td>
+                                {% endif %}
+                                {% if qtd_avaliacoes > 3 %}
+                                    <td class="vertical-align-bottom">
+                                        <table class="info">
+                                            {% for nota_avaliacao in matriculadiario.get_notas_etapa_4 %}
+                                                {% if pode_manipular_etapa_4 and matriculadiario.is_cursando and perms.edu.lancar_nota_diario %}
+                                                    <tr>
+                                                        <td><label class="hint hint-bottom"
+                                                                {% if nota_avaliacao.item_configuracao_avaliacao.descricao %}
+                                                                   aria-label="{{ nota_avaliacao.item_configuracao_avaliacao.descricao }}" {% endif %}>{{ nota_avaliacao.item_configuracao_avaliacao.sigla }}:</label>
+                                                        </td>
+                                                        <td><input
+                                                        		onfocus="this.oldvalue = this.value;"
+                                                                onblur="validar_nota(this, {{ nota_avaliacao.id }}, 0)"
+                                                                tabindex="{{ forloop.counter }}" class="int"
+                                                                name="4;{{ matriculadiario.pk }};{{ nota_avaliacao.item_configuracao_avaliacao.pk }}"
+                                                                type="text" value="{{ nota_avaliacao.get_nota }}"/>
+                                                        </td>
+                                                    </tr>
+                                                {% else %}
+                                                    <tr>
+                                                        <td>
+                                                            <label class="hint hint-bottom"{% if nota_avaliacao.item_configuracao_avaliacao.descricao %} aria-label="{{ nota_avaliacao.item_configuracao_avaliacao.descricao }}" {% endif %}>
+                                                                {{ nota_avaliacao.item_configuracao_avaliacao.sigla }}:
+                                                            </label>
+                                                        </td>
+                                                        <td>{{ nota_avaliacao.get_nota|format }}</td>
+                                                    </tr>
+                                                {% endif %}
+                                                {% if forloop.last %}
+                                                    <tr>
+                                                        <td>
+                                                            <span class="hint hint-bottom" aria-label="Conceito final da etapa">CF</span>
+                                                        </td>
+                                                        <td class="negrito">
+                                                            {% if pode_manipular_etapa_4 and matriculadiario.is_cursando and perms.edu.lancar_nota_diario %}
+                                                                <input
+                                                                    onfocus="this.oldvalue = this.value;"
+                                                                    onblur="validar_nota(this, {{ matriculadiario.id }}, 4)"
+                                                                    tabindex="{{ forloop.counter }}" class="int"
+                                                                    name="1;{{ matriculadiario.pk }}"
+                                                                    type="text" value="{{ matriculadiario|nota_diario:4 }}"
+                                                                />
+                                                            {% else %}
+                                                                {{ matriculadiario|nota_diario:4|format }}
+                                                            {% endif %}
+                                                        </td>
+                                                    </tr>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </table>
+                                    </td>
+                                {% endif %}
+
+                                {% if qtd_avaliacoes > 0 or request.GET.debug %}
+                                    {% if not etapa or etapa > 0 %}
+                                        <td class="vertical-align-bottom">
+                                           
+                                            <table class="info">
+                                                <tr>
+                                                    <td>
+                                                        <span class="hint hint-bottom" aria-label="Conceito final da disciplina">CFD</span>
+                                                    </td>
+                                                    <td class="negrito">
+                                                        {% if pode_manipular_etapa_5 and matriculadiario.is_cursando and perms.edu.lancar_nota_diario %}
+                                                            <input
+                                                                onfocus="this.oldvalue = this.value;"
+                                                                onblur="validar_nota(this, {{ matriculadiario.id }}, 5)"
+                                                                tabindex="{{ forloop.counter }}" class="int"
+                                                                name="1;{{ matriculadiario.pk }}"
+                                                                type="text" value="{{ matriculadiario|nota_diario:5 }}"
+                                                            />
+                                                        {% else %}
+                                                            {{ matriculadiario|nota_diario:5|format }}
+                                                        {% endif %}
+                                                    </td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                    {% endif %}
+                                {% endif %}
+
+                                {% if request.GET.debug or professor_diario %}
+                                    {% if qtd_avaliacoes > 0 %}
+                                        {% if matriculadiario.situacao == 1 %}
+                                            <td>
+                                                <span class="status status-{{ matriculadiario.get_situacao_nota.status }}">{{ matriculadiario.get_situacao_nota.rotulo }}</span>
+                                            </td>
+                                        {% else %}
+                                            <td>
+                                                <span class="status status-{{ matriculadiario.get_situacao_registrada_diario.status }}">{{ matriculadiario.get_situacao_registrada_diario.rotulo }}</span>
+                                            </td>
+                                        {% endif %}
+                                    {% endif %}
+                                {% endif %}
+
+                                {% if request.GET.debug or not qtd_avaliacoes > 0 %}
+                                    <td>{{ matriculadiario.get_percentual_carga_horaria_frequentada|format }} %</td>
+                                {% endif %}
+
+                                {% if request.GET.debug or not qtd_avaliacoes > 0 %}
+                                    {% if request.GET.debug or professor_diario %}
+                                        <td><span
+                                                class="status status-{{ matriculadiario.get_situacao_frequencia.status }}">{{ matriculadiario.get_situacao_frequencia.rotulo }}</span>
+                                        </td>
+                                    {% endif %}
+                                {% endif %}
+
+                                {% if request.GET.debug or not professor_diario %}
+                                    {% if matriculadiario.situacao == 1 %}
+                                        <td>
+                                            <span class="status status-{{ matriculadiario.get_situacao_diario.status }}">{{ matriculadiario.get_situacao_diario.rotulo }}</span>
+                                        </td>
+                                    {% else %}
+                                        <td>
+                                            <span class="status status-{{ matriculadiario.get_situacao_registrada_diario.status }}">{{ matriculadiario.get_situacao_registrada_diario.rotulo }}</span>
+                                        </td>
+                                    {% endif %}
+                                {% endif %}
+
+                                {% if pode_realizar_procedimentos %}
+                                    <td class="no-print field-get_acoes">
+                                        {% if matriculadiario.is_cursando %}
+                                        <ul class="action-bar">
+                                            <li class="has-child">
+                                                <a class="btn primary" href="#">{% icone "edit" %} Atualizar</a>
+                                                <ul>
+                                                    <li><a class="popup" href="/edu/alterar_data_vinculo_matricula_aluno/{{ matriculadiario.pk }}/">Data da matrícula</a></li>
+                                                </ul>
+                                            </li>
+                                        </ul>
+                                        {% endif %}
+                                    </td>
+                                {% endif %}
+                            </tr>
+                        {% endwith %}
+                    {% endfor %}
+                    </tbody>
+                </table>
+                </div>
+            {% else %}
+                <p class="alert alert-warning">Nenhum aluno matriculado.</p>
+            {% endif %}
+        {% endbox %}
+        {% empty %}
+        <p class="alert alert-warning">Nenhum aluno matriculado no diário.</p>
+    {% endfor %}
+    <div class="submit-row">
+        {% if pode_realizar_procedimentos and perms.edu.delete_matriculadiario %}
+            <input type="button" class="danger no-confirm" id="btn_remover" value="Remover Alunos Selecionados"/>
+            <input class="success hidden" type="button" id="btn_transferir" value="Transferir Alunos Selecionados" onclick="popupTransferencia({{ obj.pk }})" name="_addanother"/>
+        {% endif %}
+    </div>
+</form>
+<script>
+    jQuery(function () {
+        if (!$("input[name='del_aluno_diario']").length) {
+            $("#btn_remover").hide();
+            $("#btn_transferir").hide();
+        }
+    });
+    $("#btn_remover").click(function (e) {
+        ids = $("input[name='del_aluno_diario']:checked").map(function () {
+            return this.value;
+        }).get().join("_");
+        if (!ids) {
+            alert("Nenhum aluno selecionado.");
+        } else {
+            $.fancybox.open({
+                src  : '/comum/excluir/edu/matriculadiario/' + ids + '/?_popup=1',
+                type : 'iframe'
+            });
+        }
+    });
+
+</script>
+<script>
+    function exibirAlunosInativosNotas(e) {
+        if (e.checked) {
+            $('#table_notas > tbody > tr.disabled').show();
+            recontar_index_linha(true);
+
+        } else {
+            $('#table_notas > tbody > tr.disabled').hide();
+            recontar_index_linha(false);
+        }
+        if ($('#notas_input_ocultar').length > 0) {
+            var qtd_alunos_inativos = $('#table_notas > tbody > tr.disabled').length;
+            if (!$('#notas_input_ocultar')[0].checked && qtd_alunos_inativos > 0) {
+                if (qtd_alunos_inativos == 1) var msg = '<div class="alert alert-warning">Este diário possui 1 aluno cancelado/trancado que não está sendo exibido. Caso deseje que ele seja mostrado na tabela abaixo, marque o checkbox abaixo.</div>';
+                else var msg = '<div class="alert alert-warning">Este diário possui ' + qtd_alunos_inativos + ' alunos cancelados/trancados que não estão sendo exibidos. Caso deseje que eles sejam mostrados na tabela abaixo, marque o checkbox abaixo.</div>';
+                $('#notas_input_ocultar_msg').html(msg);
+            } else {
+                $('#notas_input_ocultar_msg').html('');
+            }
+        }
+    }
+
+    function recontar_index_linha(exibir_alunos_inativos) {
+        if (exibir_alunos_inativos) {
+            $('#table_notas > tbody > tr').each(function (index) {
+                var target_td = $('td', this)[0];
+                $(target_td).html(index + 1);
+            });
+        } else {
+            $('#table_notas > tbody > tr').not('.disabled').each(function (index) {
+                var target_td = $('td', this)[0];
+                $(target_td).html(index + 1);
+            });
+        }
+    }
+
+
+    if ($('#notas_input_ocultar').length > 0) {
+        var x = $('#notas_input_ocultar')[0];
+        x.checked = true;
+        exibirAlunosInativosNotas(x);
+    }
+
+</script>
+
+<script>
+    (function(){
+        var STORAGE_KEY = 'suap_tab_mode';
+        function modeIsByCell(){ return localStorage.getItem(STORAGE_KEY) === 'by_cell'; }
+        function setMode(byCell){ localStorage.setItem(STORAGE_KEY, byCell? 'by_cell':'default'); $('#tab_by_cell').prop('checked', byCell); }
+
+        $(function(){
+            var byCell = modeIsByCell();
+            $('#tab_by_cell').prop('checked', byCell);
+
+            $('#tab_by_cell').on('change', function(){ setMode(this.checked); });
+
+            $(document).on('keydown', function(e){
+                if (e.ctrlKey && !e.altKey && !e.shiftKey && (e.key === 'm' || e.key === 'M')){
+                    e.preventDefault();
+                    var newMode = !modeIsByCell();
+                    setMode(newMode);
+                }
+            });
+
+            $(document).on('keydown', 'input.int', function(e){
+                if (!modeIsByCell()) return;
+                if (e.key !== 'Tab') return;
+                var $input = $(this);
+                if ($input.is(':hidden') || $input.prop('disabled')) return;
+                var $tr = $input.closest('tr');
+                var $visibleInputs = $tr.find('input.int:visible').filter(function(){ return $(this).attr('type') !== 'hidden'; });
+                var idx = $visibleInputs.index(this);
+                e.preventDefault();
+                if (!e.shiftKey){
+                    if (idx >= 0 && idx < $visibleInputs.length - 1){
+                        $visibleInputs.eq(idx + 1).focus().select();
+                        return;
+                    }
+                    var $next = $tr.nextAll('tr:not(.disabled)').first();
+                    if ($next.length){
+                        var $target = $next.find('input.int:visible').filter(function(){ return $(this).attr('type') !== 'hidden'; }).first();
+                        if ($target.length) { $target.focus().select(); }
+                    }
+                } else {
+                    if (idx > 0){
+                        $visibleInputs.eq(idx - 1).focus().select();
+                        return;
+                    }
+                    var $prev = $tr.prevAll('tr:not(.disabled)').first();
+                    if ($prev.length){
+                        var $target = $prev.find('input.int:visible').filter(function(){ return $(this).attr('type') !== 'hidden'; }).last();
+                        if ($target.length) { $target.focus().select(); }
+                    }
+                }
+            });
+        });
+    })();
+</script>
+
+{% if NOTA_DECIMAL %}
+<script src="/static/djtools/jquery/jquery.maskedinput.js"></script>
+<script src="/static/djtools/jquery/widgets-core.js"></script>
+<script>
+    $("input.int").keyup(function () {
+        mask_nota(this, {{ CASA_DECIMAL }} );
+    });
+</script>
+{% endif %}

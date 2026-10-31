@@ -1,0 +1,238 @@
+{% extends super_template %}
+{% block extrahead %}
+    {{ block.super }}
+    <script src="/static/djtools/graficos/highcharts.js"></script>
+    <script src="/static/djtools/graficos/exporting.js"></script>
+    {% if indicadores.serie %}<script>{{ indicadores.grafico|safe }}</script>{% endif %}
+{% endblock %}
+{% block content %}
+    {% render_form form %}
+    {% if form.is_valid %}
+        {% box "Resumo gerencial" %}
+            <p>
+                <strong>{{ setor_escolhido }}</strong> —
+                {% if form.cleaned_data.abrangencia == 'arvore' %}
+                    Setor e subordinados
+                {% else %}
+                    Somente o setor
+                {% endif %}
+                .
+                Período: {{ form.cleaned_data.data_inicio|date:"d/m/Y"|default:"início do histórico" }}
+                a {{ form.cleaned_data.data_final|date:"d/m/Y"|default:"fim do histórico" }}.
+            </p>
+            <dl class="definition-list flex">
+                <div class="list-item">
+                    <dt>Processos distintos que tramitaram</dt>
+                    <dd>
+                        {{ indicadores.resumo.processos }}
+                    </dd>
+                </div>
+                <div class="list-item">
+                    <dt>Tramitações</dt>
+                    <dd>
+                        {{ indicadores.resumo.tramitacoes }}
+                    </dd>
+                </div>
+                <div class="list-item">
+                    <dt>Processos com entrada</dt>
+                    <dd>
+                        {{ indicadores.resumo.entradas }}
+                    </dd>
+                </div>
+                <div class="list-item">
+                    <dt>Processos com saída</dt>
+                    <dd>
+                        {{ indicadores.resumo.saidas }}
+                    </dd>
+                </div>
+            </dl>
+            <p>
+                Processos distintos contam uma vez no período, mesmo passando por vários setores da seleção.
+                Tramitações contam cada movimentação; um envio entre dois setores selecionados conta apenas uma vez.
+                As entradas incluem processos que aguardam recebimento e consideram a data de encaminhamento.
+            </p>
+        {% endbox %}
+        {% box "Evolução das tramitações" %}
+            {% if indicadores.serie %}
+                <div id="grafico_tramitacao" class="grafico-item flex-basis-100"></div>
+                <p>
+                    O mesmo processo pode aparecer em meses ou anos diferentes.
+                    Por isso, a soma dos processos das linhas pode superar o total de processos distintos do período.
+                </p>
+                <div class="table-responsive">
+                    <table>
+                        <caption>Tramitações por {{ form.cleaned_data.agrupamento }} no período selecionado</caption>
+                        <thead>
+                            <tr>
+                                <th scope="col">Período</th>
+                                <th scope="col">Processos distintos</th>
+                                <th scope="col">Tramitações</th>
+                                <th scope="col">Processos com entrada</th>
+                                <th scope="col">Processos com saída</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for linha in indicadores.serie %}
+                                <tr>
+                                    <th scope="row">{{ linha.rotulo }}</th>
+                                    <td>{{ linha.processos }}</td>
+                                    <td>{{ linha.tramitacoes }}</td>
+                                    <td>{{ linha.entradas }}</td>
+                                    <td>{{ linha.saidas }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="msg info">Nenhuma tramitação encontrada no período selecionado.</p>
+            {% endif %}
+        {% endbox %}
+        {% box "Processos por setor no período" %}
+            <p>Cada linha apresenta os processos do próprio setor. Os setores subordinados aparecem em linhas separadas.</p>
+            <p>
+                Entradas são processos encaminhados ao setor, incluindo os que aguardam recebimento.
+                Cada processo conta uma vez por setor em cada coluna, mesmo que tenha tramitado mais de uma vez no período.
+            </p>
+            <p>
+                O período considera a data de criação para processos abertos e a data de encaminhamento para entradas e saídas.
+                Para consultar todos os anos, selecione “Todo o histórico”.
+            </p>
+            <div class="table-responsive">
+                <table>
+                    <caption>Processos por setor na abrangência selecionada</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col">Setor</th>
+                            <th scope="col">Processos abertos</th>
+                            <th scope="col">Entradas de processos</th>
+                            <th scope="col">Saídas de processos</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for numero in numeros_setores %}
+                            <tr>
+                                <th scope="row">{{ numero.setor }}</th>
+                                <td>{{ numero.criados }}</td>
+                                <td>{{ numero.entradas }}</td>
+                                <td>{{ numero.saidas }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endbox %}
+    {% endif %}
+    {% if request.user.is_superuser %}
+        <p>Os indicadores gerais abaixo são pré-calculados e não utilizam os filtros acima.</p>
+        {% box "Geral Por tipo" class="collapsed" %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Geral Por tipo</caption>
+                    <thead>
+                        <tr>
+                            <th>Tipo de processo</th>
+                            <th>Quantidade</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for t in por_tipo %}
+                            <tr>
+                                <td>{{ t.tipo }}</td>
+                                <td>{{ t.qtd }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endbox %}
+        {% box "Geral por Situação" class="collapsed" %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Geral por Situação</caption>
+                    <thead>
+                        <tr>
+                            <th>Situação</th>
+                            <th>Quantidade</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for t in geral %}
+                            <tr>
+                                <td>Processos</td>
+                                <td>{{ t.qtd_processos }}</td>
+                            </tr>
+                            <tr>
+                                <td>Em trâmite</td>
+                                <td>{{ t.STATUS_ATIVO }}</td>
+                            </tr>
+                            <tr>
+                                <td>Arquivado</td>
+                                <td>{{ t.STATUS_ARQUIVADO }}</td>
+                            </tr>
+                            <tr>
+                                <td>Sobrestado</td>
+                                <td>{{ t.STATUS_SOBRESTADO }}</td>
+                            </tr>
+                            <tr>
+                                <td>Finalizado</td>
+                                <td>{{ t.STATUS_FINALIZADO }}</td>
+                            </tr>
+                            <tr>
+                                <td>Anexado</td>
+                                <td>{{ t.STATUS_ANEXADO }}</td>
+                            </tr>
+                            <tr>
+                                <td>Reaberto</td>
+                                <td>{{ t.STATUS_REABERTO }}</td>
+                            </tr>
+                            <tr>
+                                <td>Aguardando ciência</td>
+                                <td>{{ t.STATUS_AGUARDANDO_CIENCIA }}</td>
+                            </tr>
+                            <tr>
+                                <td>Aguardando juntada de documentos</td>
+                                <td>{{ t.STATUS_AGUARDANDO_JUNTADA }}</td>
+                            </tr>
+                            <tr>
+                                <td>Em validação de juntada de documentos</td>
+                                <td>{{ t.STATUS_EM_HOMOLOGACAO }}</td>
+                            </tr>
+                            <tr>
+                                <td>Documentos Texto</td>
+                                <td>{{ t.qtd_documentos_texto }}</td>
+                            </tr>
+                            <tr>
+                                <td>Documentos Digitalizado</td>
+                                <td>{{ t.qtd_documentos_digitalizado }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endbox %}
+        {% box "Tempo médio de trâmite dos processos para a(o) {{ uo }}" class="collapsed" %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Tempo médio de trâmite dos processos para a(o) {{ uo }}</caption>
+                    <thead>
+                        <tr>
+                            <th>{{ nomenclatura.campus }} de origem</th>
+                            <th>Tipo de processo</th>
+                            <th>Tempo médio (dias)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for t in tempo_medio_por_tipo %}
+                            <tr>
+                                <td>{{ t.uo_origem_interessado }}</td>
+                                <td>{{ t.tipo }}</td>
+                                <td>{{ t.tempo_medio|format }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endbox %}
+    {% endif %}
+{% endblock %}

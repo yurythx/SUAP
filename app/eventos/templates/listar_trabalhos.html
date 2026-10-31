@@ -1,0 +1,294 @@
+{% extends super_template %}
+{% load eventos_tags %}
+{% block action-bar %}
+    <ul class="action-bar">
+        <li>
+            <a href="/eventos/evento/{{ evento.pk }}/" class="btn">{% icone "return" %} Voltar para Evento</a>
+        </li>
+    </ul>
+{% endblock %}
+{% block content %}
+    {% if pode_gerenciar and tem_modalidades %}
+        {% box "Resultados" class="no-print" class="collapsed" %}
+            <p class="alert alert-info">
+                Apenas autores com trabalhos <strong>aprovados</strong> dentro do limite para cada área temática receberão certificado de <strong>autor de trabalho</strong>.
+            </p>
+            <ul class="action-bar">
+                <li>
+                    <a class="btn"
+                       href="{% url 'gerar_planilha_autores_aprovados' evento.id %}">Exportar autores aprovados</a>
+                </li>
+                <li>
+                    <a class="btn popup"
+                       href="{% url 'lista_trabalhos_aprovados_pdf' evento.id %}">{% icone "print" %} Imprimir resultados</a>
+                </li>
+            </ul>
+            <form method="post"
+                  id="frm_notificar_resultado_avaliacoes"
+                  action="{% url 'notificar_resultado_avaliacoes' evento.id %}">
+                {% csrf_token %}
+                <div class="table-responsive">
+                    <table>
+                        <caption>Áreas temáticas com trabalhos avaliados.</caption>
+                        <thead>
+                            <tr>
+                                <th>
+                                    <input type="checkbox" id="marcar_todos" title="Marcar/Desmarcar todos">
+                                    Marcar/desmarcar
+                                </th>
+                                <th>Área temática</th>
+                                <th class="no-print">Opções</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in areas_tematicas_modalidade %}
+                                <tr>
+                                    <td>
+                                        <input value="{{ item.id }}" name="ids" type="checkbox">
+                                    </td>
+                                    <td>{{ item.modalidade.tipo }} - {{ item.area_tematica }}</td>
+                                    <td class="no-print">
+                                        <a class="btn default popup"
+                                           href="{% url 'listar_resultado_avaliacoes' item.pk %}">{% icone "eye" %} Visualizar resultados</a>
+                                        {% if item.modalidade.eh_submissao_por_texto %}
+                                            <a class="btn default popup"
+                                               href="{% url 'listar_trabalhos_resumido' item.pk %}">{% icone "list" %} Visualizar trabalhos aprovados</a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <h4 class="mb-0 mt-0">Para áreas temáticas marcadas:</h4>
+                <div class="submit-row mt-2">
+                    <button type="submit" class="btn success" name="notificar_todos">Notificar todos</button>
+                    <button type="submit" class="btn success" name="notificar_aprovados">Notificar somente aprovados</button>
+                </div>
+            </form>
+        {% endbox %}
+        <script>
+            // jQuery code to validate if at least one checkbox is selected
+            $(document).ready(function () {
+                // Funcionalidade para marcar/desmarcar todos os checkboxes
+                $("#marcar_todos").change(function () {
+                    var isChecked = $(this).is(':checked');
+                    $("input[name='ids']").prop('checked', isChecked);
+                });
+
+                // Verifica se todos os checkboxes individuais estão marcados para atualizar o checkbox principal
+                $(document).on('change', "input[name='ids']", function () {
+                    var totalCheckboxes = $("input[name='ids']").length;
+                    var checkedCheckboxes = $("input[name='ids']:checked").length;
+                    
+                    if (checkedCheckboxes === totalCheckboxes) {
+                        $("#marcar_todos").prop('checked', true);
+                        $("#marcar_todos").prop('indeterminate', false);
+                    } else if (checkedCheckboxes === 0) {
+                        $("#marcar_todos").prop('checked', false);
+                        $("#marcar_todos").prop('indeterminate', false);
+                    } else {
+                        $("#marcar_todos").prop('checked', false);
+                        $("#marcar_todos").prop('indeterminate', true);
+                    }
+                });
+
+                // Validação original do formulário
+                $("#frm_notificar_resultado_avaliacoes").submit(function (event) {
+                    if ($("input[name='ids']:checked").length === 0) {
+                        // No checkbox is selected, prevent form submission and display an alert
+                        alert("Selecione pelo menos uma área temática.");
+                        event.preventDefault(); // Prevent form submission
+                    }
+                });
+            });
+        </script>
+    {% endif %}
+    {% box "Trabalhos" %}
+        <ul class="action-bar">
+            <li class="has-child">
+                <a href="#" class="btn">Avaliadores</a>
+                <ul>
+                    <li>
+                        <a href="{% url 'vincular_avaliadores_automaticamente' evento.id %}">Vincular avaliadores automaticamente</a>
+                    </li>
+                    <li>
+                        <a href="{% url 'desvincular_avaliadores_automaticamente' evento.id %}">Desvincular avaliadores automaticamente</a>
+                    </li>
+                    <li>
+                        <a href="{% url 'listar_avaliadores_sem_trabalhos' evento.id %}"
+                           class="popup">Avaliadores sem trabalhos vinculados</a>
+                    </li>
+                    <li>
+                        <a href="{% url 'listar_avaliadores_com_avaliacoes_pendentes' evento.id %}"
+                           class="popup">Avaliadores com avaliações pendentes</a>
+                    </li>
+                </ul>
+            </li>
+            <li>
+                <a href="{% url 'listar_detalhes_avaliacao' evento.id %}"
+                   class="btn default">Listar detalhes da avaliação</a>
+            </li>
+            <li>
+                <a href="{% url 'analisar_duplicidades' evento.id %}"
+                   class="btn default">{% icone "search" %} Analisar trabalhos similares</a>
+            </li>
+        </ul>
+        {% if total_submissoes %}
+            <div class="flex-container boxes infos">
+                {% for card in cards %}
+                    <a class="box-item {{ card.classe }}"
+                       href="{{ card.url }}"
+                       {% if card.selecionado %}aria-current="page"{% endif %}>
+                        <p class="stat">{{ card.total|format }}</p>
+                        <p class="title">{{ card.titulo }}</p>
+                    </a>
+                {% endfor %}
+            </div>
+        {% endif %}
+        <div class="alert alert-info">
+            <p>
+                Durante a avaliação de trabalhos, caso um avaliador <strong>solicite correções</strong>,
+                a submissão será automaticamente encaminhada para uma nova rodada de avaliação,
+                desde que o evento possua uma etapa futura configurada para reavaliação.
+                Por outro lado, se um avaliador <strong>rejeitar</strong> o trabalho e nenhum outro <strong>solicitar correções</strong>,
+                a submissão será marcada como <strong>reprovada</strong>.
+            </p>
+        </div>
+        <div class="search-and-filters">{% render_form filtroSubmissaoForm %}</div>
+        {% if submissoes.exists %}
+            {% autopaginate submissoes 25 %}
+            {% paginate %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Trabalhos submetidos ao evento.</caption>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Título</th>
+                            <th>Versão</th>
+                            <th>Modalidade</th>
+                            <th>Áreas temáticas</th>
+                            <th>Situação</th>
+                            <th>Autores</th>
+                            <th>Data de submissão</th>
+                            <th>Avaliadores</th>
+                            {% if pode_gerenciar and tem_modalidades and evento.pode_divulgar_resultado_final %}
+                                <th class="text-end">Avaliação</th>
+                                <th>Resultado</th>
+                            {% endif %}
+                            <th class="no-print text-end">Opções</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for submissao in submissoes %}
+                            <tr>
+                                <td>#{{ submissao.pk }}</td>
+                                <td>
+                                    <p>{{ submissao.titulo }}</p>
+                                    <div class="clear"></div>
+                                    <ul class="action-bar">
+                                        {% if submissao.texto %}
+                                            <li>
+                                                <a href="{% url 'visualizar_trabalho' submissao.pk %}"
+                                                   class="btn default popup">{% icone "eye" %} Visualizar trabalho</a>
+                                            </li>
+                                        {% endif %}
+                                        {% if submissao.arquivo %}
+                                            <li>
+                                                <a href="{{ submissao.arquivo.url }}" class="btn default">{% icone "download" %} Baixar trabalho</a>
+                                            </li>
+                                        {% endif %}
+                                        {% if submissao.link_video %}
+                                            <li>
+                                                <a href="{{ submissao.link_video }}" class="btn default">{% icone "play" %} Assistir vídeo</a>
+                                            </li>
+                                        {% endif %}
+                                    </ul>
+                                </td>
+                                <td>{{ submissao.get_ultima_versao.numero }}</td>
+                                <td>{{ submissao.modalidade.tipo }}</td>
+                                <td>{{ submissao.area_tematica }}</td>
+                                <td>{{ submissao.get_situacao_display|status }}</td>
+                                <td>
+                                    <ul>
+                                        {% for autor_submissao in submissao.autores_relacionados.all %}
+                                            <li>
+                                                {{ autor_submissao.participante.nome }} (
+                                                {% if autor_submissao.autor_correspondente %}<strong>Autor correspondente</strong> e{% endif %}
+                                                {{ autor_submissao.get_tipo_autor_display }})
+                                            </li>
+                                        {% endfor %}
+                                    </ul>
+                                </td>
+                                <td>{{ submissao.data_hora|format }}</td>
+                                <td>
+                                    {% if submissao.get_ultimos_avaliadores.exists %}
+                                        <ul>
+                                            {% for avaliacao_submissao in submissao.get_ultimos_avaliadores.all %}
+                                                <li>
+                                                    <p>{{ avaliacao_submissao.avaliador_modalidade.avaliador }}</p>
+                                                    {% if not avaliacao_submissao.estah_avaliado %}
+                                                        <form method="post"
+                                                              class="d-flex align-items-center gap-1 m-0"
+                                                              action="{% url 'remover_avaliador_submissao' avaliacao_submissao.pk %}"
+                                                              onsubmit="return confirm('Deseja remover o vínculo deste avaliador com o trabalho?');">
+                                                            {% csrf_token %}
+                                                            <a href="{% url 'substituir_avaliador_submissao' avaliacao_submissao.pk %}"
+                                                               title="Substituir avaliador"
+                                                               class="btn primary popup">{% icone "edit" %}<span class="visually-hidden">Substituir avaliador</span></a>
+                                                            <button class="btn danger" type="submit" title="Remover vínculo do avaliador">
+                                                                {% icone "trash" %}<span class="visually-hidden">Remover vínculo do avaliador</span>
+                                                            </button>
+                                                        </form>
+                                                    {% endif %}
+                                                </li>
+                                            {% endfor %}
+                                        </ul>
+                                    {% else %}
+                                        <span class="status status-alert">Sem avaliadores</span>
+                                    {% endif %}
+                                </td>
+                                {% if pode_gerenciar and tem_modalidades and evento.pode_divulgar_resultado_final %}
+                                    <td class="text-end">
+                                        {% if submissao.nota_final is not None %}
+                                            {{ submissao.nota_final|format }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if submissao.resultado_listagem == 'PE' %}
+                                            <span class="status status-alert">Avaliação pendente</span>
+                                        {% elif submissao.resultado_listagem %}
+                                            {{ submissao.get_resultado_avaliacao_display|status }}
+                                        {% else %}
+                                            <span class="status status-info">Sem avaliação</span>
+                                        {% endif %}
+                                    </td>
+                                {% endif %}
+                                <td class="no-print">
+                                    {% if pode_gerenciar %}
+                                        <ul class="action-bar">
+                                            <li>
+                                                <a href="{% url 'vincular_avaliador_a_submissao' submissao.pk %}"
+                                                   class="btn success popup">Vincular avaliadores</a>
+                                            </li>
+                                            <li>
+                                                <a href="{% url 'exibir_detalhes_avaliacao' submissao.pk %}"
+                                                   class="btn default">Detalhes da avaliação</a>
+                                            </li>
+                                        </ul>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% paginate %}
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Não há trabalhos.</p>
+        {% endif %}
+    {% endbox %}
+{% endblock %}

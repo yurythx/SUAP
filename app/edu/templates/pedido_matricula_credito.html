@@ -1,0 +1,811 @@
+{% extends super_template %}
+
+{% block extrahead %}
+    <script>
+        jQuery(document).ready(function() {
+            $("[data-desmarcar]").on("click", function(){
+                let disciplina = $(this).data("desmarcar");
+                let checkbox = "input[type='radio'][name='diarios_" + disciplina + "']";
+                $(checkbox).prop('checked', false);
+                $(checkbox).parent().parent().removeClass("selected");
+                return false;
+            });
+            $("[data-diario]").on("change", function(){
+                $(this).parent().parent().toggleClass("selected");
+            });
+
+            $("#btnFiltrarDisciplinasReq").on("click", function(evento) {
+                evento.preventDefault();
+
+                let textoBusca = $("#q").val();
+                if (textoBusca.length > 3) {
+                    document.location.href = `?disciplina=${textoBusca}#busca`;
+                }
+                else {
+                    alert("Informe 3 ou mais caracteres.");
+                }
+            });
+        });
+    </script>
+{% endblock %}
+
+{% block action-bar %}
+    {% if not erros and pedido_matricula %}
+        <ul class="action-bar">
+            <li><a class="btn" href="/edu/comprovante_pedido_matricula/{{ pedido_matricula.pk }}/">Imprimir Comprovante</a></li>
+        </ul>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+
+    {% if pedido_matricula is None and pode_solicitar_plano_estudo %}
+        <p class="alert alert-warning">
+            O tempo mínimo para conclusão do curso foi atingido e você pode optar pela <strong>criação de um plano de estudo</strong>, o qual será realizado pelo coordenador do seu curso e submetido a um conselho para aprovação.
+            Caso você prossiga com a renovação, será gerado um registro de <strong>dispensa de plano de estudo</strong>, o qual deve ser assinado por você posteriormente.
+        </p>
+        <p class="mb-4 text-center">
+            <a class="btn" href="?plano_estudo=1">Não Renovar e Solicitar Criação de Plano de Estudo</a>
+        </p>
+    {% endif %}
+
+    {% if solicitou_dispensa_plano_estudo %}
+        <p class="alert alert-warning">
+            O tempo mínimo para conclusão do curso foi atingido e uma solicitação de <strong>dispensa de plano de estudo</strong> foi realizada.
+        </p>
+    {% endif %}
+
+    {% if solicitou_criacao_plano_estudo %}
+        <div class="alert alert-warning">
+            <p>O tempo mínimo para conclusão do curso foi atingido e a <strong>criação de um plano de estudo</strong> foi solicitada. A renovação de matrícula online, portanto, não pode mais ser realizada.</p>
+            <p>Um e-mail será enviado para os interessados assim que o plano for homologado.</p>
+        </div>
+    {% else %}
+
+    <form method="post" action="" id="form1">
+        {% csrf_token %}
+        {% if erros %}
+            <p class="alert alert-danger">
+                {{ erros|safe }}
+            </p>
+        {% else %}
+            {% if pedido_matricula %}
+                {% if pedido_matricula.pedidomatriculadiario_set.all %}
+                    <div class="alert alert-info">
+                        <p>Existe um pedido de renovação de matrícula salvo. <a class="popup"
+                                                                                              data-reload-on-close="false"
+                                                                                              href='/edu/meu_pedido_matricula/{{ pedido_matricula.id }}/'>Acompanhe
+                        a situação do seu pedido</a>.</p>
+                        <p>Caso deseje alterar seu pedido, faça sua nova escolha e clique no botão "Salvar" no final da página.</p>
+                        <p>É obrigatória a escolha de:</p>
+                        <ul>
+                            {% if estrutura.qtd_minima_disciplinas %}
+                                <li>no mínimo {{ estrutura.qtd_minima_disciplinas }} disciplinas</li>
+                            {% endif %}
+                            {% if qtd_maxima_disciplinas %}
+                                <li>no máximo {{ qtd_maxima_disciplinas }} disciplinas</li>
+                            {% endif %}
+                            {% if estrutura.ch_minima_disciplinas %}
+                                <li>no mínimo {{ estrutura.ch_minima_disciplinas }} horas em disciplinas</li>
+                            {% endif %}
+                            {% if estrutura.ch_maxima_disciplinas %}
+                                <li>no máximo {{ estrutura.ch_maxima_disciplinas }} horas em disciplinas</li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                {% else %}
+                    {% if deve_impedir_matricula_vinculo %}
+                        <p class="alert alert-warning">Caso não seja solicitado o pedido de matrícula em nenhuma disciplina, não será possível efetuar a matrícula de vínculo institucional pelo seguinte motivo: <strong>{{ deve_impedir_matricula_vinculo }}</strong>.</p>
+                    {% else %}
+                        <div class="alert alert-info">
+                            <p>Você já confirmou a manutenção do seu vínculo com a instituição.</p>
+                            <p>Caso sejam ofertadas novas disciplinas antes do processamento do seu pedido, você poderá selecioná-las e clicar no botão "Salvar" no final da página.</p>
+                        </div>
+                    {% endif %}
+                {% endif %}
+            {% else %}
+                {% if not segunda_chamada %}
+                    {% if not diarios_obrigatorias and not diarios_optativas %}
+                        {% box 'Manter vínculo' %}
+                            {% if deve_impedir_matricula_vinculo %}
+                                <p class="alert alert-warning">Não há turmas disponíveis da matriz curricular do seu curso neste período e você não poderá realizar a matrícula de vínculo institucional pelo seguinte motivo: <strong>{{ deve_impedir_matricula_vinculo }}</strong>.</p>
+                            {% else %}
+                                <p class="alert alert-warning">Não há turmas disponíveis da matriz curricular do seu curso neste
+                                    período. Para manter o vínculo com a instituição confirme clicando no botão abaixo ou
+                                    escolha alguma turma das disciplinas eletivas disponíveis.</p>
+                                <div class="submit-row"><input class="btn success" type="submit" value="Confirmar"></div>
+                            {% endif %}
+                        {% endbox %}
+                    {% else %}
+                        {% if diarios_abaixo_qtd_minima %}
+                            <p class="alert alert-info">Para cada disciplina ofertada, selecione em qual turma você desejaria
+                                cursá-la.</p>
+                        {% else %}
+                            <div class="alert alert-info">
+                                {% if estrutura.qtd_minima_disciplinas %}
+                                    <p>Escolha, no mínimo, {{ estrutura.qtd_minima_disciplinas }} disciplina(s)
+                                    obrigatória(s) e/ou optativa(s) para cursar no próximo período letivo.</p>
+                                {% endif %}
+                                {% if qtd_maxima_disciplinas %}
+                                    <p>O limite máximo de disciplinas que você pode cursar nesse período é
+                                    {{ qtd_maxima_disciplinas }} disciplinas.</p>
+                                {% endif %}
+                                {% if estrutura.ch_minima_disciplinas %}
+                                    <p>Escolha, no mínimo, {{ estrutura.ch_minima_disciplinas }} horas em disciplina(s)
+                                    obrigatória(s) e/ou optativa(s) para cursar no próximo período letivo.</p>
+                                {% endif %}
+                                {% if estrutura.ch_maxima_disciplinas %}
+                                    <p>O limite máximo de horas em disciplinas que você pode cursar nesse período é
+                                    {{ estrutura.ch_maxima_disciplinas }} horas.</p>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                    {% endif %}
+                {% endif %}
+            {% endif %}
+        {% endif %}
+
+        {% box 'Dados gerais' %}
+            <dl class="definition-list flex">
+                <div class="list-item">
+                    <dt>Período de Matrícula</dt>
+                    <dd>{{ aluno.get_configuracao_pedido_matricula_ativa.data_inicio }}
+                        a {{ aluno.get_configuracao_pedido_matricula_ativa.data_fim }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Próximo Ano/Período</dt>
+                    <dd>{{ ultima_matricula_periodo.ano_letivo.ano }}/{{ ultima_matricula_periodo.periodo_letivo }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Aluno</dt>
+                    <dd>{{ aluno|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Período de Referência</dt>
+                    <dd>{{ aluno.periodo_atual|format }}º</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Situação no Curso</dt>
+                    <dd>{{ aluno.situacao }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Situação no Período</dt>
+                    <dd>{{ ultima_matricula_periodo.situacao }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Matriz</dt>
+                    <dd>{{ aluno.matriz }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Turma Anterior</dt>
+                    <dd>{{ aluno.get_ultima_turma_cursada|format }}</dd>
+                </div>
+            </dl>
+        {% endbox %}
+
+        {% if ultima_matricula_periodo.matriculadiario_set.exists %}
+            {% box 'Diários Matriculados' %}
+                {% if configuracao_pedido_matricula_ativa.permite_cancelamento_matricula_diario %}
+                    <p class="alert alert-warning">
+                        Caso deseje cancelar alguma matrícula em diário já deferida, identifique-a marcando o respectivo <em>checkbox</em>.
+                    </p>
+                {% endif %}
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                {% if configuracao_pedido_matricula_ativa.permite_cancelamento_matricula_diario %}
+                                    <th>Cancelar</th>
+                                {% endif %}
+                                <th>#</th>
+                                <th>Diário</th>
+                                <th>Curso</th>
+                                <th>Turno</th>
+                                <th>Horário</th>
+                                <th>Sala de aula</th>
+                                <th>Laboratório</th>
+                                <th>Professor</th>
+                                <th>Matriz</th>
+                                <th>Situação</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for md in ultima_matricula_periodo.matriculadiario_set.all %}
+                                <tr>
+                                    {% if configuracao_pedido_matricula_ativa.permite_cancelamento_matricula_diario %}
+                                        <td><input type="checkbox" name="cancelar_md" value="{{ md.pk }}" {% if md.pk in id_diarios_cancelados %}checked{% endif %}></td>
+                                    {% endif %}
+                                    <td>{{ forloop.counter }}</td>
+                                    <td>{{ md.diario }}</td>
+                                    <td>{{ md.diario.turma.curso_campus }}</td>
+                                    <td>{{ md.diario.turno }}</td>
+                                    <td>{{ md.diario.get_horario_aulas|format }}</td>
+                                    <td>{{ md.diario.local_aula|format }}</td>
+                                    <td>{{ md.diario.local_laboratorio|format }}</td>
+                                    <td>{{ md.diario.get_nomes_professores }}</td>
+                                    <td>{{ md.diario.turma.matriz_id }}</td>
+                                    <td>{{ md.get_situacao_display }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endbox %}
+        {% endif %}
+
+        {% if turnos %}
+            {% box 'Horários das Disciplinas Solicitadas' %}
+                {% include "tabela_pedido_matricula_horarios.html" %}
+            {% endbox %}
+        {% endif %}
+
+        {% box 'Disciplinas Obrigatórias' %}
+            <div class="alert alert-info">
+                <p><a class="popup" href="/edu/componentes_nao_disponiveis/{{ aluno.pk }}/">Descubra o motivo</a> pelo qual suas disciplinas obrigatórias pendentes não estão disponíveis.</p>
+                {% if permite_quebrar_requisitos %}
+                    <p>Para se matricular em disciplinas cujos pré-requisitos não tenham sido cumpridos, utilize a seção "Requerimentos de matrícula com Quebra de Requisitos".</p>
+                {% endif %}
+            </div>
+
+            {% regroup diarios_obrigatorias by componente_curricular.componente as diarios_componente %}
+            {% if diarios_componente %}
+                {% for item in diarios_componente %}
+                    <div class="table-responsive">
+                        <table>
+                            <caption>{{ item.list.0.componente_curricular.periodo_letivo }}º Período | {{ item.grouper }}</caption>
+                            <thead>
+                                <tr>
+                                    <th><a class="btn warning" href="#" data-desmarcar="{{ item.list.0.componente_curricular.componente.pk }}">Desmarcar</a></th>
+                                    <th>Turma</th>
+                                    <th>Curso</th>
+                                    <th>Turno</th>
+                                    <th>Horário</th>
+                                    <th>Local</th>
+                                    <th>Professor</th>
+                                    <th>Matriz</th>
+                                    <th class="text-center">Vagas</th>
+                                    <th class="text-center">Pedidos</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            {% for diario in item.list %}
+                                <tr {% if diario.id in id_diarios_salvos %}class="selected"{% endif %}>
+                                    <td>
+                                        <input type='radio'
+                                            name='diarios_{{ diario.componente_curricular.componente.pk }}'
+                                            {% if diario.id in id_diarios_salvos %} checked="checked" {% endif %}
+                                            value='{{ diario.pk }}'
+                                            data-diario="diarios_{{ diario.componente_curricular.componente.pk }}">
+                                    </td>
+                                    <td>{{ diario.turma }}</td>
+                                    <td>{{ diario.turma.curso_campus.descricao_historico }}</td>
+                                    <td>{{ diario.turno|format }}</td>
+                                    <td>{{ diario.get_horario_aulas|format }}</td>
+                                    <td>{{ diario.get_locais_aula|format }}</td>
+                                    <td>
+                                        {% for professor in diario.professordiario_set.all %}
+                                            <p>{{ professor.professor }}</p>
+                                        {% endfor %}
+                                    </td>
+                                    <td><span
+                                            class="status status-{% if aluno.matriz_id == diario.componente_curricular.matriz.id %}success{% else %}alert{% endif %}">{{ diario.componente_curricular.matriz.id }}</span>
+                                    </td>
+                                    <td class="text-center">{{ diario.get_qtd_vagas_restante }}</td>
+                                    <td class="text-center">{{ diario.get_qtd_pedidos_nao_processados }}</td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p class="alert alert-warning">Não existem turmas disponíveis para você das disciplinas obrigatórias do seu curso.</p>
+            {% endif %}
+        {% endbox %}
+
+        {% if aluno.matriz.ch_componentes_optativos > 0 %}
+            {% box 'Disciplinas Optativas' %}
+                <div class="alert alert-info">
+                    <p><a class="popup" href="/edu/componentes_nao_disponiveis/{{ aluno.pk }}/?optativas=1">Descubra o motivo</a> pelo qual suas disciplinas optativas pendentes não estão disponíveis.</p>
+                    {% if permite_quebrar_requisitos %}
+                        <p>Para se matricular em disciplinas cujos pré-requisitos não tenham sido cumpridos, utilize a seção "Requerimentos de matrícula com Quebra de Requisitos".</p>
+                    {% endif %}
+                </div>
+
+                {% regroup diarios_optativas by componente_curricular.componente as diarios_componente %}
+                {% if diarios_componente %}
+                    {% for item in diarios_componente %}
+                        <div class="table-responsive">
+                            <table>
+                                <caption>{{ item.grouper }}</caption>
+                                <thead>
+                                <tr>
+                                    <th><a class="btn warning" href="#" data-desmarcar="{{ item.list.0.componente_curricular.componente.pk }}">Desmarcar</a></th>
+                                    <th>Turma</th>
+                                    <th>Curso</th>
+                                    <th>Descrição</th>
+                                    <th>Turno</th>
+                                    <th>Horário</th>
+                                    <th>Local</th>
+                                    <th>Professor</th>
+                                    <th>Matriz</th>
+                                    <th>Vagas</th>
+                                    <th>Pedidos</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                {% for diario in item.list %}
+                                    <tr {% if diario.id in id_diarios_salvos %}class="selected"{% endif %}>
+                                        <td>
+                                            <input type='radio'
+                                                name='diarios_{{ diario.componente_curricular.componente.pk }}'
+                                                {% if diario.id in id_diarios_salvos %} checked="checked" {% endif %}
+                                                value='{{ diario.pk }}'
+                                                data-diario="diarios_{{ diario.componente_curricular.componente.pk }}">
+                                        </td>
+                                        <td>{{ diario.turma }}</td>
+                                        <td>{{ diario.turma.curso_campus.descricao_historico }}</td>
+                                        <td>{{ diario.descricao_dinamica|format }}</td>
+                                        <td>{{ diario.turno|format }}</td>
+                                        <td>{{ diario.get_horario_aulas|format }}</td>
+                                        <td>{{ diario.get_locais_aula|format }}</td>
+                                        <td>
+                                            {% for professor in diario.professordiario_set.all %}
+                                                <p>{{ professor.professor }}</p>
+                                            {% endfor %}
+                                        </td>
+                                        <td><span
+                                                class="status status-{% if aluno.matriz_id == diario.componente_curricular.matriz.id %}success{% else %}alert{% endif %}">{{ diario.componente_curricular.matriz.id }}</span>
+                                        </td>
+                                        <td class="text-center">{{ diario.get_qtd_vagas_restante }}</td>
+                                        <td class="text-center">{{ diario.get_qtd_pedidos_nao_processados }}</td>
+                                    </tr>
+                                {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="alert alert-warning">Não existem turmas disponíveis para você das disciplinas optativas do seu curso.</p>
+                {% endif %}
+            {% endbox %}
+        {% endif %}
+
+        {% if aluno.matriz.ch_componentes_eletivos > 0 or configuracao_pedido_matricula_ativa.permite_solicitacao_disciplinas_eletivas %}
+            {% box 'Disciplinas eletivas' %}
+                {% regroup diarios_eletivas by componente_curricular.componente as diarios_componente %}
+                {% if diarios_eletivas %}
+                    {% for item in diarios_componente %}
+                        <div class="table-responsive">
+                            <table>
+                                <caption>{{ item.grouper }}</caption>
+                                <thead>
+                                <tr>
+                                    <th><a class="btn warning" href="#" data-desmarcar="{{ item.list.0.componente_curricular.componente.pk }}">Desmarcar</a></th>
+                                    <th>Turma</th>
+                                    <th>Curso</th>
+                                    <th>Turno</th>
+                                    <th>Horário</th>
+                                    <th>Local</th>
+                                    <th>Professor</th>
+                                    <th>Vagas</th>
+                                    <th class="text-center">Matriz</th>
+                                    <th class="text-center">Pedidos</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                {% for diario in item.list %}
+                                    <tr {% if diario.id in id_diarios_salvos %}class="selected"{% endif %}>
+                                        <td>
+                                            <input type='radio'
+                                                name='diarios_{{ diario.componente_curricular.componente.pk }}'
+                                                {% if diario.id in id_diarios_salvos %} checked="checked" {% endif %}
+                                                value='{{ diario.pk }}'
+                                                data-diario='diarios_{{ diario.componente_curricular.componente.pk }}'>
+                                        </td>
+                                        <td>{{ diario.turma }}</td>
+                                        <td>{{ diario.turma.curso_campus.descricao_historico }}</td>
+                                        <td>{{ diario.turno|format }}</td>
+                                        <td>{{ diario.get_horario_aulas|format }}</td>
+                                        <td>{{ diario.get_locais_aula|format }}</td>
+                                        <td>
+                                            {% for professor in diario.professordiario_set.all %}
+                                                <p>{{ professor.professor }}</p>
+                                            {% endfor %}
+                                        </td>
+                                        <td><span
+                                                class="status status-{% if aluno.matriz_id == diario.componente_curricular.matriz.id %}success{% else %}alert{% endif %}">{{ diario.componente_curricular.matriz.id }}</span>
+                                        </td>
+                                        <td class="text-center">{{ diario.get_qtd_vagas_restante }}</td>
+                                        <td class="text-center">{{ diario.get_qtd_pedidos_nao_processados }}</td>
+                                    </tr>
+                                {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="alert alert-warning">Não existem turmas disponíveis para você das disciplinas eletivas.</p>
+                {% endif %}
+            {% endbox %}
+        {% endif %}
+
+        {% if permite_quebrar_requisitos %}
+            {% box 'Requerimentos de matrícula com Quebra de Requisitos' %}
+                {% if diarios_passiveis_de_quebra_requisito %}
+                    <div class="alert alert-info">
+                        <p>As disciplinas a seguir possuem requisitos que você ainda não cumpriu.</p>
+                        <p>Caso precise cursá-las mesmo assim, você pode usar as opções abaixo para formalizar um requerimento de matrícula.</p>
+                        <p>O requerimento será apreciado pela coordenação de curso, que poderá deferi-lo ou não.</p>
+                    </div>
+                    {% regroup diarios_passiveis_de_quebra_requisito by componente_curricular.optativo as diarios_por_obrigatoriedade %}
+                    {% for diarios in diarios_por_obrigatoriedade %}
+                        {% with componente_optativo=diarios.grouper %}
+                        {% if diarios.list %}
+                            <h3>Disciplinas {{ componente_optativo|yesno:"optativas,obrigatórias" }}:</h3>
+                            {% regroup diarios.list by componente_curricular.componente as diarios_por_componente %}
+                            {% for componente_diarios in diarios_por_componente %}
+                            <div class="table-responsive">
+                                <table>
+                                    <caption>
+                                        {% if not componente_optativo %}
+                                            {{ componente_diarios.list.0.componente_curricular.periodo_letivo }}º Período |
+                                        {% endif %}
+                                        {{ componente_diarios.grouper }}
+                                    </caption>
+                                    <thead>
+                                    <tr>
+                                        <th>Turma</th>
+                                        <th>Curso</th>
+                                        <th>Turno</th>
+                                        <th>Horário</th>
+                                        <th>Local</th>
+                                        <th>Professor</th>
+                                        <th>Vagas</th>
+                                        <th>Requisitos</th>
+                                        <th>Opções</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    {% for diario in componente_diarios.list %}
+                                        <tr>
+                                            <td>{{ diario.turma }}</td>
+                                            <td>{{ diario.turma.curso_campus.descricao_historico }}</td>
+                                            <td>{{ diario.turno|format }}</td>
+                                            <td>{{ diario.get_horario_aulas|format }}</td>
+                                            <td>{{ diario.get_locais_aula|format }}</td>
+                                            <td>
+                                                {% for professor in diario.professordiario_set.all %}
+                                                    <p>{{ professor.professor }}</p>
+                                                {% endfor %}
+                                            </td>
+                                            <td class="text-center">
+                                                {{ diario.get_qtd_vagas_restante }}
+                                                <span class="obs text-nowrap">({{ diario.get_qtd_pedidos_nao_processados }} pedido{{ diario.get_qtd_pedidos_nao_processados|pluralize }})</span>
+                                            </td>
+                                            <td>
+                                                <dl class="definition-list">
+                                                {% with qtd_pre=diario.componente_curricular.pre_requisitos.count qtd_co=diario.componente_curricular.co_requisitos.count %}
+                                                {% if qtd_pre %}
+                                                    <div class="list-item">
+                                                        <dt class="text-nowrap">Pré-requisito{{ qtd_pre|pluralize }}</dt>
+                                                        <dd>
+                                                            <ul>
+                                                                {% for pre_req in diario.componente_curricular.pre_requisitos.all %}
+                                                                    <li>{{ pre_req.componente.sigla }}</li>
+                                                                {% endfor %}
+                                                            </ul>
+                                                        </dd>
+                                                    </div>
+                                                {% endif %}
+                                                {% if qtd_co %}
+                                                    <div class="list-item">
+                                                        <dt class="text-nowrap">Có-requisito{{ qtd_co|pluralize }}</dt>
+                                                        <dd>
+                                                            <ul>
+                                                                {% for co_req in diario.componente_curricular.co_requisitos.all %}
+                                                                    <li>{{ co_req.componente.sigla }}</li>
+                                                                {% endfor %}
+                                                            </ul>
+                                                        </dd>
+                                                    </div>
+                                                {% endif %}
+                                                {% endwith %}
+                                                </dl>
+                                            </td>
+                                            <td class="no-print">
+                                                {% if pode_requerer_quebra %}
+                                                    <a class="btn success popup" href="{% url 'requerer_quebra_requisito' aluno.pk diario.pk %}?redirecionar={{ request.path }}">Requerer matrícula</a>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% endfor %}
+                        {% endif %}
+                        {% endwith %}
+                    {% endfor %}
+                {% else %}
+                    <p class="alert alert-warning">Não existem turmas disponíveis para você entre as possibilidades de quebra de requisito.</p>
+                {% endif %}
+
+                {% if requerimentos_quebra_requisito.exists %}
+                    <div class="table-responsive">
+                        <table>
+                            <caption>Requerimentos cadastrados</caption>
+                            <thead>
+                            <tr>
+                                <th>Diário</th>
+                                <th>Curso</th>
+                                <th>Turno</th>
+                                <th>Horário</th>
+                                <th>Local</th>
+                                <th>Professor</th>
+                                <th>Situação</th>
+                                <th class="no-print">Opções</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for requerimento in requerimentos_quebra_requisito.all %}
+                                <tr>
+                                    <td>{{ requerimento.diario }}</td>
+                                    <td>{{ requerimento.diario.turma.curso_campus.descricao_historico }}</td>
+                                    <td>{{ requerimento.diario.turno }}</td>
+                                    <td>{{ requerimento.diario.get_horario_aulas|format }}</td>
+                                    <td>{{ requerimento.diario.local_aula|format }}</td>
+                                    <td>{{ requerimento.diario.get_nomes_professores }}</td>
+                                    <td>
+                                        {% if requerimento.deferido is None %}
+                                            {{ 'Em análise'|status }}
+                                        {% elif requerimento.deferido %}
+                                            <span class="status status-success">Deferido em {{ requerimento.termino|format }}</span>
+                                        {% else %}
+                                            <span class="status status-error">Indeferido em {{ requerimento.termino|format }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if requerimento.deferido != False %}
+                                            <a class="btn danger no-print mt-2" href="?requerimento_qr={{ requerimento.pk }}">Cancelar requerimento</a>
+                                        {% endif %}
+                                    </td>
+
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endif %}
+            {% endbox %}
+        {% endif %}
+
+        {% if permite_requerer_aumento_ch %}
+            {% box 'Requerimentos de matrícula com Aumento de C.H.' %}
+                {% if diarios_passiveis_de_aumento_ch.exists %}
+                    <div class="alert alert-info">
+                        <p>As disciplinas escolhidas ou matriculadas atualmente totalizam <strong>{{ ch_total|format }}h</strong>,
+                            e o limite definido na sua matriz é de <strong>{{ estrutura.ch_maxima_disciplinas|format }}h</strong>.</p>
+                        <p>Abaixo, estão listados as disciplinas que extrapolam o seu limite de carga horária.
+                            Caso queira se matricular nelas, você deve usar as opções abaixo para formalizar o requerimento de matrícula com aumento de CH.</p>
+                        <p>O requerimento será apreciado pela coordenação, que poderá deferi-lo ou não.</p>
+                    </div>
+                    {% regroup diarios_passiveis_de_aumento_ch by componente_curricular.optativo as diarios_por_obrigatoriedade %}
+                    {% for diarios in diarios_por_obrigatoriedade %}
+                        {% with componente_optativo=diarios.grouper %}
+                        {% if diarios.list %}
+                            <h3>Disciplinas {{ componente_optativo.grouper|yesno:"optativas,obrigatórias" }}:</h3>
+                            <div class="table-responsive">
+                            {% regroup diarios.list by componente_curricular.componente as diarios_por_componente %}
+                            {% for componente_diarios in diarios_por_componente %}
+                                <table>
+                                    <caption>
+                                        {% if not componente_optativo %}
+                                            {{ componente_diarios.list.0.componente_curricular.periodo_letivo }}º Período |
+                                        {% endif %}
+                                        {{ componente_diarios.grouper }}
+                                    </caption>
+                                    <thead>
+                                    <tr>
+                                        <th>Turma</th>
+                                        <th>Curso</th>
+                                        <th>Turno</th>
+                                        <th>Horário</th>
+                                        <th>Local</th>
+                                        <th>Professor</th>
+                                        <th>Vagas</th>
+                                        <th>CH resultante</th>
+                                        <th>Opções</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    {% for diario in componente_diarios.list %}
+                                        <tr>
+                                            <td>{{ diario.turma }}</td>
+                                            <td>{{ diario.turma.curso_campus.descricao_historico }}</td>
+                                            <td>{{ diario.turno }}</td>
+                                            <td>{{ diario.get_horario_aulas|format }}</td>
+                                            <td>{{ diario.local_aula|format }}</td>
+                                            <td>
+                                                {% for professor in diario.professordiario_set.all %}
+                                                    <p>{{ professor.professor }}</p>
+                                                {% endfor %}
+                                            </td>
+                                            <td class="text-center">
+                                                {{ diario.get_qtd_vagas_restante }}
+                                                <span class="obs text-nowrap">({{ diario.get_qtd_pedidos_nao_processados }} pedido{{ diario.get_qtd_pedidos_nao_processados|pluralize }})</span>
+                                            </td>
+                                            <td>
+                                                {{ ch_total|add:diario.componente_curricular.componente.get_ch_hora_relogio|format }}h
+                                            </td>
+                                            <td class="no-print">
+                                                {% if pode_requerer_aumento_ch %}
+                                                    <a class="btn success popup" href="{% url 'requerer_matricula_com_aumento_ch' aluno.pk diario.pk %}?redirecionar={{ request.path }}">Requerer matrícula</a>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                    </tbody>
+                                </table>
+                            {% endfor %}
+                            </div>
+                        {% endif %}
+                        {% endwith %}
+                    {% endfor %}
+                {% else %}
+                    <p class="alert alert-info">As disciplinas escolhidas por você até o momento não ultrapassam a sua C.H. máxima para o período.</p>
+                {% endif %}
+
+                {% if requerimentos_aumento_ch.exists %}
+                    <div class="table-responsive">
+                        <table>
+                            <caption>Requerimentos cadastrados</caption>
+                            <thead>
+                            <tr>
+                                <th>Diário</th>
+                                <th>Curso</th>
+                                <th>Turno</th>
+                                <th>Horário</th>
+                                <th>Local</th>
+                                <th>Professor</th>
+                                <th>Situação</th>
+                                <th class="no-print">Opções</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for requerimento in requerimentos_aumento_ch.all %}
+                                <tr>
+                                    <td>{{ requerimento.diario }}</td>
+                                    <td>{{ requerimento.diario.turma.curso_campus.descricao_historico }}</td>
+                                    <td>{{ requerimento.diario.turno }}</td>
+                                    <td>{{ requerimento.diario.get_horario_aulas|format }}</td>
+                                    <td>{{ requerimento.diario.local_aula|format }}</td>
+                                    <td>{{ requerimento.diario.get_nomes_professores }}</td>
+                                    <td>
+                                        {% if requerimento.deferido is None %}
+                                            {{ 'Em análise'|status }}
+                                        {% elif requerimento.deferido %}
+                                            <span class="status status-success">Deferido em {{ requerimento.termino|format }}</span>
+                                        {% else %}
+                                            <span class="status status-error">Indeferido em {{ requerimento.termino|format }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if requerimento.deferido != False %}
+                                            <a class="btn danger no-print mt-2" href="?requerimento_aumento_ch={{ requerimento.pk }}">Cancelar requerimento</a>
+                                        {% endif %}
+                                    </td>
+
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endif %}
+            {% endbox %}
+        {% endif %}
+
+        {% if configuracao_pedido_matricula_ativa.permite_requerimento_matricula_diario %}
+            {% box 'Requerimentos' %}
+                {% if pedido_matricula.requerimentos_matricula_disciplina.all %}
+                    <h4>Disciplinas Requeridas</h4>
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Diário</th>
+                                    <th>Curso</th>
+                                    <th>Turno</th>
+                                    <th>Horário</th>
+                                    <th>Sala de aula</th>
+                                    <th>Laboratório</th>
+                                    <th>Professor</th>
+                                    <th>Matriz</th>
+                                    <th class="no-print">Opções</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for requerimento in pedido_matricula.requerimentos_matricula_disciplina.all %}
+                                    <tr>
+                                        <td>{{ forloop.counter }}</td>
+                                        <td>{{ requerimento.diario }}</td>
+                                        <td>{{ requerimento.diario.turma.curso_campus }}</td>
+                                        <td>{{ requerimento.diario.turno }}</td>
+                                        <td>{{ requerimento.diario.get_horario_aulas|format }}</td>
+                                        <td>{{ requerimento.diario.local_aula|format }}</td>
+                                        <td>{{ requerimento.diario.local_laboratorio|format }}</td>
+                                        <td>{{ requerimento.diario.get_nomes_professores }}</td>
+                                        <td>{{ requerimento.diario.turma.matriz_id }}</td>
+                                        <td class="no-print">
+                                            <a class="btn danger" href="?requerimento={{ requerimento.pk }}">Cancelar Solicitação</a>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endif %}
+                <div class="alert alert-info">
+                    <p>Caso deseje solicitar disciplinas que não pertencem a sua matriz, busque pela descrição da disciplina e clique no botão "Solicitar Matrícula".</p>
+                    <p>O coordenador do curso avaliará sua solicitação baseado na justificativa e no número de vagas disponíveis.</p>
+                </div>
+                <div>
+                    <label>Buscar Disciplina:</label>
+                    <input type="text" pattern=".{3,}" name="q" value="{{ request.GET.disciplina|default:'' }}" id="q" title="3 ou mais caracteres">
+                    <a id="btnFiltrarDisciplinasReq" class="btn default" href="#">Filtrar</a>
+                </div>
+                {% if request.GET.disciplina or diarios_requerimento %}
+                    <h4>Disciplinas Disponíveis</h4>
+                    {% if diarios_requerimento %}
+                        <div class="table-responsive">
+                            <table id="busca">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Diário</th>
+                                        <th>Curso</th>
+                                        <th>Turno</th>
+                                        <th>Horário</th>
+                                        <th>Sala de aula</th>
+                                        <th>Laboratório</th>
+                                        <th>Professor</th>
+                                        <th>Matriz</th>
+                                        <th class="no-print">Opções</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for diario in diarios_requerimento %}
+                                        <tr>
+                                            <td>{{ forloop.counter }}</td>
+                                            <td>{{ diario }}</td>
+                                            <td>{{ diario.turma.curso_campus }}</td>
+                                            <td>{{ diario.turno }}</td>
+                                            <td>{{ diario.get_horario_aulas|format }}</td>
+                                            <td>{{ diario.local_aula|format }}</td>
+                                            <td>{{ diario.local_laboratorio|format }}</td>
+                                            <td>{{ diario.get_nomes_professores }}</td>
+                                            <td>{{ diario.turma.matriz_id }}</td>
+                                            <td class="no-print">
+                                                <a class="btn success" href="{{ request.path }}?requerer={{ diario.pk }}">Requerer Matrícular</a>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="alert alert-warning">Nenhum diário disponível para a disciplina com a descrição informada.</p>
+                    {% endif %}
+                {% endif %}
+            {% endbox %}
+        {% endif %}
+
+        {% if diarios_obrigatorias or diarios_optativas or diarios_eletivas %}
+            <div class="submit-row">
+                <input class="btn success" type="submit" value="Salvar">
+            </div>
+        {% endif %}
+    </form>
+    {% endif %}
+{% endblock %}

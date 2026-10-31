@@ -1,0 +1,250 @@
+{# Aba "Avaliadores": carga, qualidade e gargalos. Nomes só aparecem para membros ativos da CRSC. #}
+
+<ul class="flex-container boxes infos sm">
+    <li class="box-item with-description info">
+        <p class="stat">{{ painel_avaliadores.total_avaliadores_com_carga }}</p>
+        <h4 class="title">Avaliadores</h4>
+        <p class="description">Com processo em análise</p>
+    </li>
+    <li class="box-item with-description warning">
+        <p class="stat">{{ painel_avaliadores.total_pendentes }}</p>
+        <h4 class="title">Avaliações</h4>
+        <p class="description">Pendentes</p>
+    </li>
+    <li class="box-item with-description {% if painel_avaliadores.total_atrasadas %}error{% else %}success{% endif %}">
+        <p class="stat">
+            {% if painel_avaliadores.total_atrasadas %}{{ painel_avaliadores.total_atrasadas }}{% else %}Nenhuma{% endif %}
+        </p>
+        <h4 class="title">Avaliações</h4>
+        <p class="description">Com prazo vencido</p>
+    </li>
+    <li class="box-item with-description info">
+        <p class="stat">
+            {% if painel_avaliadores.tempo_medio_geral is not None %}
+                {{ painel_avaliadores.tempo_medio_geral }}<small>d</small>
+            {% else %}
+                —
+            {% endif %}
+        </p>
+        <h4 class="title">Tempo médio</h4>
+        <p class="description">Da notificação à finalização</p>
+    </li>
+</ul>
+
+{# ------------------------------------------------------------------ #}
+{#  Carga e produtividade                                              #}
+{# ------------------------------------------------------------------ #}
+<div class="rsc-chart-grid-2-1">
+    <div>
+        {% box 'Carga e Produtividade' %}
+        {% if not painel_avaliadores.carga %}
+            <p class="text-muted">Nenhum avaliador com avaliação registrada.</p>
+        {% else %}
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>Avaliador</th>
+                            <th>Pendentes</th>
+                            <th>Finalizadas</th>
+                            <th>Tempo médio</th>
+                            <th>Aceite do sorteio</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for linha in painel_avaliadores.carga %}
+                        <tr>
+                            <td>{{ linha.avaliador }}</td>
+                            <td class="text-center">
+                                {% if linha.pendentes %}
+                                    <span class="status status-alert">{{ linha.pendentes }}</span>
+                                {% else %}
+                                    0
+                                {% endif %}
+                            </td>
+                            <td class="text-center">{{ linha.finalizadas }}</td>
+                            <td class="text-center">
+                                {% if linha.tempo_medio_dias is not None %}{{ linha.tempo_medio_dias }} dia(s){% else %}—{% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if linha.taxa_aceite is not None %}{{ linha.taxa_aceite }}%{% else %}—{% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+        {% endbox %}
+    </div>
+    <div>
+        {% box 'Avaliações Pendentes por Avaliador' %}
+        <div id="chart-carga-avaliador" class="rsc-chart-container"></div>
+        {% endbox %}
+    </div>
+</div>
+
+{# ------------------------------------------------------------------ #}
+{#  Qualidade da avaliação                                             #}
+{# ------------------------------------------------------------------ #}
+{% box 'Qualidade da Avaliação' %}
+{% if not painel_avaliadores.qualidade %}
+    <p class="text-muted">Nenhum avaliador sorteado até o momento.</p>
+{% else %}
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead>
+                <tr>
+                    <th>Avaliador</th>
+                    <th>Finalizadas</th>
+                    <th>Com resultado</th>
+                    <th>Deferidas</th>
+                    <th>Indeferidas</th>
+                    <th>Taxa de deferimento</th>
+                    <th>Média de itens validados</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for linha in painel_avaliadores.qualidade %}
+                <tr>
+                    <td>{{ linha.avaliador }}</td>
+                    <td class="text-center">{{ linha.finalizadas }}</td>
+                    <td class="text-center">
+                        {% if linha.com_resultado != linha.finalizadas %}
+                            <span class="status status-alert" title="Há avaliação finalizada sem resultado registrado">{{ linha.com_resultado }}</span>
+                        {% else %}
+                            {{ linha.com_resultado }}
+                        {% endif %}
+                    </td>
+                    <td class="text-center">{{ linha.deferidas }}</td>
+                    <td class="text-center">{{ linha.indeferidas }}</td>
+                    <td class="text-center">
+                        {% if linha.taxa_deferimento is not None %}{{ linha.taxa_deferimento }}%{% else %}—{% endif %}
+                    </td>
+                    <td class="text-center">
+                        {% if linha.media_itens is not None %}{{ linha.media_itens }}{% else %}—{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endif %}
+{% endbox %}
+
+{# ------------------------------------------------------------------ #}
+{#  Processos em poder de cada avaliador                               #}
+{# ------------------------------------------------------------------ #}
+{% box 'Processos por Avaliador' %}
+{% if not painel_avaliadores.processos_por_avaliador and not painel_avaliadores.avaliadores_sem_processo %}
+    <p class="text-muted">Nenhum avaliador sorteado até o momento.</p>
+{% else %}
+    {% for linha in painel_avaliadores.processos_por_avaliador %}
+        {% box linha.avaliador 'collapsed' linha.slug linha.em_avaliacao extra=linha.resumo %}
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead>
+                    <tr>
+                        <th>Processo</th>
+                        <th>Servidor</th>
+                        <th>Nível</th>
+                        <th>Em mãos</th>
+                        <th>Prazo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for processo in linha.processos %}
+                    <tr>
+                        <td><a href="{% url 'rsc_tae:visualizar' processo.processo_id %}">#{{ processo.processo_id }}</a></td>
+                        <td>{{ processo.servidor }}</td>
+                        <td>{{ processo.nivel }}</td>
+                        <td class="text-center">
+                            {% if processo.dias is not None %}{{ processo.dias }} dia(s){% else %}—{% endif %}
+                        </td>
+                        <td>
+                            {% if processo.situacao_prazo == 'vencido' %}
+                                <span class="status status-error">Vencido em {{ processo.prazo|date:"d/m/Y" }}</span>
+                            {% elif processo.situacao_prazo == 'vencendo' %}
+                                <span class="status status-alert">Vence em {{ processo.prazo|date:"d/m/Y" }}</span>
+                            {% elif processo.situacao_prazo == 'no-prazo' %}
+                                <span class="status status-info">Até {{ processo.prazo|date:"d/m/Y" }}</span>
+                            {% else %}
+                                <span class="status status-default">Sem prazo registrado</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endbox %}
+    {% endfor %}
+
+    {% if painel_avaliadores.avaliadores_sem_processo %}
+        <p class="text-muted">
+            <strong>Sem processo em mãos:</strong>
+            {% for avaliador in painel_avaliadores.avaliadores_sem_processo %}{{ avaliador }}{% if not forloop.last %}, {% endif %}{% endfor %}
+        </p>
+    {% endif %}
+{% endif %}
+{% endbox %}
+
+{# ------------------------------------------------------------------ #}
+{#  Gargalos e prazos por avaliador                                    #}
+{# ------------------------------------------------------------------ #}
+{% box 'Gargalos e Prazos por Avaliador' %}
+{% if not painel_avaliadores.gargalos %}
+    <p class="text-muted">Nenhuma avaliação com prazo vencido ou próximo do vencimento.</p>
+{% else %}
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead>
+                <tr>
+                    <th>Avaliador</th>
+                    <th>Vencidas</th>
+                    <th>Em alerta (≤3 dias)</th>
+                    <th>Prazo mais antigo</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for linha in painel_avaliadores.gargalos %}
+                <tr>
+                    <td>{{ linha.avaliador }}</td>
+                    <td class="text-center">{{ linha.atrasadas }}</td>
+                    <td class="text-center">{{ linha.em_alerta }}</td>
+                    <td class="text-center">{{ linha.prazo_mais_antigo|date:"d/m/Y" }}</td>
+                    <td>
+                        {% if linha.dias_atraso %}
+                            <span class="status status-error">{{ linha.dias_atraso }} dia(s) em atraso</span>
+                        {% else %}
+                            <span class="status status-alert">No prazo, vencendo</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endif %}
+{% endbox %}
+
+<script>
+(function () {
+    Highcharts.chart('chart-carga-avaliador', {
+        credits: { enabled: false },
+        title: { text: null },
+        exporting: { enabled: false },
+        chart: { type: 'bar' },
+        xAxis: { categories: {{ painel_avaliadores.carga_labels|safe }}, title: { text: null } },
+        yAxis: { title: { text: 'Avaliações' }, allowDecimals: false },
+        tooltip: { valueSuffix: ' avaliação(ões)' },
+        legend: { enabled: false },
+        series: [{
+            name: 'Pendentes',
+            data: {{ painel_avaliadores.carga_totais|safe }},
+            color: '#f6c23e'
+        }]
+    });
+}());
+</script>

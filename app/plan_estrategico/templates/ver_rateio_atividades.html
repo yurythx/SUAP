@@ -1,0 +1,100 @@
+{% extends super_template %}
+
+{% block content %}
+    <h4>Componente funcional: {{ etapa.etapa.codigo }} - {{ etapa.etapa.descricao }}</h4>
+
+    {% if origens %}
+        {% if plano_atividade.em_periodo_projeto_posloa and etapa.projeto_plano_atividade.eh_dono and etapa.tem_valor_rateado_unidades and not tem_valor_compatibilizado %}
+            <ul class="action-bar">
+                <li><a href="{% url 'remover_rateio_unidades' etapa.pk %}" class="btn danger">Cancelar Rateio das Origens entre unidades</a></li>
+            </ul>
+        {% endif %}
+        {% for origem in origens %}
+            {% box "{{ origem.origem_recurso_projeto }} - R$ {{ origem.get_valor|format_money }}" class="collapsed" %}
+                {% if origem_recurso_pode_ratear_valor and etapa.projeto_plano_atividade.eh_dono %}
+                    {% if origem.valor is None %}
+                        <p class="alert alert-info"> <strong>Atenção:</strong> O gestor do projeto precisa ratear a origem de recurso entre os componentes funcionais para depois ratear o valor entre as unidades do componente.</p>
+                    {% else %}
+                            <ul class="action-bar">
+                                <li><a href="{% url 'ratear_valores_unidades' etapa.pk origem.pk %}" class="btn default">Ratear Unidade</a></li>
+                            </ul>
+                    {% endif %}
+                {% endif %}
+
+                {% if eh_administrador and not origem.tipo_especial and plano_atividade.em_periodo_atividades_posloa %}
+                    {% if origem.tem_valor_distribuido or origem.tem_valor_especial_distribuido %}
+                        <ul class="action-bar">
+                            <li><a href="{% url 'remover_rateio_atividades' etapa.pk origem.pk %}" class="btn danger">Cancelar Rateio entre atividades</a></li>
+                        </ul>
+                    {% endif %}
+                {% endif %}
+                {% if origem.tipo_especial %}
+                    <p class="alert alert-info"> Esta Origem de Recurso é classificada como especial.</p>
+                {% endif %}
+                {% if origem.unidadeorigemetapa_set.exists %}
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Unidade Administrativa</th>
+                                <th>Valor Proposto pela UA</th>
+                                <th>Valor Rateado pelo Gestor de Projeto (R$)</th>
+                                <th>Valor Compatibilizado pela UA (R$)</th>
+                                <th>Valor Complementado pela UA (R$)</th>
+                                <th>Total (R$)</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                             {% for unidade in origem.unidadeorigemetapa_set.all %}
+                                 <tr>
+                                     <td>{{ unidade.unidade_gestora.unidade_gestora }}</td>
+                                     <td align="right">{{ unidade.get_total_valor_proposto|format_money }}</td>
+                                     <td align="right">{{ unidade.valor|format_money }}</td>
+                                     <td align="right">{{ unidade.get_total_valor_rateado|format_money }}</td>
+                                     <td align="right">{{ unidade.get_total_valor_reserva_tecnica|format_money }}</td>
+                                     <td align="right">{{ unidade.get_total_unidade|format_money }}</td>
+
+                                     <td>
+                                        {% if etapa|method:"tem_atividades"|call:unidade.unidade_gestora.unidade_gestora %}
+                                            <ul class="action-bar">
+                                                <li><a href="{% url 'detalhar_atividades_unidade' etapa.pk origem.pk unidade.unidade_gestora.unidade_gestora.pk %}" class="btn default">Ver Atividades</a></li>
+                                            </ul>
+                                        {% endif %}
+                                     </td>
+                                 </tr>
+                            {% endfor %}
+                         </tbody>
+                    </table>
+                {% elif unidades %}
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Unidade Administrativa</th>
+                                <th>Valor</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                             {% for unidade in unidades %}
+                                 <tr>
+                                     <td>{{ unidade.unidade_gestora }}</td>
+                                     <td> - </td>
+                                     <td>
+                                        <ul class="action-bar">
+                                            <li><a href="{% url 'detalhar_atividades_unidade' etapa.pk origem.pk unidade.unidade_gestora.pk %}" class="btn default">Ver Atividades</a></li>
+                                        </ul>
+                                     </td>
+                                 </tr>
+                            {% endfor %}
+                         </tbody>
+                    </table>
+                {% else %}
+                      <p class="alert alert-warning">Nenhuma unidade administrativa associada a este componente funcional.</p>
+                {% endif %}
+            {% endbox %}
+        {% endfor %}
+    {% else %}
+        <p class="alert alert-warning">Nenhuma origem de recurso associada a este componente funcional.</p>
+    {% endif %}
+
+{% endblock %}

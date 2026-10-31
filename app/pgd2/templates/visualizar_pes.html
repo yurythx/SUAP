@@ -1,0 +1,623 @@
+{% extends super_template %}
+
+{% block object-status %}
+    {{ pes.get_situacao_display|status }}
+    {% if pes.em_execucao %}
+        <span class="status status-alert">Em execução</span>
+    {% endif %}
+    {% if pes.situacao_avaliacao %}
+        {{ pes.get_situacao_avaliacao_display|status }}
+    {% endif %}
+{% endblock %}
+
+{% block action-bar %}
+
+    <ul class="action-bar">
+
+        {% if pode_solicitar_aprovacao %}
+            <li>
+                <a href="{% url 'solicitar_aprovacao_pes_pgd2' pes.id %}" class="btn success">Enviar para aprovação</a>
+            </li>
+        {% endif %}
+
+        {% if pode_receber_copia %}
+            <li>
+                <a href="{% url 'copiar_pes_pgd2' pes.id %}" class="btn primary">Copiar dados de outro PES</a>
+            </li>
+        {% endif %}
+
+        {% if pode_aprovar %}
+            <li>
+                <a href="{% url 'aprovar_pes_pgd2' pes.id %}" class="btn success">Aprovar</a>
+            </li>
+            <li>
+                <a href="{% url 'reprovar_pes_pgd2' pes.id %}" class="btn danger">Reprovar</a>
+            </li>
+        {% endif %}
+
+        {% if pode_visualizar_execucao %}
+            <li class="has-child">
+                <a class="btn" href="#">Acompanhamento</a>
+                <ul>
+                    <li>
+                        <a href="{% url 'visualizar_pes_execucao_geral_pgd2' pes.id %}">Geral</a>
+                    </li>
+                    <li>
+                        <a href="{% url 'visualizar_pes_execucao_planejamento_pgd2' pes.id %}">Planejamento</a>
+                    </li>
+                    <li>
+                        <a href="{% url 'visualizar_pes_execucao_pgd2' pes.id %}">Execução</a>
+                    </li>
+                    <li>
+                        <a href="{% url 'visualizar_pes_servidores_relacionados_pgd2' pes.id %}">Servidores relacionados</a>
+                    </li>
+                </ul>
+            </li>
+        {% endif %}
+
+        {% if pode_solicitar_avaliacao %}
+            <li>
+                <a href="{% url 'analisar_pes_pgd2' pes.id %}" class="btn">Analisar Execução / Enviar para Avaliação</a>
+            </li>
+        {% endif %}
+
+        {% if pode_avaliar %}
+            <li>
+                <a href="{% url 'avaliar_pes_pgd2' pes.id %}" class="btn">{% icone "thumbs-up" %} Avaliar execução</a>
+            </li>
+        {% endif %}
+
+        {% if pode_reabrir %}
+            <li>
+                <a href="{% url 'reabrir_pes_pgd2' pes.id %}" class="btn">{% icone "square" %} Reabrir/Devolver</a>
+            </li>
+        {% endif %}
+
+        {% if pode_excluir %}
+            <li>
+                <a href="{% url 'excluir_pes_pgd2' pes.id %}" class="btn danger">Remover</a>
+            </li>
+        {% endif %}
+        {% if eh_super_usuario %}
+            <li>
+                <a href="{% url 'visualizar_pes_api_pgd2' pes.id %}" class="btn">Visualizar dados para API</a>
+            </li>
+        {% endif %}
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+    {% if usuario_pode_solicitar_aprovacao and erros %}
+        <div class="alert alert-danger">
+            <p><strong>Pendências para solicitar aprovação deste PES</strong>:</p>
+            <ol>
+                {% for erro in erros %}
+                    <li>{{ erro }}</li>
+                {% endfor %}
+            </ol>
+        </div>
+    {% endif %}
+
+    {% if erro_habilitacao_setor %}
+        <div class="alert alert-danger">
+            {{ erro_habilitacao_setor }}
+        </div>
+    {% endif %}
+
+    <dl class="definition-list flex">
+        <div class="list-item">
+            <dt>Setor</dt>
+            <dd>
+                {{ pes.setor.get_caminho_as_html|format }}
+            </dd>
+        </div>
+        <div class="list-item">
+            <dt>Período</dt>
+            <dd>
+                {{ pes.periodo_pes.data_inicio|format }} a {{ pes.periodo_pes.data_fim|format }}
+            </dd>
+        </div>
+        {% if estah_solicitado_aprovacao_avaliacao %}        
+            <div class="list-item">
+                <dt>Setor que deve aprovar/avaliar</dt>
+                <dd>
+                    {{ pes.setor_para_aprovacao|format|safe }} (ou superior, quando for caso)
+                </dd>
+            </div>
+        {% endif %}
+        {% if eh_super_usuario %}
+            <div class="list-item">
+                <dt>Identificadores para API</dt>
+                <dd>
+                    {% if pes.cod_siape_grupo %}
+                        cod_siape_grupo: {{ pes.cod_siape_grupo|format }} | identificador_externo: {{ pes.identificador_externo|format }} | Grupo: {{ pes.get_grupo_pes_api_links|format }}
+                    {% else %}
+                        Não gerado
+                    {% endif %}
+                </dd>
+            </div>
+            <div class="list-item">
+                <dt>Datas para API</dt>
+                <dd>
+                    Data/hora do último envio pela API: {{ pes.data_hora_ultimo_envio_api|format }}
+                </dd>
+            </div>
+        {% endif %}
+    </dl>
+
+    {% if pes.situacao_avaliacao %}
+        <dl class="definition-list flex">
+            <div class="list-item flex-basis-50">
+                <dt>Situação da análise da execução</dt>
+                <dd>
+                    {{ pes.get_situacao_avaliacao_display|status }}
+                </dd>
+            </div>
+            <div class="list-item flex-basis-50">
+                <dt>Observações da análise da execucao</dt>
+                <dd>
+                    {{ pes.avaliacao_solicitacao_observacao_pes|format }}
+                </dd>
+            </div>
+        </dl>
+    {% endif %}
+
+    {% if pes.estah_avaliado %}
+        <dl class="definition-list flex">
+                <div class="list-item flex-basis-50">
+                    <dt>Avaliação da execução</dt>
+                    <dd>
+                        {{ pes.get_avaliacao_pes_display|format }}
+                    </dd>
+                </div>
+                <div class="list-item flex-basis-50">
+                    <dt>Justificativas/Observações da avaliação da execucao</dt>
+                    <dd>
+                        {{ pes.avaliacao_observacao_pes|format }}
+                    </dd>
+                </div>
+        </dl>
+    {% endif %}
+
+    {% if orientacoes_sistemico or orientacoes_nao_sistemico %}
+        <div class="tab-pane" data-title="Observações/Regras" data-tab-info="true">
+            {% if orientacoes_sistemico %}
+                {% box "Orientações Sistêmicas" %}
+                    {% for orientacao in orientacoes_sistemico %}
+                        <h4>{{ orientacao|format }} </h4>
+                        <p>{{ orientacao.orientacao|format|safe }}</p>
+                    {% endfor %}
+                {% endbox %}
+            {% endif %}
+
+            {% if orientacoes_nao_sistemico %}
+                {% box "Orientações Locais" %}
+                    {% for orientacao in orientacoes_nao_sistemico %}
+                        <h4>{{ orientacao|format }} </h4>
+                        <p>{{ orientacao.orientacao|format|safe }}</p>
+                    {% endfor %}
+                {% endbox %}
+            {% endif %}
+        </div>
+    {% endif %}
+
+    <div class="tab-pane" data-title="Dados básicos" data-tab="tab2">
+        {% if pode_editar_dados_basicos %}
+            <ul class="action-bar">
+                <li>
+                    <a href="{% url 'editar_dados_basicos_pes_pgd2' pes.id %}" class="btn primary">{% icone "edit" %} Editar</a>
+                </li>
+            </ul>
+        {% endif %}
+        <dl class="definition-list">
+            <dt>{{ pes|verbose:'doc_percentual_maximo_teletrabalho' }}</dt>
+            <dd>{{ pes.doc_percentual_maximo_teletrabalho|format }}</dd>
+
+            <dt>{{ pes|verbose:'doc_insfraestrutura' }}</dt>
+            <dd>{{ pes.doc_insfraestrutura|format|linebreaks }}</dd>
+
+            <dt>{{ pes|verbose:'doc_tecnica' }}</dt>
+            <dd>{{ pes.doc_tecnica|format|linebreaks }}</dd>
+        </dl>
+    </div>
+
+    <div class="tab-pane" data-title="Horário de funcionamento do setor" data-tab="tab3" data-checked="{% if pes_horarios_funcionamento_setor_agrupado_por_semana %}True{% else %}False{% endif %}">
+        {% if pode_cadastrar_horario_funcionamento_setor %}
+            <ul class="action-bar">
+                <li>
+                    <a href="{% url 'cadastrar_horario_funcionamento_setor_pes_pgd2' pes.id %}" class="btn success">{% icone "plus" %} Adicionar</a>
+                </li>
+            </ul>
+        {% endif %}
+        {% if not pes_horarios_funcionamento_setor_agrupado_por_semana %}
+            <p class="alert alert-warning">Não há horários cadastrados.</p>        
+        {% else %}
+            <form method="get" action="/pgd2/remover_horario_funcionamento_setor_pes/{{ pes.id }}" id="form_horario_funcionamento_setor">
+                {% csrf_token %}
+                {% if pode_cadastrar_horario_funcionamento_setor %}
+                    <div class="actions">
+                        <input value="Remover selecionados" name="remover_hfs" type="submit" class="btn danger">
+                    </div>
+                {% endif %}
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th rowspan="2" scope="col" class="action-checkbox-column">
+                                    {% if pode_cadastrar_horario_funcionamento_setor %}
+                                        <input type="checkbox" id="action-toggle" name="hfs">
+                                    {% endif %}
+                                </th>
+                                <th>Data</th>
+                                <th>Hora início</th>
+                                <th>Hora final</th>
+                                <th class="no-print text-end">Opções</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for semana, dados in pes_horarios_funcionamento_setor_agrupado_por_semana.items %}
+                                <tr>
+                                    <td colspan="5">
+                                        <strong> Semana de {{ dados.inicio|format }} a {{ dados.final|format }} </strong>
+                                    </td>
+                                </tr>
+                                {% for dia_pes_hs in dados.hfss %}
+                                    <tr>
+                                        <td>
+                                            {% if pode_cadastrar_horario_funcionamento_setor %}
+                                                <input type="checkbox" name="checks[]" value="{{ dia_pes_hs.id }}" class="hfs">
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {{ dia_pes_hs.data|date:"d/m/Y" }}</br>
+                                            <i>({{ dia_pes_hs.data|date:"l" }})</i>
+                                        </td>
+                                        <td>
+                                            {{ dia_pes_hs.hora_inicio|time:"H:i:s" }}
+                                        </td>
+                                        <td>
+                                            {{ dia_pes_hs.hora_final|time:"H:i:s" }}
+                                        </td>
+                                        <td class="no-print">
+                                            <ul class="action-bar">
+                                                {% if pode_cadastrar_horario_funcionamento_setor %}
+                                                    <li>
+                                                        <a class="btn primary" href="/pgd2/editar_horario_funcionamento_setor_pes/{{ dia_pes_hs.id }}">Editar</a>
+                                                    </li>
+                                                {% endif %}
+                                            </ul>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </form>    
+        {% endif %}
+    </div>
+
+    <div class="tab-pane" data-title="Horário de planejamento do setor" data-tab="tab4" data-checked="{% if pes_horarios_planejamento_setor_agrupado_por_semana %}True{% else %}False{% endif %}">
+        {% if pode_cadastrar_horario_planejamento_setor %}
+            <ul class="action-bar">
+                <li>
+                    <a href="{% url 'cadastrar_horario_planejamento_setor_pes_pgd2' pes.id %}" class="btn success">{% icone "plus" %} Adicionar</a>
+                </li>
+            </ul>
+        {% endif %}
+        {% if not pes_horarios_planejamento_setor_agrupado_por_semana %}
+            <p class="alert alert-warning">Não há horários cadastrados.</p>        
+        {% else %}
+            <form method="get" action="/pgd2/remover_horario_planejamento_setor_pes/{{ pes.id }}" id="form_horario_planejamento_setor">
+                {% csrf_token %}
+                {% if pode_cadastrar_horario_planejamento_setor %}
+                    <div class="actions">
+                        <input value="Remover selecionados" name="remover_hps" type="submit" class="btn danger">
+                    </div>
+                {% endif %}
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th rowspan="2" scope="col" class="action-checkbox-column">
+                                    {% if pode_cadastrar_horario_planejamento_setor %}
+                                        <input type="checkbox" id="action-toggle" name="hfs">
+                                    {% endif %}
+                                </th>
+                                <th>Data</th>
+                                <th>Hora início</th>
+                                <th>Hora final</th>
+                                <th>Reunião</th>
+                                <th>Conforme horário de funcionamento?</th>
+                                <th class="no-print">Opções</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for semana, dados in pes_horarios_planejamento_setor_agrupado_por_semana.items %}
+                                <tr>
+                                    <td colspan="7">
+                                        <strong> Semana de {{ dados.inicio|format }} a {{ dados.final|format }} </strong>
+                                    </td>
+                                </tr>
+                                {% for dia_pes_hs in dados.hfss %}
+                                    <tr>
+                                        <td>
+                                            {% if pode_cadastrar_horario_planejamento_setor %}
+                                                <input type="checkbox" name="checks[]" value="{{ dia_pes_hs.id }}" class="hfs">
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {{ dia_pes_hs.data|date:"d/m/Y" }}</br>
+                                            <i>({{ dia_pes_hs.data|date:"l" }})</i>
+                                        </td>
+                                        <td>
+                                            {{ dia_pes_hs.hora_inicio|time:"H:i:s" }}
+                                        </td>
+                                        <td>
+                                            {{ dia_pes_hs.hora_final|time:"H:i:s" }}
+                                        </td>
+                                        <td>
+                                            {{ dia_pes_hs.get_reuniao_display|format }}
+                                        </td>
+                                        <td>
+                                            {% if dia_pes_hs.estah_conforme_horario_funcionamento_setor %}
+                                                <img src="/static/admin/img/icon-yes.svg" alt="True">
+                                            {% else %}
+                                                <img src="/static/admin/img/icon-no.svg" alt="False">
+                                            {% endif %}
+                                        </td>
+            
+                                        <td class="no-print">
+                                            <ul class="action-bar">
+                                                {% if pode_cadastrar_horario_planejamento_setor %}
+                                                    <li>
+                                                        <a class="btn primary" href="/pgd2/editar_horario_planejamento_setor_pes/{{ dia_pes_hs.id }}">Editar</a>
+                                                    </li>
+                                                {% endif %}
+                                            </ul>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </form>    
+        {% endif %}
+    </div>
+    
+    <div class="tab-pane" data-title="Entregas" data-tab="tab5" data-checked="{% if not pes_entregas %}False{% endif %}" data-counter="{{ pes_entregas.count }}">
+        {% if pode_cadastrar_entrega %}
+            <ul class="action-bar">
+                <li>
+                    <a href="{% url 'cadastrar_entrega_pes_pgd2' pes.id %}" class="btn success">{% icone "plus" %} Adicionar</a>
+                </li>
+            </ul>
+        {% endif %}
+        {% if not pes_entregas %}
+            <p class="alert alert-warning">Não há entregas cadastradas.</p>        
+        {% else %}
+            <form method="get" action="/pgd2/remover_entrega_pes/{{ pes.id }}" id="form_entrega_setor">
+                {% csrf_token %}
+                {% if pode_cadastrar_entrega and existe_entrega_que_pode_ser_removida_no_pes %}
+                    <div class="actions">
+                        <input value="Remover selecionadas" name="remover_entregas_setor" type="submit" class="btn danger">
+                    </div>
+                {% endif %}
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                {% if pode_cadastrar_entrega and existe_entrega_que_pode_ser_removida_no_pes %}
+                                    <th rowspan="2" scope="col" class="no-print action-checkbox-column">
+                                        <input type="checkbox" id="action-toggle" name="entsetor">
+                                    </th>
+                                {% endif %}
+                                <th class="no-print">Ações</th>
+                                <th>Título</th>
+                                <th>Descrição</th>
+                                <th>Métrica/Meta</th>
+                                <th>Prazo</th>
+                                {% comment %}
+                                <th>Critérios de avaliação</th>
+                                {% endcomment %}
+    
+                                {% comment %}
+                                <th>Setores Demandantes</th>
+                                <th>Pessoas Demandantes</th>
+                                <th>Setores Destinatários</th>
+                                <th>Pessoas Destinatárias</th>
+                                {% endcomment %}
+                                
+                                {% if utilizar_plan_estrat %}
+                                    <th>Vinculado com planejamento estratégico</th>
+                                {% endif %}
+                                
+                                <th>Cancelado?</th>
+                                <th class="no-print text-end">Opções</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for entrega in pes_entregas %}
+                                {% if entrega.cancelado %}
+                                    <tr class="error">
+                                {% else %}
+                                    <tr>
+                                {% endif %}
+                                    {% if pode_cadastrar_entrega and existe_entrega_que_pode_ser_removida_no_pes %}
+                                        <td class="no-print">
+                                            {% if entrega.pode_remover_entrega %}
+                                                <input type="checkbox" name="checks[]" value="{{ entrega.id }}" class="entsetor">
+                                            {% endif %}
+                                        </td>
+                                    {% endif %}
+                                    <td class="list-display-icons no-print">
+                                        {% icon "view" "/pgd2/visualizar_entrega_pes/{{ entrega.id }}" %}
+                                        {% if pode_cadastrar_entrega %}
+                                            {% icon "edit" "/pgd2/editar_entrega_pes/{{ entrega.id }}" %}
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {{ entrega.titulo|format }}
+                                    </td>
+                                    <td>
+                                        {{ entrega.descricao|linebreaks }}
+                                    </td>
+                                    <td>
+                                        {{ entrega.get_metrica_display|format }} ({{ entrega.get_meta_str|format }})
+                                    </td>
+                                    <td>
+                                        {{ entrega.data_prazo|format }}
+                                    </td>
+                                    {% comment %}
+                                    <td>
+                                        {{ entrega.criterios_avaliacao|linebreaks }}
+                                    </td>
+                                    {% endcomment %}
+                                    {% comment %}
+                                    <td>
+                                        {{ entrega.get_setores_demandantes|format }}
+                                    </td>
+                                    <td>
+                                        {{ entrega.get_vinculos_demandantes|format }}
+                                    </td>
+                                    <td>
+                                        {{ entrega.get_setores_destinatarios|format }}
+                                    </td>
+                                    <td>
+                                        {{ entrega.get_vinculos_destinatarios|format }}
+                                    </td>
+                                    {% endcomment %}
+                                    
+                                    {% if utilizar_plan_estrat %}
+                                    <td>
+                                        {{ entrega.atividade_processo_plan_estrategico.exists|format }}
+                                    </td>
+                                    {% endif %}
+                                    <td>
+                                        {{ entrega.cancelado|format }}
+                                    </td>
+                                    <td class="no-print">
+                                        <ul class="action-bar">
+                                            {% if pode_cadastrar_entrega %}
+                                                {% if entrega.pode_cancelar_entrega %}
+                                                    <li>
+                                                        <a class="btn danger" href="/pgd2/cancelar_entrega_pes/{{ entrega.id }}">Cancelar</a>
+                                                    </li>
+                                                {% endif %}
+                                                {% if entrega.pode_descancelar_entrega %}
+                                                    <li>
+                                                        <a class="btn warning" href="/pgd2/descancelar_entrega_pes/{{ entrega.id }}">Descancelar</a>
+                                                    </li>
+                                                {% endif %}
+                                            {% endif %}
+                                        </ul>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </form>    
+        {% endif %}
+    </div>
+
+    <div class="tab-pane" data-title="Auxiliares" data-counter="{{ pes_auxiliares.count }}" data-tab="tab6">
+
+        {% if pode_cadastrar_entrega %}
+            <ul class="action-bar">
+                <li>
+                    <a href="{% url 'editar_auxiliares_pes_pgd2' pes.id %}" class="btn success">{% icone "edit" %} Cadastrar/Editar</a>
+                </li>
+            </ul>
+        {% endif %}
+        {% if not pes_auxiliares %}
+            <p class="alert alert-warning">Não há auxiliares cadastrados.</p>        
+        {% else %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Auxiliar</th>
+                            <th>Setor</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for auxiliar in pes_auxiliares %}
+                            <tr>
+                                <td>
+                                    {{ auxiliar }}
+                                </td>
+                                <td>
+                                    {{ auxiliar.setor|format }}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="tab-pane" data-title="Histórico" data-counter="{{ registros_acoes.count }}" data-tab="tab7">
+        <div class="legenda">
+            <p>Legenda:</p>
+            <ul>
+                <li class="info">Antes da aprovação do PES</li>
+                <li class="warning">Após aprovação do PES</li>
+            </ul>
+        </div>    
+        
+        {% autopaginate registros_acoes 15 %}
+        {% paginate %}
+
+        <ul class="timeline compact">
+            {% for registro_acao in registros_acoes %}
+                {% if registro_acao.realizada_apos_aprovacao_pes %}
+                    <li class="warning">
+                {% else %}
+                    <li class="info">
+                {% endif %}
+                    <div class="timeline-date">
+                        {{ registro_acao.data|format }}
+                    </div>
+                    <div class="timeline-icon"></div>
+                    <div class="timeline-content">
+                        <h4>
+                            {{ registro_acao.get_tipo_display }} <small>por {{ registro_acao.user|format }}</small>
+                        </h4>
+                        <p>
+                            {{ registro_acao.observacao }}
+                        </p>
+                        <ul>
+                            {% for depa in registro_acao.get_de_para %}
+                                <li>
+                                    <strong>Editou</strong> "{{ depa.dado }}" 
+                                    <ul>
+                                        <li><strong>De: </strong> "{{ depa.de }}" </li>
+                                        <li><strong>Para: </strong> "{{ depa.para }}" </li>
+                                    </ul>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+
+        {% paginate %}
+    </div>
+
+    <script>
+        (function ($) {
+            $(document).on('click', '#action-toggle', function() {
+                var c = $(this).attr("name");
+                $("."+c).not(this).prop('checked', this.checked);
+            });
+        })(django.jQuery);
+    </script>
+
+
+
+{% endblock %}

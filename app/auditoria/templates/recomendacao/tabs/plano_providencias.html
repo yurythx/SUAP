@@ -1,0 +1,72 @@
+<div class="tab-pane" data-tab="{{ unidade|slugify }}" data-title="{{ unidade }}" data-checked="{% if monitoramento.situacao_final %}True{% else %}False{% endif %}">
+    <ul class="action-bar">
+        {% if monitoramento|method:"pode_enviar_solicitacao"|call:request.user %}
+            <li>
+                <a href="{% url 'auditoria:enviar_solicitacao_providencia' monitoramento.id %}" class="btn success"> 
+                    Enviar Solicitação de Providência
+                </a>
+            </li> 
+        {% endif %}
+        {% if monitoramento|method:"pode_cancelar"|call:request.user %}
+            <li>
+                <a href="{% url 'auditoria:cancelar_monitoramento' monitoramento.id %}" class="btn popup danger"> 
+                    Cancelar 
+                </a>
+            </li>
+        {% endif %}
+        {% if monitoramento|method:"pode_finalizar"|call:request.user %}
+            <li>
+                <a href="{% url 'auditoria:finalizar_monitoramento' monitoramento.id %}" class="btn popup"> 
+                    Finalizar
+                </a>
+            </li> 
+        {% endif %}
+        {% if monitoramento|method:"pode_excluir"|call:request.user %}
+            <li>
+                <a href="{% url 'admin:auditoria_monitoramento_delete' monitoramento.id %}" class="btn danger"> 
+                    Excluir
+                </a>
+            </li>
+        {% endif %}
+            <li>
+                <a href="{% url 'auditoria:vincular_beneficio_ao_monitoramento' monitoramento.id %}" class="btn primary">
+                    Adicionar Benefício
+                </a>
+            </li>
+    </ul>
+
+    {% if not monitoramento.situacao_terminal %}
+        {{ monitoramento|method:"get_steps"|call:request.user|safe }}
+    {% else %}
+        <dl class="definition-list">
+            <dt>Situação</dt>
+            <dd>{{ monitoramento.get_status_display|status }}</dd>
+        </dl>
+    {% endif %}
+
+    {% box "Plano de Providências" %}
+        <ul class="general-box-container">
+            {% for solicitacao in monitoramento.solicitacoes_ordenadas.all %} 
+                <li>
+                    {% include 'monitoramento/box_providencia.html' %}
+                    {% with manifestacoes=solicitacao.manifestacoes_do_auditado %}
+                        {% if manifestacoes.exists %}
+                            {% box "Manifestações" badge=manifestacoes.count %}
+                                <ul>
+                                    {% include "monitoramento/tabs/manifestacoes.html" with manifestacoes=manifestacoes %}
+                                </ul>
+                            {% endbox %}
+                        {% endif %}
+                    {% endwith %}
+                </li>
+            {% empty %}
+                <p class="alert alert-warning">Nenhuma solicitação de providência.</p>
+            {% endfor %}
+            {% with manifestacoes_auditoria=monitoramento.manifestacoes_auditoria %}
+                {% if manifestacoes_auditoria %}
+                    {% include "monitoramento/tabs/manifestacoes.html" with manifestacoes=manifestacoes_auditoria %}
+                {% endif %}
+            {% endwith %}
+        </ul>
+    {% endbox %}
+</div>

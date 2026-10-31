@@ -1,0 +1,181 @@
+{% extends super_template %}
+
+{% block content %}
+<ul class="action-bar">
+        <li><a class="btn" href="/pesquisa/distribuir_bolsas/">Retornar</a></li>
+    </ul>
+{% if projetos %}
+
+{% box "{{ edital.titulo }} - {{ campus }}" %}
+    <div class="table-responsive">
+         <table>
+            <thead>
+                <tr>
+                    <th colspan="4">Quantidade de Bolsas para Pesquisador</th>
+                    <th colspan="4">Quantidade de Bolsas de Iniciação Científica</th>
+                </tr>
+                <tr>
+                    <th>Previstas</th>
+                    <th>Solicitadas</th>
+                    <th>Distribuídas</th>
+                    <th>Saldo</th>
+                    <th>Previstas</th>
+                    <th>Solicitadas</th>
+                    <th>Distribuídas</th>
+                    <th>Saldo</th>
+                </tr>
+
+            </thead>
+            <tbody>
+                <tr>
+                    <td>{{ qtd_bolsa_pesquisador|default:"0" }}</td>
+                    <td>{{ qtd_bolsa_pesquisador_solicitada }}</td>
+                    <td>{{ qtd_bolsa_pesquisador_distribuida|default:"0"  }}</td>
+                    <td>{{ saldo_bolsa_pesquisador|default:"0" }}</td>
+                    <td>{{ qtd_bolsa_ic|default:"0"      }}</td>
+                    <td>{{ qtd_bolsa_ic_solicitada      }}</td>
+                    <td>{{ qtd_bolsa_ic_distribuida }}</td>
+                    <td>{{ saldo_bolsa_ic|default:"0"  }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+{% endbox %}
+
+    {% box 'Ranking dos Projetos' %}
+    <ul class="action-bar">
+        {% if edital.pode_atualizar_curriculo_lattes %}
+            <li><a class="btn success" href="/pesquisa/atualizar_curriculo_lattes/{{ edital.pk }}/">Atualizar Pontuações dos Currículos Lattes</a></li>
+        {% endif %}
+        {% if edital.pode_refazer_distribuicao_bolsas %}
+            {% if edital.forma_selecao == edital.GERAL %}
+                <li><a class="btn primary" href="/pesquisa/refazer_distribuicao_bolsas/{{ edital.pk }}/">Refazer Distribuição de Bolsas</a></li>
+            {% else %}
+                <li><a class="btn primary" href="/pesquisa/refazer_distribuicao_bolsas/{{ edital.pk }}/?campus={{campus.id }}">Refazer Distribuição de Bolsas deste Campus</a></li>
+            {% endif %}
+        {% endif %}
+        {% if campus.id %}
+            <li><a class="btn" href="/pesquisa/gerenciar_bolsas/{{edital.id }}/{{campus.id }}/?xls=1">Exportar para XLS</a></li>
+        {% else %}
+            <li><a class="btn" href="/pesquisa/gerenciar_bolsas/{{edital.id }}/?xls=1">Exportar para XLS</a></li>
+        {% endif %}
+    </ul>
+    {% if campus %}
+        <form method="POST" id="bolsas_form" action="/pesquisa/gerenciar_bolsas/{{edital.id }}/{{campus.id }}/">
+    {% else %}
+        <form method="POST" id="bolsas_form" action="/pesquisa/gerenciar_bolsas/{{edital.id }}/">
+    {% endif %}
+
+                {% csrf_token %}
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Projeto</th>
+                    <th>Servidores</th>
+                    <th>Alunos</th>
+                    <th>Situação</th>
+                    <th>Pontuação do Currículo</th>
+                    <th>Pontuação da Avaliação</th>
+                    <th>Pontuação Final</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for opcao in projetos %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td><a href="/pesquisa/projeto/{{opcao.id }}/">{{ opcao.titulo }}</a></td>
+                        <td>
+                            <ol>
+                                {% for item in opcao.participacao_por_vinculo.all %}
+                                    {% if item.is_servidor %}
+                                        <li>
+                                            {% if item.vinculo == 'Bolsista' and edital.is_periodo_selecao_e_pre_divulgacao %}
+                                                <INPUT TYPE="checkbox" NAME="participacoes_pesquisadores" VALUE="{{ item.id }}" "{% if item.vinculo == 'Bolsista' and item.bolsa_concedida %} checked {% endif %}">
+                                            {% endif %}
+                                            <a href="/pesquisa/historico_equipe/{{ item.id }}/" class="popup" title="Visualizar">{{ item.get_nome }}</a></li>
+                                            {% if item.responsavel %}
+                                                <b>(Coordenador)</b>
+                                            {% endif %}
+                                            {% if item.vinculo == 'Bolsista' %}
+                                                {% if item.get_historico_distribuicao_bolsa %}
+                                                    - <span class="negrito"> * </span>
+                                                {% endif %}
+                                                {% if item.bolsa_concedida %}
+                                                    <span class="true"> Bolsa concedida </span>
+                                                {% else %}
+                                                    <span class="false"> Bolsa não concedida </span>
+                                                {% endif %}
+                                            {% else %}
+                                                    <span class="negrito"> - Voluntário</span>
+                                            {% endif %}
+                                        </li>
+                                    {% endif %}
+                                {% endfor %}
+                            </ol>
+                        </td>
+                        <td>
+                            <ol>
+                                {% for item in opcao.participacao_por_vinculo.all %}
+                                    {% if not item.is_servidor %}
+                                        <li>
+                                            {% if item.vinculo == 'Bolsista' and edital.is_periodo_selecao_e_pre_divulgacao %}
+                                                <INPUT TYPE="checkbox" NAME="participacoes_ic" VALUE="{{ item.id }}" "{% if item.vinculo == 'Bolsista' and item.bolsa_concedida %} checked {% endif %}">
+                                            {% endif %}
+                                            <a href="/pesquisa/historico_equipe/{{ item.id }}/" class="popup" title="Visualizar">{{ item.get_nome }}</a></li>
+                                            {% if item.vinculo == 'Bolsista' %}
+                                                {% if item.get_historico_distribuicao_bolsa %}
+                                                    - <span class="negrito"> * </span>
+                                                {% endif %}
+                                                {% if item.bolsa_concedida %}
+                                                    <span class="true"> Bolsa concedida </span>
+                                                {% else %}
+                                                    <span class="false"> Bolsa não concedida </span>
+                                                {% endif %}
+                                            {% else %}
+                                                    <span class="negrito"> - Voluntário</span>
+                                            {% endif %}
+                                            <p><b>CRE:</b> {{ item.get_participante.get_ira }}</p>
+                                        </li>
+                                    {% endif %}
+                                {% endfor %}
+                            </ol>
+                        </td>
+                        <td>
+                            {% if opcao.pode_aprovar_projeto %}
+                                <INPUT TYPE="checkbox" NAME="situacao" VALUE="{{opcao.id }}" "{% if opcao.aprovado %} checked {% endif %}">
+                            {% endif %}
+                            {% if opcao.aprovado == True %}
+                                {% if opcao.aprovado_na_distribuicao %}
+                                    <span class="status status-success"> * Aprovado</span>
+                                {% else %}
+                                    <span class="status status-success">Aprovado</span>
+                                 {% endif %}
+                            {% else %}
+                                {% if opcao.aprovado_na_distribuicao %}
+                                    <span class="status status-error">*Não Aprovado</span>
+                                {% else %}
+                                    <span class="status status-error">Não Aprovado</span>
+                                 {% endif %}
+                            {% endif %}
+                        </td>
+                        <td>{{ opcao.pontuacao_curriculo_normalizado }} ({{ opcao.pontuacao_curriculo }})</td>
+                        <td>{{ opcao.pontuacao }}</td>
+                        <td><span class="negrito">{{ opcao.pontuacao_total }}</span></td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <p>*Ações realizadas pelo gestor de pesquisa durante a fase de distribuição de bolsas</p>
+        {% if edital.is_periodo_selecao_e_pre_divulgacao %}
+            <div class="submit-row">
+                <input type="submit" value="Salvar" class="btn large" />
+            </div>
+        {% endif %}
+    </form>
+
+    {% endbox %}
+{% else %}
+    <p class="alert alert-warning">Não existe nenhum projeto cadastrado para o edital e o campus selecionados.</p>
+{% endif %}
+{% endblock %}

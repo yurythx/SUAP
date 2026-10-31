@@ -1,0 +1,184 @@
+{% load i18n %}
+
+<h3>
+    Plano de ação
+    {% if plano_pendencias.prazo_vencido or plano_pendencias.sem_responsavel or plano_pendencias.sem_prazo or plano_pendencias.sem_recurso %}
+        <span class="status status-alert">Com pendências</span>
+    {% else %}
+        <span class="status status-success">Em dia</span>
+    {% endif %}
+</h3>
+
+<ul class="flex-container boxes infos sm mb-4">
+    <li class="box-item with-icon{% if plano_pendencias.prazo_vencido %} error{% endif %}">
+        {% icone "calendar-times" %}
+        <p class="stat">{{ plano_pendencias.prazo_vencido|length }}</p>
+        <h4 class="title">Prazo vencido</h4>
+    </li>
+    <li class="box-item with-icon">
+        {% icone "user-slash" %}
+        <p class="stat">{{ plano_pendencias.sem_responsavel|length }}</p>
+        <h4 class="title">Sem responsável</h4>
+    </li>
+    <li class="box-item with-icon">
+        {% icone "calendar-alt" %}
+        <p class="stat">{{ plano_pendencias.sem_prazo|length }}</p>
+        <h4 class="title">Sem prazo</h4>
+    </li>
+    <li class="box-item with-icon">
+        {% icone "file-alt" %}
+        <p class="stat">{{ plano_pendencias.sem_recurso|length }}</p>
+        <h4 class="title">Sem recurso de dados</h4>
+    </li>
+</ul>
+
+{% if bases_relacionadas %}
+<div class="table-responsive">
+    <table>
+        <caption class="pt-0">Cronograma de abertura das bases</caption>
+        <thead>
+            <tr>
+                <th>Base de dados</th>
+                <th>Responsável</th>
+                <th>Situação LAI</th>
+                <th>Meta de abertura</th>
+                <th>Publicação</th>
+                <th class="text-end">Opções</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for rel in bases_relacionadas %}
+            <tr>
+                <td>
+                    {% if perms.dados_abertos.view_pdabasedados %}<a href="{% url 'admin:dados_abertos_pdabasedados_change' rel.pk %}"><strong>{{ rel.base_dados.titulo }}</strong></a>{% else %}<strong>{{ rel.base_dados.titulo }}</strong>{% endif %}
+                    {% if rel.herdada or rel.em_revisao or rel.submetida_consulta_publica %}
+                    <small class="d-block">
+                        {% if rel.herdada %}<span class="status status-info">Herdada de PDA anterior</span>{% endif %}
+                        {% if rel.em_revisao %}<span class="status status-info">Em revisão</span>{% endif %}
+                        {% if rel.submetida_consulta_publica %}<span class="status status-info">Consulta pública</span>{% endif %}
+                    </small>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if rel.responsavel_abertura %}
+                        {{ rel.responsavel_abertura.get_full_name|default:rel.responsavel_abertura }}
+                    {% else %}
+                        <span class="status status-default">Sem responsável</span>
+                    {% endif %}
+                    {% if rel.unidade_responsavel_abertura %}<small class="d-block text-muted">{{ rel.unidade_responsavel_abertura }}</small>{% endif %}
+                </td>
+                <td>
+                    <span class="status {{ rel.classe_situacao_lai }}">{{ rel.get_situacao_lai_display }}</span>
+                    {% if rel.devolvida_lai %}<small class="d-block"><a href="#ajustes-lai">ver parecer</a></small>{% endif %}
+                </td>
+                <td>
+                    {% if rel.prazo_status == 'vencido' %}
+                        <span class="status status-error">Atrasado</span>
+                    {% elif rel.prazo_status == 'proximo' %}
+                        <span class="status status-alert">Prazo próximo</span>
+                    {% elif rel.prazo_status == 'ok' %}
+                        <span class="status status-success">No prazo</span>
+                    {% else %}
+                        <span class="status status-default">Sem prazo</span>
+                    {% endif %}
+                    {% if rel.meta_prazo_abertura or rel.frequencia_atualizacao %}
+                    <small class="d-block text-muted">
+                        {% if rel.meta_prazo_abertura %}{{ rel.meta_prazo_abertura|date:"d/m/Y" }}{% if rel.frequencia_atualizacao %}, {% endif %}{% endif %}{% if rel.frequencia_atualizacao %}atualização {{ rel.get_frequencia_atualizacao_display|lower }}{% endif %}.
+                    </small>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if rel.ckan_status == 'sincronizado' %}
+                        <span class="status status-success">Sincronizada com o CKAN</span>
+                    {% elif rel.ckan_status == 'parcial' or rel.ckan_status == 'dataset' %}
+                        <span class="status status-alert">{{ rel.ckan_status_label }}</span>
+                    {% elif rel.num_recursos %}
+                        <span class="status status-alert">Não sincronizada</span>
+                    {% else %}
+                        <span class="status status-default">Sem recurso de dados</span>
+                    {% endif %}
+                    <small class="d-block text-muted">
+                        {% if rel.num_recursos %}{{ rel.num_recursos }} recurso{{ rel.num_recursos|pluralize }} cadastrado{{ rel.num_recursos|pluralize }}{% else %}Nenhum recurso cadastrado{% endif %}{% if rel.ultima_sincronizacao_ckan %}, sincronizada em {{ rel.ultima_sincronizacao_ckan|date:'d/m/Y H:i' }}{% endif %}.
+                    </small>
+                </td>
+                <td class="text-end">
+                    <ul class="action-bar">
+                        {% if perms.dados_abertos.change_pdabasedados %}<li><a href="{% url 'admin:dados_abertos_pdabasedados_change' rel.pk %}" class="btn primary">Editar</a></li>{% endif %}
+                        {% if perms.dados_abertos.view_basedados %}<li><a href="{% url 'dados_abertos:base_dados_detalhe' rel.base_dados_id %}" class="btn default">Visualizar base</a></li>{% endif %}
+                    </ul>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p class="alert alert-info">Nenhuma base de dados associada a este PDA.</p>
+{% endif %}
+
+{% if devolvidas_lai %}
+<h3 id="ajustes-lai">Ajustes solicitados pelo Responsável LAI</h3>
+<p class="text-muted">Estas bases foram devolvidas e não seguem para publicação até serem ajustadas e reenviadas à análise.</p>
+
+{% for rel in devolvidas_lai %}
+    {% box rel.base_dados.titulo badge=rel.eventos_ordenados|length %}
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>Situação LAI</dt>
+                <dd><span class="status {{ rel.classe_situacao_lai }}">{{ rel.get_situacao_lai_display }}</span></dd>
+            </div>
+            <div class="list-item">
+                <dt>Rodada de análise</dt>
+                <dd>{{ rel.rodada_atual }}ª</dd>
+            </div>
+            {% if rel.parecer_lai %}
+            <div class="list-item">
+                <dt>Devolvida em</dt>
+                <dd>{{ rel.parecer_lai.data|date:"d/m/Y H:i" }}{% if rel.parecer_lai.autor %} por {{ rel.parecer_lai.autor }}{% endif %}</dd>
+            </div>
+            {% endif %}
+        </dl>
+
+        {% if rel.parecer_lai %}
+            <h4>Parecer</h4>
+            <p>{{ rel.parecer_lai.texto|linebreaksbr }}</p>
+        {% else %}
+            <span class="status status-alert">Devolvida sem parecer registrado.</span>
+        {% endif %}
+
+        {% box "Histórico" "collapsed" badge=rel.eventos_ordenados|length %}
+            <ul class="timeline">
+                {% for evento in rel.eventos_ordenados %}
+                    <li class="{{ evento.classe_timeline }}">
+                        <div class="timeline-date">{{ evento.data|date:"d/m/Y H:i" }}</div>
+                        <div class="timeline-icon"></div>
+                        <div class="timeline-content">
+                            <h4>
+                                {{ evento.get_tipo_display }}
+                                <small>{% if evento.autor %}por {{ evento.autor }}{% else %}registro automático do sistema{% endif %}</small>
+                            </h4>
+                            {% if evento.texto %}<p>{{ evento.texto|linebreaksbr }}</p>{% endif %}
+                        </div>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% endbox %}
+
+        {% if usuario_pode_reenviar_lai %}
+            <form method="post" action="{% url 'dados_abertos:reenviar_lai' pda.pk rel.pk %}" class="mt-3">
+                {% csrf_token %}
+                <label for="resposta_{{ rel.pk }}">O que foi ajustado <span class="text-muted">(obrigatório)</span></label>
+                <textarea id="resposta_{{ rel.pk }}" name="resposta" class="form-control" rows="3"
+                          placeholder="Descreva o ajuste feito em resposta ao parecer."></textarea>
+                <div class="mt-2">
+                    {% if rel.num_recursos %}
+                        <button type="submit" class="btn success">{% icone "paper-plane" %} Reenviar ao Responsável LAI</button>
+                    {% else %}
+                        <span class="status status-warning">Anexe ao menos um recurso antes de reenviar.</span>
+                    {% endif %}
+                </div>
+            </form>
+        {% endif %}
+    {% endbox %}
+{% endfor %}
+{% endif %}

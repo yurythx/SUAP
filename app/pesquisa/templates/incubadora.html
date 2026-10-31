@@ -1,0 +1,284 @@
+{% extends super_template %}
+
+{% block extrahead %}
+    <script>
+        function mudar_url(url, aba){
+            if(aba != ""){
+                window.location.href=url+"?tab="+aba;
+            } else {
+                window.location.href=url
+            };
+        };
+    </script>
+{% endblock %}
+
+{% block action-bar %}
+
+<ul class="action-bar">
+    {% if perms.pesquisa.add_incubadora %}
+         <li><a class="btn primary" href="/admin/pesquisa/incubadora/{{ incubadora.pk }}/change/">Editar Dados</a></li>
+    {% endif %}
+</ul>
+
+{% endblock %}
+{% block content %}
+    {% box "Dados gerais" %}
+        <dl class="definition-list flex">
+            <div class="list-item flex-basis-100">
+                <dt>Nome</dt>
+                <dd>{{ incubadora.nome }}</dd>
+            </div>
+            <div class="list-item flex-basis-50">
+                <dt>Sigla</dt>
+                <dd>{{ incubadora.sigla }}</dd>
+            </div>
+            <div class="list-item flex-basis-50">
+                <dt>Campus</dt>
+                <dd>{{ incubadora.uo }}</dd>
+            </div>
+            <div class="list-item flex-basis-50">
+                <dt>Coordenador</dt>
+                <dd>{{ incubadora.coordenador.user|format }}</dd>
+            </div>
+            <div class="list-item flex-basis-50">
+                <dt>Gerente executivo</dt>
+                <dd>{{ incubadora.gerente.user|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Regimento Interno</dt>
+                <dd><a href="{{ incubadora.regimento_interno.url }}">Ver arquivo</a></dd>
+            </div>
+            <div class="list-item">
+                <dt>Ata de aprovação no colegiado acadêmico</dt>
+                <dd><a href="{{ incubadora.ata_aprovacao.url }}">Ver arquivo</a></dd>
+            </div>
+        </dl>
+    {% endbox %}
+     <div class="tab-pane" data-title="Equipe" data-tab="equipe">
+        {% if perms.pesquisa.add_incubadora %}
+             <ul class="action-bar">
+                 <li><a class="btn success popup" href="/pesquisa/cadastrar_membro_incubadora/{{ incubadora.pk }}/">Adicionar Membro</a></li>
+            </ul>
+        {% endif %}
+        <table>
+            <thead>
+                <tr>
+                    <th class="no-print">Ações</th>
+                    <th>Membro</th>
+                    <th>Função</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+
+                    <td class="no-print">
+                        {% if pode_editar_dados_incubadora %}
+                            {% icon "edit" "/admin/pesquisa/incubadora/{{ incubadora.pk }}/change/" "Editar" %}
+                        {% endif %}
+                    </td>
+                    <td>{{ incubadora.coordenador.user|format }}</td>
+                    <td>Coordenador</td>
+                </tr>
+                <tr>
+                    <td class="no-print">
+                        {% if pode_editar_dados_incubadora %}
+                            {% icon "edit" "/admin/pesquisa/incubadora/{{ incubadora.pk }}/change/" "Editar" %}
+                        {% endif %}
+                    </td>
+                    <td>{{ incubadora.gerente.user|format }}</td>
+                    <td>Gerente executivo</td>
+                </tr>
+                {% for registro in incubadora.membroincubadora_set.all %}
+                    <tr>
+                        <td class="no-print">
+                            {% icon "edit" "/pesquisa/editar_membro_incubadora/{{ registro.id }}/" "Editar" "popup" %}
+                            {% icon "delete" "/pesquisa/excluir_membro_incubadora/{{ registro.id }}/" %}
+                        </td>
+                        <td>{{ registro.membro.user|format }}</td>
+                        <td>{{ registro.funcao }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+     </div>
+     {% if incubadora.assessorincubadora_set.exists %}
+        <div class="tab-pane" data-title="Assessores Técnicos" data-tab="assessores">
+        <table>
+            <thead>
+                <tr>
+                    <th>Nome</th>
+                    <th>Data de Início</th>
+                    <th>Data de Término</th>
+                    <th>Módulo</th>
+                    <th>Modalidade da Assessoria</th>
+                    <th>Carga Horária</th>
+                    <th class="no-print">Opções</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for assessor in incubadora.assessorincubadora_set.all %}
+                    <tr>
+                        <td>{{ assessor.vinculo.user|format }}</td>
+                        <td>{{ assessor.data_inicio }}</td>
+                        <td>{{ assessor.data_termino|format }}</td>
+                        <td>{{ assessor.recrutamento.modulo|format }}</td>
+                        <td>{{ assessor.recrutamento.modalidade_assessoria|format }}</td>
+                        <td>{{ assessor.recrutamento.carga_horaria|format }}</td>
+                        <td class="no-print">
+                            <div class="float-end">
+                                {% if pode_gerenciar_incubadora and not assessor.data_termino %}
+                                    <a href="/pesquisa/finalizar_vinculo_assessor/{{ assessor.id }}/" class="btn danger">Finalizar participação</a>
+                                {% endif %}
+                                {% if assessor.data_termino %}
+                                    <a href="/pesquisa/emitir_certificado_assessor/{{ assessor.id }}/" class="btn primary">Emitir certificado</a>
+                                {% else %}
+                                    <a href="/pesquisa/emitir_declaracao_assessor/{{ assessor.id }}/" class="btn primary">Emitir declaração</a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+     </div>
+     {% endif %}
+     <div class="tab-pane" data-title="Empreendimentos" data-tab="empreendimentos">
+        {% if pode_gerenciar_incubadora %}
+             <ul class="action-bar">
+                 <li><a class="btn success popup" href="/pesquisa/cadastrar_empreendimento_incubadora/{{ incubadora.pk }}/">Adicionar Empreendimento</a></li>
+            </ul>
+        {% endif %}
+            {% if incubadora.empreendimentoincubadora_set.exists %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="no-print">Ações</th>
+                            <th>Razão Social</th>
+                            <th>CNPJ</th>
+                            <th>Situação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for registro in incubadora.empreendimentoincubadora_set.all %}
+                            <tr>
+                                <td class="no-print">
+                                    {% icon "view" "/pesquisa/ver_empreendimento_incubadora/{{ registro.id }}/" "Editar" "popup" %}
+                                    {% if pode_gerenciar_incubadora %}
+                                        {% icon "edit" "/pesquisa/editar_empreendimento_incubadora/{{ registro.id }}/" "Editar" "popup" %}
+                                        {% icon "delete" "/pesquisa/excluir_empreendimento_incubadora/{{ registro.id }}/" %}
+                                    {% endif %}
+                                </td>
+                                <td>{{ registro.razao_social }}</td>
+                                <td>{{ registro.cnpj }}</td>
+                                <td>{{ registro.situacao }} {% if  registro.situacao == registro.DESLIGADO and registro.razao_desligamento %} ({{ registro.razao_desligamento }}){% endif %}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="alert alert-warning">Nenhum empreendimento cadastrado.</p>
+            {% endif %}
+     </div>
+     <div class="tab-pane" data-title="Eventos" data-tab="eventos">
+        {% if pode_gerenciar_incubadora %}
+             <ul class="action-bar">
+                 <li><a class="btn success popup" href="/pesquisa/cadastrar_evento_incubadora/{{ incubadora.pk }}/">Adicionar Evento</a></li>
+            </ul>
+        {% endif %}
+        {% if incubadora.eventoincubadora_set.exists %}
+            <table>
+                <thead>
+                    <tr>
+                        <th class="no-print">Ações</th>
+                        <th>Nome</th>
+                        <th>Descrição</th>
+                        <th>Carga Horária</th>
+                        <th>Data de Início</th>
+                        <th>Data de Término</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for registro in incubadora.eventoincubadora_set.all %}
+                        <tr>
+                            <td class="no-print">
+                                {% if pode_gerenciar_incubadora %}
+                                    {% icon "edit" "/pesquisa/editar_evento_incubadora/{{ registro.id }}/" "Editar" "popup" %}
+                                    {% icon "delete" "/pesquisa/excluir_evento_incubadora/{{ registro.id }}/" %}
+                                {% endif %}
+                            </td>
+                            <td>{{ registro.nome }}</td>
+                            <td>{{ registro.descricao }}</td>
+                            <td>{{ registro.ch }}</td>
+                            <td>{{ registro.data_inicio|format }}</td>
+                            <td>{{ registro.data_termino|format }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="alert alert-warning">Nenhum evento cadastrado.</p>
+        {% endif %}
+     </div>
+     <div class="tab-pane" data-title="Documentos" data-tab="documentos">
+        {% if pode_gerenciar_incubadora %}
+             <ul class="action-bar">
+                 <li><a class="btn success popup" href="/pesquisa/cadastrar_documento_incubadora/{{ incubadora.pk }}/">Adicionar Documento</a></li>
+            </ul>
+        {% endif %}
+        {% if incubadora.documentoincubadora_set.exists %}
+            <table>
+                <thead>
+                    <tr>
+                        <th class="no-print">Ações</th>
+                        <th>Descrição</th>
+                        <th>Observações</th>
+                        <th>Arquivo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for registro in incubadora.documentoincubadora_set.all %}
+                        <tr>
+                            <td class="no-print">
+                                {% if pode_gerenciar_incubadora %}
+                                    {% icon "edit" "/pesquisa/editar_documento_incubadora/{{ registro.id }}/" "Editar" "popup" %}
+                                    {% icon "delete" "/pesquisa/excluir_documento_incubadora/{{ registro.id }}/" %}
+                                {% endif %}
+                            </td>
+                            <td>{{ registro.descricao }}</td>
+                            <td>{{ registro.observacoes|format }}</td>
+                            <td><a href="{{ registro.arquivo.url }}" class="btn">Ver arquivo</a></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="alert alert-warning">Nenhum documento cadastrado.</p>
+        {% endif %}
+     </div>
+     <div class="tab-pane" data-title="Fotos" data-tab="fotos">
+        {% if pode_gerenciar_incubadora %}
+             <ul class="action-bar">
+                 <li><a class="btn success popup" href="/pesquisa/cadastrar_foto_incubadora/{{ incubadora.pk }}/">Adicionar Foto</a></li>
+            </ul>
+        {% endif %}
+        {% if incubadora.fotoincubadora_set.exists %}
+             <ul class="flex-container gallery">
+                {% for foto in  incubadora.fotoincubadora_set.all %}
+                    <li class="gallery-item">
+                        <h4 class="title">Foto {{ forloop.counter }}</h4>
+                        {% if pode_gerenciar_incubadora %}
+                            <div class="float-end">
+                                <a href="/pesquisa/editar_foto_incubadora/{{ foto.id }}/" class="btn primary">Editar</a>
+                                <a href="/pesquisa/excluir_foto_incubadora/{{ foto.id }}/" class="btn danger">Remover</a>
+                            </div>
+                        {% endif %}
+                        <p class="description">{{ foto.descricao }}</p>
+                        <img class="image" src="{{ foto.arquivo.url }}" alt="{{ foto.descricao }}">
+                    </li>
+                {% endfor %}
+                </ul>
+        {% else %}
+            <p class="alert alert-warning">Nenhuma foto cadastrada.</p>
+        {% endif %}
+     </div>
+{% endblock %}

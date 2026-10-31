@@ -1,0 +1,277 @@
+{% extends super_template %}
+
+{% block object-status %}
+    {% if modelo.ativo %}
+        <span class="status status-success">Ativo</span>
+    {% else %}
+        <span class="status status-error">Inativo</span>
+        {% if modelo.permite_sobrescrever_ppc %}
+            <span class="status status-warning">Sobrescrita de PPC ativa</span>
+        {% endif %}
+    {% endif %}
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if pode_ativar %}
+            <li><a class="btn success" href="/ppc/modeloppc/{{ modelo.pk }}/ativar/">{% icone "toggle-on" %} Ativar</a></li>
+        {% endif %}
+        {% if pode_inativar %}
+            <li><a class="btn warning" href="/ppc/modeloppc/{{ modelo.pk }}/inativar/">{% icone "toggle-off" %} Inativar</a></li>
+        {% endif %}
+        {% if pode_sobrescrever_conteudo_ppc %}
+            <li><a class="btn warning" href="/ppc/modeloppc/{{ modelo.pk }}/habilitar_sobrescrita_ppc/">{% icone "toggle-on" %} Habilitar inclusão de seções e conteúdos</a></li>
+        {% endif %}
+        {% if pode_editar %}
+            <li><a class="btn primary" href="/admin/ppc/modeloppc/{{ modelo.pk }}/change/">{% icone "edit" %} Editar</a></li>
+        {% endif %}
+        {% if pode_replicar %}
+            <li><a class="btn" href="{% url 'replicar_modelo_ppc' modelo.pk %}">{% icone "copy" %} Replicar</a></li>
+        {% endif %}
+        <li class="has-child">
+            <a class="btn default" href="#">{% icone "eye" %} Visualizar </a>
+            <ul>
+                <li><a class="popup" href="/ppc/modeloppc/{{ modelo.pk }}/visualizar/">HTML</a></li>
+                <li><a href="/ppc/modeloppc/{{ modelo.pk }}/imprimir/">PDF</a></li>
+            </ul>
+        </li>
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+    {% if not modelo.ativo and modelo.permite_sobrescrever_ppc %}
+        <p class="alert alert-warning"><strong>Atenção:</strong> A inclusão de seções e conteúdos está habilitada. Ao ativar este modelo, os conteúdos de todos os PPCs vinculados a ele serão sobrescritos.</p>
+    {% endif %}
+
+    {% if not possui_secao %}
+        <p class="alert alert-warning"><strong>Atenção:</strong> O modelo deve possuir pelo menos uma seção.</p>
+    {% endif %}
+
+    {% if modelo.possui_secao_sem_conteudo %}
+        <p class="alert alert-warning"><strong>Atenção:</strong> Existe seção sem conteúdo informado.</p>
+    {% endif %}
+
+    {% if pode_inativar and modelo.ativo %}
+        <p class="alert alert-info"><strong>Atenção:</strong> Para editar este modelo é necessário inativá-lo.</p>
+    {% endif %}
+
+    {% if modelo.possui_ppc and not modelo.ativo and not modelo.permite_sobrescrever_ppc %}
+        <p class="alert alert-warning"><strong>Atenção:</strong> A alteração deste modelo poderá impactar os PPCs em elaboração e em revisão.</p>
+    {% endif %}
+
+    {% if modelo.possui_ppc_revisado %}
+        <p class="alert alert-info">{% if not modelo.ativo %}Algumas ações foram desabilidatas pois e{% else %}E{% endif %}ste modelo possui PPC com revisão finalizada.</p>
+    {% elif modelo.possui_ppc and not modelo.ativo and not modelo.permite_sobrescrever_ppc %}
+        <p class="alert alert-info">Algumas ações foram desabilidatas pois este modelo possui PPC vinculado.</p>
+    {% endif %}
+
+    {% box "Dados gerais" %}
+        <dl class="definition-list flex">
+            <div class="list-item flex-basis-100">
+                <dt>Descrição</dt>
+                <dd>{{ modelo.descricao }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Tipo de oferta</dt>
+                <dd>{{ modelo.tipo_oferta }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Modalidade</dt>
+                <dd>{{ modelo.modalidade }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Data de criação</dt>
+                <dd>{{ modelo.data_criacao }}</dd>
+            </div>
+        </dl>
+    {% endbox %}
+
+    <div class="tab-pane ajax-rendered" data-title="Seções" data-tab="secao" data-counter="{{ modelo.secao_set.count }}">
+        {% if request.GET.tab == "secao" or request.GET.tab == None %}
+        {% if pode_adicionar_secao %}
+            <ul class="action-bar">
+                <li><a class="btn success popup" href="/ppc/adicionar_secao/{{ modelo.pk }}/">Adicionar seção</a></li>
+            </ul>
+        {% endif %}
+
+        {% if possui_secao %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Seções do modelo de PPC</caption>
+                    <thead>
+                        <tr>
+                            {% if pode_editar_secao %}
+                                <th class="no-print">Ações</th>
+                            {% endif %}
+                            <th>Título</th>
+                            <th>Ordem de exibição</th>
+                            <th>É subseção</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for secao in modelo.secao_set.all %}
+                            <tr>
+                                {% if pode_editar_secao %}
+                                    <td class="no-print field-get_acoes">
+                                        {% icon "edit" "/ppc/editar_secao/{{ secao.pk }}/" "Editar" "popup" %}
+                                        {% if secao|method:"can_delete"|call:request.user %}
+                                            {% icon "delete" "/comum/excluir/ppc/secao/{{ secao.pk }}/" "Excluir" "no-confirm popup" %}
+                                        {% endif %}
+                                    </td>
+                                {% endif %}
+                                <td>{{ secao.titulo }}</td>
+                                <td>{{ secao.ordem_exibicao }}</td>
+                                <td>{{ secao.subsecao|format }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Nenhuma seção adicionada.</p>
+        {% endif %}
+        {% endif %}
+    </div>
+
+    <div class="tab-pane ajax-rendered" data-title="Conteúdos" data-tab="conteudo" data-checked="{% if tem_pendencia_secao %}False{% else %}True{% endif %}">
+        {% if request.GET.tab == "conteudo" %}
+        {% if pode_adicionar_secao and possui_secao %}
+            <ul class="action-bar">
+                <li><a class="btn success popup" href="/ppc/adicionar_conteudo/{{ modelo.pk }}/">Adicionar conteúdo</a></li>
+            </ul>
+        {% endif %}
+
+        {% if possui_secao %}
+            {% if tem_pendencia_secao %}
+                <div class="alert alert-warning">
+                    <p><strong>Atenção:</strong> Existe seção sem conteúdo criado:</p>
+                    <ul>
+                        {% for secao in secoes_conteudo_pendente %}    
+                            <li>Seção: {{ secao.titulo }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
+
+            <div class="alert alert-info">
+                <p>Os seguintes marcadores estão disponíveis para preenchimento dos conteúdos:</p>
+                <ul>
+                    <li>{% verbatim %}{{ nome_curso }}{% endverbatim %}: Incorpora no texto o nome do curso.</li>
+                    <li>{% verbatim %}{{ nome_diploma_historico }}{% endverbatim %}: Incorpora no texto o nome do curso que é exibido no diploma e histórico.</li>
+                    <li>{% verbatim %}{{ eixo_tecnologico }}{% endverbatim %}: Incorpora no texto o eixo tecnológico indicado na solicitação do PPC.</li>
+                    <li>{% verbatim %}{{ ch_curso }}{% endverbatim %}: Incorpora no texto a carga horária do curso.</li>
+                    <li>{% verbatim %}{{ ch_matriz }}{% endverbatim %}: Incorpora no texto a carga horária das disciplinas da matriz.</li>
+                    <li>{% verbatim %}{{ ch_pratica }}{% endverbatim %}: Incorpora no texto a carga horária da prática profissional.</li>
+                    <li>{% verbatim %}{{ quadro_matriz }}{% endverbatim %}: Incorpora no texto o quadro da matriz curricular do curso.</li>
+                    <li>{% verbatim %}{{ quadro_requisitos }}{% endverbatim %}: Incorpora no texto o quadro de pré-requisitos e correquisitos dos planos de disciplinas da matriz.</li>
+                    <li>{% verbatim %}{{ quadro_optativas }}{% endverbatim %}: Incorpora no texto o quadro dos planos de disciplinas optativas da matriz curricular.</li>
+                    <li>{% verbatim %}{{ certificacao_intermediaria }}{% endverbatim %}: Incorpora no texto as certificações intermediárias do PPC.</li>
+                    <li>{% verbatim %}{{ bibliografia }}{% endverbatim %}: Importa as referências cadastradas nas seções "Bibliografia Básica" e "Bibliografia Complementar" dos planos de disciplinas aprovados vinculados ao PPC.</li>
+                    <li>{% verbatim %}{{ quebra_de_pagina }}{% endverbatim %}: Insere uma quebra de página no texto.</li>
+                </ul>
+            </div>
+
+            {% if conteudos.exists %}
+                <div class="table-responsive">
+                    <table>
+                        <caption>Conteúdos do modelo de PPC</caption>
+                        <thead>
+                            <tr>
+                                {% if pode_editar_secao %}
+                                    <th class="no-print">Ações</th>
+                                {% endif %}
+                                <th>Seção</th>
+                                <th>Texto</th>
+                                <th>Editável</th>
+                                <th>Orientação de preenchimento</th>
+                                <th>Ordem de exibição na seção</th>
+                                {% if pode_replicar and not modelo.ativo and possui_ppc %}
+                                    <th class="no-print">Opções</th>
+                                {% endif %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for conteudo in conteudos %}
+                                <tr>
+                                    {% if pode_editar_secao %}
+                                        <td class="no-print field-get_acoes">
+                                            {% icon "edit" "/ppc/editar_conteudo/{{ conteudo.pk }}/" "Editar Conteúdo" "popup" %}
+                                            {% if conteudo|method:"can_delete"|call:request.user %}
+                                                {% icon "delete" "/comum/excluir/ppc/conteudo/{{ conteudo.pk }}/" "Excluir Conteúdo" "no-confirm popup" %}
+                                            {% endif %}
+                                        </td>
+                                    {% endif %}
+                                    <td>{{ conteudo.secao|format }}</td>
+                                    <td>{{ conteudo.get_texto|safe }}</td>
+                                    <td>{{ conteudo.editavel|format }}</td>
+                                    <td>{{ conteudo.orientacao_preenchimento }}</td>
+                                    <td>{{ conteudo.ordem_exibicao }}</td>
+                                    {% if pode_replicar and not modelo.ativo and possui_ppc %}
+                                        <td class="no-print">
+                                            <ul class="action-list">
+                                                {% if conteudo|method:"pode_editar_texto"|call:request.user %}
+                                                    <li><a href="/ppc/conteudo/{{ conteudo.pk }}/editar_texto/" class="btn primary popup">Editar texto</a></li>
+                                                {% endif %}
+                                                {% if conteudo|method:"pode_tornar_editavel"|call:request.user %}
+                                                    <li><a href='/ppc/conteudo/{{ conteudo.pk }}/tornar_editavel/SIM/' class="btn warning">Tornar editável</a></li>
+                                                {% endif %}
+                                                {% if conteudo|method:"pode_tornar_nao_editavel"|call:request.user %}
+                                                    <li><a href='/ppc/conteudo/{{ conteudo.pk }}/tornar_editavel/NAO/' class="btn warning">Tornar não editável</a></li>
+                                                {% endif %}
+                                            </ul>
+                                        </td>
+                                    {% endif %}
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="alert alert-warning">Nenhum conteúdo adicionado.</p>
+            {% endif %}
+        {% else %}
+            <p class="alert alert-warning">Cadastre uma seção para habilitar o cadastro de conteúdo.</p>
+        {% endif %}
+        {% endif %}
+    </div>
+
+    {% if possui_ppc %}
+    <div class="tab-pane ajax-rendered" data-title="PPCs vinculados" data-tab="ppc" data-counter="{{ modelo.projetopedagogicocurso_set.count }}">
+        {% if request.GET.tab == "ppc" %}
+            <div class="table-responsive">
+                <table>
+                    <caption>PPCs vinculados a este modelo de PPC</caption>
+                    <thead>
+                        <tr>
+                            <th>PPC</th>
+                            <th>Situação</th>
+                            {% if pode_editar %}
+                            <th class="no-print">Opções</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ppc in ppcs %}
+                            <tr>
+                                <td><a href="{{ ppc.get_absolute_url }}">{{ ppc.nome_curso }}</a></td>
+                                <td>{{ ppc.get_situacao_display|status }}</td>
+                                {% if pode_editar %}
+                                    <td class="no-print">
+                                        {% if ppc|method:"pode_alterar_modeloppc"|call:request.user %}
+                                        <ul class="action-list">
+                                            <li class="hint hint-bottom" aria-label="Atenção: ao alterar o modelo do PPC, todas as alterações realizadas pela equipe de elaboração serão permanentemente perdidas."><a class="btn danger" href="{% url 'alterar_modelo_projetopedagogicocurso' ppc.pk %}">Alterar modelo de PPC</a></li>
+                                        </ul>
+                                        {% endif %}
+                                    </td>
+                                {% endif %}
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+{% endblock %}

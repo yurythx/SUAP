@@ -1,0 +1,101 @@
+{% extends super_template %}
+{% load static %}
+
+{% block content %}
+
+    {% box "Remover Itens da Entrada" %}
+        <p class="alert alert-warning">
+            Os itens marcados serão <strong>removidos permanentemente</strong>, junto com os inventários
+            gerados e toda a sua movimentação (carga contábil, transferências, cautelas, reavaliações e
+            conferências). A entrada é preservada e o registro da remoção fica disponível na aba
+            <strong>Itens Removidos</strong>.
+        </p>
+
+        {% if itens %}
+            <form method="post">
+                {% csrf_token %}
+
+                {% if form.non_field_errors %}
+                    <p class="alert alert-danger">{{ form.non_field_errors }}</p>
+                {% endif %}
+                {% if form.itens.errors %}
+                    <p class="alert alert-danger">{{ form.itens.errors }}</p>
+                {% endif %}
+
+                <div class="checkbutton">
+                    <button type="button" class="btn default markall" data-elemento="itens">Marcar todos</button>
+                </div>
+
+                <div class="table-responsive">
+                    <table>
+                        <caption>Itens da entrada</caption>
+                        <thead>
+                            <tr>
+                                <th class="no-print">Remover</th>
+                                <th>#</th>
+                                <th>Material</th>
+                                <th class="text-center">Cod. ED</th>
+                                <th class="text-end">Qtd.</th>
+                                <th class="text-end">Valor Unitário</th>
+                                <th class="text-end">Valor Total</th>
+                                <th>Situação</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in itens %}
+                                <tr>
+                                    <td class="no-print">
+                                        {% if item.pode_cancelar %}
+                                            <input type="checkbox" name="itens" value="{{ item.pk }}" id="item_{{ item.pk }}"
+                                                   aria-label="Remover {{ item.get_material }}">
+                                        {% else %}
+                                            &mdash;
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ forloop.counter }}</td>
+                                    <td>{{ item.get_material }}</td>
+                                    <td class="text-center">{{ item.get_categoria.codigo }}</td>
+                                    <td class="text-end">{{ item.qtd|format_quantity }}</td>
+                                    <td class="text-end">{{ item.get_valor_unitario }}</td>
+                                    <td class="text-end">{{ item.get_valor }}</td>
+                                    <td>
+                                        {% if item.pode_cancelar %}
+                                            <span class="status status-success">Pode ser removido</span>
+                                        {% else %}
+                                            <span class="status status-error">{{ item.get_impedimentos_cancelamento|join:"; "|capfirst }}</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <fieldset>
+                    <h3>Justificativa</h3>
+                    <div class="form-row">
+                        {{ form.justificativa.label_tag }}
+                        {{ form.justificativa }}
+                        {% if form.justificativa.errors %}
+                            <p class="alert alert-danger">{{ form.justificativa.errors }}</p>
+                        {% endif %}
+                    </div>
+                </fieldset>
+
+                <div class="submit-row">
+                    <input type="submit" value="Cancelar Itens" class="btn danger">
+                    <a href="{{ entrada.get_absolute_url }}" class="btn default">Voltar</a>
+                </div>
+            </form>
+        {% else %}
+            <p class="alert alert-info">Esta entrada não possui itens.</p>
+            <a href="{{ entrada.get_absolute_url }}" class="btn default">Voltar</a>
+        {% endif %}
+    {% endbox %}
+
+{% endblock %}
+
+{% block extrascripts %}
+    {{ block.super }}
+    <script src="{% static 'djtools/widgets/js/marcar_todos_checkbox.js' %}"></script>
+{% endblock %}

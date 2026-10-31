@@ -1,0 +1,134 @@
+{% extends super_template %}
+
+
+
+{% block content %}
+
+    <ul class="action-bar">
+        {% if exibir_botao_executar %}
+            <li><a class="btn popup" href="/edu/meus_relatorios/3">Executar Consulta Salva Anteriormente</a></li>
+        {% endif %}
+        {% help_button %}
+    </ul>
+
+    <div id="formbox">
+
+        {% render_form form %}
+
+    </div>
+    {% if request.GET %}
+        <form method="post" id="relatorioform" class="mt-2">
+            {% csrf_token %}
+
+            <div id="resultadobox">
+                {% if matriculas_diarios %}
+
+                    <script>
+                        $('#formbox').hide();
+                    </script>
+                    {% box "Filtros" %}
+
+                        <ul class="action-bar">
+                            <li><a class="btn" href="/edu/relatorio_dependentes/">Limpar Filtros</a></li>
+                            <li><a class="btn" href="#"
+                                   onclick="javascript:$('#formbox').toggle();javascript:$('#resultadobox').toggle();">Alterar
+                                Filtros</a></li>
+                            <li><a class="btn success popup" data-reload-on-close="false"
+                                   href="/edu/salvar_relatorio/3/{{ query_string }}/">Salvar Consulta</a></li>
+                        </ul>
+
+                        <table class="info">
+                            {% for filtro in filtros %}
+                                <tr>
+                                    <td>{{ filtro.chave }}</td>
+                                    {% if filtro.chave == 'Curso' %}
+                                        <td><a href="/edu/cursocampus/{{ filtro.valor.pk }}/">{{ filtro.valor }}</a>
+                                        </td>
+                                    {% else %}
+                                        <td>{{ filtro.valor|format }}</td>
+                                    {% endif %}
+                                </tr>
+                            {% endfor %}
+                        </table>
+                    {% endbox %}
+
+                    {% box "Resultado da Pesquisa ({{ matriculas_diarios|length }} matrículas em diários)" %}
+                        {% autopaginate matriculas_diarios 25 %}
+
+                        <ul class="action-bar">
+                            <li>
+                                <button type="submit" class="btn" name="xls" value="1">Exportar para XLS</button>
+                            </li>
+                        </ul>
+                        {% regroup matriculas_diarios by matricula_periodo.situacao as matriculas_diarios_agrupadas %}
+                        {% for matriculas_diarios_item in matriculas_diarios_agrupadas %}
+                            <h4>{{ matriculas_diarios_item.grouper }}</h4>
+                            <table class="mb-2">
+                                <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th><input type="checkbox"
+                                               onchange="var is = this.parentNode.parentNode.parentNode.parentNode.getElementsByTagName('input');for(var i=0; i<is.length; i++){ is[i].checked = this.checked;}">
+                                    </th>
+                                    <th>Matrícula</th>
+                                    <th>Nome</th>
+                                    <th>Turno</th>
+                                    <th>Turma Subsequente</th>
+                                    <th>Diário</th>
+                                    <th>Componente</th>
+                                    <th>Diário de Dependência no Período Subsequente</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                {% for matricula_diario in matriculas_diarios_item.list %}
+                                    <tr>
+                                        <td>{% index_paginacao %}</td>
+                                        <td>{% if matricula_diario.diario %}
+                                            <input value="{{ matricula_diario.pk }}" name="select_matricula_diario"
+                                                   type="checkbox"/>{% elif matricula_diario.equivalencia_componente %}
+                                            <input value="{{ matricula_diario.pk }}"
+                                                   name="select_matricula_diario_resumida" type="checkbox"/>{% endif %}
+                                        </td>
+                                        <td>
+                                            <a href="/edu/aluno/{{ matricula_diario.matricula_periodo.aluno.matricula }}/">{{ matricula_diario.matricula_periodo.aluno.matricula }}</a>
+                                        </td>
+                                        <td>{{ matricula_diario.matricula_periodo.aluno.get_nome_social_composto }}</td>
+                                        <td>{{ matricula_diario.matricula_periodo.aluno.turno }}</td>
+                                        <td>{{ matricula_diario.matricula_periodo.get_matricula_periodo_subsequente.turma|format }}</td>
+                                        <td>{% if matricula_diario.diario %}
+                                            <a href="/edu/diario/{{ matricula_diario.diario.pk }}/">{{ matricula_diario.diario.pk }}</a>{% else %}
+                                            {{ matricula_diario.codigo_diario_pauta }}{% endif %}</td>
+                                        <td>{% if matricula_diario.diario %}
+                                            {{ matricula_diario.diario.componente_curricular.componente.descricao_historico }}{% else %}
+                                            {{ matricula_diario.equivalencia_componente.componente.descricao_historico }}{% endif %}</td>
+                                        <td align="center">
+                                            {% with diario_dependencia=matricula_diario.get_diario_dependencia %}
+                                                {% if diario_dependencia %}
+                                                    <a href="/edu/diario/{{ diario_dependencia }}/">{{ diario_dependencia }}</a>
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            {% endwith %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                                </tbody>
+                            </table>
+                        {% endfor %}
+                        <div class="submit-row">
+                            <ul class="action-bar">
+                                <li>
+                                    <button type="submit" class="btn" name="xls" value="1">Exportar para XLS</button>
+                                </li>
+                            </ul>
+                        </div>
+                        {% paginate %}
+                    {% endbox %}
+                {% else %}
+                    <p class="alert alert-warning">Nenhum registro encontrado.</p>
+                {% endif %}
+            </div>
+        </form>
+    {% endif %}
+
+{% endblock %}

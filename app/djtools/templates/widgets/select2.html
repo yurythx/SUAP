@@ -1,0 +1,139 @@
+{% if readonly %}
+    {% if values %}
+        {% for value, unicode in values %}
+            <input type="hidden" id="{{ name }}_{{ id }}" name="{{ name }}" value="{{ value }}">
+            <input type="text" disabled readonly value="{{ unicode }}">
+        {% endfor %}
+    {% else %}
+        <input type="hidden" id="{{ name }}_{{ id }}" name="{{ name }}" value>
+        <input type="text" disabled readonly value="{{ readonly_no_value_text }}">
+    {% endif %}
+{% elif static %}
+    <select class="form-control" id="{{ name }}_{{ id }}" name="{{ name }}"  {% if allow_multiple_selected %}multiple="multiple"{% endif %}>
+        {# djlint:off #}<option></option>{# djlint:on #}
+        {% for value, unicode in choices %}
+            <option value="{{ value }}"
+                {% for selected_value in values %}
+                    {% if selected_value and selected_value == value %}
+                    selected="selected"
+                    {% endif %}
+                {% endfor %}
+            >{{ unicode }}</option>
+        {% endfor %}
+    </select>
+    <script>
+        var input = $("#{{ name }}_{{ id }}");
+        input.select2({
+            language: "pt-BR",
+            allowClear: true,
+            {% if allow_multiple_selected %}
+                placeholder: 'Escolha uma ou mais opções',
+            {% else %}
+                placeholder: 'Escolha uma opção',
+            {% endif %}
+        });
+    </script>
+{% else %}
+    <select class="js-example-data-ajax form-control" id="{{ name }}_{{ id }}" name="{{ name }}"  {% if allow_multiple_selected %}multiple="multiple"{% endif %} inert>
+        {% for value, unicode in values %}
+            <option value="{{ value }}" selected="selected">{{ unicode }}</option>
+        {% endfor %}
+    </select>
+
+    {% if side_html %}
+        {{ side_html|safe }}
+    {% endif %}
+
+    <script>
+    $(function(){
+        var input = $("#{{ name }}_{{ id }}");
+        var clear = $('#clear_{{ name }}_{{ id }}');
+
+        {% if not show %}
+            input.prev().remove();
+        {% endif %}
+        input.select2({
+            language: "pt-BR",
+            allowClear: true,
+            ajax: {
+                url: "{{ url }}",
+                dataType: 'json',
+                delay: 250,
+                data: function (params) {
+                    return {
+                        q: params.term, // search term
+                        control: '{{ control }}',
+                        {% if options.extraParams.form_parameter_names %}
+                            filter_pks: __filter_pks('{{ options.extraParams.form_parameter_names|safe }}'),
+                        {% endif %}
+                        {% if options.extraParams.ext_combo_template %}
+                            ext_combo_template: '{{ options.extraParams.ext_combo_template|safe }}',
+                        {% endif %}
+                        {% if options.extraParams.qs_filter %}
+                            qs_filter: '{{ options.extraParams.qs_filter|safe }}',
+                        {% endif %}
+                        {% if options.extraParams.search_fields %}
+                            search_fields: '{{ options.extraParams.search_fields|safe }}',
+                        {% endif %}
+                        {% if options.extraParams.manager_name %}
+                            manager_name: '{{ options.extraParams.manager_name|safe }}',
+                        {% endif %}
+                        {% if options.extraParams.min_chars %}
+                            min_chars: '{{ options.extraParams.min_chars|safe }}',
+                        {% endif %}
+                        page: params.page
+                    }
+                },
+                type: 'POST',
+                params: { // extra parameters that will be passed to ajax
+                    contentType: "application/json; charset=utf-8",
+                },
+                processResults: function (data, params) {
+                    params.page = params.page || 1;
+
+                    return {
+                        results: data.items,
+                        pagination: {
+                            more: (params.page * 20) < data.total
+                        }
+                    };
+                },
+                cache: true
+            },
+            {% if allow_multiple_selected %}
+                placeholder: 'Escolha uma ou mais opções',
+            {% else %}
+                placeholder: 'Escolha uma opção',
+            {% endif %}
+            escapeMarkup: function (markup) {
+                return markup;
+            }, // let our custom formatter work
+            minimumInputLength: {% if options.extraParams.min_chars %}{{ options.extraParams.min_chars }}{% else %}0{% endif %},
+            templateResult: function (data) {
+                return data.html || 'Buscando...';
+            },
+            templateSelection: function (data) {
+                return data.text;
+            }
+        }).on('select2:select', function (e) {
+            if (input.val() !== null) {
+                input.siblings().find('.select2-selection__rendered').addClass('option-selected');
+            }
+        }).on('select2:unselect', function (e) {
+            if (input.val() === null) {
+                input.siblings().find('.select2-selection__rendered').removeClass('option-selected');
+            }
+        });
+
+        {% if submit_on_select %}
+            input.change(function(){
+                $(this).closest('form').submit();
+            });
+        {% endif %}
+    });
+    </script>
+{% endif %}
+
+{% if help_text %}
+    <span class="help">{{ help_text }}</span>
+{% endif %}

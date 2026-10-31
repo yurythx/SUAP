@@ -1,0 +1,390 @@
+{% box 'Matrículas em períodos' %}
+    {% if obj.matriz %}
+        <div class="search-and-filters">
+            <div class="filter">
+                <input id="exibe_frequencia" onclick="if(this.checked) document.location.href = '/edu/aluno/{{ obj.matricula }}/?exibir_frequencia=1'; else document.location.href = '/edu/aluno/{{ obj.matricula }}/';" type="checkbox" {% if request.GET.exibir_frequencia %}checked{% endif %}>
+                <label for="exibe_frequencia">Exibir percentual de frequência {% if obj.matriz %} e I.R.A. {% endif %}nos períodos</label>
+            </div>
+        </div>
+    {% endif %}
+
+    <ul class="action-bar">
+        {% if obj.matriz %}
+            {% if obj.get_matriculas_periodo.count > 1 %}
+                <li><a class="popup btn default" data-reload-on-close="false" href='/edu/progresso_ch_por_matriculaperiodo/{{ obj.id }}/'>Progresso por Período</a></li>
+            {% endif %}
+        {% endif %}
+        {% if is_admin %}
+            <li><a class="popup btn success" data-reload-on-close="false" href='/edu/cadastrar_matricula_periodo/{{ obj.pk }}/'>Cadastrar Matrícula em Período</a></li>
+        {% endif %}
+    </ul>
+
+    <div class="table-responsive">
+        <table>
+            <caption>Matrículas por período letivo</caption>
+            <thead>
+                <tr>
+                    {% if pode_desfazer_migracao %}
+                        <th class="text-center no-print">Ações</th>
+                    {% endif %}
+                    {% if obj.matriz.estrutura.tipo_avaliacao != obj.matriz.estrutura.TIPO_AVALIACAO_CREDITO %}
+                        <th class="text-center">Período</th>
+                    {% endif %}
+                    <th class="text-center">Ano/Período Letivo</th>
+                    <th class="text-center">Turma</th>
+                    {% if obj.codigo_educacenso %}
+                        <th class="text-center">EDUCACENSO</th>
+                    {% endif %}
+                    <th class="text-center">Situação no Período</th>
+                    {% if request.GET.exibir_frequencia and obj.matriz %}
+                        <th class="text-center">Frequência (%)</th>
+                        <th class="text-center">I.R.A.</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+            {% for matricula_periodo in obj.get_matriculas_periodo %}
+                <tr {% if pode_desfazer_migracao and matricula_periodo.gerada_suap %}class="dependencia"{% endif %}>
+                    {% if pode_desfazer_migracao %}
+                        <td class="no-print">
+                            {% icon "edit" "/edu/editar_situacao_matricula_periodo/{{ matricula_periodo.pk }}/" "Editar" "popup" %}
+                            {% icon "delete" "/comum/excluir/edu/matriculaperiodo/{{ matricula_periodo.pk }}/" "Remover" "no-confirm popup" %}
+                        </td>
+                    {% endif %}
+                    {% if obj.matriz.estrutura.tipo_avaliacao != obj.matriz.estrutura.TIPO_AVALIACAO_CREDITO %}
+                        <td class="text-center">{{ matricula_periodo.periodo_matriz|format }}</td>
+                    {% endif %}
+                    <td class="text-center">{{ matricula_periodo.ano_letivo }}/{{ matricula_periodo.periodo_letivo }}</td>
+                    <td class="text-center">{% if matricula_periodo.turma and perms.edu.view_turma %}
+                        <a href="/edu/turma/{{ matricula_periodo.turma.pk }}">{{ matricula_periodo.get_codigo_turma|format }}</a>{% else %}
+                        {{ matricula_periodo.get_codigo_turma|format }}{% endif %}
+                    </td>
+                    {% if obj.codigo_educacenso %}
+                        <td class="text-center">{{ matricula_periodo.codigo_educacenso|format }}</td>
+                    {% endif %}
+                    <td class="text-center">
+                        {{ matricula_periodo.situacao|format }}
+                    </td>
+                    {% if request.GET.exibir_frequencia and obj.matriz %}
+                        <td class="text-center">{{ matricula_periodo.get_percentual_frequencia_periodo|format }}%</td>
+                        <td class="text-center">{{ matricula_periodo.get_ira|format }}</td>
+                    {% endif %}
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endbox %}
+
+{% if obj.integralizou_ensino_medio %}
+    {% box 'Observação da integralização do Ensino Médio' %}
+        {% if obj|method:"pode_editar_obs_integralizacao_ensino_medio"|call:request.user %}
+            <ul class="action-bar">
+                <li>
+                    <a href="/edu/editar_observacao_integralizacao_ensino_medio/{{ obj.pk }}/" class="btn popup primary">Editar observação</a>
+                </li>
+            </ul>
+        {% endif %}
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>Observação</dt>
+                <dd>{{ obj.obs_integralizacao_ensino_medio }}</dd>
+            </div>
+        </dl>
+    {% endbox %}
+{% endif %}
+
+{% box 'Observações gerais' %}
+	{% if perms.edu.add_observacao %}
+        <ul class="action-bar">
+            <li>
+                <a href="/edu/adicionar_observacao/{{ obj.pk }}/" class="btn popup success">Adicionar observação</a>
+            </li>
+        </ul>
+   	{% endif %}
+   	{% if obj.observacao_set.exists %}
+        <div class="table-responsive">
+            <table>
+                <caption>Observações</caption>
+                <thead>
+                    <tr>
+                        {% if perms.edu.change_observacao %}
+                        <th class="text-center no-print">Ações</th>
+                        {% endif %}
+                        <th class="text-center">Observação</th>
+                        <th class="text-center">Inserido por</th>
+                        <th class="text-center">Última alteração</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for observacao in obj.observacao_set.all %}
+                    <tr>
+                        {% if perms.edu.change_observacao %}
+                        <td class="text-center no-print">
+                            {% if request.user == observacao.usuario %}
+                                {% icon "edit" "/edu/editar_observacao/{{ observacao.pk }}/" "Editar" "popup" %}
+                            {% endif %}
+                            {% if perms.edu.adm_delete_observacao or request.user == observacao.usuario and perms.edu.delete_observacao %}
+                                {% icon "delete" "/comum/excluir/edu/observacao/{{ observacao.pk }}/" "Remover" "no-confirm popup" %}
+                            {% endif %}
+                        </td>
+                        {% endif %}
+                        <td class="text-center">{{ observacao.observacao }}</td>
+                        <td class="text-center">{{ observacao.usuario }}</td>
+                        <td class="text-center">{{ observacao.data }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="alert alert-warning">Nenhuma observação cadastrada.</p>
+    {% endif %}
+{% endbox %}
+
+{% box 'Dados acadêmicos' %}
+    <dl class="definition-list flex">
+        <div class="list-item">
+            <dt>Matrícula</dt>
+            <dd>{{ obj.matricula }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Data da Matrícula</dt>
+            <dd>{{ obj.data_matricula|format }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>I.R.A.</dt>
+            <dd>{% if pode_ver_dados_sociais or pode_ver_dados_academicos %}{{ obj.get_ira|format }}{% else %}**{% endif %}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Turno</dt>
+            <dd>{{ obj.turno.descricao|format }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Forma de Ingresso</dt>
+            <dd>
+                {{ obj.forma_ingresso.descricao|format }}
+                {% if obj.convenio_internacional_id %}
+                    ({{ obj.convenio_internacional }})
+                {% endif %}
+            </dd>
+        </div>
+        <div class="list-item">
+            <dt>Polo EAD</dt>
+            <dd>{{ obj.polo|format }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Ano de Ingresso</dt>
+            <dd>{{ obj.ano_letivo|format }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Período de Ingresso</dt>
+            <dd>{{ obj.periodo_letivo|format }}º</dd>
+        </div>
+        <div class="list-item">
+            <dt>Período de Referência</dt>
+            <dd>{{ obj.periodo_atual|format }}º</dd>
+        </div>
+        <div class="list-item">
+            <dt>Prev. Conclusão</dt>
+            <dd>{{ obj.ano_let_prev_conclusao|format }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Data de Conclusão</dt>
+            <dd>{{ obj.dt_conclusao_curso|format }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Data da Colação</dt>
+            <dd>{{ obj.get_data_colacao_grau|format }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Data de Expedição do Diploma</dt>
+            <dd>{{ obj.data_expedicao_diploma|format }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Data da Migração</dt>
+            <dd>{{ obj.data_integralizacao|format }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Nº da Pasta (SEAC)</dt>
+            <dd>{{ obj.numero_pasta|format }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Código SISTEC</dt>
+            <dd>{{ obj.codigo_sistec|format }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Data de início do ciclo (SISTEC)</dt>
+            <dd>{{ obj.data_inicio_ciclo|format }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Data prevista de término do ciclo (SISTEC)</dt>
+            <dd>{{ obj.data_prevista_termino_ciclo|format }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Código Educacenso</dt>
+            <dd>{{ obj.codigo_educacenso|format }}</dd>
+        </div>
+        {% if obj.matriz %}
+            {% if obj.is_credito %}
+                <div class="list-item">
+                    <dt>Quantidade de Créditos Aproveitados/Certificados</dt>
+                    <dd>
+                        {{ obj.get_creditos_certificados_ou_aproveitados }}
+                        {% if obj.matriz.estrutura.quantidade_max_creditos_aproveitamento > 0 %}
+                            de {{ obj.matriz.estrutura.quantidade_max_creditos_aproveitamento }}
+                        {% endif %}
+                    </dd>
+                </div>
+            {% elif obj.is_seriado %}
+                <div class="list-item">
+                    <dt>% de Carga Horária Aproveitada/Certificada</dt>
+                    <dd>
+                        {{ obj.get_percentual_ch_certificada_ou_aproveitada }}%
+                        {% if obj.matriz.estrutura.percentual_max_aproveitamento %}
+                            de {{ obj.matriz.estrutura.percentual_max_aproveitamento }}%
+                        {% endif %}
+                    </dd>
+                </div>
+            {% endif %}
+        {% endif %}
+        {% if obj.pessoa_fisica.lattes %}
+            <div class="list-item">
+                <dt>Currículo Lattes</dt>
+                <dd><a href="{{ obj.pessoa_fisica.lattes }}">{{ obj.pessoa_fisica.lattes }}</a></dd>
+            </div>
+        {% endif %}
+        {% if obj.pessoa_fisica.orcid %}
+            <div class="list-item">
+                <dt>ORCID</dt>
+                <dd><a href="{{ obj.pessoa_fisica.orcid }}">{{ obj.pessoa_fisica.orcid }}</a></dd>
+            </div>
+        {% endif %}
+        {% if obj.orientador %}
+            <dt>Orientador</dt>
+            <dd>{{ obj.orientador|format }}</dd>
+        {% endif %}
+        {% if obj.coorientadores.exists %}
+            <dt>Coorientadores</dt>
+            {% for coorientador in obj.coorientadores.all %}
+                <dd>{{ coorientador|format }}</dd>
+            {% endfor %}
+        {% endif %}
+
+        {% if obj.titulo_projeto_pesquisa %}
+            <dt>Título do Projeto de Pesquisa</dt>
+            <dd>{{ obj.titulo_projeto_pesquisa|format }}</dd>
+        {% endif %}
+    </dl>
+{% endbox %}
+
+{% if obj.candidato_vaga %}
+    {% box 'Dados do Concurso' %}
+        <dl class="definition-list">
+            <dt>Edital</dt>
+            <dd>
+                {% if perms.processo_seletivo.view_edital %}
+                    <a href="/processo_seletivo/edital/{{ obj.candidato_vaga.oferta_vaga.oferta_vaga_curso.edital.pk }}/">{{ obj.candidato_vaga.oferta_vaga.oferta_vaga_curso.edital|format }}</a></td>
+                {% else %}
+                    {{ obj.candidato_vaga.oferta_vaga.edital|format }}
+                {% endif %}
+            </dd>
+            <dt>Classificação</dt>
+            <dd>
+                {% if perms.processo_seletivo.view_edital %}
+                    <a href="/processo_seletivo/classificados/{{ obj.candidato_vaga.oferta_vaga.pk }}/#{{ obj.candidato_vaga.pk }}">{{ obj.candidato_vaga|format }}</a>
+                {% else %}
+                    {{ obj.candidato_vaga|format }}
+                {% endif %}
+            </dd>
+            {% if obj.is_cancelado %}
+                <dt>Vaga migrada para outro candidato</dt>
+                <dd>{{ obj.is_vaga_migrada|format }}</dd>
+            {% endif %}
+        </dl>
+    {% endbox %}
+{% endif %}
+
+{% box 'Dados do Curso' %}
+	<dl class="definition-list">
+        <dt>Curso</dt>
+        <dd>
+            {% if perms.edu.view_cursocampus %}
+                <a href="/edu/cursocampus/{{ obj.curso_campus.pk }}/">
+            {% endif %}
+            {{ obj.curso_campus }}
+            {% if perms.edu.view_cursocampus %}
+                </a>
+            {% endif %}
+        </dd>
+        <dt>Estrutura do Curso</dt>
+        <dd>
+            {% if perms.edu.view_estruturacurso %}
+                <a href="/edu/estruturacurso/{{ obj.matriz.estrutura.pk }}/">
+            {% endif %}
+            {{ obj.matriz.estrutura|format }}
+            {% if perms.edu.view_estruturacurso %}
+                </a>
+            {% endif %}
+        </dd>
+        <dt>Matriz</dt>
+        <dd>
+            {% if perms.edu.view_matriz %}
+                <a href="/edu/matriz/{{ obj.matriz.pk }}/">
+            {% endif %}
+            {{ obj.matriz.pk|format }} - {{ obj.matriz|format }}
+            {% if perms.edu.view_matriz %}
+                </a>
+            {% endif %}
+        </dd>
+        {% if matrizppc %}
+            <dt>PPC</dt>
+            <dd>
+                {% if perms.ppc.view_projetopedagogicocurso %}<a href="{{ matrizppc.get_absolute_url }}">{% endif %}
+                {{ matrizppc|format }}
+                {% if perms.ppc.view_projetopedagogicocurso %}</a>{% endif %}
+            </dd>
+        {% endif %}
+        
+        <dt>Linha de pesquisa</dt>
+        <dd>{{ obj.linha_pesquisa.descricao|format }}</dd>
+        <dt>Aluno Especial?</dt>
+        <dd>{{ obj.aluno_especial|format }}</dd>
+    </dl>
+{% endbox %}
+
+{% if obj.get_matriculas_anteriores %}
+    <div class="table-responsive">
+        <table>
+            <caption>Matrículas relacionadas</caption>
+            <thead>
+                <tr>
+                    <th>Matrícula</th>
+                    <th>Curso</th>
+                    <th>Situação</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for aluno in obj.get_matriculas_anteriores %}
+                <tr>
+                    <td>
+                        {% if not is_proprio_aluno %}
+                            <a href="{{ aluno.get_absolute_url }}">{{ aluno.matricula }}</a>
+                        {% else %}
+                            {{ aluno.matricula }}
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if perms.edu.view_cursocampus %}
+                            <a href="{{ aluno.curso_campus.get_absolute_url }}">
+                        {% endif %}
+                        {{ aluno.curso_campus }}
+                        {% if perms.edu.view_cursocampus %}</a>{% endif %}
+                    </td>
+                    <td>{{ aluno.situacao }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endif %}

@@ -1,0 +1,373 @@
+{% extends super_template %}
+
+{% block extrahead %}
+
+    <style>
+        ul li{
+            line-height: 2.2em;
+        }
+        span.status{
+            display: inline;
+        }
+    </style>
+
+    <script>jQuery.getScript('/static/edu/js/TransferirTurma.js');</script>
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        <li>
+            <a class="btn default popup" href="/edu/calendario_avaliacao/{{ obj.pk }}/"> Calendário de avaliações</a>
+        </li>
+        <li><a class="btn default" href="/edu/turma_estatistica/{{ obj.pk }}/">Estatísticas da turma</a></li>
+        <li class="has-child">
+            <a class="btn" href="#"> Ações </a>
+            <ul>
+                <li><a class="btn default wait" href="/edu/mapa_turma/{{ obj.pk }}/">Gerar mapa da turma</a></li>
+                {% if obj.pode_gerar_diario %}
+                    <li><a class="btn popup" href="/edu/gerar_diarios/{{ obj.pk }}/">Gerar diários</a></li>
+                {% endif %}
+                {% if obj.matriculaperiodo_set.exists %}
+                    <li><a class="btn" href="?boletim=1">Imprimir boletins</a></li>
+                {% endif %}
+                {% if obj.tem_integracao_com_moodle %}
+                    <li><a class="btn" href="?moodle=sincronizar">Exportar para o Moodle</a></li>
+                {% endif %}
+            </ul>
+        </li>
+    </ul>
+{% endblock %}
+
+{% block content %}
+    
+    {% if diarios_pendentes %}
+        <div class="alert alert-warning">
+            Esta turma possui os seguintes diários pendentes:
+            <ul>
+                {% for diario in diarios_pendentes %}
+                    <li><a class="negrito" href="{{ diario.0.get_absolute_url }}">{{ diario.0.componente_curricular.componente.sigla }} - {{ diario.0.componente_curricular.componente.descricao }}</a>: {{ diario.1 }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+    {% box "Dados gerais" %}
+        <table class="info">
+            <tr>
+                <td>Descrição</td>
+                <td>{{ obj.descricao }}</td>
+                <td>Código</td>
+                <td>{{ obj.codigo }}</td>
+            </tr>
+            <tr>
+                <td>Ano/Período Letivo</td>
+                <td>{{ obj.ano_letivo }}/{{ obj.periodo_letivo }}</td>
+                <td>Turno</td>
+                <td>{{ obj.turno }}</td>
+            </tr>
+            <tr>
+                <td>Curso</td>
+                <td colspan="3">
+                    <a href="{{ obj.curso_campus.get_absolute_url }}">{{ obj.curso_campus }}</a>
+                </td>
+            </tr>
+            <tr>
+                <td>Matriz</td>
+                <td colspan="3">
+                    <a href="{{ obj.matriz.get_absolute_url }}">{{ obj.matriz }}</a>
+                </td>
+            </tr>
+            {% if obj.diario_set.exists %}
+                <tr>
+                    <td>Calendário Acadêmico</td>
+                    <td colspan="3">
+                        <a class="popup"
+                           href="{{ obj.calendario_academico.get_absolute_url }}">{{ obj.calendario_academico|format }}</a>
+                    </td>
+                </tr>
+            {% endif %}
+            <tr>
+                <td>Período na Matriz</td>
+                <td colspan="3">{{ obj.periodo_matriz }}º Período</td>
+            </tr>
+            <tr>
+                <td>Quantidade de Vagas</td>
+                <td colspan="3">
+                    {{ obj.quantidade_vagas|format }}
+                </td>
+            </tr>
+            {% if obj.curso_campus.diretoria.ead %}
+                <tr>
+                    <td>Polo</td>
+                    <td colspan="3">
+                        <a href="{{ obj.polo.get_absolute_url }}">{{ obj.polo|format }}</a>
+                    </td>
+                </tr>
+            {% endif %}
+            {% if obj.codigo_educacenso %}
+                <tr>
+                    <td>EDUCACENSO</td>
+                    <td colspan="3">
+                        {{ obj.codigo_educacenso|format }}
+                    </td>
+                </tr>
+            {% endif %}
+        </table>
+    {% endbox %}
+
+    <div class="tab-pane ajax-rendered" data-title="Diários" data-tab="dados_diarios" data-counter="{{ qtd_diarios }}">
+        {% if request.GET.tab == "dados_diarios" or not request.GET.tab %}
+            {% if diarios.exists %}
+                {% if pode_realizar_procedimentos %}
+                    <ul class="action-bar">
+                        <li><a class="btn primary popup" href="/edu/definir_local_aula_turma/{{ obj.pk }}/">Definir local das aulas</a></li>
+                    </ul>
+                {% endif %}
+                <div class="table-responsive">
+                    <table>
+                        <caption>Diários da Turma</caption>
+                        <thead>
+                        <tr>
+                            <th class="no-print">-</th>
+                            <th>Código</th>
+                            {% if regime_modular %}
+                                <th>Módulo</th>
+                            {% endif %}
+                            <th>Componente</th>
+                            <th>Núcleo</th>
+                            <th>Percentual Mínimo (CH)</th>
+                            <th>Quantidade de Vagas</th>
+                            <th>Quantidade de Alunos</th>
+                            <th>Carga Horária Ministrada (%)</th>
+                            <th>Local das Aulas</th>
+                            <th>Professores</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for diario in diarios %}
+                            <tr>
+                                <td class="no-print">
+                                    {% icon "view" "/edu/diario/{{ diario.pk }}/" %}
+                                    {% if perms.edu.delete_diario and diario.pode_ser_excluido %}
+                                        {% icon "delete" "/comum/excluir/edu/diario/{{ diario.pk }}/" "Remover" "no-confirm popup" %}
+                                    {% endif %}
+                                </td>
+                                <td>{{ diario.pk }}</td>
+                                {% if regime_modular %}
+                                    <td>{{ diario.componente_curricular.get_modulo }}</td>
+                                {% endif %}
+                                <td>
+                                    {{ diario.componente_curricular.componente }}{{ diario.get_descricao_dinamica }}
+                                    {% if diario.possui_segunda_oferta %}
+                                        <br><br><span>{{ "Primeira oferta"|status }}</span>
+                                    {% elif diario.diario_primeira_oferta_id %}
+                                        <br><br><span>{{ "Segunda oferta"|status }}</span>
+                                    {% endif %}
+                                </td>
+                                <td align="center">{{ diario.componente_curricular.nucleo }}</td>
+                                <td align="center">{{ diario.percentual_minimo_ch }}%</td>
+                                <td align="center">{{ diario.quantidade_vagas }}</td>
+                                <td align="center">{{ diario.matriculadiario_set.count }}</td>
+                                <td>
+                                    <div class="progress">
+                                        <p>{{ diario.get_percentual_carga_horaria_cumprida }}%</p>
+                                    </div>
+                                </td>
+                                <td>{{ diario.get_locais_aula|format }}</td>
+                                <td>{% for professor_diario in diario.get_professores %}
+                                    <a href="{{ professor_diario.professor.get_absolute_url }}">
+                                        {{ professor_diario.professor.vinculo.pessoa.nome|format }}{% if not forloop.last %}
+                                            ,{% endif %}</a>{% endfor %}</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="alert alert-warning">Nenhum diário cadastrado.</p>
+            {% endif %}
+        {% endif %}
+    </div>
+
+    <div class="tab-pane ajax-rendered" data-title="Alunos" data-tab="dados_alunos" data-counter="{{ qtd_alunos_ativos }}">
+        {% if request.GET.tab == "dados_alunos" %}
+            <ul class="action-bar">
+                <li class="has-child">
+                    <a class="btn" href="#">Exportar XLS</a>
+                    <ul>
+                        <li><a href="/edu/exportar_xls_aluno/?escopo=turma&turma={{ obj.pk }}&xls=alunos_na_turma">Alunos na turma</a></li>
+                        <li><a href="/edu/exportar_xls_aluno/?escopo=turma&turma={{ obj.pk }}&xls=alunos_apenas_em_diarios">Alunos apenas em diários</a></li>
+                        <li><a href="/edu/exportar_xls_aluno/?escopo=turma&turma={{ obj.pk }}&xls=alunos_todos">Ambos</a></li>
+                    </ul>
+                </li>
+            </ul>
+
+            <p class="alert alert-info">Os alunos sem destaque estão com o período letivo fechado.</p>
+
+            {% box "Alunos na Turma" %}
+                {% if pode_realizar_procedimentos %}
+                    <ul class="action-bar">
+                        <li><a class="btn success" href="/edu/adicionar_aluno_turma/{{ obj.pk }}/">Adicionar alunos</a></li>
+                    </ul>
+                {% endif %}
+                {% if alunos.exists %}
+                    <form method="post" action="">
+                        {% csrf_token %}
+                        <div class="table-responsive">
+                        <table>
+                            <caption>Listagem de alunos</caption>
+                            <thead>
+                            <tr>
+                                <th>#</th>
+                                {% if pode_realizar_procedimentos %}
+                                    <th class="text-center">
+                                        <input type="checkbox"
+                                            onchange="var is = this.parentNode.parentNode.parentNode.parentNode.getElementsByTagName('input');for(var i=0; i<is.length; i++){ is[i].checked = this.checked;}"/>
+                                    </th>
+                                {% endif %}
+                                <th>Aluno</th>
+                                <th>Situação no Período</th>
+                                <th>Possui Nota na Turma</th>
+                                <th>Possui Falta na Turma</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for matricula_periodo in alunos %}
+                                <tr {% if not matricula_periodo.situacao.pk == matricula_periodo.situacao.MATRICULADO %} class="disabled" {% endif %}>
+                                    <td>{{ forloop.counter }}</td>
+                                    {% if pode_realizar_procedimentos %}
+                                        <td class="text-center">
+                                                <input value="{{ matricula_periodo.pk }}" name="matriculas_periodo" type="checkbox"/>
+                                        </td>
+                                    {% endif %}
+                                    <td> {{ matricula_periodo.aluno.get_nome }} (<a
+                                            href="{{ matricula_periodo.aluno.get_absolute_url }}">{{ matricula_periodo.aluno.matricula }}</a>)
+                                    </td>
+                                    <td>{{ matricula_periodo.situacao }}</td>
+                                    <td class="text-center">{{ matricula_periodo.possui_nota_lancada_na_turma|format }}</td>
+                                    <td class="text-center">{{ matricula_periodo.possui_falta_lancada_na_turma|format }}</td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                        </div>
+                        {% if pode_realizar_procedimentos %}
+                            <div class="submit-row">
+                                {% if obj.matriz.estrutura.tipo_avaliacao == obj.matriz.estrutura.TIPO_AVALIACAO_SERIADO %}
+                                    <input class="success" type="button" value="Transferir Alunos Selecionados"
+                                        onclick="popupTransferencia({{ obj.pk }})" name="_addanother"/>
+                                {% endif %}
+                                <input type="button" class="danger no-confirm" id="btn_remover" value="Remover Alunos Selecionados"/>
+                                <input type="button" class="primary" id="btn_addturma" value="Adicionar alunos selecionados à turma de minicurso">
+                            </div>
+                                <script>
+                                    jQuery(function () {
+                                        if (!$("input[name='matriculas_periodo']").length) {
+                                            $("#btn_remover").hide();
+                                        }
+                                    });
+                                    $("#btn_remover").click(function (ev) {
+                                        ids = $("input[name='matriculas_periodo']:checked").map(function () {
+                                            return this.value;
+                                        }).get().join("_");
+                                        if (ids && confirm("Você tem certeza que deseja remover o(s) aluno(s) selecionado(s)? Isso implicará na exlcusão de suas matrículas nos diários vinculados à turma caso seja(m) do regime seriado. O registro de notas e faltas nesses diários para estes alunos também serão removidos.")) {
+                                            document.location.href = '?tab=dados_alunos&matriculas_periodo=' + ids;
+                                        }
+                                    });
+                                    jQuery(function () {
+                                        if (!$("input[name='matriculas_periodo']").length) {
+                                            $("#btn_addturma").hide();
+                                        }
+                                    });
+                                    $("#btn_addturma").click(function (ev) {
+                                        ids = $("input[name='matriculas_periodo']:checked").map(function () {
+                                            return this.value;
+                                        }).get().join("_");
+                                        if (ids){
+                                            document.location.href = '/edu/adicionar_alunos_turma_minicurso/{{ obj.pk }}/?pks=' + ids;
+                                        }
+                                    });
+                                </script>
+                        {% endif %}
+                    </form>
+                {% else %}
+                    <p class="alert alert-warning">Nenhum aluno matriculado na turma.</p>
+                {% endif %}
+            {% endbox %}
+            {% box "Alunos apenas em diários" %}
+                {% if alunos_diarios.exists %}
+                    <div class="table-responsive">
+                    <table>
+                        <caption>Listagem de alunos</caption>
+                        <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Aluno</th>
+                            <th>Situação no Período</th>
+                            <th>Possui Nota</th>
+                            <th>Possui Falta</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for matricula_periodo in alunos_diarios %}
+                            <tr {% if not matricula_periodo.situacao.pk == matricula_periodo.situacao.MATRICULADO %}
+                                class="disabled" {% endif %}>
+                                <td>{{ forloop.counter }}</td>
+                                <td> {{ matricula_periodo.aluno.get_nome }} (<a
+                                        href="{{ matricula_periodo.aluno.get_absolute_url }}">{{ matricula_periodo.aluno.matricula }}</a>)
+                                </td>
+                                <td>{{ matricula_periodo.situacao }}</td>
+                                <td class="text-center">{{ matricula_periodo.possui_nota_lancada|format }}</td>
+                                <td class="text-center">{{ matricula_periodo.possui_falta_lancada|format }}</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                    </div>
+                {% else %}
+                    <p class="alert alert-warning">Nenhum aluno matriculado apenas em um ou mais diários da turma.</p>
+                {% endif %}
+            {% endbox %}
+        {% endif %}
+    </div>
+    
+    <div class="tab-pane ajax-rendered" data-title="Horários" data-tab="horarios">
+        {% if request.GET.tab == "horarios" %}
+            {% include "horarios_turma.html" %}
+        {% endif %}
+    </div>
+
+    {% if regime_modular %}
+        <div class="tab-pane ajax-rendered" data-title="Módulos" data-tab="dados_modulos" data-counter="{{ modulos|length }}">
+            {% if request.GET.tab == "dados_modulos" %}
+                <div class="table-responsive">
+                    <table>
+                        <caption>Módulos da Turma</caption>
+                        <thead>
+                        <tr>
+                            <th>Módulo</th>
+                            <th class="no-print text-end">Opções</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for modulo in modulos %}
+                            <tr>
+                                <td>{{ modulo.nome }}</td>
+                                <td class="no-print">
+                                    <ul class="action-bar">
+                                        {% if modulo.pode_fechar %}
+                                            <li><a class="btn success" href="/edu/fechar_periodo_letivo/?ano_letivo={{ obj.ano_letivo_id }}&periodo_letivo={{ obj.periodo_letivo }}&tipo=TURMA&turma={{ obj.id }}&modulo={{ modulo.modulo }}">Fechar módulo</a></li>
+                                        {% endif %}
+                                        {% if modulo.pode_reabrir %}
+                                            <li><a class="btn warning" href="/edu/abrir_periodo_letivo/?ano_letivo={{ obj.ano_letivo_id }}&periodo_letivo={{ obj.periodo_letivo }}&tipo=TURMA&turma={{ obj.id }}&modulo={{ modulo.modulo }}">Reabrir módulo</a></li>
+                                        {% endif %}
+                                    </ul>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
+        </div>
+    {% endif %}
+{% endblock %}

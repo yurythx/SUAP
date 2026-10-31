@@ -1,0 +1,182 @@
+{% extends super_template %}
+
+{% load rsc_tags %}
+
+{% block extrahead %}
+    <style>
+        ol.lower-alpha > li { list-style-type: lower-alpha; list-style: lower-alpha; }
+        ol.decimal > li { list-style-type: decimal; list-style: decimal; }
+        div.instrucoes-gerais { line-height: 20px; }
+        .boxsizingBorder {
+            -webkit-box-sizing: border-box;
+               -moz-box-sizing: border-box;
+                    box-sizing: border-box;
+                         width: 100%
+        }
+        .tbox .tcontent h2, .tbox .tcontent h3 {
+            margin: 0 !important;
+        }
+    </style>
+
+    <script>
+	    function finalizar_avaliacao(avaliacao_id){
+	    	if(confirm('Deseja mesmo finalizar esta avaliação? Depois de finalizada não será mais possível editá-la.')){
+		        $.ajax({
+		                type: "POST",
+		                url: '/professor_titular/finalizar_avaliacao_titular/'+avaliacao_id+'/',
+		                data: $('#form_avaliacao').serialize(),
+		                success: function (retorno) {
+		                    if (retorno.ok) {
+		                    	alert(retorno.msg)
+		                    	window.location.href = "/professor_titular/processo_avaliacao/";
+		                    }else {
+		                        alert(retorno.msg)
+		                    }
+		                }
+		        });
+	    	}
+	    }
+
+	    function onInitTabs(){
+	        preencher_relatorio_descritivo();
+	        preencher_documentos_preliminares();
+
+	        preencher_quadro_resumo_avaliacao();
+	        $("a[data-tab='quadro_resumo_avaliacao']").on('click', function(){
+	        	preencher_quadro_resumo_avaliacao();
+	        });
+
+            $("a[data-tab='relatorio_descritivo']").on('click', function(){
+            preencher_relatorio_descritivo();
+            });
+	    }
+
+	    function preencher_relatorio_descritivo(){
+	        $.get("/professor_titular/relatorio_descritivo/{{ processo.id }}/", function(data) {
+	            $("div[data-tab='relatorio_descritivo']").html(data);
+	        })
+	    }
+
+	    function preencher_documentos_preliminares(){
+            $.get("/professor_titular/documentos_preliminares/{{ processo.id }}/", function(data) {
+                $("div[data-tab='documentos_preliminares']").html(data);
+            });
+        }
+
+	    function preencher_quadro_resumo_avaliacao(){
+            $.get("/professor_titular/quadro_resumo_avaliacao/{{ avaliacao.id }}/", function(data) {
+                $("div[data-tab='quadro_resumo_avaliacao']").html(data);
+            });
+        }
+    </script>
+{% endblock %}
+
+{% block content %}
+
+<form id="form_avaliacao">
+    {% csrf_token %}
+    <ul class="action-bar">
+        {% if avaliacao.pode_avaliar %}
+            <li><a href="javascript:void(0);" onclick="finalizar_avaliacao({{ avaliacao.id }})" class="btn success">Finalizar Avaliação</a></li>
+            <li><a href="/professor_titular/desistir_avaliacao/{{ avaliacao.id }}" class="btn popup danger no-confirm">Desistir da Avaliação</a></li>
+        {% else %}
+            <li><a class="btn" href="/professor_titular/processo_avaliacao/?tab=avaliacoes_concluidas">Voltar</a></li>
+        {% endif %}
+    </ul>
+</form>
+
+{% box 'Dados do requerente' %}
+    <dl class="definition-list flex">
+        <div class="list-item">
+            <dt>Nome:</dt>
+            <dd>{{ processo.servidor.pessoa_fisica.nome }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Matrícula SIAPE:</dt>
+            <dd>{{ processo.servidor.matricula }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Pontuação Requerida:</dt>
+            <dd><span id="pontuacao_requerida">{{ processo.pontuacao_pretendida|format }}</span></dd>
+        </div>
+        <div class="list-item">
+            <dt>Pontuação Validada:</dt>
+            <dd><span id="pontuacao_validada_com_corte">{{ pontuacao_validada_com_corte|format }}</span></dd>
+        </div>
+    </dl>
+{% endbox %}
+
+<div class="tab-pane" data-title="Instruções gerais" data-tab="instrucoes_gerais">
+
+    {{ config.instrucoes_gerais|safe }}
+
+</div>
+
+<div class="tab-pane" data-title="Documentos preliminares" data-tab="documentos_preliminares"></div>
+
+<div class="tab-pane" data-title="Memorial descritivo" data-tab="relatorio_descritivo"></div>
+
+<div class="tab-pane" data-title="Avaliação" data-tab="avaliacao">
+
+    {% regroup arquivos by arquivo.criterio.indicador.grupo as grupos %}
+    {% for grupo in grupos %}
+	    <h3>Grupo {{ grupo.grouper }}</h3>
+	        <table>
+	            <thead>
+	                <tr>
+	                    <th>Artigo</th>
+	                    <th>Descrição</th>
+	                    <th>Ver arquivo</th>
+	                    <th>Data de Referência Requerida</th>
+	                    <th>Pontos por item</th>
+                        <th>Quantidade de Itens</th>
+	                    <th>Pontuação Requerida</th>
+                        <th>Situação</th>
+                        {% if avaliacao.pode_avaliar %}
+                            <th>Opções</th>
+                        {% endif %}
+	                </tr>
+	            </thead>
+	            <tbody>
+	                {% regroup grupo.list by arquivo.criterio.indicador as arquivos_indicador %}
+	                {% for arquivo_indicador in arquivos_indicador %}
+	                    <tr>
+	                        <td colspan="10"><p class="negrito">{{ arquivo_indicador.grouper }}</p> </td>
+	                    </tr>
+    	                {% for arquivo in arquivo_indicador.list %}
+    	                    <tr>
+    	                        <td align="right" {% if arquivo.justificativa %}rowspan="2"{% endif %}>{{ arquivo.arquivo.criterio.artigo }}</td>
+    	                        <td>{{ arquivo.arquivo.criterio.nome }}</td>
+    	                        <td><a href="/professor_titular/visualizar_arquivo_pdf/{{ arquivo.arquivo.encrypted_pk }}" target="_blank">Visualizar o arquivo</a></td>
+    	                        <td align="center">{{ arquivo.arquivo.data_referencia|format }}</td>
+                                <td align="center">{{ arquivo.arquivo.criterio.pontos }}</td>
+    	                        <td align="center">{{ arquivo.arquivo.qtd_itens }}</td>
+    	                        <td align="center">{{ arquivo.arquivo.nota_pretendida }}</td>
+    	                        <td>
+    	                            {% if arquivo.item_validado %}
+                                        <span class="status status-success" id="status">Avaliado</span>
+                                    {% else %}
+                                        <span class="status status-alert" id="status">Não avaliado</span>
+                                    {% endif %}
+                                </td>
+                                {% if avaliacao.pode_avaliar %}
+                                    <td><a name="{{ arquivo.arquivo.id }}" class="btn {% if arquivo.item_validado %}primary {% else %}success {% endif %}" href="/professor_titular/avaliar_item/{{ arquivo.id }}">{% if arquivo.item_validado %} Editar {% else %} Avaliar {% endif %}</a></td>
+                                {% endif %}
+    	                    </tr>
+                            {% if arquivo.justificativa %}
+                                <tr>
+                                    <td colspan="8"><strong>Justificativa:</strong> {{ arquivo.justificativa }}</td>
+                                </tr>
+                            {% endif %}
+    	                {% endfor %}
+	                {% endfor %}
+	            </tbody>
+	        </table>
+	{% endfor %}
+
+</div>
+
+<div class="tab-pane" data-title="Quadro de Resumo da Avaliação" data-tab="quadro_resumo_avaliacao">
+</div>
+
+{% endblock %}

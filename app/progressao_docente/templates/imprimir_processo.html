@@ -1,0 +1,307 @@
+{% extends "relatorio_pdf.html" %}
+
+{% block css_variables %}
+    --page-mt: 4cm;
+{% endblock %}
+
+{% block style %}
+    header {
+        top: -3cm;
+    }
+    small {
+        font-size: 11px;
+        color: gray;
+    }
+    ul.lista-afastamentos {
+        margin: 0;
+    }
+{% endblock %}
+
+{% block cabecalho %}
+    <header>
+        <table>
+            <tr>
+                <td rowspan="4" class="logo-brasao-container"><img src="/static/comum/img/brazao_colorido.jpg" class="logo-brasao" alt="Brasão da República" /></td>
+                <td class="titulo">SERVIÇO PÚBLICO FEDERAL</td>
+                <td rowspan="4" class="logo-instituicao-container text-end"><img src="/static/comum/img/logo_instituicao.jpg" class="logo-instituicao" alt="Logotipo da instituição" /></td>
+            </tr>
+            <tr>
+                <td class="titulo">INSTITUTO FEDERAL DE EDUCAÇÃO, CIÊNCIA E TECNOLOGIA DO RIO GRANDE DO NORTE</td>
+            </tr>
+            <tr>
+                <td class="titulo">DIRETORIA DE GESTÃO DE PESSOAS</td>
+            </tr>
+            <tr>
+                <td class="titulo">COORDENAÇÃO DE DESENVOLVIMENTO DE PESSOAL</td>
+            </tr>
+        </table>
+    </header>
+{% endblock %}
+
+{% block content %}
+    <h2>RESUMO DO PROCESSO DE PROGRESSÃO DOCENTE</h2>
+    <table class="definicoes">
+        <tr>
+            <td colspan="2"><strong>Servidor avaliado</strong> {{ progressao.avaliado }}</td>
+            <td colspan="2"><strong>Cargo</strong> {{ progressao.avaliado.cargo_emprego }}</td>
+        </tr>
+        <tr>
+            <td colspan="2">
+                <strong>Padrão de vencimento atual</strong>
+                {{ progressao.nivel_atual }}
+            </td>
+            <td colspan="2">
+                <strong>Padrão de vencimento novo</strong>
+                {{ progressao.proximo_nivel }}
+            </td>
+        </tr>
+
+        <tr>
+            <td><strong>Data de início da contagem</strong> {{ progressao.data_inicio_periodo|format }}</td>
+            <td><strong>Data de fim da contagem</strong> {{ progressao.data_fim_periodo|format }}</td>
+            <td><strong>Pontuação final do processo</strong> {{ progressao.pontuacao_final_progressao|format }}</td>
+            <td>
+                <strong>Resultado final</strong>
+                {{ progressao.progressao_aprovada_display }}
+            </td>
+        </tr>
+    </table>
+
+    <!-- ACELERAÇÃO  -->
+    {% if progressao.pode_acelerar %}
+    <hr>
+
+    <h2>ACELERAÇÃO DA PROGRESSÃO</h2>
+
+    <table class="definicoes">
+        <thead>
+            <tr>
+                <th>Aceleração Desejada</th>
+                <th>Avaliação</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>{{ progressao.get_tipo_aceleracao_display|format }}</td>
+                <td>{{ progressao.get_validacao_aceleracao_display|format }}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <br />
+    {% endif %}
+    <!-- ACELERAÇÃO  -->
+
+
+    {% if progressao.ids_afastamentos_utilizados %}
+        <hr>
+
+        <h2>Dias que contribuiram para o cálculo da data fim da progressão (Despacho 124/2022 - ASSEL/DIGPE/RE/IFRN)</h2>
+
+        {% if progressao.afastamentos_interrompem_tempo_servico %}
+            <table class="definicoes">
+                <thead>
+                    <tr>
+                        <th colspan="6"><h3>Afastamentos que interrompem o tempo de serviço</h3></th>
+                    </tr>
+                    <tr>
+                        <th>Código</th>
+                        <th>Sigla</th>
+                        <th>Nome</th>
+                        <th>Data de Início</th>
+                        <th>Data de Termino</th>
+                        <th>Dias</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for afastamento in progressao.afastamentos_interrompem_tempo_servico.afastamentos %}
+                    <tr>
+                        <td>{{ afastamento.codigo }}</td>
+                        <td>{{ afastamento.sigla }}</td>
+                        <td>{{ afastamento.nome }}</td>
+                        <td>{{ afastamento.data_inicio }}</td>
+                        <td>{{ afastamento.data_termino }}</td>
+                        <td>{{ afastamento.dias_afastamento }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="6">Total de Dias: {{ progressao.afastamentos_interrompem_tempo_servico.total_dias }}</td>
+                    </tr>
+                </tfoot>
+            </table>
+            <br>
+        {% endif %}
+
+        {% if progressao.afastamentos_efetivo_exercicio_30_dias %}
+            <table class="definicoes">
+                <thead>
+                    <tr>
+                        <th colspan="3"><h3>Afastamentos que extrapolaram 30 dias no período de um ano</h3></th>
+                    </tr>
+                    <tr>
+                        <th>Qtde. de Dias</th>
+                        <th>Dia</th>
+                        <th>Afastamento</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for afastamento in progressao.afastamentos_efetivo_exercicio_30_dias.observacoes %}
+                    <tr>
+                        <td>{{ afastamento.qtd_dias }}º</td>
+                        <td>{{ afastamento.data_afetada }}</td>
+                        <td>
+                            <ul class="lista-afastamentos">
+                            {% for i in afastamento.lista_afastamentos %}
+                                <li>{{ i.afastamento }}</li>
+                            {% endfor %}
+                            </ul>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="3">Total de Dias: {{ progressao.afastamentos_efetivo_exercicio_30_dias.observacoes|length }}</td>
+                    </tr>
+                </tfoot>
+            </table>
+            <br>
+        {% endif %}
+
+    {% endif %}
+
+    <h2>AVALIAÇÕES</h2>
+    {% for avaliacao in avaliacoes %}
+        <h2>{{ avaliacao }}</h2>
+        <table class="definicoes">
+            <tr>
+                <td><strong>Avaliador</strong> {{ avaliacao.avaliador }}</td>
+                <td><strong>Cargo</strong> {{ avaliacao.avaliador.cargo_emprego }}</td>
+                <td><strong>Período avaliado</strong> {{ avaliacao.get_periodo_txt }}</td>
+                <td><strong>Pontuação total da avaliação</strong> {{ avaliacao.pontuacao_final|format }}</td>
+            </tr>
+            <tr>
+                <td><strong>Data da Avaliação:</strong>{{ avaliacao.data_assinatura_avaliador.date|format }}</td>
+                <td colspan="3"><strong>Assinatura do Avaliador</strong>{{ avaliacao.assinatura_avaliador_fomatada }}</td>
+            </tr>
+        </table>
+
+        {% if avaliacao.manifestacao_ciencia_html or avaliacao.manifestacao_preenchimento_html or avaliacao.manifestacao_edicao_reavaliacao_html or avaliacao.manifestacao_reavaliacao_html %}
+        <table class="definicoes">
+            {% if avaliacao.manifestacao_ciencia_html %}
+            <tr>
+                <td><strong>Manifestação do Avaliado (Ciência)</strong> {{ avaliacao.manifestacao_ciencia_html|safe }}</td>
+            </tr>
+            {% endif %}
+            {% if avaliacao.manifestacao_preenchimento_html %}
+            <tr>
+                <td><strong>Preenchimento</strong> {{ avaliacao.manifestacao_preenchimento_html|safe }}</td>
+            </tr>
+            {% endif %}
+            {% if avaliacao.manifestacao_edicao_reavaliacao_html %}
+            <tr>
+                <td><strong>Manifestação do Avaliado (Edição para Reavaliação)</strong> {{ avaliacao.manifestacao_edicao_reavaliacao_html|safe }}</td>
+            </tr>
+            {% endif %}
+            {% if avaliacao.manifestacao_reavaliacao_html %}
+            <tr>
+                <td><strong>Manifestação do Avaliador (Reavaliação)</strong> {{ avaliacao.manifestacao_reavaliacao_html|safe }}</td>
+            </tr>
+            {% endif %}
+        </table>
+        {% endif %}
+
+        {% for k, v in avaliacao.informacoes_avaliacao.items %}
+
+            <table class="definicoes">
+                <thead>
+                    <tr>
+                        <th{% if not v.eh_arquivos %} colspan="2"{% endif %}><h3>{{ v.order }}. {{ k }}</h3></th>
+                    </tr>
+                    <tr>
+                        <th>Item</th>
+                        {% if not v.eh_arquivos %}
+                        <th>Pontuação</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in v.dados %}
+                        {% if item.eh_arquivo %}
+                            <tr>
+                                <td >{{ item.order }} {{ item.item }}</td>
+                            </tr>
+                            {% for i in item.itens %}
+                                <tr>
+                                    <td>
+                                    {% if i.deferimento == 2 %}
+                                        <span class="status status-alert"><b>Indeferido:</b> {{ i.justificativa }}</span>
+                                    {% else %}
+                                        {% if item.item_tem_avaliacao %}
+                                            <span class="status status-success">
+                                                Pontuação Validada: {{ i.pontuacao }}
+                                                {% if i.pontuacao_original %}
+                                                    <br>
+                                                    Pontuação desconsiderada: {{ i.pontuacao_original }}
+                                                    <br>
+                                                    Justificativa: {{ i.justificativa }}
+                                                {% endif %}
+                                            </span>
+                                        {% else %}
+                                            <span class="status status-warning">Nenhum pontuação registrada.</span>
+                                        {% endif %}
+                                    {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+
+                        {% else %}
+
+                            {% for i in item.itens %}
+                                <tr>
+                                    <td>{{ item.order }} {{ item.item }}</td>
+                                    <td><span class="status status-success">{{ i.pontuacao }}</span></td>
+                                </tr>
+                            {% endfor %}
+
+                        {% endif %}
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <th{% if not v.eh_arquivos %} colspan="2"{% endif %}>
+                        {% if v.totais.ajuste %}
+                            <span>Total: {{ v.totais.total|format }}</span> <br>
+                            <span> Pontuação ajustada para <b>{{ v.totais.p }} pontos</b> (-{{ v.totais.ajuste }} pontos) devido ao limite do critério.</span>
+                        {% elif v.totais.pontuacao_positiva >= 0 %}
+                            Somatória da Pontuação: {{ v.totais.soma_pontuacao|format }} <br>
+                            Média: {{ v.totais.media_pontuacao|format }} <br>
+                            Pontuação Consideração Positiva: {{ v.totais.pontuacao_positiva|format }} <br>
+                        {% else %}
+                            {% if v.autoavaliacao %}
+                                Pontuação Autoavaliacao: {{ v.totais.nota_avaliado|format }} <br>
+                                Pontuação Avaliação Discente: {{ v.totais.nota_discente|format }} <br>
+                            {% endif %}
+                            Pontuação Total: {{ v.totais.p|format }}
+                        {% endif %}
+                        </th>
+                    </tr>
+                    {% if v.totais.qtd_positiva or v.totais.qtd_negativas %}
+                    <tr>
+                        <th>
+                            Avaliações Positivas: {{ v.totais.qtd_positivas }} <br>
+                            Avaliações Negativas: {{ v.totais.qtd_negativas }}
+                        </th>
+                    </tr>
+                    {% endif %}
+                </tfoot>
+            </table>
+            <br>
+        {% endfor %}
+        {% if not forloop.last %}
+            <p class="page-break"></p>
+        {% endif %}
+    {% endfor %}
+{% endblock %}

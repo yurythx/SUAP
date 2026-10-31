@@ -1,0 +1,121 @@
+{% extends super_template %}
+{% block content %}
+
+    <ul class="action-bar">
+        {% if turma or diario or aluno or uo %}
+            <li><a class="btn" href="/edu/relatorio_faltas/?notificar=1&{{ request.META.QUERY_STRING }}"
+                   title="Notifica apenas os responsáveis de alunos com faltas não justificadas">Notificar
+                Responsáveis</a></li>
+        {% endif %}
+    </ul>
+
+    <div id="formbox">
+
+        {% render_form form %}
+
+    </div>
+    <div id="resultadobox">
+        {% if turma or diario or aluno or uo or curso_campus or diretoria %}
+
+            {% box "Resultado da Pesquisa" %}
+
+                <script>
+                    $('#formbox').hide();
+                </script>
+
+                <ul class="action-bar">
+                    <li><a class="btn primary" href="#"
+                           onclick="javascript:$('#formbox').toggle();javascript:$('#resultadobox').toggle();">Alterar
+                        Filtros</a></li>
+                    <li><a class="btn default" href="/edu/relatorio_faltas/">Limpar Filtros</a></li>
+                    <li><a class="btn" href="/edu/relatorio_faltas/?exportar=1&{{ request.META.QUERY_STRING }}">Exportar</a></li>
+                </ul>
+
+
+                {% if qs_aulas.exists %}
+                    <div class="legenda">
+                        <p>Legenda:</p>
+                        <ul>
+                            <li class="info">Quantidade de Aulas</li>
+                            <li class="danger">Quantidade de Faltas</li>
+                            <li class="success">Quantidade de Justificativas</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <form name="result" id="result"
+                              action="/edu/relatorio_faltas/?exportar=1&{{ request.META.QUERY_STRING }}" method="post">
+                            {% csrf_token %}
+                            <div class="table-responsive">
+                            <table>
+                                <thead>
+                                <tr>
+                                    <th>
+                                        <input type="checkbox"
+                                               onchange="var is = this.parentNode.parentNode.parentNode.parentNode.getElementsByTagName('input');for(var i=0; i<is.length; i++){ is[i].checked = this.checked;}">
+                                    </th>
+                                    <th>Matrícula</th>
+                                    <th>Aluno</th>
+
+                                    {% if aluno %}
+                                        <th>Período Letivo</th>
+                                    {% endif %}
+
+                                    {% for ano, mes, descricao in lista1 %}
+                                        <th colspan="3" class="text-center">{{ descricao }}/{{ ano }}</th>
+                                    {% endfor %}
+                                    <th class="text-center">Total de Aulas</th>
+                                    <th class="text-center">Total de Faltas</th>
+                                    <th class="text-center">Percentual de Presença</th>
+                                    <th class="text-center">Percentual de Faltas</th>
+                                    <th class="text-center">Total de Justificativas</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                {% for matricula_periodo in matriculas_periodos %}
+                                    <tr>
+                                        <td><input value="{{ matricula_periodo.pk }}" name="select_aluno"
+                                                   type="checkbox"/></td>
+                                        <td>
+                                            <a href="{{ matricula_periodo.aluno.get_absolute_url }}">{{ matricula_periodo.aluno.matricula }}</a>
+                                        </td>
+                                        <td>
+                                            {{ matricula_periodo.aluno.get_nome_social_composto|normalizar }}
+                                        </td>
+                                        {% if aluno %}
+                                            <td>{{ matricula_periodo.ano_letivo.ano }}/{{ matricula_periodo.periodo_letivo }}</td>
+                                        {% endif %}
+                                        {% for n in matricula_periodo.aulas_faltas_abonos %}
+                                            <td><span class="text-center status status-info">{{ n.aula }}</span></td>
+                                            <td><span class="text-center status status-error">{{ n.falta }}</span></td>
+                                            <td><span class="text-center status status-success">{{ n.abono }}</span>
+                                            </td>
+                                        {% endfor %}
+                                        <td><span
+                                                class="text-center status status-info">{{ matricula_periodo.aulas_total }}</span>
+                                        </td>
+                                        <td><span
+                                                class="text-center status status-error">{{ matricula_periodo.faltas_total }}</span>
+                                        </td>
+                                        <td><span
+                                                class="text-center status status-info">{{ matricula_periodo.percentual_presenca }}</span>
+                                        </td>
+                                        <td><span
+                                                class="text-center status status-error">{{ matricula_periodo.percentual_faltas }}</span>
+                                        </td>
+                                        <td><span
+                                                class="text-center status status-success">{{ matricula_periodo.abonos_total }}</span>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                                </tbody>
+                            </table>
+                            </div>
+                        </form>
+                    </div>
+                {% else %}
+                    <p class="alert alert-warning">Nenhuma aula registrada.</p>
+                {% endif %}
+            {% endbox %}
+        {% endif %}
+    </div>
+{% endblock %}

@@ -1,0 +1,174 @@
+{% extends super_template %}
+
+{% load rsc_tags %}
+
+{% block extrahead %}
+    <style>
+        .boxsizingBorder {
+		    -webkit-box-sizing: border-box;
+		       -moz-box-sizing: border-box;
+		            box-sizing: border-box;
+		                 width: 100%
+		}
+    </style>
+    <script>
+        var pode_submeter = true;
+        function auto_save(avaliacao_item_id){
+            check_qtd_item();
+            $.ajax({
+                    type: "POST",
+                    url: '/professor_titular/salvar_avaliacao/' + avaliacao_item_id+ '/',
+                    data: $('#form_avaliacao_item').serialize(),
+                    success: function (retorno) {
+                        if(!retorno.ok){
+                            alert(retorno.msg);
+                            pode_submeter = false;
+                        }else{
+                            pode_submeter = true;
+                        }
+                        if (retorno.justificar){
+                        	$('#justificativa_avaliacao_{{ avaliacao_item.id }}').css("border", "red solid 1px");
+                        }else{
+                            $('#justificativa_avaliacao_{{ avaliacao_item.id }}').css("border", "#D1D1D1 solid 1px");
+                        }
+                    }
+            });
+        }
+
+        function check_qtd_item(){
+            var qtd_item_field= $("#qtd_itens_validado_{{ avaliacao_item.id }}");
+            var qtd_item = qtd_item_field.val()
+            if(qtd_item == 0){
+                $('#data_referencia_validada_{{ avaliacao_item.id }}').attr('style', 'display:none');
+                $('#msg_data_referencia').attr('style', '');
+            }else{
+                $('#data_referencia_validada_{{ avaliacao_item.id }}').attr('style', '');
+                $('#msg_data_referencia').attr('style', 'display:none');
+            }
+        }
+
+        function submit_form(url){
+            if(pode_submeter){
+                var form = $('#form_avaliacao_item');
+                form.attr('action', url);
+                form.submit()
+            }
+        }
+
+        function calcula_nota_validada(field_qtd, arquivo_id, pontos) {
+            var pontosFloat = parseFloat(pontos.replace(',', '.'));
+            var quantidade = parseFloat(field_qtd.value);
+            var nota = (quantidade * pontosFloat).toFixed(2);
+            $("#classe_pontuacao_validada_" + arquivo_id).html(nota);
+        }
+    </script>
+    <style>
+        .iframe-pdf {
+            float: left;
+            width: 70%;
+            padding-right: 5px;
+        }
+        .dados {
+            float: right;
+            width: 30%;
+        }
+        .display-block {
+            display: block;
+        }
+        .display-none {
+            display: none;
+        }
+        .text-center {
+            text-align: center;
+        }
+        .clear-both {
+            clear: both;
+        }
+        .padding-bottom-1px {
+            padding-bottom: 1px;
+        }
+        .height-100px {
+            height: 100px;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+<form id="form_avaliacao_item" method="post">
+    <ul class="action-bar">
+        <li><a href="javascript:;" onclick="history.back()" class="btn primary">Item Anterior</a></li>
+        <li><a href="javascript:;" onclick="submit_form('/professor_titular/salvar_avaliacao/{{ avaliacao_item.id }}/')" class="btn success">Salvar</a></li>
+        <li><a href="javascript:;" onclick="submit_form('/professor_titular/salvar_avancar_proximo/{{ avaliacao_item.id }}/')" class="btn success no-confirm">Salvar e Avançar</a></li>
+        <li><a href="javascript:;" onclick="submit_form('/professor_titular/pular_item/{{ avaliacao_item.id }}/')" class="btn primary">Pular Item</a></li>
+    </ul>
+    <br class="clear-both"/>
+    <h3>ID: {{ avaliacao_item.id }} - {{ criterio.nome }}</h3>
+
+    {% if criterio.descricao %}
+    <p class="alert alert-info">{{ criterio.descricao|format }}</p>
+    {% endif %}
+
+    <div id="iframe" class="iframe-pdf">
+        <iframe src="/professor_titular/visualizar_arquivo_pdf/{{ avaliacao_item.arquivo.encrypted_pk }}" width="100%" height="500"  allow="fullscreen"></iframe>
+    </div>
+    <div class="dados">
+
+        {% csrf_token %}
+        <table>
+            <caption>ITEM EM AVALIAÇÃO</caption>
+            <tr>
+                <th>Informação</th>
+                <th>Solicitado</th>
+                <th>Avaliado</th>
+            </tr>
+            <tr>
+                <td><strong>Data referência</strong></td>
+                <td>{{ avaliacao_item.arquivo.data_referencia|format }}</td>
+                <td>
+                    <input type="text"{% if avaliacao_item.qtd_itens_validado == 0 %} style="display: none"{% endif %} class="br-data-widget" id="data_referencia_validada_{{ avaliacao_item.id }}" name="data_referencia_validada_{{ avaliacao_item.id }}" value="{{ avaliacao_item.data_referencia|default_if_none:avaliacao_item.arquivo.data_referencia|format }}" onchange="auto_save({{ avaliacao_item.id }});">
+                    <span id="msg_data_referencia" class="alert alert-warning {% if avaliacao_item.qtd_itens_validado == 0 %} display-block {% else %} display-none {% endif %}">Não necessário</span>
+                </td>
+            </tr>
+            <tr>
+                <td><strong>Qtd. Itens:</strong></td>
+                <td>{{ avaliacao_item.arquivo.qtd_itens }}</td>
+                <td><input type="text" style="width: 100px" class="integer-widget" onkeyup="calcula_nota_validada(this,{{ avaliacao_item.arquivo.id }},'{{ avaliacao_item.arquivo.criterio.pontos }}')" size="6" name="qtd_itens_validado_{{ avaliacao_item.id }}" id="qtd_itens_validado_{{ avaliacao_item.id }}" value="{{ avaliacao_item.qtd_itens_validado|default_if_none:avaliacao_item.arquivo.qtd_itens }}"  onchange="auto_save({{ avaliacao_item.id }});"></td>
+            </tr>
+            <tr>
+                <td><strong>Métrica:</strong></td>
+                <td colspan="2" class="text-center">{{ avaliacao_item.arquivo.criterio.pontos }} ponto(s) / {{ avaliacao_item.arquivo.criterio.unidade }}</td>
+            </tr>
+            <tr>
+                <td><strong>Pontuação:</strong></td>
+                <td>{{ avaliacao_item.arquivo.nota_pretendida }}</td>
+                <td>
+                    <span id="classe_pontuacao_validada_{{ avaliacao_item.arquivo.id }}">{{ avaliacao_item.arquivo.nota_pretendida }}</span>
+                    <script>
+                        // forçando o recalculo da pontuação
+                        var qtd_item_field = $("#qtd_itens_validado_{{ avaliacao_item.id }}")
+                        if (qtd_item_field){
+                            calcula_nota_validada(qtd_item_field[0], {{ avaliacao_item.arquivo.id }},'{{ avaliacao_item.arquivo.criterio.pontos }}')
+                        }
+                    </script>
+                </td>
+            </tr>
+        </table>
+    </div>
+    <div class="dados">
+            <div class="padding-bottom-1px">
+                <fieldset>
+                    <div class="form-row">
+                        <div class="field-box">
+                            <label>Justificativa da Avaliação (se necessário):</label>
+                            <textarea id="justificativa_avaliacao_{{ avaliacao_item.id }}" name="justificativa_avaliacao_{{ avaliacao_item.id }}" class="boxsizingBorder height-100px" rows="3" cols="20"  onchange="auto_save({{ avaliacao_item.id }});">{{ avaliacao_item.justificativa|default_if_none:'' }}</textarea>
+                        </div>
+                    </div>
+                </fieldset>
+            </div>
+            <br class="clear-both"/>
+        </form>
+    </div>
+    <div class="clear-both">
+        <p><strong>Descrição do Arquivo:</strong></p><p>{{ avaliacao_item.arquivo.descricao|linebreaks }}</p>
+    </div>
+{% endblock %}

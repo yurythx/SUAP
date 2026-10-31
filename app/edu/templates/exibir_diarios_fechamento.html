@@ -1,0 +1,127 @@
+{% extends super_template %}
+
+{% block content %}
+    {% if diarios.exists %}
+        <table>
+            <thead>
+            <tr>
+                <th>Diário</th>
+                <th>Dados do diário</th>
+                <th>Faltas</th>
+                {% if matricula_periodo.aluno.matriz.estrutura.is_lancamento_conceito %}
+                    <th>Conceito</th>
+                {% else %}
+                    <th>Notas</th>
+                {% endif %}
+                <th>Situação</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr>
+                {% for matricula_diario in diarios %}
+                    <td>
+                        <a href="/edu/diario/{{ matricula_diario.diario.pk }}/?tab=notas_faltas"
+                           target="_blank">{{ matricula_diario.diario.pk }}</a>
+                    </td>
+                    <td>
+                        <dl>
+                            <dt>Componente:</dt>
+                            <dd><a href="/edu/diario/{{ matricula_diario.diario.pk }}/?tab=notas_faltas"
+                                   target="_blank">{{ matricula_diario.diario }}</a></dd>
+                            {% if matricula_periodo.aluno.matriz.is_regime_modular %}
+                            <dt>Módulo:</dt>
+                            <dd>{{ matricula_diario.diario.componente_curricular.get_modulo }}</dd>
+                            {% endif %}
+                            <dt>Professor Principal:</dt>
+                            <dd>{{ matricula_diario.diario.get_professor_principal.professor|format }}</dd>
+                            <dt>Carga Horária Mínima:</dt>
+                            <dd>{{ matricula_diario.diario.percentual_minimo_ch }}%
+                                ({{ matricula_diario.diario.get_carga_horaria_minima }} aulas)
+                            </dd>
+                            <dt>Aulas Ministradas:</dt>
+                            <dd>{{ matricula_diario.diario.get_carga_horaria_cumprida }}
+                                de {{ matricula_diario.diario.get_carga_horaria }} aulas
+                            </dd>
+                            <dt>Posse:</dt>
+                            {% if matricula_diario.diario.em_posse_do_registro %}
+                                <dd><span class="status status-success">Registro</span></dd>
+                            {% else %}
+                                <dd><span class="status status-alert">Professor</span></dd>
+                            {% endif %}
+                            <dt>Percentual de Carga Horária Cumprida:</dt>
+                            <dd>
+                                <div class="progress">
+                                    <p>{{ matricula_diario.diario.get_percentual_carga_horaria_cumprida }}%</p>
+                                </div>
+                            </dd>
+                        </dl>
+
+                    </td>
+
+                    <td>
+                        <dl>
+                            <dt>F1:</dt>
+                            <dd>{{ matricula_diario.get_numero_faltas_primeira_etapa }} falta(s)</dd>
+                            {% if matricula_diario.diario.componente_curricular.qtd_avaliacoes > 1 %}
+                                <dt>F2:</dt>
+                                <dd>{{ matricula_diario.get_numero_faltas_segunda_etapa }} falta(s)</dd>
+                            {% endif %}
+                            {% if matricula_diario.diario.componente_curricular.qtd_avaliacoes > 2 %}
+                                <dt>F3:</dt>
+                                <dd>{{ matricula_diario.get_numero_faltas_terceira_etapa }} falta(s)</dd>
+                            {% endif %}
+                            {% if matricula_diario.diario.componente_curricular.qtd_avaliacoes > 3 %}
+                                <dt>F4:</dt>
+                                <dd>{{ matricula_diario.get_numero_faltas_quarta_etapa }} falta(s)</dd>
+                            {% endif %}
+                            <dt>Percentual de frequência:</dt>
+                            <dd>{{ matricula_diario.get_percentual_carga_horaria_frequentada|format }}%</dd>
+                        </dl>
+                    </td>
+                    <td>
+                        {% if matricula_periodo.aluno.matriz.estrutura.is_lancamento_conceito %}
+                            {{ matricula_diario.get_media_final_disciplina_exibicao }}
+                        {% else %}
+                            <dl>
+                                {% if matricula_diario.diario.componente_curricular.qtd_avaliacoes > 0 %}
+                                    <dt>N1:</dt>
+                                    <dd>{{ matricula_diario.nota_1|formatar_nota }}</dd>
+                                {% endif %}
+                                {% if matricula_diario.diario.componente_curricular.qtd_avaliacoes > 1 %}
+                                    <dt>N2:</dt>
+                                    <dd>{{ matricula_diario.nota_2|formatar_nota }}</dd>
+                                {% endif %}
+                                {% if matricula_diario.diario.componente_curricular.qtd_avaliacoes > 2 %}
+                                    <dt>N3:</dt>
+                                    <dd>{{ matricula_diario.nota_3|formatar_nota }}</dd>
+                                {% endif %}
+                                {% if matricula_diario.diario.componente_curricular.qtd_avaliacoes > 3 %}
+                                    <dt>N4:</dt>
+                                    <dd>{{ matricula_diario.nota_4|formatar_nota }}</dd>
+                                {% endif %}
+                                <dt>MD:</dt>
+                                <dd>{{ matricula_diario.get_media_disciplina|formatar_nota }}</dd>
+                                <dt>MAF:</dt>
+                                <dd>{{ matricula_diario.nota_final|formatar_nota }}</dd>
+                                <dt>MFD:</dt>
+                                <dd>{{ matricula_diario.get_media_final_disciplina|formatar_nota }}</dd>
+                            </dl>
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if not form.cleaned_data.forcar_fechamento %}
+                            <span class="status status-{{ matricula_diario.get_situacao_diario.status }}">{{ matricula_diario.get_situacao_diario.rotulo }}</span>
+                        {% else %}
+                            <span class="status status-{{ matricula_diario.get_situacao_forcada_diario.status }}">{{ matricula_diario.get_situacao_forcada_diario.rotulo }}</span>
+                        {% endif %}
+                    </td>
+                    </tr>
+
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="alert alert-warning">O aluno não está matriculado em nenhum diário neste período.</p>
+    {% endif %}
+{% endblock %}

@@ -1,0 +1,127 @@
+{% if itens_nada_consta.exists %}
+
+    <p class="alert alert-info">
+        Antes de realizar procedimentos de matrícula (trancamento, cancelamento etc.), é necessário que todos os registros de Nada Consta para o procedimento estejam quitados.
+    </p>
+
+    {% box 'Nada Consta Exigidos' %}
+
+        <ul class="action-bar">
+            {% if pode_solicitar_nada_consta %}
+                <li><a class="btn success popup" href="/edu/solicitar_quitacao_nada_consta/{{ obj.pk }}/">Solicitar quitação de todos</a></li>
+            {% endif %}
+            {% if obj.pode_gerar_declaracao_nada_consta %}
+                <li><a href="/edu/declaracao_nada_consta/{{ obj.pk }}" class="btn">Gerar Declaração de Nada Consta</a></li>
+            {% endif %}
+        </ul>
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <th>Nada Consta</th>
+                    <th>Procedimento</th>
+                    <th>Situação</th>
+                    <th class="no-print">Opções</th>
+                </thead>
+                <tbody>
+                    {% for item in itens_nada_consta %}
+                        {% with nadaconsta=item|method:"get_nada_consta_aluno"|call:obj.id %}
+                            <tr>
+                                <td>{{ item.tipo_nada_consta }}</td>
+                                <td>{{ item.get_exigencias|format }}</td>
+                                <td>{{ nadaconsta.get_situacao }}</td>
+                                <td class="no-print">
+                                    <ul class="action-bar">
+                                        {% if nadaconsta.pode_solicitar and pode_solicitar_nada_consta %}
+                                            <li><a class="btn success popup" href="/edu/solicitar_quitacao_nada_consta/{{ obj.pk }}/?item={{ item.pk }}">Solicitar quitação</a></li>
+                                        {% endif %}
+                                        {% if nadaconsta|method:"pode_revogar"|call:request.user %}
+                                            <li><a href="/edu/revogar_registro_nada_consta/{{ nadaconsta.pk }}" class="btn warning popup">Revogar Avaliação</a></li>
+                                        {% endif %}
+                                        {% if nadaconsta|method:"pode_avaliar"|call:request.user %}
+                                            <li><a href="/edu/avaliar_registro_nada_consta/{{ nadaconsta.pk }}/" class="btn success popup">Avaliar</a></li>
+                                        {% endif %}
+                                        {% if nadaconsta.pode_gerar_declaracao %}
+                                            <li><a href="/edu/declaracao_item_nada_consta/{{ nadaconsta.pk }}/" class="btn">Gerar Declaração</a></li>
+                                        {% endif %}
+                                    </ul>
+                                </td>
+                            </tr>
+                        {% endwith %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endbox %}
+    {% box 'Solicitações de Nada Consta' %}
+        {% if nada_consta_andamento %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Nada Consta</th>
+                        <th>Solicitação</th>
+                        <th>Avaliação</th>
+                        <th>Revogação</th>
+                        <th>Situação</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for registro in nada_consta_andamento %}
+                        <tr>
+                            <td>{{ registro.tipo }}</td>
+                            <td>{{ registro.data_solicitacao|format }}</td>
+                            <td>
+                                {% if registro.data_avaliacao %}
+                                    {% if registro.justificativa_avaliacao %}
+                                        <p>{{ registro.justificativa_avaliacao|format }}</p>
+                                    {% else %}
+                                        <p>Declaramos para os devidos fins que o solicitante não possui pendências nesse setor.</p>
+                                    {% endif %}
+                                    Avaliado por {{ registro.resposavel_avaliacao|format }} em {{ registro.data_avaliacao|format }}. Válido até {{ registro.data_validade|format }}.
+                                {% else %}
+                                    {% if registro.valido %}
+                                        {% if registro.is_avaliacao_no_prazo %}
+                                            <p>Aguardando avaliação até {{ registro.prazo_avaliacao }}.</p>
+                                        {% else %}
+                                            <p class="alert alert-danger">Avaliação atrasada desde {{ registro.prazo_avaliacao }}.</p>
+                                        {% endif %}
+                                    {% endif %}
+                                    <p><strong>Responsáveis</strong>: {{ registro.item_configuracao.get_responsaveis }}</strong></p>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if registro.data_revogacao %}
+                                    {% if registro.justificativa_revogacao %}
+                                        <p><i>Justificativa:</i> {{ registro.justificativa_revogacao|format }}</p>
+                                    {% endif %}
+                                    Revogado {% if registro.resposavel_revogacao %}por {{ registro.resposavel_revogacao|format }} {% endif %}em {{ registro.data_revogacao|format }}.
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if registro.data_revogacao %}
+                                    <span class="status status-error">Revogado</span>
+                                {% elif registro.is_expirado %}
+                                    <span class="status status-error">Expirado</span>
+                                {% else %}
+                                    {% if registro.quitado is None %}
+                                        <span class="status status-alert">Aguardando Avaliação</span>
+                                    {% else %}
+                                        {% if registro.quitado %}
+                                            <span class="status status-success">Deferido</span>
+                                        {% else %}
+                                            <span class="status status-error">Indeferido</span>
+                                        {% endif %}
+                                    {% endif %}
+                                {% endif %}
+                            </td>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Nenhum nada consta solicitado.</p>
+        {% endif %}
+    {% endbox %}
+{% else %}
+    <p class="alert alert-warning">Este curso não possui configuração de nada consta cadastrada.</p>
+{% endif %}

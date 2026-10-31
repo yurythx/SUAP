@@ -1,0 +1,281 @@
+    {% if obj.matriz.estrutura.exibe_frequencia_global %}
+        <p class="alert alert-info"><strong>Atenção:</strong> Este curso utiliza a frequência global por período.</p>
+    {% endif %}
+    {% for tipo, componentes in historico.grupos_componentes.items %}
+        {% box tipo %}
+            {% if forloop.first and pode_realizar_procedimentos %}
+                <ul class="action-bar">
+                    {% if is_matriculado or is_matricula_vinculo %}
+                        {% if obj|method:"pode_gerenciar_mobilidade_academica"|call:request.user %}
+                            <li><a class="btn popup" href="/edu/adicionar_registro_historico_mobilidade_academica/{{ obj.pk }}/">Adicionar Registro de Mobilidade Acadêmica</a></li>
+                        {% endif %}
+                        {% if obj|method:"pode_adicionar_registro_historico"|call:request.user %}
+                            <li><a class="btn popup" href="/edu/adicionar_registro_historico/{{ obj.pk }}/">Adicionar Registro de Histórico</a></li>
+                        {% endif %}
+                        {% if obj.matriz.estrutura %}
+                            <li><a class="btn" href="?tab=historico&reprocessar_historico=1">Reprocessar Histórico</a></li>
+                        {% endif %}
+                    {% endif %}
+                    {% if not request.GET.optativas %}
+                        <li><a class="btn" href="?tab=historico&optativas=1">Mostrar Componentes Optativos</a></li>
+                    {% else %}
+                        <li><a class="btn" href="?tab=historico">Esconder Componentes Optativos</a></li>
+                    {% endif %}
+                </ul>
+            {% endif %}
+            {% if componentes %}
+                <div class="table-responsive">
+                <table>
+                    <thead>
+                    <tr>
+                        <th rowspan="2" class="text-center">
+                            {% if request.GET.order_by == 'periodo_letivo' %}
+                                <div class="sortoptions">
+                                    <a href="?tab=historico&order_by=periodo_letivo" class="toggle descending"
+                                    title="Alternar ordenação"></a>
+                                </div>
+                            {% endif %}
+                            <div class="text">
+                                <a href="?tab=historico&order_by=periodo_letivo">Ano Letivo</a>
+                            </div>
+                        </th>
+                        <th rowspan="2" class="text-center">
+                            {% if request.GET.order_by == 'periodo_matriz' %}
+                                <div class="sortoptions">
+                                    <a href="?tab=historico&order_by=periodo_matriz" class="toggle descending" title="Alternar ordenação"></a>
+                                </div>
+                            {% endif %}
+                            <div class="text">
+                                <a href="?tab=historico&order_by=periodo_matriz">Período do Curso</a>
+                            </div>
+                        </th>
+                        <th colspan="6" class="text-center">Componentes</th>
+                        <th rowspan="2" class="text-center">C.H.</th>
+
+                        <th rowspan="2" class="text-center">{% if not is_lancamento_conceito %}Nota/<br/>{% endif %}Conceito</th>
+                        <th rowspan="2" class="text-center">% Freq.</th>
+                        <th rowspan="2" class="text-center">Situação</th>
+                        {% if pode_realizar_procedimentos or pode_editar_titulacao_diario_resumido and not tipo == 'Componentes Extracurriculares' %}
+                            <th rowspan="2" class="text-center">Ações</th>
+                        {% endif %}
+                    </tr>
+                    <tr>
+                        <th colspan="2" class="text-center">Diário</th>
+                        <th>
+                            {% if request.GET.order_by == 'componente' %}
+                                <div class="sortoptions">
+                                    <a href="?tab=historico&order_by=componente" class="toggle descending"
+                                    title="Alternar ordenação"></a>
+                                </div>
+                            {% endif %}
+                            <div class="text text-center">
+                                <a href="?tab=historico&order_by=componente">Código</a>
+                            </div>
+                        </th>
+                        <th colspan="3">Descrição</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for componente_curricular in componentes %}
+                        <tr>
+                            <td class="text-center">{{ componente_curricular.ano_periodo_letivo|format }}</td>
+                            <td class="text-center">{{ componente_curricular.periodo_matriz|format }}</td>
+                            <td colspan="2" class="text-center">
+                                {% if componente_curricular.matricula_diario %}
+                                    <a href="/edu/diario/{{ componente_curricular.codigo_diario }}/">
+                                        {{ componente_curricular.codigo_diario|format }}
+                                    </a>
+                                {% else %}
+                                    {{ componente_curricular.codigo_diario|format }}
+                                {% endif %}
+                            </td>
+                            <td class="text-center">{{ componente_curricular.sigla_componente|format }}</td>
+                            <td colspan="3">
+                                {{ componente_curricular.descricao_componente|format }}
+                                <ul>
+                                {% for _, _, nome_professor, titulacao_professor in componente_curricular.professores %}
+                                    <li>
+                                        {{ nome_professor }}
+                                        (<i>
+                                            {% if titulacao_professor %}
+                                                {{ titulacao_professor }}
+                                            {% else %}
+                                                <span class="false">Sem titulação</span>
+                                            {% endif %}
+                                        </i>)
+                                    </li>
+                                {% endfor %}
+                                </ul>
+                            </td>
+                            <td class="text-center">{{ componente_curricular.carga_horaria|format }}</td>
+                            <td class="text-center">{{ componente_curricular.media_final_disciplina|format }}</td>
+                            <td class="text-center text-nowrap">
+                                {% if componente_curricular.percentual_carga_horaria_frequentada|default_if_none:"" %}
+                                    {{ componente_curricular.percentual_carga_horaria_frequentada|format }}%{% else %}
+                                    -{% endif %}</td>
+                            <td class="text-center" title="{{ componente_curricular.situacao_legend }}">
+                                {{ componente_curricular.situacao_display|format }}
+                            </td>
+                            {% if pode_realizar_procedimentos or pode_editar_titulacao_diario_resumido and not tipo == 'Componentes Extracurriculares' %}
+                                <td>
+                                    {% if obj.situacao.ativo %}
+                                    <ul class="action-bar inner-action-bar">
+                                        <li class="has-child">
+                                            <a class="btn" href="#">Ações</a>
+                                            <ul>
+                                                {% if componente_curricular.matricula_diario_resumida and perms.edu.add_matriz %}
+                                                    <li><a class="popup" href="/edu/editar_matricula_diario_resumida/{{ componente_curricular.matricula_diario_resumida.pk }}/">Editar</a></li>
+                                                    <li><a class="danger no-confirm popup" href="/comum/excluir/edu/matriculadiarioresumida/{{ componente_curricular.matricula_diario_resumida.pk }}/">Remover</a></li>
+                                                {% endif %}
+
+                                                {% if componente_curricular.gerenciavel and componente_curricular.registro_historico|method:"pode_gerenciar_mobilidade_academica"|call:request.user %}
+                                                    <li><a class="popup" href="/edu/editar_registro_historico_mobilidade_academica/{{ componente_curricular.registro_historico.pk }}/">Editar</a></li>
+                                                {% elif componente_curricular.registro_historico and obj|method:"pode_editar_registro_historico"|call:request.user %}
+                                                    <li><a class="popup" href="/edu/editar_registro_historico/{{ componente_curricular.registro_historico.pk }}/">Editar</a></li>
+                                                {% endif %}
+
+                                                {% if componente_curricular.gerenciavel and obj|method:"pode_excluir_registro_historico"|call:request.user %}
+                                                    <li><a class="danger no-confirm popup" href="/comum/excluir/edu/registrohistorico/{{ componente_curricular.registro_historico.pk }}/">Remover</a></li>
+                                                {% endif %}
+
+                                                {% if componente_curricular.certificada %}
+                                                    <li><a class="popup" href="/edu/visualizar_certificacao/{{ obj.pk }}/{{ componente_curricular.pk }}/">Visualizar Certificação</a></li>
+                                                    <li><a class="popup" href="/edu/certificar_conhecimento/{{ obj.pk }}/{{ componente_curricular.pk }}/">Editar Certificação</a></li>
+                                                    <li><a class="danger no-confirm popup" href="/comum/excluir/edu/certificacaoconhecimento/{{ componente_curricular.certificada }}/">Cancelar Certificação</a></li>
+                                                {% else %}
+                                                    {% if componente_curricular.aproveitada %}
+                                                        <li><a class="popup" href="/edu/visualizar_aproveitamento/{{ obj.pk }}/{{ componente_curricular.pk }}/">Visualizar Aproveitamento</a></li>
+                                                        <li><a class="popup" href="/edu/aproveitar_estudo/{{ obj.pk }}/{{ componente_curricular.pk }}/">Editar Aproveitamento</a></li>
+                                                        <li><a class="danger no-confirm popup" href="/comum/excluir/edu/aproveitamentoestudo/{{ componente_curricular.aproveitada }}/">Cancelar Aproveitamento</a></li>
+                                                    {% else %}
+                                                        {% if componente_curricular.equivalente %}
+
+                                                            <li><a class="popup"
+                                                                href="/edu/visualizar_equivalencia/{{ obj.pk }}/{{ componente_curricular.pk }}/">Visualizar
+                                                                Equivalência</a></li>
+                                                            <li><a class="danger no-confirm popup"
+                                                                href="/comum/excluir/edu/aproveitamentocomponente/{{ componente_curricular.equivalente }}/">Cancelar
+                                                                Equivalência</a></li>
+
+                                                        {% else %}
+                                                            {% if componente_curricular.certificavel %}
+
+                                                                <li><a class="popup"
+                                                                    href="/edu/aproveitar_estudo/{{ obj.pk }}/{{ componente_curricular.pk }}/">Registrar Aproveitamento de Estudo</a></li>
+                                                                <li><a class="popup"
+                                                                    href="/edu/certificar_conhecimento/{{ obj.pk }}/{{ componente_curricular.pk }}/">Registrar Certificação do Conhecimento</a></li>
+                                                            {% endif %}
+                                                        {% endif %}
+                                                    {% endif %}
+                                                {% endif %}
+
+                                                {% if not componente_curricular.situacao_display %}
+                                                    <li><a class="popup"
+                                                        href="/edu/aproveitar_componente/{{ obj.pk }}/{{ componente_curricular.pk }}/">Registrar
+                                                        Equivalência</a></li>
+                                                {% endif %}
+
+                                                {% if componente_curricular.matricula_diario.situacao == 7 %}
+                                                    <li>
+                                                        <a href="/edu/desfazer_cancelamento_matricula_diario/{{ componente_curricular.matricula_diario.pk }}/"
+                                                        {% if obj.atingiu_qtd_max_disciplinas %}
+                                                            class="confirm"
+                                                            data-confirm="A revogação do cancelamento excede o número máximo de disciplinas permitidas para o período de referência. Tem certeza que deseja continuar?"
+                                                        {% elif obj|method:"atingiu_ch_max_disciplinas"|call:componente_curricular.carga_horaria %}
+                                                            class="confirm"
+                                                            data-confirm="A revogação do cancelamento excede a carga horária máxima de disciplinas permitidas para o período. Tem certeza que deseja continuar?"
+                                                        {% endif %}>
+                                                            Desfazer Cancelamento de Matrícula no Diário
+                                                        </a>
+                                                    </li>
+                                                {% else %}
+                                                    {% if componente_curricular.pertence_ao_plano_retomada or componente_curricular.matricula_diario.situacao == 1 and obj.matriz.estrutura.tipo_avaliacao == 1 %}
+                                                        {% if componente_curricular.pertence_ao_plano_retomada or not componente_curricular.periodo_matriz or componente_curricular.periodo_matriz > 1 %}
+                                                            <li>
+                                                                <a href="/edu/cancelar_matricula_diario/{{ componente_curricular.matricula_diario.pk }}/">Cancelar
+                                                                    Matrícula em Diário</a></li>
+                                                        {% endif %}
+                                                    {% endif %}
+                                                {% endif %}
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                    {% else %}
+                                        {% if componente_curricular.matricula_diario_resumida and perms.edu.change_matriculadiarioresumida %}
+                                            <ul class="action-bar">
+                                                <li><a class="btn popup" href="/edu/editar_matricula_diario_resumida/{{ componente_curricular.matricula_diario_resumida.pk }}/">Editar Professor</a></li>
+                                            </ul>
+                                        {% endif %}
+                                    {% endif %}
+                                </td>
+                            {% endif %}
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                </div>
+            {% else %}
+                <p class="alert alert-warning">Nenhum registro encontrado.</p>
+            {% endif %}
+        {% endbox %}
+    {% endfor %}
+
+    {% if obj.matriz.configuracao_creditos_especiais %}
+        {% box "Créditos Especiais" %}
+            <ul class="action-bar">
+                <li><a class="btn popup success" href="/edu/lancar_credito_especial/{{ obj.pk }}/">Lançar Crédito Especial</a></li>
+            </ul>
+            {% if obj.get_creditos_especiais.exists %}
+                <div class="table-responsive">
+                <table>
+                    <thead>
+                    <tr>
+                        <th class="text-center">Ano/Período Letivo</th>
+                        <th>Atividade Acadêmica</th>
+                        <th class="text-center">Quantidade de Créditos</th>
+                        <th>Ações</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for credito_especial in obj.get_creditos_especiais %}
+                        <tr>
+                            <td class="text-center">{{ credito_especial.matricula_periodo.ano_letivo.ano }}/{{ credito_especial.matricula_periodo.periodo_letivo }}</td>
+                            <td>{{ credito_especial.item_configuracao_creditos_especiais.atividade_academica }}</td>
+                            <td class="text-center">{{ credito_especial.item_configuracao_creditos_especiais.equivalencia_creditos }}</td>
+                            {% if pode_realizar_procedimentos %}
+                                <td>
+                                    <ul class="action-bar inner-action-bar">
+                                        <li class="has-child">
+                                            <a class="btn" href="#">Ações</a>
+                                            <ul>
+                                                <li><a class="popup"
+                                                       href="/edu/lancar_credito_especial/{{ obj.pk }}/{{ credito_especial.pk }}/">Editar</a>
+                                                </li>
+                                                <li><a class="danger no-confirm popup"
+                                                       href="/comum/excluir/edu/creditoespecial/{{ credito_especial.pk }}/">Excluir</a>
+                                                </li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                </td>
+                            {% endif %}
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                </div>
+            {% else %}
+                <p class="alert alert-warning">Nenhum crédito especial foi lançado até o momento.</p>
+            {% endif %}
+        {% endbox %}
+    {% endif %}
+
+    {% if historico.observacoes %}
+        {% box "Observações" %}
+            <ul>
+                {% for obs in historico.observacoes %}
+                    <li>{{ obs }}</li>
+                {% endfor %}
+            </ul>
+        {% endbox %}
+    {% endif %}

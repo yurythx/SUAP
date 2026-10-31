@@ -1,0 +1,312 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block extracss %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static 'dados_abertos/css/formularios.css' %}">
+{% endblock %}
+
+{% block object-status %}
+<ul class="steps">
+    {% for bloco in etapas_data %}
+    <li aria-label="Passo {{ bloco.etapa.ordem }} - {{ bloco.etapa.titulo }}" class="hint hint-bottom"><span class="step-info{% if pda.etapa_atual.titulo == bloco.etapa.titulo %} active{% endif %}">{{ bloco.etapa.titulo }}</span></li>
+    {% endfor %}
+
+    {% if pda.fluxo_obrigatorio_concluido %}
+    <li aria-label="Todas as etapas obrigatórias concluídas" class="hint hint-bottom"><span class="step-info active">Concluído</span></li>
+    {% else %}
+    <li aria-label="Conclusão do PDA" class="hint hint-bottom"><span class="step-info">Concluído</span></li>
+    {% endif %}
+</ul>
+{% endblock %}
+
+{% block content %}
+<section class="section dashboard">
+  <!-- Intro + indicador geral -->
+  <div class="row mb-4">
+    <div class="col-lg-12">
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>PDA</dt>
+                <dd>
+                    <select id="js-pda-select" class="form-select" aria-label="Selecionar PDA">
+                        {% for item in pdas %}
+                            <option value="{% url 'dados_abertos:dashboard' item.id %}" {% if item.id == pda.id %}selected{% endif %}>
+                                {{ item.titulo }} ({{ item.vigencia_inicio.year }} - {{ item.vigencia_fim.year }})
+                            </option>
+                        {% endfor %}
+                    </select>
+                </dd>
+            </div>
+            <div class="list-item">
+                <dt>Vigência</dt>
+                <dd>{{ pda.vigencia }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Etapa Atual</dt>
+                <dd>
+                    {% if pda.fluxo_obrigatorio_concluido %}
+                        <span class="status status-success"><strong>Concluído</strong></span>
+                    {% else %}
+                        <span class="status status-info"><strong>{{ pda.etapa_atual }}</strong></span>
+                    {% endif %}
+                </dd>
+            </div>
+            <div class="list-item">
+                <dt>Progresso Geral</dt>
+                <dd>
+                    <div class="progress">
+                        <div id="progresso-geral-bar" class="progress-bar fs-5" role="progressbar" style="width: {{ progresso_geral }}%;" aria-valuenow="{{ progresso_geral }}" aria-valuemin="0" aria-valuemax="100">{{ progresso_geral }}%</div>
+                    </div>
+                </dd>
+            </div>
+        </dl>
+    </div>
+  </div>
+
+  <div class="tab-content">
+    <!-- Etapas -->
+    <div class="tab-pane fade" id="etapa-tab-pane" data-title="Etapas">
+        {% for bloco in etapas_data %}
+        {% with etapa=bloco.etapa acoes_pda=bloco.acoes_pda progresso=bloco.progresso status=bloco.status %}
+        <div class="col-12">
+
+            <div class="general-box">
+                <div class="primary-info">
+                    <div class="status-info-container">
+                        {% if status == 'pulada' %}
+                            <span class="status status-neutro me-2">Etapa dispensada</span>
+                        {% elif status == 'atual' %}
+                            <span class="status status-info">Etapa atual</span>
+                        {% elif status == 'concluida' %}
+                            <span class="status status-success me-2">Concluída</span>
+                        {% elif status == 'bloqueada' %}
+                            <span class="status status-default me-2">Aguardando etapas anteriores</span>
+                        {% endif %}
+                    </div>
+                    <h4 class="title">
+                        <small>{{ etapa.ordem }}</small>
+                        <a href="#"><strong>{{ etapa.titulo }}</strong></a>
+                    </h4>
+                    {% if not usuario_pode_pular_etapa %}
+                    {% elif bloco.pulada %}
+                    <ul class="action-bar">
+                        <li><a href="#" class="btn primary js-reativar-etapa" data-pda="{{ pda.id }}" data-etapa="{{ etapa.id }}">Reativar etapa</a></li>
+                    </ul>
+                    {% elif bloco.pulavel %}
+                    <ul class="action-bar">
+                        <li><a href="#" class="btn warning js-abrir-pular" data-alvo="pular-form-{{ etapa.id }}">Pular etapa</a></li>
+                    </ul>
+                    <div id="pular-form-{{ etapa.id }}" class="d-none mt-2">
+                        <label class="form-label" for="just-{{ etapa.id }}">Justificativa da dispensa</label>
+                        <textarea id="just-{{ etapa.id }}" class="form-control mb-2" rows="3" placeholder="Descreva por que esta etapa está sendo dispensada"></textarea>
+                        <ul class="action-bar">
+                            <li><a href="#" class="btn success js-confirmar-pular" data-pda="{{ pda.id }}" data-etapa="{{ etapa.id }}" data-just="just-{{ etapa.id }}">Confirmar dispensa</a></li>
+                            <li><a href="#" class="btn js-cancelar-pular" data-alvo="pular-form-{{ etapa.id }}">Cancelar</a></li>
+                        </ul>
+                    </div>
+                    {% endif %}
+                    <div class="extra-info">
+                        <p>{{ etapa.descricao }}</p>
+
+                        <div class="d-flex justify-content-between align-items-center mb-2 mt-4">
+                            <span class="small text-muted">Progresso da etapa</span>
+                            <span class="small"><strong id="progresso-etapa-label-{{ etapa.id }}">{{ progresso }}%</strong></span>
+                        </div>
+                        <div class="progress mb-4">
+                            <div id="progresso-etapa-bar-{{ etapa.id }}" class="progress-bar" role="progressbar" style="width: {{ progresso }}%;"
+                                aria-valuenow="{{ progresso }}" aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>
+
+                        <form>
+                            {% csrf_token %}
+                            <h4>Checklist</h4>
+                            <ul class="list-group list-group-flush">
+                            {% for pda_acao in acoes_pda %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <div class="form-check">
+                                    <input
+                                    class="form-check-input js-toggle-acao"
+                                    type="checkbox"
+                                    value="1"
+                                    id="acao-{{ pda_acao.acao.id }}"
+                                    data-pda="{{ pda.id }}"
+                                    data-acao="{{ pda_acao.acao.id }}"
+                                    {% if pda_acao.concluida %} checked {% endif %}
+                                    {% if not usuario_pode_marcar_acoes or status == 'bloqueada' or status == 'pulada' or pda_acao.acao.condicao_automatica %}
+                                        disabled
+                                    {% endif %}
+                                    >
+                                    <label class="form-check-label" for="acao-{{ pda_acao.acao.id }}">
+                                    {{ pda_acao.acao.titulo }}
+                                    {% if not pda_acao.acao.obrigatoria %}
+                                        <span class="badge bg-light text-muted ms-2">Opcional</span>
+                                    {% endif %}
+                                    </label>
+                                </div>
+                                <div class="d-flex flex-column align-items-end">
+                                    <div class="d-flex align-items-center gap-2">
+                                        {% if pda_acao.acao.condicao_automatica %}
+                                        <span class="status status-info" title="Marcada automaticamente pelo sistema: {{ pda_acao.acao.get_condicao_automatica_display }}">Automática</span>
+                                        {% endif %}
+                                        {% if pda_acao.concluida %}
+                                        <span class="status status-success">Concluída</span>
+                                        {% elif status == 'pulada' %}
+                                        <span class="status status-default">Dispensada</span>
+                                        {% else %}
+                                        <span class="status status-default">Pendente</span>
+                                        {% endif %}
+                                    </div>
+                                    {% if pda_acao.concluida and pda_acao.responsavel %}
+                                    <small class="text-muted">por {{ pda_acao.responsavel.get_short_name|default:pda_acao.responsavel.username }}</small>
+                                    {% endif %}
+                                </div>
+                                </li>
+                            {% empty %}
+                                <li class="list-group-item">
+                                <em>Não há ações cadastradas para esta etapa.</em>
+                                </li>
+                            {% endfor %}
+                            </ul>
+                        </form>
+
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+        {% endwith %}
+        {% endfor %}
+    </div>
+
+    <div class="tab-pane fade" id="plano-acao-tab-pane" data-title="Plano de Ação">
+        {% include "dadosabertos/plano_acao.html" %}
+    </div>
+
+    <div class="tab-pane fade" id="ckan-tab-pane" data-title="CKAN">
+        {% include "dadosabertos/ckan.html" %}
+    </div>
+
+  </div>
+
+</div>
+
+</section>
+{% endblock %}
+
+{% block extrascripts %}
+<script>
+    (function () {
+        const select = document.getElementById('js-pda-select');
+        if (!select) return;
+        select.addEventListener('change', function () {
+            const url = this.value;
+            window.location.href = url;
+        });
+    })();
+
+  // Pega o token CSRF do input hidden gerado pelo {% csrf_token %}
+  function getCsrfToken() {
+    const input = document.querySelector('[name="csrfmiddlewaretoken"]');
+    return input ? input.value : '';
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    const checkboxes = document.querySelectorAll('.js-toggle-acao');
+
+    checkboxes.forEach(function (cb) {
+      cb.addEventListener('change', function () {
+        const acaoId = this.dataset.acao;
+        const pdaId = this.dataset.pda;
+        const concluida = this.checked;
+        const csrftoken = getCsrfToken();
+
+        fetch(`/dados_abertos/${pdaId}/acao/${acaoId}/toggle/`, {
+          method: 'POST',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: new URLSearchParams({
+            'concluida': concluida.toString(),
+            'csrfmiddlewaretoken': csrftoken
+          })
+        })
+        .then(resp => {
+          if (!resp.ok) {
+            throw new Error('Erro HTTP ' + resp.status);
+          }
+          return resp.json();
+        })
+        .then(data => {
+          if (!data.ok) {
+            alert('Erro ao atualizar ação.');
+            cb.checked = !concluida;
+            return;
+          }
+
+          // Se quiser, pode tirar isso depois e atualizar só na mão
+          location.reload();
+        })
+        .catch(err => {
+          console.error(err);
+          alert('Erro ao comunicar com o servidor.');
+          cb.checked = !concluida;
+        });
+      });
+    });
+  });
+
+  // --- Pular / reativar etapa ---
+  function postAcaoEtapa(url, body) {
+    return fetch(url, {
+      method: 'POST',
+      headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams(Object.assign({ csrfmiddlewaretoken: getCsrfToken() }, body || {}))
+    }).then(function (resp) { return resp.json(); });
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.js-abrir-pular').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        var alvo = document.getElementById(this.dataset.alvo);
+        if (alvo) alvo.classList.remove('d-none');
+      });
+    });
+
+    document.querySelectorAll('.js-cancelar-pular').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        var alvo = document.getElementById(this.dataset.alvo);
+        if (alvo) alvo.classList.add('d-none');
+      });
+    });
+
+    document.querySelectorAll('.js-confirmar-pular').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        var pdaId = this.dataset.pda, etapaId = this.dataset.etapa;
+        var ta = document.getElementById(this.dataset.just);
+        var justificativa = ((ta && ta.value) || '').trim();
+        if (!justificativa) { alert('Informe a justificativa da dispensa.'); return; }
+        postAcaoEtapa('/dados_abertos/' + pdaId + '/etapa/' + etapaId + '/pular/', { justificativa: justificativa })
+          .then(function (d) { if (d.ok) { location.reload(); } else { alert(d.erro || 'Erro ao pular etapa.'); } })
+          .catch(function () { alert('Erro ao comunicar com o servidor.'); });
+      });
+    });
+
+    document.querySelectorAll('.js-reativar-etapa').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        if (!confirm('Reativar esta etapa? A dispensa será removida.')) return;
+        var pdaId = this.dataset.pda, etapaId = this.dataset.etapa;
+        postAcaoEtapa('/dados_abertos/' + pdaId + '/etapa/' + etapaId + '/reativar/', {})
+          .then(function (d) { if (d.ok) { location.reload(); } else { alert(d.erro || 'Erro ao reativar etapa.'); } })
+          .catch(function () { alert('Erro ao comunicar com o servidor.'); });
+      });
+    });
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,220 @@
+<div class="general-box {% if not participacao.ativo %}danger{% endif %}">
+    <div class="primary-info">
+        <div class="status-info-container">
+            {% if participacao.vinculo == "Bolsista" %}
+                <span class="status status-success">Bolsista</span>
+            {% else %}
+                <span class="status status-info">Não bolsista</span>
+            {% endif %}
+            {% if participacao.ativo %}<span class="status status-success">Ativo</span>{% else %}<span class="status status-error">Inativo</span>{% endif %}
+            {% if participacao.responsavel and edital_projeto.exige_termo_coordenador %}
+                {% if participacao.termo_aceito_em %}
+                    <span class="status status-success">Termo de Compromisso assinado em {{ participacao.termo_aceito_em }}</span>
+                {% else %}
+                    <span class="status status-error">Termo de Compromisso não assinado</span>
+                {% endif %}
+            {% elif participacao.is_servidor and edital_projeto.exige_termo_servidor %}
+                {% if participacao.termo_aceito_em %}
+                    <span class="status status-success">Termo de Compromisso assinado em {{ participacao.termo_aceito_em }}</span>
+                {% else %}
+                    <span class="status status-error">Termo de Compromisso não assinado</span>
+                {% endif %}
+            {% elif participacao.eh_aluno and edital_projeto.exige_termo_aluno %}
+                {% if participacao.termo_aceito_em and not participacao.atividade_integracao_curricular %}
+                    <span class="status status-success">Termo de Compromisso assinado em {{ participacao.termo_aceito_em }}</span>
+                {% elif not participacao.atividade_integracao_curricular %}
+                    <span class="status status-error">Termo de Compromisso não assinado</span>
+                {% endif %}
+            {% elif not participacao.is_servidor and not participacao.eh_aluno and edital_projeto.exige_termo_colaborador and not participacao.responsavel %}
+                {% if participacao.termo_aceito_em %}
+                    <span class="status status-success">Termo de Compromisso assinado em {{ participacao.termo_aceito_em }}</span>
+                {% else %}
+                    <span class="status status-error">Termo de Compromisso não assinado</span>
+                {% endif %}
+            {% endif %}
+        </div>
+        {% if participacao.responsavel and is_avaliador and status == projeto.STATUS_EM_SELECAO %}
+            <h4 class="title">Confidencial</h4>
+        {% else %}
+            <h4 class="title">{{ participacao.get_nome }} (<a href="{{ participacao.get_participante.get_absolute_url }}">{{ participacao.get_identificador }}</a>)</h4>
+        {% endif %}
+        <ul class="action-bar">
+            <li><a href="/projetos/historico_equipe/{{ participacao.id }}/" title="Visualizar" class="btn default popup">{% icone "eye" %}<span class="visually-hidden">Visualizar</span></a></li>
+            {% if pode_editar_inscricao_execucao and not eh_somente_leitura %}
+                {% if participacao.is_servidor and participacao.ativo %}
+                    <li><a href="/projetos/editar_participante_servidor/{{ projeto.pk }}/{{ participacao.id }}/" title="Editar" class="btn primary popup">{% icone "edit" %}<span class="visually-hidden">Editar</span></a></li>
+                {% elif participacao.eh_aluno and participacao.ativo %}
+                    <li><a href="/projetos/editar_participante_aluno/{{ projeto.pk }}/{{ participacao.id }}/" title="Editar" class="btn primary popup">{% icone "edit" %}<span class="visually-hidden">Editar</span></a></li>
+                {% elif participacao.ativo %}
+                    <li><a href="/projetos/editar_participante_colaborador/{{ projeto.pk }}/{{ participacao.id }}/" title="Editar" class="btn primary popup">{% icone "edit" %}<span class="visually-hidden">Editar</span></a></li>
+                {% endif %}
+            {% endif %}
+            {% if participacao.pode_remover_participacao %}
+                <li><a href="/projetos/deletar_participante/{{ participacao.id }}/" title="Excluir" class="btn danger" data-confirm="Caso o participante seja removido ele não fará jus a nenhum certificado de participação">{% icone "trash" %}<span class="visually-hidden">Excluir</span></a></li>
+            {% endif %}
+            {% if pode_editar_inscricao_execucao and not eh_somente_leitura %}
+                {% if participacao.eh_aluno and participacao.ativo %}
+                    {% if not participacao.orientador %}
+                        <li><a class="btn success popup" href="/projetos/indicar_orientador/{{ participacao.pk }}/">Indicar orientador</a></li>
+                    {% else %}
+                        <li><a class="btn primary popup" href="/projetos/indicar_orientador/{{ participacao.pk }}/">Editar orientador</a></li>
+                    {% endif %}
+                {% endif %}
+                {% if participacao.responsavel and eh_gerenciador_projeto %}
+                    <li><a class="btn primary popup" href="/projetos/alterar_coordenador/{{ projeto.pk }}/">Substituir coordenador</a></li>
+                {% elif not participacao.responsavel %}
+                    {% if participacao.ativo %}
+                        <li><a href="/projetos/remover_participante/{{ participacao.id }}/" class="btn danger">Encerrar participação</a></li>
+                    {% else %}
+                        <li><a href="/projetos/ativar_participante/{{ participacao.id }}/" class="btn success">Ativar participante</a></li>
+
+                    {% endif %}
+                {% endif %}
+            {% elif participacao.responsavel and not eh_somente_leitura and is_pre_avaliador %}
+                <li><a class="btn primary popup" href="/projetos/alterar_coordenador/{{ projeto.pk }}/">Substituir coordenador</a></li>
+            {% endif %}
+            {% if pode_editar_ch_extensao and not participacao.ativo and participacao.is_aluno_extensao %}
+                <li><a href="/projetos/editar_ch_extensao/{{ participacao.id }}/" class="btn primary">Editar CH total de atividade de extensão</a></li>
+            {% endif %}
+            {% if eh_gerenciador_projeto or is_gerente_sistemico %}
+                <li><a class="btn" href="/projetos/adicionar_anexo_do_projeto/{{ participacao.id }}/">Gerenciar anexos</a></li>
+            {% endif %}
+            {% if participacao.pode_emitir_declaracao_orientacao %}
+                <li><a href="/projetos/emitir_declaracao_orientacao_pdf/{{ participacao.pk }}/" class="btn default">Declaração de Orientação</a></li>
+            {% endif %}
+            {% if edital_exige_avaliacao_aluno and participacao.vinculo_pessoa and participacao.eh_aluno and participacao.pode_ver_avaliacoes or participacao.vinculo_pessoa and participacao.vinculo_pessoa == request.user.get_vinculo and participacao.eh_aluno %}
+                <li><a class="btn" href="/projetos/avaliacoes_aluno/{{ participacao.pk }}/">Avaliações do aluno</a></li>
+            {% endif %}
+            {% if participacao.pode_emitir_plano_de_trabalho and eh_interno %}
+                <li><a class="btn default popup" href="/projetos/ver_plano_trabalho/{{ projeto.id }}/{{ participacao.id }}/">Plano de Trabalho</a></li>
+            {% endif %}
+            {% if participacao.vinculo_pessoa and participacao.pode_emitir_declaracao_de_participacao %}
+                <li><a href="/projetos/emitir_declaracao_participacao_pdf/{{ participacao.id }}/" class="btn default">Declaração de Participação</a></li>
+            {% endif %}
+            {% if participacao.vinculo_pessoa and participacao.pode_emitir_certificado_de_participacao_extensao %}
+                <li><a class="btn default" href="/projetos/emitir_certificado_extensao_pdf/{{ participacao.pk }}/">Certificado de Participação</a></li>
+            {% endif %}
+            {% if eh_coordenador and participacao.vinculo_pessoa == vinculo and edital_projeto.exige_termo_coordenador and not participacao.termo_aceito_em %}
+                <li><a href="/projetos/aceitar_termo_compromisso/{{ participacao.pk }}/" class="btn success">Aceitar Termo de Compromisso</a></li>
+            {% elif participacao.is_servidor and not eh_coordenador and participacao.vinculo_pessoa == vinculo and edital_projeto.exige_termo_servidor and not participacao.termo_aceito_em %}
+                <li><a href="/projetos/aceitar_termo_compromisso/{{ participacao.pk }}/" class="btn success">Aceitar Termo de Compromisso</a></li>
+            {% elif participacao.eh_aluno and participacao.vinculo_pessoa == vinculo and edital_projeto.exige_termo_aluno and not participacao.termo_aceito_em %}
+                <li><a href="/projetos/aceitar_termo_compromisso/{{ participacao.pk }}/" class="btn success">Aceitar Termo de Compromisso</a></li>
+            {% elif not participacao.is_servidor and not participacao.eh_aluno and participacao.vinculo_pessoa == vinculo and edital_projeto.exige_termo_colaborador and not participacao.termo_aceito_em %}
+                <li><a href="/projetos/aceitar_termo_compromisso/{{ participacao.pk }}/" class="btn success">Aceitar Termo de Compromisso</a></li>
+            {% endif %}
+            {% if pode_alterar_chefia_imediata and participacao.exige_anuencia %}
+                {% if not participacao.anuencia_registrada_em %}
+                    <li><a href="/projetos/alterar_chefia_imediata_participacao/{{ participacao.pk }}/" class="btn success">Alterar Responsável pela Anuência</a></li>
+                {% elif is_gerente_sistemico and status == projeto.STATUS_EM_INSCRICAO or is_gerente_sistemico and status == projeto.STATUS_EM_EXECUCAO %}
+                    <li><a href="/projetos/cancelar_anuencia/{{ participacao.pk }}/" class="btn danger confirm">Cancelar anuência</a></li>
+                {% endif %}
+            {% endif %}
+            {% if participacao.vinculo_pessoa == vinculo and not eh_somente_leitura %}
+                <li><a href="/projetos/cadastrar_dados_bancarios/{{ participacao.pk }}/" class="btn primary">Dados bancários</a></li>
+            {% endif %}
+        </ul>
+    </div>
+    <dl class="secondary-info">
+        <div class="list-item">
+            <dt>{% icone "square" %} Categoria/Titulação:</dt>
+            <dd>{{ participacao.get_titulacao }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>{% icone "square" %} Carga Horária Semanal:</dt>
+            <dd>{{ participacao.carga_horaria }} {% if participacao.eh_docente %}horas/aula{% else %}h{% endif %}</dd>
+        </div>
+        {% if participacao.responsavel and is_avaliador and status == projeto.STATUS_EM_SELECAO %}
+        {% else %}
+            {% if participacao.eh_aluno %}
+                <div class="list-item">
+                    <dt>{% icone "square" %} Coeficiente de Rendimento Escolar:</dt>
+                    <dd>{{ participacao.get_participante.get_ira|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>{% icone "square" %} Curso:</dt>
+                    <dd>{{ participacao.get_participante.curso_campus|format }}</dd>
+                </div>
+                {% if not participacao.vinculo_pessoa %}
+                    {% if participacao.nivel_ensino %}
+                        <div class="list-item">
+                            <dt>{% icone "square" %} Nível de Ensino:</dt>
+                            <dd>{{ participacao.nivel_ensino|format }}</dd>
+                        </div>
+                    {% endif %}
+                    {% if participacao.obs %}
+                        <div class="list-item">
+                            <dt>{% icone "square" %} Observações:</dt>
+                            <dd>{{ participacao.obs|format }}</dd>
+                        </div>
+                    {% endif %}
+                {% endif %}
+                {% if participacao.get_participante.pessoa_fisica.lattes %}
+                    <div class="list-item">
+                        <dt>{% icone "square" %} Lattes:</dt>
+                        <dd><a href="{{ participacao.get_participante.pessoa_fisica.lattes }}">{{ participacao.get_participante.pessoa_fisica.lattes }}</a></dd>
+                    </div>
+                {% endif %}
+                {% if participacao.get_participante.pessoa_fisica.orcid %}
+                    <div class="list-item">
+                        <dt>{% icone "square" %} ORCID:</dt>
+                        <dd><a href="{{ participacao.get_participante.pessoa_fisica.orcid }}">{{ participacao.get_participante.pessoa_fisica.orcid }}</a></dd>
+                    </div>
+                {% endif %}
+            {% elif participacao.is_servidor and participacao.get_participante.pessoa_fisica.get_lattes %}
+                 <div class="list-item">
+                    <dt>{% icone "square" %} Lattes:</dt>
+                    <dd><a href="{{ participacao.get_participante.pessoa_fisica.get_lattes }}">{{ participacao.get_participante.pessoa_fisica.get_lattes }}</a></dd>
+                </div>
+            {% endif %}
+            {% if participacao.is_servidor and participacao.get_participante.pessoa_fisica.orcid %}
+                <div class="list-item">
+                    <dt>{% icone "square" %} ORCID:</dt>
+                    <dd><a href="{{ participacao.get_participante.pessoa_fisica.orcid }}">{{ participacao.get_participante.pessoa_fisica.orcid }}</a></dd>
+                </div>
+            {% endif %}
+            {% if participacao.exige_anuencia %}
+                <div class="list-item">
+                    <dt>{% icone "square" %} Anuência da Chefia</dt>
+                    <dd>
+                        {% if participacao.anuencia or participacao.anuencia == False %}
+                            {{ participacao.anuencia|format }} <small>em {{ participacao.anuencia_registrada_em }} por {{ participacao.responsavel_anuencia }}</small>
+                        {% elif participacao.responsavel_anuencia %}
+                            <span class="status status-alert">Não avaliado por <small>{{ participacao.responsavel_anuencia|format  }}</small></span>
+                        {% else %}
+                            <span class="status status-alert">O chefe imediato não foi indicado.</span>
+                        {% endif %}
+                    </dd>
+                </div>
+            {% endif %}
+            {% if pode_ver_dados_bancarios or participacao.vinculo_pessoa == vinculo %}
+                {% if participacao.instituicao %}
+                    <div class="list-item">
+                        <dt>{% icone "square" %} CPF:</dt>
+                        <dd>{{ participacao.get_participante.pessoa_fisica.cpf }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>{% icone "square" %} Banco:</dt>
+                        <dd>{{ participacao.instituicao }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>{% icone "square" %} Agência:</dt>
+                        <dd>{{ participacao.numero_agencia }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>{% icone "square" %} Tipo da Conta:</dt>
+                        <dd>{{ participacao.tipo_conta }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>{% icone "square" %} Número da Conta:</dt>
+                        <dd>{{ participacao.numero_conta }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>{% icone "square" %} Operação:</dt>
+                        <dd>{{ participacao.operacao|format }}</dd>
+                    </div>
+                {% endif %}
+            {% endif %}
+        {% endif %}
+    </dl>
+</div>

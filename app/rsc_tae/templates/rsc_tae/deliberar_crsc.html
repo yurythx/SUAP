@@ -1,0 +1,421 @@
+{% extends super_template %}
+{% load rsc_tae_extras %}
+{% load static %}
+
+{% block extracss %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static 'rsc_tae/css/rsc-tae.css' %}">
+{% endblock %}
+
+{% block content %}
+
+{% box 'Deliberação da CRSC — RSC-TAE' %}
+
+<p class="alert alert-info">
+    Esta tela registra a <strong>decisão final da CRSC-PCCTAE</strong> sobre o processo.
+    A deliberação é irreversível e encerrará o processo como Deferido ou Indeferido.
+</p>
+
+<dl class="definition-list flex mb-5">
+    <div class="list-item">
+        <dt>Servidor</dt>
+        <dd>{{ processo.vinculo.relacionamento }}</dd>
+    </div>
+    <div class="list-item">
+        <dt>Titulação atual</dt>
+        <dd>{{ processo.vinculo.relacionamento.titulacao|default:"—" }}</dd>
+    </div>
+    <div class="list-item">
+        <dt>Cargo</dt>
+        <dd>{{ processo.vinculo.relacionamento.cargo_emprego|default:"—" }}</dd>
+    </div>
+    <div class="list-item">
+        <dt>Data de exercício</dt>
+        <dd>{{ data_exercicio_cargo|date:"d/m/Y"|default:"— não informada" }}</dd>
+    </div>
+    <div class="list-item">
+        <dt>RSC pretendido</dt>
+        <dd>{{ processo.nivel_requisitado.nome }}</dd>
+    </div>
+</dl>
+
+{% include 'rsc_tae/partials/resumo_avaliacao.html' %}
+
+{% endbox %}
+
+{% if divergencias %}
+{% box 'Divergências para análise da CRSC' %}
+
+<p class="text-muted">
+    Os itens abaixo apresentam divergência entre o declarado pelo avaliado e o verificado
+    por ao menos um avaliador auxiliar. A CRSC deve analisar e registrar sua deliberação
+    sobre cada um antes de emitir a decisão final do processo.
+</p>
+
+{% if divergencias_pendentes > 0 %}
+<div class="alert alert-warning">
+    <strong>Atenção:</strong> {{ divergencias_pendentes }} divergência(s) ainda pendente(s) de deliberação pela CRSC.
+</div>
+{% else %}
+<div class="alert alert-success">
+    Todas as divergências foram analisadas e deliberadas pela CRSC.
+</div>
+{% endif %}
+
+<div class="table-responsive">
+    <table>
+        <thead>
+            <tr>
+                <th>Critério</th>
+                <th>Arquivo</th>
+                <th class="text-center">Unid. declaradas</th>
+                <th class="text-center">Avaliadores</th>
+                <th class="text-center">Tipo de divergência</th>
+                <th class="w-10">Ação</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for div in divergencias %}
+            <tr>
+                <td>
+                    <small class="text-muted">{{ div.item.grupo.requisito.descricao_curta }}</small><br>
+                    {{ div.item.titulo }}
+                </td>
+                <td>
+                    <a href="{{ div.anexo.arquivo.url }}" target="_blank" rel="noopener noreferrer">
+                        {{ div.anexo.nome_exibicao }}
+                    </a>
+                </td>
+                <td class="text-center">
+                    {% if div.item.item_temporal %}
+                        {{ div.anexo.pontuacao|meses_para_anos }} ano(s)
+                        <br><small class="text-muted">{{ div.anexo.periodo_display }}</small>
+                    {% else %}
+                        {{ div.anexo.pontuacao|format }}
+                    {% endif %}
+                </td>
+                <td class="text-center">
+                    {% for av in div.avaliacoes %}
+                        <div>
+                            <span class="text-muted">{% nome_avaliador av.avaliador_vinculo %}</span>:
+                            {% if av.situacao == 2 %}
+                                <span class="status status-success">Defere</span>
+                                {% if av.pontuacao_validada != div.anexo.pontuacao %}
+                                    <small class="text-muted">({% if div.item.item_temporal %}{{ av.pontuacao_validada|meses_para_anos }} ano(s){% else %}{{ av.pontuacao_validada|format }} un.{% endif %})</small>
+                                {% endif %}
+                            {% elif av.situacao == 3 %}
+                                <span class="status status-error">Indefere</span>
+                            {% else %}
+                                <span class="status status-default">Pendente</span>
+                            {% endif %}
+                        </div>
+                    {% empty %}
+                        <span class="text-muted">—</span>
+                    {% endfor %}
+                </td>
+                <td class="text-center">
+                    {% if div.desacordo_avaliadores %}
+                        <span class="status status-warning">Desacordo entre avaliadores</span>
+                    {% endif %}
+                    {% if div.tem_indeferido %}
+                        <span class="status status-error">Indeferimento</span>
+                    {% endif %}
+                    {% if div.pontuacao_alterada %}
+                        <span class="status status-warning">Pontuação alterada</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if div.status_deliberacao.fechado %}
+                        <span class="text-muted">Consolidado</span>
+                    {% elif div.status_deliberacao.aguardando_desempate %}
+                        <a href="{% url 'rsc_tae:deliberar_item_crsc' processo.id div.anexo.id %}?_popup=1" class="btn warning popup">Desempatar</a>
+                    {% else %}
+                        <a href="{% url 'rsc_tae:deliberar_item_crsc' processo.id div.anexo.id %}?_popup=1" class="btn primary popup">Deliberar</a>
+                    {% endif %}
+                </td>
+            </tr>
+            <tr class="rsc-delib-detalhe">
+                <td colspan="6">
+                    {% with s=div.status_deliberacao %}
+                        <div class="rsc-delib-header">
+                            <span class="rsc-delib-label">Deliberações da comissão:</span>
+                            {% if s.fechado %}
+                                <span class="status status-success">Consolidado</span>
+                                <span class="rsc-delib-nota">Nota final: <strong>{% if div.item.item_temporal %}{{ s.nota_consolidada|meses_para_anos }} ano(s){% else %}{{ s.nota_consolidada|format }} un.{% endif %}</strong></span>
+                            {% else %}
+                                <span class="status status-warning">Em deliberação</span>
+                                <span class="rsc-delib-progresso">{{ s.total }} de {{ s.quantidade_necessaria }} votos</span>
+                            {% endif %}
+                            {% if s.aguardando_desempate %}<span class="status status-info">Empate — aguardando desempate</span>{% endif %}
+                        </div>
+                        {% if div.votos %}
+                            <ul class="rsc-delib-votos">
+                                {% for v in div.votos %}
+                                    <li class="rsc-delib-voto">
+                                        <span class="rsc-delib-membro">{{ v.deliberado_por_vinculo.pessoa.nome|default:v.deliberado_por_vinculo }}</span>
+                                        {% if v.decisao == 2 %}
+                                            <span class="status status-success">Deferir</span>
+                                            <span class="rsc-delib-pontos">{% if div.item.item_temporal %}{{ v.pontuacao_efetiva|meses_para_anos }} ano(s){% else %}{{ v.pontuacao_efetiva|format }} un.{% endif %}</span>
+                                        {% else %}
+                                            <span class="status status-error">Indeferir</span>
+                                        {% endif %}
+                                        {% if v.desempate %}<span class="status status-info">Desempate</span>{% endif %}
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <p class="rsc-delib-vazio text-muted">Nenhum voto registrado ainda.</p>
+                        {% endif %}
+                    {% endwith %}
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% endbox %}
+{% else %}
+{% box 'Divergências' %}
+<p class="text-muted">Não foram identificadas divergências entre o declarado pelo avaliado e o verificado pelos avaliadores auxiliares.</p>
+{% endbox %}
+{% endif %}
+
+{% box 'Deliberação Final da Comissão' %}
+
+{% if divergencias_pendentes > 0 %}
+<div class="alert alert-warning">
+    <strong>Atenção:</strong> consolide as {{ divergencias_pendentes }} divergência(s) de item (atingir o quórum em cada uma)
+    antes de votar a deliberação final.
+</div>
+{% endif %}
+
+<h3>Nota final do processo (consolidada)</h3>
+<p class="text-muted m-0 mb-2">
+    Resultado projetado com as notas já consolidadas nas deliberações de item
+    ({{ resumo_final.itens_consolidados }} de {{ resumo_final.total_divergencias }} divergência(s) consolidada(s)).
+    Serve apenas para nortear a decisão dos membros; a decisão final é definida pela votação abaixo.
+</p>
+
+<dl class="definition-list flex">
+    <div class="list-item">
+        <dt>Pontos solicitados</dt>
+        <dd>{{ resumo_final.total_solicitado|format }}</dd>
+    </div>
+    {% if resumo_final.saldo_anterior > 0 %}
+    <div class="list-item">
+        <dt>Saldo de concessão anterior</dt>
+        <dd>{{ resumo_final.saldo_anterior|format }}</dd>
+    </div>
+    {% endif %}
+    <div class="list-item">
+        <dt>Pontos validados</dt>
+        <dd>
+            {% if resumo_final.pontos_requeridos and resumo_final.pontos_requeridos > 0 %}
+                {{ resumo_final.total_pontos|format }} / {{ resumo_final.pontos_requeridos|format }}
+                {% if resumo_final.saldo_anterior > 0 %}
+                    <span class="text-muted">(itens {{ resumo_final.total_pontos_itens|format }} + saldo {{ resumo_final.saldo_anterior|format }})</span>
+                {% endif %}
+                {% if resumo_final.atingiu_pontos %}
+                    <span class="status status-success">Atingida</span>
+                {% else %}
+                    <span class="status status-error">Abaixo do mínimo</span>
+                {% endif %}
+            {% else %}
+                {{ resumo_final.total_pontos|format }}
+            {% endif %}
+        </dd>
+    </div>
+    <div class="list-item">
+        <dt>Itens validados</dt>
+        <dd>
+            {% if resumo_final.itens_requeridos %}
+                {{ resumo_final.itens_validados }} / {{ resumo_final.itens_requeridos }}
+                {% if resumo_final.atingiu_itens %}
+                    <span class="status status-success">Atingido</span>
+                {% else %}
+                    <span class="status status-error">Insuficiente</span>
+                {% endif %}
+            {% else %}
+                {{ resumo_final.itens_validados }}
+            {% endif %}
+        </dd>
+    </div>
+    {% if resumo_final.requisito_obrigatorio_aplicavel %}
+    <div class="list-item">
+        <dt>Requisito obrigatório</dt>
+        <dd>
+            {% if resumo_final.atingiu_requisito_obrigatorio %}
+                <span class="status status-success">Atendido</span>
+            {% else %}
+                <span class="status status-error">Não atendido</span>
+            {% endif %}
+            <span class="text-muted">({{ resumo_final.labels_requisitos_obrigatorios|join:", " }})</span>
+        </dd>
+    </div>
+    {% endif %}
+    <div class="list-item">
+        <dt>Resultado projetado</dt>
+        <dd>
+            {% if resumo_final.deferido %}
+                <span class="status status-success">Deferido</span>
+            {% else %}
+                <span class="status status-error">Indeferido</span>
+            {% endif %}
+        </dd>
+    </div>
+</dl>
+
+{% if not resumo_final.deferido %}
+<div class="alert alert-warning">
+    <strong>Deferimento indisponível:</strong> os critérios do nível não foram atingidos após a avaliação
+    (pontuação mínima, itens mínimos e/ou requisito obrigatório) — o voto só pode ser pelo indeferimento.
+</div>
+{% endif %}
+
+{% if resumo_final.pontos_requeridos and resumo_final.pontos_requeridos > 0 %}
+<div class="mb-3">{% progressbar resumo_final.pontos_percent %}</div>
+{% endif %}
+
+<dl class="definition-list flex">
+    <div class="list-item">
+        <dt>Votos registrados</dt>
+        <dd>{{ status_final.total }} de {{ status_final.quantidade_necessaria }}</dd>
+    </div>
+    <div class="list-item">
+        <dt>Deferido</dt>
+        <dd>{{ status_final.deferidos }}</dd>
+    </div>
+    <div class="list-item">
+        <dt>Indeferido</dt>
+        <dd>{{ status_final.indeferidos }}</dd>
+    </div>
+</dl>
+
+{% if status_final.empate %}
+<div class="alert alert-warning">
+    <strong>Empate.</strong> Aguardando o voto de desempate do presidente da comissão.
+</div>
+{% endif %}
+
+{% if votos_finais %}
+<div class="table-responsive mb-3">
+    <table>
+        <caption>VOTOS DOS MEMBROS DA COMISSÃO</caption>
+        <thead>
+            <tr>
+                <th>Membro</th>
+                <th class="text-center">Voto</th>
+                <th class="text-center">Pontuação</th>
+                <th>Justificativa</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for v in votos_finais %}
+            <tr>
+                <td>{{ v.deliberado_por_vinculo.pessoa.nome|default:v.deliberado_por_vinculo }}</td>
+                <td class="text-center">
+                    {% if v.resultado == 4 %}
+                        <span class="status status-success">Deferido</span>
+                    {% else %}
+                        <span class="status status-error">Indeferido</span>
+                    {% endif %}
+                    {% if v.desempate %}<span class="status status-info">Desempate</span>{% endif %}
+                </td>
+                <td class="text-center">{{ v.pontuacao_efetiva|format }}</td>
+                <td>
+                    {% if v.motivos_indeferimento_display %}
+                        <ul class="mb-0">
+                            {% for motivo in v.motivos_indeferimento_display %}<li>{{ motivo }}</li>{% endfor %}
+                        </ul>
+                        {% if v.justificativa %}{{ v.justificativa }}{% endif %}
+                    {% else %}
+                        {{ v.justificativa|default:"—" }}
+                    {% endif %}
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% if pode_ver_devolucao_crsc %}
+    <h3>Devolver para correção</h3>
+    <p class="text-muted">
+        Quando o problema constatado só o servidor pode corrigir — documento preliminar errado,
+        nível pretendido inadequado —, o processo pode voltar a ele. A devolução
+        <strong>anula a fase de avaliação</strong>: avaliações, votos de item e votos da
+        deliberação final são apagados, e novos avaliadores são sorteados quando o servidor
+        reenviar o que foi apontado.
+    </p>
+    <div class="mt-3">
+        {% if pode_devolver_para_correcao_crsc %}
+            <a href="{% url 'rsc_tae:devolver_correcao_crsc' processo.id %}?_popup=1" class="btn danger popup">Devolver para correção</a>
+        {% else %}
+            <span class="status status-info">Devolver para correção é ato privativo do presidente da comissão.</span>
+        {% endif %}
+    </div>
+{% endif %}
+
+{% if pode_finalizar_manual %}
+    <h3>Finalizar deliberação</h3>
+    <p class="text-muted">O quórum já foi atingido com os votos registrados. Finalize para consolidar o resultado e encerrar o processo.</p>
+    <form method="post" action="">
+        {% csrf_token %}
+        <input type="hidden" name="acao" value="finalizar_manual">
+        <div class="mt-3">
+            <button type="submit" class="btn success">Finalizar e consolidar deliberação</button>
+            <a href="{% url 'rsc_tae:visualizar' processo.id %}" class="btn default">Cancelar</a>
+        </div>
+    </form>
+{% endif %}
+
+{% if not pode_votar_final and impedimento_voto_final %}
+<div class="alert alert-warning">
+    <strong>Você não pode votar na deliberação final deste processo.</strong> {{ impedimento_voto_final }}
+</div>
+{% endif %}
+
+{% if pode_votar_final %}
+    {% if is_desempate_final %}
+        <h3>Voto de desempate do presidente</h3>
+        <p class="text-muted">Sua decisão encerra o empate e define o resultado do processo.</p>
+    {% else %}
+        <h3>{% if meu_voto_final %}Atualizar meu voto{% else %}Registrar meu voto{% endif %}</h3>
+    {% endif %}
+    <form method="post" action="">
+        {% csrf_token %}
+        {% render_form form False False %}
+        <div class="mt-3">
+            <button type="submit" class="btn primary">
+                {% if is_desempate_final %}Assinar voto de desempate{% elif meu_voto_final %}Atualizar meu voto{% else %}Assinar e registrar meu voto{% endif %}
+            </button>
+            <a href="{% url 'rsc_tae:visualizar' processo.id %}" class="btn default">Cancelar</a>
+        </div>
+    </form>
+    <script>
+        // Motivos do indeferimento só aparecem quando o voto marcado é "Indeferido" (valor 5)
+        (function () {
+            const radios = document.querySelectorAll('input[name="resultado"]');
+            const grupoMotivos = document.querySelector('.form-row.motivos_indeferimento');
+            if (!radios.length || !grupoMotivos) {
+                return;
+            }
+            function atualizar() {
+                const marcado = document.querySelector('input[name="resultado"]:checked');
+                const indeferido = Boolean(marcado && marcado.value === '5');
+                grupoMotivos.classList.toggle('d-none', !indeferido);
+                if (!indeferido) {
+                    grupoMotivos.querySelectorAll('input[type="checkbox"]').forEach(function (cb) { cb.checked = false; });
+                }
+            }
+            radios.forEach(function (r) { r.addEventListener('change', atualizar); });
+            atualizar();
+        })();
+    </script>
+{% endif %}
+
+{% endbox %}
+
+{% endblock %}

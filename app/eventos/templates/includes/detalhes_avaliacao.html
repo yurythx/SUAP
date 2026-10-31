@@ -1,0 +1,93 @@
+{% box "Submissão: #{{ submissao.id }} - {{ submissao.titulo }}" %}
+    <dl class="definition-list">
+        <dt>Modalidade</dt>
+        <dd>
+            {{ submissao.modalidade }}
+        </dd>
+        <dt>Área temática</dt>
+        <dd>
+            {{ submissao.area_tematica }}
+        </dd>
+        <dt>Autores</dt>
+        {% for autor_submissao in submissao.autores_relacionados.all %}
+            <dd>
+                #{{ autor_submissao.participante.id }} {{ autor_submissao }}
+            </dd>
+        {% endfor %}
+        <dt>Situação</dt>
+        <dd>
+            {{ submissao.get_situacao_display|status }}
+        </dd>
+        <dt>Nota final</dt>
+        <dd>
+            {{ submissao.nota_final|format }}
+        </dd>
+        <dt>Resultado</dt>
+        <dd>
+            {% if submissao.nota_final is not None %}
+                {{ submissao.get_resultado_avaliacao_display|status }}
+            {% else %}
+                <span class="status status-info">Sem avaliação</span>
+            {% endif %}
+        </dd>
+    </dl>
+{% endbox %}
+{% for versao in submissao.versoes.all %}
+    {% box "Versão {{ versao.numero }}" %}
+        {% if versao.etiqueta %}
+            <div class="alert alert-info">
+                <p>{{ versao.etiqueta }}</p>
+            </div>
+        {% endif %}
+        {% if versao.pareceres.exists %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Avaliações da versão {{ versao.numero }}</caption>
+                    <thead>
+                        <tr>
+                            <th>Avaliador</th>
+                            <th>Recomendação</th>
+                            <th>Nota</th>
+                            <th>Data</th>
+                            <th>Observação</th>
+                            <th>Nota interna</th>
+                            <th class="text-end no-print">Opções</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for avaliacao_submissao in versao.pareceres.all %}
+                            <tr>
+                                <td>{{ avaliacao_submissao.id }} {{ avaliacao_submissao.avaliador_modalidade.avaliador }}</td>
+                                <td>{{ avaliacao_submissao.get_recomendacao_display|default_if_none:"Não informado"|status }}</td>
+                                <td>{{ avaliacao_submissao.nota|default:"-" }}</td>
+                                <td>{{ avaliacao_submissao.data_hora_nota|default:"-" }}</td>
+                                <td>{{ avaliacao_submissao.observacao|default:"-" }}</td>
+                                <td>{{ avaliacao_submissao.observacao_interna|default:"-" }}</td>
+                                <td class="no-print">
+                                    {% if not avaliacao_submissao.estah_avaliado %}
+                                        <a href="{% url 'substituir_avaliador_submissao' avaliacao_submissao.pk %}"
+                                           class="btn primary"
+                                           title="Substituir avaliador">Substituir</a>
+                                        <form method="post"
+                                              action="{% url 'remover_avaliador_submissao' avaliacao_submissao.pk %}">
+                                            {% csrf_token %}
+                                            <button class="icon icon-delete" type="submit">
+                                                <span class="visually-hidden">Remover</span>
+                                            </button>
+                                        </form>
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Nenhuma avaliação para esta versão.</p>
+        {% endif %}
+    {% endbox %}
+{% empty %}
+    <p class="alert alert-warning">Não há versões registradas para esta submissão.</p>
+{% endfor %}

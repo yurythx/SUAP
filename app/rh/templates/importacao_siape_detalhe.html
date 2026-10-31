@@ -1,0 +1,153 @@
+{% extends super_template %}
+{% load static %}
+{% block extrahead %}
+    <script src="{% static 'rh/js/importacao_siape.js' %}" defer></script>
+{% endblock %}
+{% block object-status %}
+    <span class="status {{ importacao.classe_status }}"
+          data-situacao-importacao>{{ importacao.get_situacao_display }}</span>
+{% endblock %}
+{% block content %}
+    {{ dependencias|json_script:"importacao-siape-dependencias" }}
+    <div data-workers-agora {% if not importacao.em_execucao %}hidden{% endif %}>
+        {% box "Workers agora" %}
+            <div class="table-responsive">
+                <table class="mt-0">
+                    <caption>Workers agora</caption>
+                    <thead>
+                        <tr>
+                            <th>Worker</th>
+                            <th>Layout</th>
+                            <th>Lote</th>
+                            <th>Linhas</th>
+                            <th>Progresso</th>
+                        </tr>
+                    </thead>
+                    <tbody data-workers-corpo>
+                        <tr>
+                            <td colspan="5">Nenhum lote em execução no momento.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        {% endbox %}
+    </div>
+    <form method="post"
+          data-importacao-siape
+          data-progresso-url="{{ importacao.get_absolute_url }}progresso.json"
+          data-em-execucao="{{ importacao.em_execucao|yesno:'1,0' }}">
+        {% csrf_token %}
+        <div class="alert alert-info" data-avisos-dependencias hidden></div>
+        {% for grupo, linhas in grupos %}
+            {% box grupo %}
+                <div class="table-responsive">
+                    <table class="mt-0">
+                        <caption>{{ grupo }}</caption>
+                        <thead>
+                            <tr>
+                                <th>Importar</th>
+                                <th>Layout</th>
+                                <th>Arquivo</th>
+                                <th>Linhas</th>
+                                <th>Depende de</th>
+                                <th>Situação</th>
+                                <th>Progresso</th>
+                                <th>Falhas</th>
+                                <th>Avisos</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for linha in linhas %}
+                                {% with arquivo=linha.arquivo %}
+                                    <tr data-arquivo="{{ arquivo.pk }}">
+                                        <td>
+                                            <input type="checkbox"
+                                                   name="arquivos"
+                                                   value="{{ arquivo.pk }}"
+                                                   data-layout="{{ arquivo.layout|default:'' }}"
+                                                   aria-label="Importar {{ arquivo.layout|default:'arquivo' }}"
+                                                   {% if arquivo.selecionado %}checked{% endif %}
+                                                   {% if not arquivo.pode_ser_selecionado %}disabled{% endif %}>
+                                        </td>
+                                        <td>{{ arquivo.layout|default:"Não reconhecido" }}</td>
+                                        <td>{{ arquivo.nome_txt|cut:importacao.pasta }}</td>
+                                        <td>{{ arquivo.total_linhas }}</td>
+                                        <td>
+                                            {{ linha.dependencias|join:", "|default:"-" }}
+                                            {% if linha.ausentes %}
+                                                <p class="help">Não vieram no zip: {{ linha.ausentes|join:", " }} — serão usados os dados já existentes no banco.</p>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <span class="status {{ arquivo.classe_status }}" data-campo="situacao">{{ arquivo.get_situacao_display }}</span>
+                                            <p class="help" data-campo="motivo">{{ arquivo.motivo|truncatechars:300 }}</p>
+                                            {% if arquivo.diagnostico %}<p class="help">{{ arquivo.diagnostico|truncatechars:300 }}</p>{% endif %}
+                                        </td>
+                                        <td data-campo="progresso">{% progressbar arquivo.percentual %}</td>
+                                        <td>
+                                            <a href="{{ importacao.get_absolute_url }}arquivo/{{ arquivo.pk }}/ocorrencias/"
+                                               data-campo="falhas">{{ arquivo.falhas }}</a>
+                                        </td>
+                                        <td>
+                                            <a href="{{ importacao.get_absolute_url }}arquivo/{{ arquivo.pk }}/ocorrencias/"
+                                               data-campo="avisos">{{ arquivo.avisos }}</a>
+                                        </td>
+                                    </tr>
+                                    {% if linha.lotes|length > 1 %}
+                                        <tr data-lotes-de="{{ arquivo.pk }}">
+                                            <td colspan="9">
+                                                <p class="help" data-campo="resumo-lotes">{{ linha.resumo_lotes }}</p>
+                                                <div data-campo="badges-lotes">
+                                                    {% for lote in linha.lotes %}
+                                                        <span class="status {{ lote.classe_status }}"
+                                                              data-lote="{{ lote.pk }}"
+                                                              title="Lote {{ lote.numero }} · {{ lote.processadas }} de {{ lote.total_linhas }} linhas · worker {{ lote.worker|default:"-" }} · {{ lote.falhas }} falhas">
+                                                            {{ lote.numero }}{% if lote.situacao == 'executando' %} · {{ lote.percentual }}%{% endif %}
+                                                        </span>
+                                                    {% endfor %}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% endif %}
+                                {% endwith %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endbox %}
+        {% endfor %}
+        {% if importacao.situacao == 'identificada' %}
+            {% if outra_em_execucao %}
+                <p class="alert alert-warning">Já existe uma importação SIAPE em execução. Aguarde o término para importar os arquivos selecionados. Você ainda pode agendar para a execução noturna.</p>
+                <div class="submit-row">
+                    <button type="submit" name="acao" value="agendar" class="btn success">Agendar selecionados</button>
+                </div>
+            {% else %}
+                <div class="submit-row">
+                    <button type="submit" name="acao" value="importar" class="btn success">Importar selecionados agora</button>
+                    <button type="submit" name="acao" value="agendar" class="btn">Agendar selecionados</button>
+                </div>
+            {% endif %}
+        {% elif importacao.situacao == 'agendada' %}
+            <p class="alert alert-info">Agendada para a execução noturna (01:07).</p>
+            {% if outra_em_execucao %}
+                <p class="alert alert-warning">Já existe uma importação SIAPE em execução. Aguarde o término para executar agora. Você ainda pode cancelar o agendamento.</p>
+            {% endif %}
+            <div class="submit-row">
+                {% if not outra_em_execucao %}
+                    <button type="submit" name="acao" value="importar" class="btn success">Executar agora</button>
+                {% endif %}
+                <button type="submit" name="acao" value="cancelar_agendamento" class="btn">Cancelar agendamento</button>
+            </div>
+        {% endif %}
+    </form>
+    {% if importacao.em_execucao %}
+        <form method="post" action="{{ importacao.get_absolute_url }}interromper/">
+            {% csrf_token %}
+            <p class="help">
+                Use somente se a importação parou de responder (por exemplo, após um reinício do servidor): ela marca esta importação como interrompida, liberando o sistema para uma nova importação.
+            </p>
+            <button type="submit" class="btn danger">Marcar como interrompida</button>
+        </form>
+    {% endif %}
+{% endblock %}

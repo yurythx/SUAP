@@ -1,0 +1,81 @@
+{% extends super_template %}
+{% load static %}
+
+{% block extrahead %}
+    {{ block.super }}
+    {{ TINYMCE_DEFAULT_CONFIG|json_script:"tinymce-default-config" }}
+    <script src="{% static 'tinymce/tinymce.min.js' %}"></script>
+    <script src="{% static 'tinymce/tiny_mce_toolbar.js' %}?v=6"></script>
+    <script>
+        jQuery(document).ready(function () {
+            $('#editarmodelodocumento_form').on('submit', function () {
+                // Fail-closed: bloqueia o salvamento se o editor/validação não
+                // carregou, em vez de pular a validação (Sentry SUAP-V39/V3G).
+                if (typeof tinymce === 'undefined' || typeof validarTags !== 'function') {
+                    alert('O editor de texto não carregou completamente. Recarregue a página antes de salvar.');
+                    return false;
+                }
+                const editor = tinymce.get('id_corpo_padrao');
+                if (editor && !validarTags(editor)) {
+                    $('#editarmodelodocumento_form_submit').removeAttr('disabled').val('Salvar');
+                    return false;
+                }
+            });
+        });
+    </script>
+    <style>
+        .form-row {
+            width: 100% !important;
+            flex: 1 1 100%;
+            display: block;
+        }
+
+        .form-row textarea,
+        .form-row .corpo_padrao {
+            width: 100% !important;
+        }
+
+        .form-row .tox,
+        .form-row .tox .tox-editor-container,
+        .form-row .tox .tox-edit-area iframe {
+            width: 100% !important;
+        }
+
+        .form-row .tox .tox-edit-area iframe {
+            min-height: 600px !important;
+        }
+
+        textarea.tinymce {
+            width: 100% !important;
+            min-height: 600px;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+
+<form method="post" id="editarmodelodocumento_form" name="editarmodelodocumento_form" action="">
+    {% csrf_token %}
+    {{ form.media }}
+    <ul class="action-bar">
+        <li><a class="btn popup default" href="/documento_eletronico/visualizar_variaveis/">Visualizar Variáveis</a></li>
+    </ul>
+
+    {% box 'Dados gerais' %}
+        {% render_form form render_full=False submit_label=False %}
+    {% endbox %}
+
+    {% box 'Corpo' %}
+        {{ form.corpo_padrao }}
+    {% endbox %}
+
+    <div class="submit-row">
+        <input type="submit" value="Salvar" class="default" id="editarmodelodocumento_form_submit">
+        <a class="btn default" href="/admin/documento_eletronico/modelodocumento/">Voltar</a>
+        {% if perms.documento_eletronico.delete_modelodocumento %}
+            <a class="btn danger" href="/admin/documento_eletronico/modelodocumento/{{ modelo_documento.pk }}/delete/">Apagar</a>
+        {% endif %}
+    </div>
+</form>
+
+{% endblock %}

@@ -1,0 +1,281 @@
+{% extends super_template %}
+
+{% block extrahead %}
+    <script>
+        function human_file_size(bytes, si) {
+            var thresh = si ? 1000 : 1024;
+            if(bytes < thresh) return bytes + ' B';
+            var units = si ? ['kB','MB','GB','TB','PB','EB','ZB','YB'] : ['KB','MB','GB','TB','PB','EB','ZB','YB'];
+            var u = -1;
+            do {
+                bytes /= thresh;
+                ++u;
+            } while(bytes >= thresh);
+            return bytes.toFixed(1)+' '+units[u];
+        };
+
+        //sendAjax | Função genérica do processamento Ajax + Jquery + Json
+        function sendAjax(url, parametros, sucesso, erro) {
+            $.ajax({
+                type: "POST",
+                url: url,
+                data: parametros,
+                contentType: "application/json; charset=utf-8",
+                headers: { "X-CSRFToken": $('input[name="csrfmiddlewaretoken"]').val() },
+                dataType: "json",
+                success: sucesso,
+                error: erro
+            });
+        }
+
+        function Excluir(id, msg, url) {
+            //alert(processo_id);
+            var parametros = { "Id": "" };
+            parametros.Id = id;
+
+            if (confirm(msg)) {
+                sendAjax(url, JSON.stringify(parametros), function (retorno) {
+                            if (retorno.ok)
+                            {
+                                $(".linha-" + id).animate({ backgroundColor: "#fbc7c7" }, "slow").animate({ opacity: "hide" }, "slow", function () {
+                                    $(this).remove();
+                                })
+                            } else {
+                                alert(retorno.msg)
+                            }
+                        },
+                        function (XMLHttpRequest, textStatus, errorThrown) {
+                            alert((XMLHttpRequest.responseJSON && XMLHttpRequest.responseJSON.msg) || "Não foi possível excluir o arquivo.")
+                        });
+            }
+        }
+
+        function onCompleteUpload(uploader, id, fileName, responseJSON) {
+            var el = uploader._getItemByFileId(id);
+            var msn = "Deseja continuar?";
+            var url = "/rh/excluir_documentacao_pdf/" + responseJSON.chave + "/";
+            if(responseJSON.success) {
+                //alert(responseJSON.tamanho);
+                var templateRow = '' +
+                        '<tr id="linha-' + responseJSON.chave + '" class="linha-' + responseJSON.chave + '">' +
+                        '    <td>' +
+                        '        <a class="icon icon-view" href="/rh/visualizar_documentacao_pdf/' + responseJSON.chave + '" title="Visualizar o arquivo ' + fileName + '"><span class="visually-hidden">Visualizar</span></a>' +
+                        '        <a class="icon icon-delete" href="javascript:void(0);" onclick="Excluir(\'' + responseJSON.chave + '\', \'' + msn + '\', \'' + url + '\')"><span class="visually-hidden">Remover</span></a>' +
+                        '    </td>' +
+                        '    <td><a href="/rh/visualizar_documentacao_pdf/' + responseJSON.chave + '" title="Visualizar o arquivo ' + fileName + '" target="_blank">' + fileName + '</a></td>' +
+                        '    <td>' + human_file_size(responseJSON.tamanho) + '</td>' +
+                        '</tr>';
+                $(templateRow).hide().prependTo("#arquivos_pendentes tbody").fadeIn("slow");
+                $($(el).find('.qq-upload-result')[0]).html('<span class="true">Concluído</span>').fadeOut("slow");
+                $(el).fadeOut("fast");
+            } else {
+                $($(el).find('.qq-upload-result')[0]).html('<span class="false">Ocorreu um erro!</span>');
+            }
+            $(el).find('.qq-progress')[0].remove();
+        }
+    </script>
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if usuario_logado_eh_rh_sistemico or grupo_coordenador_rh_campus %}
+            {% if processo.pode_atualizar_situacao_pelo_rh %}
+                <li class="has-child">
+                    <a href="#" class="btn primary">Atualizar Situação</a>
+                    <ul>
+                        <li><a href="{% url 'afastamento_parcial_situacao_alterar_rh' processo.pk processo.STATUS_AMIGAVEL_DEFERIDO %}">{{ processo.STATUS_AMIGAVEL_CHOICES.0.1 }}</a></li>
+                        <li><a class="no-confirm popup" href="{% url 'afastamento_parcial_situacao_alterar_rh' processo.pk processo.STATUS_AMIGAVEL_INDEFERIDO %}">{{ processo.STATUS_AMIGAVEL_CHOICES.1.1 }}</a></li>
+                    </ul>
+                </li>
+            {% endif %}
+        {% endif %}
+        {% if usuario_logado_eh_rh_sistemico or grupo_coordenador_rh_campus %}
+            <li><a class="btn primary" href="/admin/rh/cargahorariareduzida/{{ processo.pk }}/change/">Editar</a></li>
+        {% endif %}
+    </ul>
+{% endblock %}
+
+{% block object-status %}
+    {{ processo.get_status_display|status }}
+{% endblock %}
+
+{% block content %}
+
+    <form id="form_afastamento" action="" method="post">
+    {% csrf_token %}
+
+    {% if processo.servidor %}
+        {% box 'Dados gerais' %}
+
+            <h4>Identificação do Servidor</h4>
+            <dl class="definition-list flex">
+                <div class="list-item">
+                    <dt>Nome</dt>
+                    <dd>{{ processo.servidor.pessoa_fisica.nome }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Matrícula</dt>
+                    <dd>{{ processo.servidor.matricula }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>E-mail Institucional</dt>
+                    <dd><a href="mailto:{{ processo.servidor.email_institucional }}">{{ processo.servidor.email_institucional|format }}</a></dd>
+                </div>
+                <div class="list-item">
+                    <dt>Cargo</dt>
+                    <dd>{{ processo.servidor.cargo_emprego }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Jornada Trabalho</dt>
+                    <dd><span id="jornada_trabalho">{{ processo.servidor.jornada_trabalho|format }}</span></dd>
+                </div>
+                <div class="list-item">
+                    <dt>Padrão de Vencimento</dt>
+                    <dd><span id="padrao_vencimento">{{ processo.servidor.nivel_padrao|format }}</span></dd>
+                </div>
+            </dl>
+
+            <h4>Dados do Processo</h4>
+            <dl class="definition-list flex">
+                <div class="list-item">
+                    <dt>Data de Início</dt>
+                    <dd><span id="data_inicio">{{ processo.data_inicio|format }}</span></dd>
+                </div>
+                <div class="list-item">
+                    <dt>Data de Término</dt>
+                    <dd><span id="data_fim">{{ processo.data_termino|format }}</span></dd>
+                </div>
+                <div class="list-item">
+                    <dt>Tipo do Processo</dt>
+                    <dd>{{ processo.get_tipo_display }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Processo</dt>
+                    <dd><a href="{{ processo.protocolo_content_object.get_absolute_url }}">{{ processo.protocolo_content_object }}</a></dd>
+                </div>
+            </dl>
+        {% endbox %}
+
+        {% box 'Horário Semanal Padrão' %}
+            {% if pode_adicionar_horario %}
+                <ul class="action-bar">
+                    <li><a href="/rh/adicionar_horario_afastamento_parcial/{{ processo.id }}/" class="btn success popup">Adicionar Horário</a></li>
+                </ul>
+            {% endif %}
+            {% if processo.horariosemanal_set.all %}
+                <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            {% if processo.servidor_pode_editar or usuario_logado_eh_rh_sistemico or grupo_coordenador_rh_campus and processo.rh_pode_validar or processo.tipo_ch_excepcional %}
+                               <th class="no-print">Ações</th>
+                            {% endif %}
+                            <th>Data Inicial</th>
+                            <th>Data Final</th>
+                            <th>SEG</th>
+                            <th>TER</th>
+                            <th>QUA</th>
+                            <th>QUI</th>
+                            <th>SEX</th>
+                            <th>Jornada Semanal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for horario in processo.horariosemanal_set.all %}
+                            <tr>
+                                {% if processo.servidor_pode_editar or usuario_logado_eh_rh_sistemico or grupo_coordenador_rh_campus and processo.rh_pode_validar or processo.tipo_ch_excepcional %}
+                                    <td class="no-print">
+                                        {% if pode_editar_horario %}
+                                            {% if processo.servidor_pode_editar or processo.tipo_ch_excepcional %}
+                                                {% icon "edit" "/rh/editar_horario_afastamento/{{ horario.id }}/" "Editar Período" "popup" %}
+                                            {% else %}
+                                                {% icon "edit" "/rh/editar_horario_afastamento/{{ horario.id }}/" "Editar" "popup" %}
+                                            {% endif %}
+                                        {% endif %}
+                                        {% if pode_remover_horario %}
+                                            {% icon "delete" "/rh/remover_horario_afastamento/{{ horario.id }}/" %}
+                                        {% endif %}
+                                    </td>
+                                {% endif %}
+                                <td>{{ horario.data_inicio }}</td>
+                                <td>{{ horario.data_fim }}</td>
+                                <td>{{ horario.seg_format_ch }}</td>
+                                <td>{{ horario.ter_format_ch }}</td>
+                                <td>{{ horario.qua_format_ch }}</td>
+                                <td>{{ horario.qui_format_ch }}</td>
+                                <td>{{ horario.sex_format_ch }}</td>
+                                <td>{{ horario.jornada_semanal_format_ch }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                </div>
+            {% else %}
+                <p class="alert alert-warning">Não há horários cadastrados.</p>
+            {% endif %}
+        {% endbox %}
+
+        {% if processo.tipo_afastamento_parcial %}
+            {% box 'Documentação' %}
+                <p class="alert alert-warning">Somente serão carregados arquivos com extensão <strong>pdf</strong>.</p>
+                {% render_form form False %}
+
+                <table id="arquivos_pendentes">
+                <thead>
+                    <tr>
+                        <th class="no-print">Ações</th>
+                        <th>Arquivo</th>
+                        <th>Tamanho</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for arquivo in arquivos_pendentes_identificar_servidor %}
+                        <tr id="linha-{{ arquivo.encrypted_pk }}" class="linha-{{ arquivo.encrypted_pk }}">
+                            <td class="no-print" id="viewer">
+                                {% icon "view" "/rh/visualizar_documentacao_pdf/{{ arquivo.encrypted_pk }}" "Visualizar arquivo {{ arquivo.nome }}" %}
+                                {% if pode_excluir_documento %}
+                                    <a class="icon icon-delete no-confirm" href="#" onclick="Excluir('{{ arquivo.encrypted_pk }}', 'Deseja continuar?', '/rh/excluir_documentacao_pdf/{{ arquivo.encrypted_pk }}/')"
+                                    title="Remover o  arquivo {{ arquivo.nome }}"><span class="visually-hidden">Remover</span></a>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="/rh/visualizar_documentacao_pdf/{{ arquivo.encrypted_pk }}" title="Visualizar o arquivo {{ arquivo.nome|format }}">{{ arquivo.nome|format }}</a>
+                            </td>
+                            <td>{{ arquivo.tamanho|filesizeformat }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+                </table>
+            {% endbox %}
+        {% endif %}
+
+        {% if processo.motivo_indeferimento_rh and eh_dono_processo and processo.status_processo_indeferido_pelo_rh %}
+            {% box 'Motivo do indeferimento' %}
+                {{ processo.motivo_indeferimento_rh }}
+            {% endbox %}
+        {% endif %}
+
+        {% if processo.descricao_novos_documentos and eh_dono_processo and processo.status_documentos_solicitados %}
+            {% box 'Documentos solicitados' %}
+                {{ processo.descricao_novos_documentos }}
+            {% endbox %}
+        {% endif %}
+
+        {% if processo.pode_indeferir_ch_excepcional %}
+            {% box 'Indeferimento' %}
+                {% render_form form_indeferimento False False %}
+            {% endbox %}
+        {% endif %}
+
+        <div class="submit-row">
+            {% if processo.pode_deferir_ch_excepcional %}
+                <input type="hidden" id="acao" name="acao" />
+                <input value="Deferir" onclick="$('#form_afastamento').find('#acao').val('salvar_ch_excepcional');" class="default" type="submit" />
+            {% endif %}
+            {% if processo.pode_indeferir_ch_excepcional %}
+                <input value="Indeferir" onclick="$('#form_afastamento').find('#acao').val('indeferir_ch_excepcional');" class="btn danger" type="submit" />
+            {% endif %}
+        </div>
+    {% endif %}
+    </form>
+{% endblock %}

@@ -1,0 +1,474 @@
+{% extends super_template %}
+
+{% block content %}
+
+<ul class="action-bar">
+    {% if not relatorio %}
+        {% block actionBarEsquerda %}
+            {% if calculo.can_change %}
+                <li><a title="Editar {{ calculo|getattr:"_meta"|getattr:"verbose_name" }}" class="btn primary" href="/admin/calculos_pagamentos/{{ tipo_calculo }}/{{ calculo.id }}/change/">Editar {{ calculo|getattr:"_meta"|getattr:"verbose_name" }}</a></li>
+            {% endif %}
+            {# IFMA - Luiz e Tássio #}
+            <li class="has-child">
+                <a href="#" class="btn primary">Gerar/Visualizar Documentos</a>
+                <ul>
+                    {# Tipos com geração de documento de Ficha de Cálculo #}
+                    <li><a href="/calculos_pagamentos/gerar_documento/{{ calculo.id }}/5/">Ficha de Cálculo de Pagamento</a></li>
+                    {% if consolidacao %}
+                        <li><a href="/calculos_pagamentos/gerar_documento/{{ calculo.id }}/1/">Declaração de Não Ajuizamento</a></li>
+                        <li><a href="/calculos_pagamentos/gerar_documento/{{ calculo.id }}/2/">Amparo Legal</a></li>
+                        <li><a href="/calculos_pagamentos/gerar_documento/{{ calculo.id }}/3/?consolidacao={{ consolidacao }}">Nota Técnica</a></li>
+                    {% endif %}
+                </ul>
+            </li>
+            {# Fim IFMA - Luiz #}
+        {% endblock %}
+    {% endif %}
+    {% block actionBar %}{% endblock %}
+</ul>
+
+{% box "Dados do cálculo" %}
+    {% block dados_calculo %}
+        <table class="info">
+            <tr>
+                <td>Servidor Interessado</td>
+                <td><a href="{{ calculo.servidor.get_absolute_url }}">{{ calculo.servidor.pessoa_fisica.nome|format }} ({{ calculo.servidor.matricula|format }})</a></td>
+                <td>Categoria</td>
+                <td>{{ calculo.servidor.categoria|format }}</td>
+            </tr>
+            <tr>
+                <td>Justificativa</td>
+                <td colspan="3">{{ calculo.justificativa|safe }}</td>
+            </tr>
+            <tr>
+                <td>Observações</td>
+                <td colspan="3">{{ calculo.observacoes|safe }}</td>
+            </tr>
+            <tr>
+                <td>Último atestador</td>
+                <td>{{ calculo.atestador|format }}</td>
+                <td>Data de Cadastro</td>
+                <td>{{ calculo.data_criacao|format }}</td>
+            </tr>
+        </table>
+    {% endblock %}
+{% endbox %}
+
+{% if calculo.portariafisica_set.exists %}
+    {% box "Portarias" %}
+		<table>
+		    <thead>
+		        <tr>
+					<th>Nº</th>
+					<th>Data</th>
+					<th>Campus</th>
+                    <th>Processo</th>
+                    <th>Documento Eletrônico</th>
+		        </tr>
+		    </thead>
+		    <tbody>
+		        {% for portaria in calculo.portariafisica_set.all %}
+                    <tr>
+                        <td>{{ portaria.numero|format }}</td>
+                        <td>{{ portaria.data_portaria|format }}</td>
+                        <td>{{ portaria.campus|format }}</td>
+                        <td>
+                            {% if portaria.processo %}
+                                <a href="{{ portaria.processo.get_absolute_url }}">{{ portaria.processo|format }}</a>
+                            {% endif %}
+                            {% if portaria.processo_eletronico %}
+                                <a href="{{ portaria.processo_eletronico.get_absolute_url }}">{{ portaria.processo_eletronico|format }}</a>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if calculo.get_portaria_geradora %}
+                                {% icon "view" "{{ calculo.get_portaria_geradora.get_absolute_url }}" %}
+                            {% else %}
+                                <p class="alert alert-warning">Nos cálculos gerados a partir de uma portaria, o link para o
+                                    documento eletrônico dessa portaria aparece aqui.</p>
+                            {% endif %}
+                        </td>
+                    </tr>
+		        {% endfor %}
+		    </tbody>
+		</table>
+	{% endbox %}
+{% endif %}
+
+{% block periodos %}{% endblock %}
+
+{% block detalhamentos %}
+    {% for ano_detalhamentos in anos_detalhamentos %}
+        {% if ano_detalhamentos %}
+            {% box "Detalhamento - {{ ano_detalhamentos.ano }}" %}
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Mês/Ano</th>
+                            <th>Período</th>
+                            <th>Quantidade de Dias {% if calculo.tipo == 9 %}Úteis {# <- CalculoTransporte #}{% endif %}</th>
+
+                            {% if calculo.total_venc %}
+                                {% if relatorio %}
+                                    <th>Vencimento Devido</th>
+                                    <th>Vencimento Recebido</th>
+                                {% endif %}
+                                <th>Vencimento - Diferença a Receber</th>
+                            {% endif %}
+                            {% if calculo.total_rt %}
+                                {% if relatorio %}
+                                    <th>Retribuição Por Titulação Devida</th>
+                                    <th>Retribuição Por Titulação Recebida</th>
+                                {% endif %}
+                                <th>Retribuição Por Titulação - Diferença a Receber</th>
+                            {% endif %}
+                            {% if calculo.total_anuenio %}
+                                <th>Anuênio a Receber</th>
+                            {% endif %}
+                            {% if calculo.total_per %}
+                                <th>Ad. de Periculosidade a Receber</th>
+                            {% endif %}
+                            {% if calculo.total_ins %}
+                                <th>Ad. de Insalubridade a Receber</th>
+                            {% endif %}
+                            {% if calculo.total_iq %}
+                                <th>Inc. à Qualificação {% if calculo.total_venc %}a Receber{% else %}- Diferença a Receber{% endif %}</th>
+                            {% endif %}
+                            {% if calculo.total_aux %}
+                                {% if calculo.tipo == 17 %}
+                                        <th>Valor do Auxílio Vigente</th>
+                                {% endif %}
+                                <th>{{ ano_detalhamentos.detalhamentos.0|verbose:"valor_aux" }}</th>
+                            {% endif %}
+                            {% if calculo.total_abono %}
+                                <th>{{ ano_detalhamentos.detalhamentos.0|verbose:"valor_abono" }}</th>
+                            {% endif %}
+                            {% if num_col_total > 2 %}
+                                <th>Total da Parcela</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for detalhamento in ano_detalhamentos.detalhamentos %}
+                            <tr>
+                                <td>
+                                    {% if detalhamento.gratificacao == True %}
+                                        {% if detalhamento.data_inicio.year < calculo.data_criacao.year %}
+                                            {{ detalhamento.data_inicio.month|format }}/{{ detalhamento.data_inicio.year|format }} + Gratificação Natalina
+                                        {% else %}
+                                            Gratificação Natalina
+                                        {% endif %}
+                                    {% else %}
+                                        {{ detalhamento.data_inicio.month|format }}/{{ detalhamento.data_inicio.year|format }}
+                                    {% endif %}
+                                    {% if detalhamento.tem_ferias %}
+                                        + Férias {{ detalhamento.tem_ferias }}
+                                    {% endif %}
+                                </td>
+                                <td>{{ detalhamento.data_inicio|format }} a {{ detalhamento.data_fim|format }}</td>
+                                <td>{{ detalhamento.quant_dias|format }}</td>
+                                {% if calculo.total_venc %}
+                                    {% if relatorio %}
+                                        <td>R${{ detalhamento.valor_venc_devido|format }}</td>
+                                        <td>R${{ detalhamento.valor_venc_recebido|format }}</td>
+                                    {% endif %}
+                                    <td>R${{ detalhamento.valor_venc|format }}</td>
+                                {% endif %}
+                                {% if calculo.total_rt %}
+                                    {% if relatorio %}
+                                        <td>R${{ detalhamento.valor_rt_devido|format }}</td>
+                                        <td>R${{ detalhamento.valor_rt_recebido|format }}</td>
+                                    {% endif %}
+                                    <td>R${{ detalhamento.valor_rt|format }}</td>
+                                {% endif %}
+                                {% if calculo.total_anuenio %}
+                                    <td>R${{ detalhamento.valor_anuenio|format }}</td>
+                                {% endif %}
+                                {% if calculo.total_per %}
+                                    <td {% if not calculo.total_venc and detalhamento.valor_venc %}title="Vencimento Recebido: R${{ detalhamento.valor_venc|format }}" {% endif %}>
+                                        R${{ detalhamento.valor_per|format }}
+                                    </td>
+                                {% endif %}
+                                {% if calculo.total_ins %}
+                                    <td {% if not calculo.total_venc and detalhamento.valor_venc %}title="Vencimento Recebido: R${{ detalhamento.valor_venc|format }}" {% endif %}>
+                                        R${{ detalhamento.valor_ins|format }}
+                                    </td>
+                                {% endif %}
+                                {% if calculo.total_iq %}
+                                    <td>R${{ detalhamento.valor_iq|format }}</td>
+                                {% endif %}
+                                {% if calculo.total_aux %}
+                                    {% if calculo.tipo == 17 %}
+                                        <td>R${{ detalhamento.get_valor_do_auxilio_vigente|format }}</td>
+                                    {% endif %}
+                                    {% if detalhamento.valor_aux > 0 %}
+                                        <td>R${{ detalhamento.valor_aux|format }}</td>
+                                    {% else %}
+                                        <td>R$0,00 (Calculado: R${{ detalhamento.valor_aux|format }})</td>
+                                    {% endif %}
+                                {% endif %}
+                                {% if calculo.total_abono %}
+                                    <td>R${{ detalhamento.valor_abono|format }}</td>
+                                {% endif %}
+                                {% if num_col_total > 2 %}
+                                    <td>R${{ detalhamento.total|format }}</td>
+                                {% endif %}
+                            </tr>
+                        {% endfor %}
+                        {% if not relatorio %}
+                            {% if num_col_total > 2 %}
+                                <tr>
+                                    <td colspan="3"><b>SUBTOTAL</b></td>
+                                    {% if calculo.total_venc %}
+                                        <td><b>R${{ ano_detalhamentos.total_venc|format }}</b></td>
+                                    {% endif %}
+                                    {% if calculo.total_rt %}
+                                        <td><b>R${{ ano_detalhamentos.total_rt|format }}</b></td>
+                                    {% endif %}
+                                    {% if calculo.total_anuenio %}
+                                        <td><b>R${{ ano_detalhamentos.total_anuenio|format }}</b></td>
+                                    {% endif %}
+                                    {% if calculo.total_per %}
+                                        <td><b>R${{ ano_detalhamentos.total_per|format }}</b></td>
+                                    {% endif %}
+                                    {% if calculo.total_ins %}
+                                        <td><b>R${{ ano_detalhamentos.total_ins|format }}</b></td>
+                                    {% endif %}
+                                    {% if calculo.total_iq %}
+                                        <td><b>R${{ ano_detalhamentos.total_iq|format }}</b></td>
+                                    {% endif %}
+                                    {% if calculo.total_aux %}
+                                        {% if ano_detalhamentos.total_aux > 0 %}
+                                            <td>R${{ ano_detalhamentos.total_aux|format }}</td>
+                                        {% else %}
+                                            <td>R$0,00 (Calculado: R${{ ano_detalhamentos.total_aux|format }})</td>
+                                        {% endif %}
+                                    {% endif %}
+                                    {% if calculo.total_abono %}
+                                        <td><b>R${{ ano_detalhamentos.total_abono|format }}</b></td>
+                                    {% endif %}
+                                    <td></td>
+                                </tr>
+                            {% endif %}
+                            <tr>
+                                <td colspan="2"><b>TOTAL A RECEBER</b></td>
+                                <td colspan="{{ num_col_total|add:num_col_extra }}">
+                                    <b>
+                                        {% if not ano_detalhamentos.total_aux or ano_detalhamentos.total > 0 %}
+                                            R${{ ano_detalhamentos.total|format }}
+                                        {% else %}
+                                            R$0,00 (Calculado: R${{ ano_detalhamentos.total|format }})
+                                        {% endif %}
+                                    </b>
+                                </td>
+                                {% if num_col_total > 2 %}
+                                    <td></td>
+                                {% endif %}
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            {% endbox %}
+            {# FÉRIAS DO ANO CORRENTE #}
+            {% if ano_detalhamentos.ferias and ano_detalhamentos.ano >= calculo.data_criacao.year %}
+                {% box "Férias - {{ ano_detalhamentos.ano }}" %}
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Ano de Exercício/Referência - Usufruto</th>
+                                {% if calculo.total_venc %}
+                                    {% if relatorio %}
+                                        <th>Vencimento Devido</th>
+                                        <th>Vencimento Recebido</th>
+                                    {% endif %}
+                                    <th>Vencimento - Diferença a Receber</th>
+                                {% endif %}
+                                {% if calculo.total_rt %}
+                                    {% if relatorio %}
+                                        <th>Retribuição Por Titulação Devida</th>
+                                        <th>Retribuição Por Titulação Recebida</th>
+                                    {% endif %}
+                                    <th>Retribuição Por Titulação - Diferença a Receber</th>
+                                {% endif %}
+                                {% if calculo.total_anuenio %}
+                                    <th>Anuênio a Receber</th>
+                                {% endif %}
+                                {% if calculo.total_per %}
+                                    <th>Ad. de Periculosidade a Receber</th>
+                                {% endif %}
+                                {% if calculo.total_ins %}
+                                    <th>Ad. de Insalubridade a Receber</th>
+                                {% endif %}
+                                {% if calculo.total_iq %}
+                                    <th>Inc. à Qualificação {% if calculo.total_venc %}a Receber{% else %}- Diferença a Receber{% endif %}</th>
+                                {% endif %}
+                                {% if num_col_total > 2 %}
+                                    <th>Total da Parcela</th>
+                                {% endif %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for ferias in ano_detalhamentos.ferias %}
+                                {% with f=ferias %}
+                                    <tr>
+                                        <td> Férias de {{ f.ano_referencia|format }} - {{ f.data_inicio.month|format }}/{{ f.data_inicio.year|format }} </td>
+                                        {% if calculo.total_venc %}
+                                            {% if relatorio %}
+                                                <td>R${{ f.valor_venc_devido|format }}</td>
+                                                <td>R${{ f.valor_venc_recebido|format }}</td>
+                                            {% endif %}
+                                            <td>R${{ f.valor_venc|format }}</td>
+                                        {% endif %}
+                                        {% if calculo.total_rt %}
+                                            {% if relatorio %}
+                                                <td>R${{ f.valor_rt_devido|format }}</td>
+                                                <td>R${{ f.valor_rt_recebido|format }}</td>
+                                            {% endif %}
+                                            <td>R${{ f.valor_rt|format }}</td>
+                                        {% endif %}
+                                        {% if calculo.total_anuenio %}
+                                            <td>R${{ f.valor_anuenio|format }}</td>
+                                        {% endif %}
+                                        {% if calculo.total_per %}
+                                            <td {% if not calculo.total_venc and f.valor_venc %}title="Vencimento Recebido: R${{ f.valor_venc|format }}" {% endif %}>
+                                                R${{ f.valor_per|format }}
+                                            </td>
+                                        {% endif %}
+                                        {% if calculo.total_ins %}
+                                            <td {% if not calculo.total_venc and f.valor_venc %}title="Vencimento Recebido: R${{ f.valor_venc|format }}" {% endif %}>
+                                                R${{ f.valor_ins|format }}
+                                            </td>
+                                        {% endif %}
+                                        {% if calculo.total_iq %}
+                                            <td>R${{ f.valor_iq|format }}</td>
+                                        {% endif %}
+                                        {% if num_col_total > 2 %}
+                                            <td>R${{ f.total|format }}</td>
+                                        {% endif %}
+                                    </tr>
+                                {% endwith %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% endbox %}
+            {% endif %}
+        {% else %}
+            <p class="alert alert-warning">OPS! Houve um erro ao buscar o detalhamento.</p>
+        {% endif %}
+    {% endfor %}
+{% endblock %}
+
+{% if consolidacao and not relatorio %}
+    {% box "Consolidação de Exercícios Anteriores" %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Ano</th>
+                    <th>Total Anual</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ano_detalhamentos in anos_detalhamentos %}
+                    {% if ano_detalhamentos.ano < calculo.data_criacao.year %}
+                        <tr>
+                            <td>{{ ano_detalhamentos.ano|format }}</td>
+                            <td>R${{ ano_detalhamentos.total|format }}</td>
+                        </tr>
+                    {% endif %}
+                {% endfor %}
+                <tr>
+                    <td><b>TOTAL A RECEBER</b></td>
+                    <td><b>R${{ consolidacao|format }}</b></td>
+                </tr>
+            </tbody>
+        </table>
+    {% endbox %}
+{% endif %}
+
+{% if not relatorio %}
+    {% block totalizacao %}
+        {% box "Totalização" %}
+            <table>
+                <thead>
+                    <tr>
+                        <th></th>
+                        {% if calculo.total_venc %}
+                            <th>Vencimento - Diferença a Receber</th>
+                        {% endif %}
+                        {% if calculo.total_rt %}
+                            <th>Retribuição Por Titulação - Diferença a Receber</th>
+                        {% endif %}
+                        {% if calculo.total_anuenio %}
+                            <th>Anuênio a Receber</th>
+                        {% endif %}
+                        {% if calculo.total_per %}
+                            <th>Ad. de Periculosidade a Receber</th>
+                        {% endif %}
+                        {% if calculo.total_ins %}
+                            <th>Ad. de Insalubridade a Receber</th>
+                        {% endif %}
+                        {% if calculo.total_iq %}
+                            <th>Inc. à Qualificação {% if calculo.total_venc %}a Receber{% else %}- Diferença a Receber{% endif %}</th>
+                        {% endif %}
+                        {% if calculo.total_aux %}
+                            <th>{{ calculo|verbose:"total_aux" }}</th>
+                        {% endif %}
+                        {% if calculo.total_abono %}
+                            <th>Abono de Permanência a Receber</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if num_col_total > 2 %}
+                        <tr>
+                            <td><b>SUBTOTAL</b></td>
+                            {% if calculo.total_venc %}
+                                <td><b>R${{ calculo.total_venc|format }}</b></td>
+                            {% endif %}
+                            {% if calculo.total_rt %}
+                                <td><b>R${{ calculo.total_rt|format }}</b></td>
+                            {% endif %}
+                            {% if calculo.total_anuenio %}
+                                <td><b>R${{ calculo.total_anuenio|format }}</b></td>
+                            {% endif %}
+                            {% if calculo.total_per %}
+                                <td><b>R${{ calculo.total_per|format }}</b></td>
+                            {% endif %}
+                            {% if calculo.total_ins %}
+                                <td><b>R${{ calculo.total_ins|format }}</b></td>
+                            {% endif %}
+                            {% if calculo.total_iq %}
+                                <td><b>R${{ calculo.total_iq|format }}</b></td>
+                            {% endif %}
+                            {% if calculo.total_aux %}
+                                <td><b>
+                                    {% if calculo.total_aux > 0 %}
+                                        <td>R${{ calculo.total_aux|format }}</td>
+                                    {% else %}
+                                        <td>R$0,00 (Calculado: R${{ calculo.total_aux|format }})</td>
+                                    {% endif %}
+                                </b></td>
+                            {% endif %}
+                            {% if calculo.total_abono %}
+                                <td><b>R${{ calculo.total_abono|format }}</b></td>
+                            {% endif %}
+                        </tr>
+                    {% endif %}
+                    <tr>
+                        <td><b>TOTAL A RECEBER</b></td>
+                        <td><b>
+                            {% if not calculo.total_aux or calculo.total > 0 %}
+                                R${{ calculo.total|format }}
+                            {% else %}
+                                R$0,00 (Calculado: R${{ calculo.total|format }})
+                            {% endif %}
+                        </b></td>
+                    </tr>
+                </tbody>
+            </table>
+        {% endbox %}
+    {% endblock %}
+{% endif %}
+
+{% endblock %}

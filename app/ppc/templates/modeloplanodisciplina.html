@@ -1,0 +1,137 @@
+{% extends super_template %}
+
+{% block object-status %}
+    {% if modelo.ativo %}
+        <span class="status status-success">Ativo</span>
+    {% else %}
+        <span class="status status-error">Inativo</span>
+    {% endif %}
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if perms.ppc.add_modeloplanodisciplina %}    
+            {% if tem_secao and not modelo.ativo %}
+                <li><a class="btn success" href="/ppc/modeloplanodisciplina/{{ modelo.pk }}/ativar/">{% icone "toggle-on" %} Ativar</a></li>
+            {% endif %}
+            <li><a class="btn primary" href="/admin/ppc/modeloplanodisciplina/{{ modelo.pk }}/change/">{% icone "edit" %} Editar</a></li>
+            <li><a class="btn primary" href="/ppc/modeloplanodisciplina/{{ modelo.pk }}/replicar/">{% icone "copy" %} Replicar</a></li>
+        {% endif %}
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+    {% if not tem_secao %}
+        <p class="alert alert-warning"><strong>Atenção:</strong> Nenhuma nenhuma seção foi criada para este modelo.</p>
+    {% endif %}
+
+    {% box "Dados gerais" %}
+        <dl class="definition-list flex">
+            <div class="list-item flex-basis-100">
+                <dt>Descrição</dt>
+                <dd>{{ modelo.descricao }}</dd>
+            </div>
+            <div class="list-item flex-basis-100">
+                <dt>Orientações de preenchimento</dt>
+                <dd>{{ modelo.orientacoes|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Nível de ensino</dt>
+                <dd>{{ modelo.nivel_ensino }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Data de criação</dt>
+                <dd>{{ modelo.data_criacao }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Permite seções EAD</dt>
+                <dd>{{ modelo.permite_secoes_ead|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Permite criação de versão EAD de plano aprovado</dt>
+                <dd>{{ modelo.permite_versao_ead_plano_aprovado|format }}</dd>
+            </div>
+        </dl>
+    {% endbox %}
+
+    <div class="tab-pane" data-title="Seções" data-tab="secoes">
+
+        {% if pode_adicionar_secao %}
+            <ul class="action-bar">
+                <li><a class="btn success popup" href="/ppc/modelosecaoplanodisciplina/{{ modelo.pk }}/adicionar/">Adicionar seção</a></li>
+            </ul>
+        {% endif %}
+
+        <p class="alert alert-info">Cada seção representará um item do programa no plano de disciplina</p>
+
+        {% if tem_secao %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Seções do modelo de plano de disciplina</caption>
+                    <thead>
+                        <tr>
+                            {% if perms.ppc.add_modeloplanodisciplina %}
+                                <th class="no-print">Ações</th>
+                            {% endif %}
+                            <th>Título</th>
+                            <th>Ordem de exibição</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for secao in modelo.modelosecaoplanodisciplina_set.all %}
+                            <tr>
+                                {% if perms.ppc.add_modeloplanodisciplina %}
+                                    <td class="no-print field-get_acoes">
+                                        {% icon "edit" "/ppc/modelosecaoplanodisciplina/{{ secao.pk }}/editar/" "Editar" "popup" %}
+                                        {% if pode_adicionar_secao %}
+                                            {% icon "delete" "/comum/excluir/ppc/modelosecaoplanodisciplina/{{ secao.pk }}/" "Excluir" "no-confirm popup" %}
+                                        {% endif %}
+                                    </td>
+                                {% endif %}
+                                <td>{{ secao.titulo }}</td>
+                                <td>{{ secao.ordem_exibicao }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Nenhuma seção adicionada.</p>
+        {% endif %}
+    </div>
+
+    <div class="tab-pane ajax-rendered" data-title="Planos de disciplina" data-counter="{{ modelo.planodisciplina_set.count }}" data-tab="planos">
+        {% if request.GET.tab == "planos" %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Planos de disciplina criados a partir deste modelo</caption>
+                    <thead>
+                        <tr>
+                            <th class="no-print">Ações</th>
+                            <th>Disciplina</th>
+                            <th>CH</th>
+                            <th>Tipo de oferta</th>
+                            <th>Situação</th>
+                            <th>Ativo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for plano in planos %}
+                            <tr>
+                                <td class="no-print field-get_acoes">
+                                    {% icon "view" "{{ plano.get_absolute_url }}" "Visualizar" "popup" %}
+                                </td>
+                                <td>{{ plano.nome_disciplina }}</td>
+                                <td>{{ plano.ch_disciplina }}</td>
+                                <td>{{ plano.tipo_oferta }}</td>
+                                <td>{{ plano.get_situacao_display|status }}</td>
+                                <td>{{ plano.ativo|format }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}

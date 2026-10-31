@@ -1,0 +1,233 @@
+{% extends super_template %}
+{% load demandas_templatetags %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if perms.demandas.add_demanda %}
+            <li><a href="/admin/demandas/demanda/add/" class="btn success">{% icone "plus" %} Adicionar demanda</a></li>
+        {% endif %}
+        <li><a href="{% url 'demandas_listagem' %}" class="btn default">{% icone "list" %} Listagem</a></li>
+        {% for area in areas_pode_alterar_prioridade %}
+            {% if forloop.first and forloop.last %}
+                <li><a href="{{ area|getkey:"url" }}" class="btn default">Prioridades de {{ area|getkey:"label" }}</a></li>
+            {% elif forloop.first %}
+                <li class="has-child">
+                    <a class="btn default" href="#">{% icone "eye" %} Prioridades</a>
+                    <ul>
+                        <li><a href="{{ area|getkey:"url" }}">{{ area|getkey:"label" }}</a></li>
+            {% elif forloop.last %}
+                        <li><a href="{{ area|getkey:"url" }}">{{ area|getkey:"label" }}</a></li>
+                    </ul>
+            {% else %}
+                <li><a href="{{ area|getkey:"url" }}">{{ area|getkey:"label" }}</a></li>
+            {% endif %}
+        {% endfor %}
+        <li><a href="/admin/demandas/demanda/" class="btn default">{% icone "eye" %} Visualizar todas</a></li>
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+    {% if pode_ver_pendencias and demandantes_sem_areas %}
+        {% box "Pendências" %}
+            {% for demandante in demandantes_sem_areas %}
+                <p class="checklist error">Demandante {{ demandante }} <strong>Sem área associada</strong></p>
+            {% endfor %}
+        {% endbox %}
+    {% endif %}
+
+    {% if eh_demandante %}
+        <div class="tab-pane ajax-rendered {% if not eh_analista and not eh_desenvolvedor %}active{% endif %}" data-title="Minhas áreas" data-tab="minhas_areas">
+            {% include 'tabs/tab_dashboard_prioritarias.html' with prioritarias=minhas_prioritarias ano_atual=ano_atual qtd_prioritarias_por_area_range=qtd_demandas_prioritarias_por_area_range %}
+        </div>
+    {% endif %}
+
+    <div class="tab-pane ajax-rendered" data-title="Todas as áreas" data-tab="todas_as_areas">
+
+        {# ── Indicadores gerais ── #}
+        <ul class="flex-container boxes infos horizontal">
+            {% if demandas_atrasadas_demandantes > 0 %}
+                <li class="box-item with-description error">
+                    {% icone 'clock' %}
+                    <h4 class="title">Em atraso</h4>
+                    <p class="description">Pelos demandantes</p>
+                    <p class="stat">{{ demandas_atrasadas_demandantes }}</p>
+                </li>
+            {% endif %}
+            {% if demandas_atrasadas_desenvolvimento > 0 %}
+                <li class="box-item with-description error">
+                    {% icone 'clock' %}
+                    <h4 class="title">Em atraso</h4>
+                    <p class="description">Pelo desenvolvimento</p>
+                    <p class="stat">{{ demandas_atrasadas_desenvolvimento }}</p>
+                </li>
+            {% endif %}
+            <li class="box-item with-description warning">
+                {% icone 'stop' %}
+                <h4 class="title">Suspensas</h4>
+                <p class="description">{{ percent_demandas_suspensas|format }}%</small>
+                <p class="stat">{{ demandas_suspensas }}</p>
+            </li>
+            <li class="box-item with-description success">
+                {% icone 'check' %}
+                <h4 class="title">Concluídas em {{ ano_atual }}</h4>
+                <p class="description">{{ qtd_demandas_concluidas_ano }} de {{ qtd_demandas_concluidas_ano_passado }} em {{ ano_passado }}</p>
+                <p class="stat">{{ percent_demandas_concluidas_ano|format }}%</p>
+            </li>
+            <li class="box-item info">
+                {% icone 'circle' %}
+                <h4 class="title">Tipo: Funcionalidade</h4>
+                <p class="stat">{{ funcionalidades|format }}</p>
+            </li>
+            <li class="box-item info">
+                {% icone 'circle' %}
+                <h4 class="title">Tipo: Melhorias</h4>
+                <p class="stat">{{ melhorias|format }}</p>
+            </li>
+            {% if qtd_entregas_pendentes %}
+                <li class="box-item warning">
+                    {% icone 'box-open' %}
+                    <h4 class="title">Entregas pendentes</h4>
+                    <p class="stat">{{ qtd_entregas_pendentes }}</p>
+                </li>
+            {% endif %}
+            {% if qtd_entregas_vencidas %}
+                <li class="box-item error">
+                    {% icone 'box-open' %}
+                    <h4 class="title">Entregas vencidas</h4>
+                    <p class="stat">{{ qtd_entregas_vencidas }}</p>
+                </li>
+            {% endif %}
+        </ul>
+
+        {# ── NOVO: bloco de entregas vencidas ── #}
+        {% if entregas_vencidas %}
+            {% box "Entregas vencidas" class="error" %}
+                <p class="alert alert-error">
+                    {% icone "exclamation-triangle" %}
+                    As seguintes entregas ultrapassaram o prazo de feedback sem resposta do cliente.
+                </p>
+                <table class="table sm">
+                    <thead>
+                        <tr>
+                            <th>Demanda</th>
+                            <th>Área</th>
+                            <th>Entrega</th>
+                            <th>Prazo</th>
+                            <th>Dias em atraso</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for entrega in entregas_vencidas %}
+                            <tr>
+                                <td>
+                                    <a href="{{ entrega.demanda.get_absolute_url }}">{{ entrega.demanda }}</a>
+                                </td>
+                                <td>{{ entrega.demanda.area }}</td>
+                                <td>{{ entrega.titulo }}</td>
+                                <td>{{ entrega.prazo_feedback|date:"d/m/Y" }}</td>
+                                <td>
+                                    <span class="status status-error">{{ entrega.dias_em_atraso }} dia{{ entrega.dias_em_atraso|pluralize }}</span>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% endbox %}
+        {% endif %}
+
+        {# ── NOVO: bloco de entregas aguardando (não vencidas) ── #}
+        {% with pendentes_nao_vencidas=entregas_pendentes|dictsort:"prazo_feedback" %}
+            {% if pendentes_nao_vencidas and not entregas_vencidas %}
+                {% box "Aguardando homologação" %}
+                    <table class="table sm">
+                        <thead>
+                            <tr>
+                                <th>Demanda</th>
+                                <th>Área</th>
+                                <th>Entrega</th>
+                                <th>Prazo</th>
+                                <th>Aguardando</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for entrega in entregas_pendentes %}
+                                {% if not entrega.prazo_vencido %}
+                                    <tr>
+                                        <td>
+                                            <a href="{{ entrega.demanda.get_absolute_url }}">{{ entrega.demanda }}</a>
+                                        </td>
+                                        <td>{{ entrega.demanda.area }}</td>
+                                        <td>{{ entrega.titulo }}</td>
+                                        <td>
+                                            {% if entrega.prazo_feedback %}
+                                                {{ entrega.prazo_feedback|date:"d/m/Y" }}
+                                            {% else %}—{% endif %}
+                                        </td>
+                                        <td>{{ entrega.dias_aguardando }} dia{{ entrega.dias_aguardando|pluralize }}</td>
+                                    </tr>
+                                {% endif %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% endbox %}
+            {% endif %}
+        {% endwith %}
+
+        {% box "Demandas prioritárias" badge=total_demandas_prioritarias %}
+            {% include 'tabs/tab_dashboard_prioritarias.html' with prioritarias=prioritarias ano_atual=ano_atual qtd_prioritarias_por_area_range=qtd_demandas_prioritarias_por_area_range %}
+        {% endbox %}
+
+        {% box "Demandas não-prioritárias" badge=demandas_nao_prioritarias.count %}
+            <p class="alert alert-info">Cada Área de Atuação é responsável por selecionar até <strong>{{ qtd_demandas_prioritarias_por_area }} demanda{{ qtd_demandas_prioritarias_por_area|pluralize }} prioritária{{ qtd_demandas_prioritarias_por_area|pluralize }}</strong> para iniciar o desenvolvimento. A estatística abaixo representa somente as demandas que não tem prioridade para desenvolvimento.</p>
+            <div class="total-container flex-container">
+                <a href="/admin/demandas/demanda/?situacao__exact=Solicitada&eh_prioritaria=N%C3%A3o&tab=tab_ativas" class="total-item info">
+                    {% icone "square" %}
+                    <p class="total">{{ demandas_solicitadas }}</p>
+                    <p class="description">Solicitada{{ demandas_solicitadas|pluralize }}</p>
+                </a>
+                <a href="/admin/demandas/demanda/?situacao__exact=Em+negociação&eh_prioritaria=N%C3%A3o&tab=tab_ativas" class="total-item warning">
+                    {% icone "hourglass-half" %}
+                    <p class="total">{{ demandas_em_negociacao }}</p>
+                    <p class="description">Em negociação</p>
+                </a>
+                {% if demandas_em_analise > 0 %}
+                    <a href="/admin/demandas/demanda/?situacao__exact=Em+análise&eh_prioritaria=N%C3%A3o&tab=tab_ativas" class="total-item warning">
+                        {% icone "hourglass-half" %}
+                        <p class="total">{{ demandas_em_analise }}</p>
+                        <p class="description">Em análise</p>
+                    </a>
+                {% endif %}
+                {% if demandas_aprovadas > 0 %}
+                    <a href="/admin/demandas/demanda/?situacao__exact=Aprovada&eh_prioritaria=N%C3%A3o&tab=tab_ativas" class="total-item success">
+                        {% icone "thumbs-up" %}
+                        <p class="total">{{ demandas_aprovadas }}</p>
+                        <p class="description">Aprovada{{ demandas_aprovadas|pluralize }}</p>
+                    </a>
+                {% endif %}
+                {% if demandas_homologadas > 0 %}
+                    <a href="/admin/demandas/demanda/?situacao__exact=Homologada&eh_prioritaria=N%C3%A3o&tab=tab_ativas" class="total-item success">
+                        {% icone "thumbs-up" %}
+                        <p class="total">{{ demandas_homologadas }}</p>
+                        <p class="description">Homologada{{ demandas_homologadas|pluralize }}</p>
+                    </a>
+                {% endif %}
+                {% if demandas_em_homologacao > 0 %}
+                    <a href="/admin/demandas/demanda/?situacao__exact=Em+homologação&eh_prioritaria=N%C3%A3o&tab=tab_ativas" class="total-item warning">
+                        {% icone "hourglass-half" %}
+                        <p class="total">{{ demandas_em_homologacao }}</p>
+                        <p class="description">Em homologação</p>
+                    </a>
+                {% endif %}
+                {% if demandas_em_implantacao > 0 %}
+                    <a href="/admin/demandas/demanda/?situacao__exact=Em+implantação&eh_prioritaria=N%C3%A3o&tab=tab_ativas" class="total-item warning">
+                        {% icone "hourglass-half" %}
+                        <p class="total">{{ demandas_em_implantacao }}</p>
+                        <p class="description">Em implantação</p>
+                    </a>
+                {% endif %}
+            </div>
+        {% endbox %}
+    </div>
+
+{% endblock %}

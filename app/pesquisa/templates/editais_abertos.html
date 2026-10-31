@@ -1,0 +1,59 @@
+{% extends super_template %}
+
+{% block content %}
+
+    {% if editais %}
+        {% if eh_servidor and not tem_lattes %}
+            <p class="alert alert-warning">Somente servidores com Currículo Lattes cadastrados podem submeter projetos.</p>
+        {% endif %}
+        {% for edital in editais %}
+            <div class="general-box">
+                <div class="primary-info">
+                    <h4><small>{{ forloop.counter }}</small><strong>{{ edital.titulo }}</strong></h4>
+                    {% if edital|method:"pode_submeter_projeto"|call:request.user.get_vinculo %}
+                        <ul class="action-bar">
+                            <li><a href="/pesquisa/adicionar_projeto/{{ edital.id }}/" class="btn success">Adicionar Projeto</a></li>
+                            {% if pode_clonar_projeto %}
+                                <li><a class="btn" href="/pesquisa/clonar_projeto/{{ edital.id }}/">Clonar Projeto</a></li>
+                            {% endif %}
+                        </ul>
+                    {% endif %}
+                    <div class="extra-info">
+                        <p>{{ edital.descricao|truncatewords:60 }}</p>
+                        {% if edital.editalanexoauxiliar_set.all %}
+                            <h5>Anexos</h5>
+                            <ul>
+                                {% for anexo in edital.editalanexoauxiliar_set.all %}
+                                    {% if anexo.arquivo %}
+                                        <li><a href="/pesquisa/visualizar_arquivo/{{ anexo.arquivo.id }}/">{{ anexo.nome }}</a> - {{ anexo.descricao }}</li>
+                                    {% endif %}
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                    </div>
+                </div>
+                <dl class="secondary-info">
+                    <div class="list-item">
+                        <dt>{% icone "file-download" %} Arquivo do Edital:</dt>
+                        {% if edital.arquivo %}
+                            <dd><a href="/pesquisa/visualizar_arquivo/{{ edital.arquivo.id }}/">{{ edital.arquivo.nome }}</a></dd>
+                        {% elif edital.tem_arquivo %}
+                            <dd><a href="{{ edital.arquivo_mais_recente.arquivo.url }}">{{ edital.arquivo_mais_recente.nome }}</a></dd>
+                        {% endif %}
+                    </div>
+                    <div class="list-item">
+                        <dt>{% icone "calendar" %} Inscrições:</dt>
+                        <dd><span class="true">{{ edital.inicio_inscricoes|format }}</span> a <span class="false">{{ edital.fim_inscricoes|format }}</span></dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>{% icone "building" %} Para os Campi:</dt>
+                        <dd>{{ edital.get_uos_edital_pesquisa|join:", "|format }}</dd>
+                    </div>
+                </dl>
+            </div>
+        {% endfor %}
+    {% else %}
+        <p class="alert alert-warning">Nenhum edital disponível.</p>
+    {% endif %}
+
+{% endblock %}

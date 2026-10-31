@@ -1,0 +1,66 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "python3 -c 'import json,subprocess,sys; p=json.load(sys.stdin).get(\"tool_input\",{}).get(\"file_path\",\"\"); p.endswith(\".py\") and subprocess.run([\"ruff\",\"format\",\"-q\",p])' || true",
+            "description": "Formata com ruff o .py editado (caminho lido do JSON do stdin; o Claude Code nao exporta o caminho em variavel de ambiente)",
+            "type": "command"
+          }
+        ],
+        "matcher": "Edit|Write"
+      },
+      {
+        "hooks": [
+          {
+            "command": "$CLAUDE_PROJECT_DIR/.agents/hooks/check_complexity.py",
+            "description": "Bloqueia funcoes TOCADAS com complexidade ciclomatica > 10 (ruff C901, diff vs HEAD)",
+            "statusMessage": "Checando complexidade ciclomatica das funcoes tocadas (C901 <= 10)",
+            "type": "command"
+          }
+        ],
+        "matcher": "Edit|Write|MultiEdit"
+      },
+      {
+        "hooks": [
+          {
+            "command": "$CLAUDE_PROJECT_DIR/.agents/hooks/register_mr_time_spent.py --sob-pedido",
+            "description": "Registra time spent no MR via /spend SOB PEDIDO (so no Claude Code, pela flag --sob-pedido): so age com REGISTRAR_TEMPO=True prefixado ao \"glab mr create|update\"; sem o prefixo nao registra. Codex e OpenCode chamam o mesmo script sem a flag e seguem registrando sempre. Tempo ativo medido nas transcricoes; sem elas, backfiring por LOC. Casa Bash, mas o filtro fica no proprio script",
+            "statusMessage": "Checando pedido de registro de tempo no MR (REGISTRAR_TEMPO=True)",
+            "type": "command"
+          }
+        ],
+        "matcher": "mcp__gitlab__create_merge_request|mcp__gitlab__update_merge_request|Bash"
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "/usr/bin/env python3 \"$CLAUDE_PROJECT_DIR/.agents/hooks/protect_env.py\"",
+            "description": "Bloqueia (exit 2) edicoes em .env/.env.* pelo guard compartilhado (le tool_input.file_path do stdin)",
+            "statusMessage": "Verificando protecao de arquivos .env",
+            "type": "command"
+          }
+        ],
+        "matcher": "Edit|Write"
+      },
+      {
+        "hooks": [
+          {
+            "command": "/usr/bin/env python3 \"$CLAUDE_PROJECT_DIR/.agents/hooks/commit_gate.py\"",
+            "description": "Gate de commit compartilhado com Codex/OpenCode: prefixa ruff format/check, git add -u e pre-commit a todo segmento git commit (--no-verify/-n pulam). Devolve so updatedInput, sem permissionDecision: o comando reescrito passa pelo fluxo normal de permissao",
+            "type": "command"
+          }
+        ],
+        "matcher": "Bash"
+      }
+    ]
+  },
+  "worktree": {
+    "symlinkDirectories": [
+      ".venv"
+    ]
+  }
+}

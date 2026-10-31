@@ -1,0 +1,279 @@
+{% extends super_template %}
+
+{% block content %}
+
+    {% if obj.get_diretores_gerais.exists and not obj.diretor_geral %}
+        <p class="alert alert-warning">Por favor, defina o <strong>Diretor Geral</strong> titular dessa diretoria.</p>
+    {% endif %}
+    {% if obj.get_diretores_academicos.exists and not obj.diretor_academico %}
+        <p class="alert alert-warning">Por favor, defina o <strong>Diretor {% if obj.is_diretoria_ensino %}de Ensino{% else %} Acadêmico{% endif %}</strong> titular dessa diretoria.</p>
+    {% endif %}
+
+	{% if not obj.is_diretoria_sistemica %}
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>Setor</dt>
+                <dd>{{ obj.setor }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Campus</dt>
+                <dd>{{ obj.setor.uo.nome }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Diretor Geral</dt>
+                <dd>{{ obj.diretor_geral|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Diretor {% if obj.is_diretoria_ensino %}de Ensino{% else %}Acadêmico{% endif %}</dt>
+                <dd>{{ obj.diretor_academico|format }}</dd>
+            </div>
+        </dl>
+	{% endif %}
+
+    {% for dimensao in dimensoes %}
+        <div class="tab-pane" data-title="{{ dimensao.nome }}" data-tab="{{ dimensao.nome|slugify }}">
+
+            {% for grupo in dimensao.grupos %}
+
+                {% if is_administrador_academico and dimensao.nome == 'Secretaria Acadêmica' and grupo.nome == 'Secretários Acadêmicos' %}
+                    <ul class="action-bar mt-4">
+                        <li><a class="btn popup primary" href="/edu/vincular_grupo_atendimento_diretoria/{{ obj.pk }}/">Vincular Grupo de Atendimento da Central de Chamados</a></li>
+                    </ul>
+                    {% if obj.id_grupo_atendimento %}
+                        <p class="alert alert-info">Ao adicionar ou remover usuários nos grupos Secretários Acadêmicos ou Auxiliares de Secretaria, eles serão automaticamente adicionados ou removidos do grupo de atendimento correspondente a secretaria (ID {{ obj.id_grupo_atendimento }}) na central de chamados.</p>
+                    {% endif %}
+                {% endif %}
+
+                {% box grupo.nome badge=grupo.membros|length %}
+                    {% if perms.edu.add_diretoria or perms.edu.change_diretoria %}
+                        <ul class="action-bar mt-4">
+                            {% if grupo.nome == 'Responsáveis pela Emissão do Diploma' %}
+                                <li><a class="btn success popup"
+                                    href="/edu/adicionar_coordenador_registro_academico/{{ obj.pk }}/">Adicionar {{ grupo.group.name }}</a>
+                                </li>
+                            {% else %}
+                                <li><a class="btn success popup"
+                                    href="/edu/adicionar_membro_diretoria/{{ obj.pk }}/{{ grupo.parametro }}/">Adicionar {{ grupo.group.name }}</a>
+                                </li>
+                            {% endif %}
+                        </ul>
+                    {% else %}
+                            {% if perms.edu.add_termovinculacaousuariodiretoria and grupo.nome == 'Auxiliares de Secretaria Acadêmica' %}
+                                <ul class="action-bar">
+                                    <li><a class="btn success popup" href="/edu/adicionar_auxiliar_secretaria/{{ obj.pk }}/">Adicionar Auxiliar de Secretaria Acadêmica</a></li>
+                                </ul>
+                            {% endif %}
+                            {% if perms.edu.add_termovinculacaousuariodiretoria and grupo.nome == 'Estagiários' %}
+                                <ul class="action-bar">
+                                    <li><a class="btn success popup" href="/edu/adicionar_estagiario_secretaria/{{ obj.pk }}/">Adicionar Estagiário</a></li>
+                                </ul>
+                            {% endif %}
+                    {% endif %}
+                    <div class="card-container mb-5">
+                        {% for membro in grupo.membros %}
+                            <div class="card {% if grupo.nome == 'Diretor Geral' and membro.usuario_grupo.user.username == obj.diretor_geral.user.username %}info{% endif %}
+                            {% if grupo.nome in tipo_diretor and membro.usuario_grupo.user.username == obj.diretor_academico.user.username %}info{% endif %}">
+                                <div class="photo"><img src="{{ membro.usuario_grupo.user.get_vinculo.get_foto_75x100_url }}"
+                                        alt="Foto de {{ membro.usuario_grupo.user.get_profile.nome }}"></div>
+                                <h4>{{ membro.usuario_grupo.user.get_profile.nome }}</h4>
+                                <dl>
+                                    <dt>Matrícula:</dt>
+                                    <dd><a href="/rh/servidor/{{ membro.usuario_grupo.user.username }}/">{{ membro.usuario_grupo.user.username }}</a></dd>
+                                    <dt>Setor de Lotação:</dt>
+                                    <dd>{{ membro.usuario_grupo.user.get_vinculo.setor|format }}</dd>
+                                    {% if membro.usuario_grupo.user.get_vinculo.email_notificacao %}
+                                        <dt>Email:</dt>
+                                        <dd>{{ membro.usuario_grupo.user.get_vinculo.email_notificacao|format }}</dd>
+                                    {% endif %}
+                                </dl>
+                                <div class="content">
+                                    {% if grupo.nome == 'Coordenadores de Curso' %}
+                                        {% if membro.usuario_grupo.user.get_vinculo.cursocampus_set.exists %}
+                                            <div class="alert alert-info">
+                                                <h5>Coordenador</h5>
+                                                <ul>
+                                                    {% for curso_campus in membro.usuario_grupo.user.get_vinculo.cursocampus_set.all %}
+                                                        <li>{{ curso_campus }}</li>
+                                                    {% endfor %}
+                                                </ul>
+                                            </div>
+                                        {% endif %}
+                                        {% if membro.usuario_grupo.user.get_vinculo.cursocampus_vicecoordenador_set.exists %}
+                                            <div class="alert alert-info">
+                                                <h5>Coordenador substituto</h5>
+                                                <ul>
+                                                    {% for curso_campus in membro.usuario_grupo.user.get_vinculo.cursocampus_vicecoordenador_set.all %}
+                                                        <li>{{ curso_campus }}</li>
+                                                    {% endfor %}
+                                                </ul>
+                                            </div>
+                                        {% endif %}
+                                    {% endif %}
+                                    {% if perms.edu.add_diretoria or perms.edu.change_diretoria %}
+                                        <ul class="action-bar">
+                                            {% if grupo.nome == 'Diretor Geral' and not membro.usuario_grupo.user.username == obj.diretor_geral.user.username %}
+                                                <li><a class="btn success"
+                                                    href="/edu/diretoria/{{ obj.pk }}/?diretor_geral_id={{ membro.usuario_grupo.pk }}">Definir
+                                                    como Titular</a></li>
+                                            {% endif %}
+                                            {% if grupo.nome in tipo_diretor and not membro.usuario_grupo.user.username == obj.diretor_academico.user.username %}
+                                                <li><a class="btn success"
+                                                    href="/edu/diretoria/{{ obj.pk }}/?diretor_academico_id={{ membro.usuario_grupo.pk }}">Definir
+                                                    como Titular</a></li>
+                                            {% endif %}
+                                            {% if grupo.nome == 'Responsáveis pela Emissão do Diploma' %}
+                                                <li>
+                                                    <a class="btn primary popup"
+                                                    href="/edu/adicionar_coordenador_registro_academico/{{ obj.pk }}/{{ membro.usuario_grupo.pk }}/">Editar</a>
+                                                </li>
+                                                <li>
+                                                    <a class="btn danger"
+                                                    href="/edu/remover_coordenador_registro_academico/{{ obj.pk }}/{{ membro.usuario_grupo.pk }}/">Remover</a>
+                                                </li>
+                                            {% elif grupo.nome == 'Coordenadores de Curso' %}
+                                                <li><a class="btn popup" href="/edu/adicionar_coordenador/{{ obj.pk }}/{{ membro.usuario_grupo.pk }}/?tipo=coordenador">Gerenciar Coordenação</a></li>
+                                                <li><a class="btn popup" href="/edu/adicionar_coordenador/{{ obj.pk }}/{{ membro.usuario_grupo.pk }}/?tipo=vice">Gerenciar Vice-Coordenação</a></li>
+                                            {% else %}
+                                                <li><a class="btn danger"
+                                                    href="/comum/excluir/comum/usuariogruposetor/{{ membro.pk }}/">Remover</a>
+                                                </li>
+                                            {% endif %}
+                                        </ul>
+                                    {% endif %}
+                                    {% if perms.edu.add_termovinculacaousuariodiretoria and grupo.nome == 'Auxiliares de Secretaria Acadêmica' %}
+                                        <ul class="action-bar">
+                                            <li><a class="btn danger" href="/edu/remover_auxiliar_secretaria/{{ obj.pk }}/{{ membro.usuario_grupo.pk }}/">Remover</a></li>
+                                        </ul>
+                                    {% endif %}
+                                    {% if perms.edu.add_termovinculacaousuariodiretoria and grupo.nome == 'Estagiários' %}
+                                        <ul class="action-bar">
+                                            <li><a class="btn danger" href="/edu/remover_estagiario_secretaria/{{ obj.pk }}/{{ membro.usuario_grupo.pk }}/">Remover</a></li>
+                                        </ul>
+                                    {% endif %}
+                                </div>
+                                {% if grupo.nome == 'Diretor Geral' and membro.usuario_grupo.user.username == obj.diretor_geral.user.username %}<footer>É o Diretor Geral Titular</footer>{% endif %}
+                                {% if grupo.nome in tipo_diretor and membro.usuario_grupo.user.username == obj.diretor_academico.user.username %}<footer>É o {{ grupo.nome }} Titular</footer>{% endif %}
+                            </div>
+                        {% empty %}
+                            <p class="alert alert-warning">Nenhum servidor cadastrado com esse perfil.</p>
+                        {% endfor %}
+                    </div>
+                    {% box 'Permissões relacionadas ao Grupo' class='collapsed' boxid='permissoes_{{ grupo.nome }}' %}
+                        {% include "includes/grupo_permissoes.html" with grupo=grupo.group %}
+                    {% endbox %}
+
+                    {% if grupo.nome == "Auxiliares de Secretaria Acadêmica" %}
+                        {% with termos=obj.get_termos_vinculacao_auxiliar_secretaria %}
+                            {% if termos.exists %}
+                                <div class="table-responsive">
+                                    <table>
+                                        <caption>Termos de Vinculação de Usuário à Diretoria</caption>
+                                        <thead>
+                                        <tr>
+                                            <th>Responsável</th>
+                                            <th>Usuário Vinculado</th>
+                                            <th>Grupo</th>
+                                            <th>Data</th>
+                                        </thead>
+                                        <tbody>
+                                            {% for termo in termos %}
+                                                <tr>
+                                                    <td>{{ termo.responsavel|format }}</td>
+                                                    <td>{{ termo.user|format }}</td>
+                                                    <td>{{ termo.group|format }}</td>
+                                                    <td>{{ termo.data_hora_assinatura|format }}</td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% endif %}
+                        {% endwith %}
+                    {% endif %}
+
+                    {% if grupo.nome == "Estagiários" %}
+                        {% with termos=obj.get_termos_vinculacao_estagiario_secretaria %}
+                            {% if termos.exists %}
+                                <div class="table-responsive">
+                                    <table>
+                                        <caption>Termos de Vinculação de Usuário à Diretoria</caption>
+                                        <thead>
+                                        <tr>
+                                            <th>Responsável</th>
+                                            <th>Usuário Vinculado</th>
+                                            <th>Grupo</th>
+                                            <th>Data</th>
+                                        </thead>
+                                        <tbody>
+                                            {% for termo in termos %}
+                                                <tr>
+                                                    <td>{{ termo.responsavel|format }}</td>
+                                                    <td>{{ termo.user|format }}</td>
+                                                    <td>{{ termo.group|format }}</td>
+                                                    <td>{{ termo.data_hora_assinatura|format }}</td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% endif %}
+                        {% endwith %}
+                    {% endif %}
+
+                {% endbox %}
+            {% endfor %}
+
+            {% if dimensao.nome == 'Coordenação Acadêmica' and not obj.is_diretoria_sistemica %}
+                {% box 'Coordenadores de Modalidade de Ensino ({{ obj.coordenadormodalidade_set.count }})' %}
+                    {% if perms.edu.add_diretoria or perms.edu.change_diretoria %}
+                        <ul class="action-bar">
+                            <li><a class="btn success popup" href="/edu/adicionar_coordenador_modalidade/{{ obj.pk }}/0/">Adicionar Coordenador de Modalidade de Ensino</a></li>
+                        </ul>
+                    {% endif %}
+                    {% if obj.coordenadormodalidade_set.exists %}
+                        <div class="card-container">
+                            {% for coordenador in obj.coordenadormodalidade_set.all %}
+                                <div class="card">
+                                    <div class="photo"><img src="{{ coordenador.servidor.get_foto_75x100_url }}" alt="Foto do {{ coordenador.nome }}"/></div>
+                                    <h4>{{ coordenador.servidor.pessoa_fisica.nome }}</h4>
+                                    <dl>
+                                        <dt>Matrícula:</dt>
+                                        <dd>
+                                            <a href="/rh/servidor/{{ coordenador.servidor.matricula }}/">{{ coordenador.servidor.matricula }}</a>
+                                        </dd>
+                                        <dt>Setor de Lotação:</dt>
+                                        <dd>{{ coordenador.servidor.setor|format }}</dd>
+                                        <dt>Email:</dt>
+                                        <dd>{{ coordenador.servidor.email_notificacao|format }}</dd>
+                                        <dt>Modalidades:</dt>
+                                        <dd><br/>
+                                            <ul>
+                                                {% for modalidade in coordenador.modalidades.all %}
+                                                    <li>{{ modalidade }}</li>
+                                                {% endfor %}
+                                            </ul>
+                                        </dd>
+                                    </dl>
+                                    <div class="content">
+                                        <ul class="action-bar">
+                                            <li><a class="btn primary no-confirm popup"
+                                                href="/edu/adicionar_coordenador_modalidade/{{ obj.pk }}/{{ coordenador.pk }}/">Editar</a>
+                                            </li>
+                                            <li><a class="btn danger no-confirm popup"
+                                                href="/comum/excluir/edu/coordenadormodalidade/{{ coordenador.pk }}/">Remover</a>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="alert alert-warning">Nenhum coordenador de modalidade vinculado à diretoria.</p>
+                    {% endif %}
+                {% endbox %}
+            {% endif %}
+
+        </div>
+    {% endfor %}
+
+{% endblock %}

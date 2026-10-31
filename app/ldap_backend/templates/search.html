@@ -1,0 +1,85 @@
+{% extends super_template %}
+
+{% load tags %}
+
+{% block content %}
+    {% box 'Busca' %}
+    {% block content_subtitle %}
+        <h2>Procurar Usuários - {{ ldap_conf }}</h2>
+    {% endblock %}
+
+    <form action="" method="post">
+        {% csrf_token %}
+        {% if form.errors.filtro.0 %}
+            <ul class="errorlist">
+                <li>{{ form.errors.filtro.0 }}</li>
+            </ul>
+        {% endif %}
+        <div>
+            <fieldset class="module aligned">
+                <h2>Buscar</h2>
+                <div class="form-row field-tipo">
+                    <div class="field-box">
+                        <label class="required" for="id_tipo" title="Preenchimento obrigatório">Tipo:</label>
+                        {{ form.tipo }}
+                    </div>
+                </div>
+                <div class="form-row field-filtro">
+                    <div class="field-box">
+                        <label class="required" for="id_filtro" title="Preenchimento obrigatório">Filtro:</label>
+                        {{ form.filtro }}
+                        <p class="help">Formato de busca rápida só pesquisa em sAMAccountName: "matricula".
+                            Formato de busca detalhada (vide <a href="https://www.ietf.org/rfc/rfc4515.txt">RFC 4515</a>):
+                            "sAMAccountName=usuario123"</p>
+                    </div>
+                </div>
+            </fieldset>
+        </div>
+        <div class="submit-row">
+            <input type="submit" class="btn success" />
+        </div>
+    </form>
+    {% endbox %}
+    {% block result %}
+        {% box 'Resultado' %}
+        {% if form.is_valid %}
+            {% if error %}
+                <div class="alert alert-danger">{{ error }}</div>
+            {% endif %}
+            {% if objects %}
+                <div class="table-responsive">
+                    <table>
+                        <caption>Resultados da busca</caption>
+                        <thead>
+                        <tr>
+                            <th>dn</th>
+                            {% for key in parameters.attrlist %}
+                                <th>{{ key }}</th>
+                            {% endfor %}
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for obj in objects %}
+                            <tr>
+                                <td>{{ obj.dn }}</td>
+                                {% for key in parameters.attrlist %}
+                                    {% if key in ldap_conf.filterstr %}
+                                        <td><a class="bold"  href="/ldap_backend/show_object/{{ obj|getattr:key|format }}/">
+                                            {{ obj|getattr:key|format }}
+                                        </a></td>
+                                    {% else %}
+                                        <td>{{ obj|getattr:key|format }}</td>
+                                    {% endif %}
+                                {% endfor %}
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="alert alert-warning">Nenhum registro encontrado.</p>
+            {% endif %}
+        {% endif %}
+        {% endbox %}
+    {% endblock %}
+{% endblock %}

@@ -1,0 +1,176 @@
+{% extends super_template|default:"admin/base_site.html" %}
+
+{% block content %}
+
+<script>
+$(document).ready(function(){
+    // Rótulo
+    $("#id_tipo_baixa_0").click(function () {
+        $(".form-row.rotulo").show();
+        $(".form-row.inventario").hide();
+        $(".form-row.faixa").hide();
+    });
+
+    // Inventário
+    $("#id_tipo_baixa_1").click(function () {
+        $(".form-row.inventario").show();
+        $(".form-row.rotulo").hide();
+        $(".form-row.faixa").hide();
+    });
+
+    // Faixa
+    $("#id_tipo_baixa_2").click(function () {
+        $(".form-row.inventario").hide();
+        $(".form-row.rotulo").hide();
+        $(".form-row.faixa").show();
+    });
+
+
+    if("{{ radio }}" == "faixa"){
+        $("#id_tipo_baixa_0").attr('checked', false);
+        $("#id_tipo_baixa_1").attr('checked', false);
+        $("#id_tipo_baixa_2").attr('checked', true);
+        $(".form-row.inventario").hide();
+        $(".form-row.rotulo").hide();
+        $(".form-row.faixa").show();
+    }else if("{{ radio }}" == "inventario"){
+		$("#id_tipo_baixa_0").attr('checked', false);
+        $("#id_tipo_baixa_1").attr('checked', true);
+        $("#id_tipo_baixa_2").attr('checked', false);
+        $(".form-row.inventario").show();
+        $(".form-row.rotulo").hide();
+        $(".form-row.faixa").hide();
+    }else{
+        $("#id_tipo_baixa_0").attr('checked', true);
+        $("#id_tipo_baixa_1").attr('checked', false);
+        $("#id_tipo_baixa_2").attr('checked', false);
+        $(".form-row.inventario").hide();
+        $(".form-row.rotulo").show();
+        $(".form-row.faixa").hide();
+    }
+});
+</script>
+<h2>Baixa {{ baixa.numero }}</h2>
+
+<ul class="action-bar">
+	{% if perms.patrimonio.change_baixa %}
+		<li><a class="btn success" href="#" onclick="$('div#novo-item').toggle();">Baixar Novo Inventário</a></li>
+		<li><a class="btn primary" href="/patrimonio/baixa/editar/{{ baixa.id }}/">Editar Baixa</a></li>
+{% endif %}
+	{% if perms.patrimonio.delete_baixa %}
+		<li><a class="btn danger" href="/patrimonio/baixa/{{ baixa.id }}/remover/">Remover Baixa</a></li>
+	{% endif %}
+	<li><a class="btn default" href="/patrimonio/relatorioBaixaPDF/{{ baixa.id }}/">Gerar PDF</a></li>
+</ul>
+
+<div id="novo-item" {% if form.is_bound %}{% else %}style="display: none"{% endif %}>
+	{% box "Baixar Novo Inventário" %}
+		{% render_form form %}
+	{% endbox %}
+</div>
+
+{% box "Informações Gerais" %}
+    <dl class="definition-list">
+        <dt>Tipo</dt>
+        <dd>{{ baixa.tipo }}</dd>
+        <dt>Número</dt>
+        <dd>{{ baixa.numero }}</dd>
+        <dt>Data</dt>
+        <dd>{{ baixa.get_data }}</dd>
+        <dt>Processo</dt>
+        <dd>{{ baixa.processo|format }}</dd>
+        <dt>Observação</dt>
+        <dd>{{ baixa.observacao|format }}</dd>
+    </dl>
+{% endbox %}
+
+{% if resumo_ed %}
+	{% box "Resumo por Elemento de Despesa" %}
+		<table>
+			<thead>
+				<tr>
+					<th>Código</th>
+                    <th>Conta Contábil</th>
+					<th>Descrição</th>
+                    <th>Valor Inicial</th>
+					<th>Valor Contábil</th>
+                    <th>Depreciação Acumulada</th>
+				</tr>
+			</thead>
+			<tbody>
+				{% for resumo in resumo_ed %}
+					<tr>
+						<td>{{ resumo.codigo }}</td>
+                        <td>{{ resumo.plano_contas }}</td>
+				        <td>{{ resumo.nome }}</td>
+                        <td class="text-end">{{ resumo.total_inicial|mascara_dinheiro }}</td>
+				        <td class="text-end">{{ resumo.total_contabil|mascara_dinheiro }}</td>
+                        <td class="text-end">{{ resumo.total_depreciacao_acumulada|mascara_dinheiro }}</td>
+	    			</tr>
+			    {% endfor %}
+			</tbody>
+			<tfoot>
+                <tr>
+					<td colspan="3">Valor Total:</td>
+					<td>{{ valor_total_inicial|format_money_almox }}</td>
+                    <td>{{ valor_total|format_money_almox }}</td>
+                    <td>{{ valor_depreciacao_acumulada|format_money_almox }}</td>
+				</tr>
+
+				</tr>
+			</tfoot>
+		</table>
+	{% endbox %}
+{% endif %}
+
+<h3>Itens Baixados</h3>
+{% if itens %}
+	<table>
+		<thead>
+			<tr>
+		        <th>Número</th>
+				<th>Descrição</th>
+				<th>Situação</th>
+				<th>Valor Inicial</th>
+                <th>Valor Contábil</th>
+				{% if perms.patrimonio.delete_baixa %}
+					<th>Opções</th>
+				{% endif %}
+		    </tr>
+		</thead>
+		<tbody>
+			{% autopaginate itens 100 %}
+            {% paginate %}
+			{% for item in itens %}
+				<tr>
+					<td>
+						<a href="{{ item.inventario.get_absolute_url }}">
+						    {{ item.inventario.numero }}
+						</a>
+					</td>
+					<td>{{ item.inventario.get_descricao }}</td>
+			    	<td><span class="status status-{{ item.inventario.status|slugify }}">{{ item.inventario.status }}</span></td>
+			    	<td class="text-end">{{ item.inventario.entrada_permanente.valor|format_money_almox }}</td>
+                    <td class="text-end">{{ item.inventario.get_valor|format }}</td>
+			    	{% if perms.patrimonio.delete_baixa %}
+						<td><a href="/patrimonio/baixa/{{ baixa.id }}/remover_item/{{ item.id }}" title="Remover Item de Baixa" class="btn danger">Remover Item de Baixa</a></td>
+					{% endif %}
+    			</tr>
+		    {% endfor %}
+		</tbody>
+        <tfoot>
+                <tr>
+					<td colspan="3">Valor Total:</td>
+					<td>{{ valor_total_inicial|format_money_almox }}</td>
+                    <td>{{ valor_total|format_money_almox }}</td>
+                    <td></td>
+				</tr>
+
+				</tr>
+        </tfoot>
+	</table>
+{% else %}
+	<p class="alert alert-warning">Nenhum item encontrado.</p>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,709 @@
+{% extends "base_super_pgd2.html" %}
+
+{% block bodyclass %}hasAsideRight large-action-bar{% endblock %}
+
+{% block object-status %}
+    {{ pit|method:"get_situacao_pit_calculado"|call:request.user }}
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if modo == 'registro' %}
+            {% if pode_solicitar_aprovacao_homologacao_pit %}
+                <li>
+                    <a href="/pgd2/solicitar_aprovacao_homologacao_pit/{{ pit.id }}" class="btn success">{% icone "share" %} Solicitar aprovação/homologação</a>
+                </li>
+            {% endif %}
+            {% if pode_aprovar_aprovar_pit %}
+                <li>
+                    <a href="/pgd2/aprovar_pit/{{ pit.id }}" class="btn success">{% icone "thumbs-up" %} Aprovar {{ nomenclatura.plano_individual_de_trabalho_sigla_pgd2 }}</a>
+                </li>
+                <li>
+                    <a href="/pgd2/reprovar_pit/{{ pit.id }}" class="btn danger">{% icone "thumbs-down" %} Reprovar {{ nomenclatura.plano_individual_de_trabalho_sigla_pgd2 }}</a>
+                </li>
+            {% endif %}
+            {% if pode_homologar_pit %}
+                <li>
+                    <a href="/pgd2/homologar_pit/{{ pit.id }}" class="btn success">{% icone "thumbs-up" %} Homologar {{ nomenclatura.plano_individual_de_trabalho_sigla_pgd2 }}</a>
+                </li>
+                <li>
+                    <a href="/pgd2/nao_homologar_pit/{{ pit.id }}" class="btn danger">{% icone "thumbs-down" %} Não homologar {{ nomenclatura.plano_individual_de_trabalho_sigla_pgd2 }}</a>
+                </li>
+            {% endif %}
+            {% if pit|method:"pode_visualizar_rit"|call:request.user %}
+                <li><a href="/pgd2/visualizar_rit/{{ pit.id }}" class="btn default">{% icone "eye" %} Execução ({{ nomenclatura.relatorio_individual_de_trabalho_sigla_pgd2 }})</a></li>
+            {% endif %}
+            {% if modo == 'historico' or modo == 'solicitacoes_aprova_homologa' %}
+                {% if pit|method:"pode_visualizar"|call:request.user %}
+                    <li><a href="/pgd2/visualizar_pit/{{ pit.id }}" class="btn default">{% icone "eye" %} Planejamento ({{ nomenclatura.plano_individual_de_trabalho_sigla_pgd2 }})</a></li>
+                {% endif %}
+            {% endif %}         
+            {% if pit|method:"pode_visualizar"|call:request.user %}                
+                <li class="has-child">
+                    <a class="btn default" href="#">{% icone "eye" %} Consultas</a>
+                    <ul>
+                        <li><a href="/pgd2/visualizar_pit/{{ pit.id }}?m=solicitacoes_aprova_homologa">Solicitações de aprovação ou homologação</a></li>
+                        <li><a href="/pgd2/visualizar_pit/{{ pit.id }}?m=historico">Histórico de alterações</a></li>
+                        <li><a href="/pgd2/visualizar_pit/{{ pit.id }}?m=consultar_api">Situação do envio dos dados pela API PGD 2</a></li>
+                    </ul>
+                </li>
+            {% endif %}
+
+            {% if pode_cancelar_pit or pode_recalcular_setor_pes_pit or pode_receber_copia %}
+                <li class="has-child">
+                    <a class="btn default" href="#">Ações</a>
+                    <ul>
+                        {% if pode_cancelar_pit %}
+                            <li>
+                                <a href="/pgd2/cancelar_pit/{{ pit.id }}" title="Cancelar {{ nomenclatura.plano_individual_de_trabalho_sigla_pgd2 }}">Cancelar {{ nomenclatura.plano_individual_de_trabalho_sigla_pgd2 }}</a>
+                            </li>
+                        {% endif %}
+                        {% if pode_recalcular_setor_pes_pit %}
+                            <li>
+                                <a href="/pgd2/recalcular_setor_pes_pit/{{ pit.id }}" title="Recalcular setores e PES relacionados">Recalcular setor e PES</a>
+                            </li>
+                        {% endif %}
+                        {% if pode_receber_copia %}
+                            <li>
+                                <a href="/pgd2/copiar_pit/{{ pit.id }}">
+                                    Copiar entregas de outro {{ nomenclatura.plano_individual_de_trabalho_sigla_pgd2 }}
+                                </a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </li>
+            {% endif %}
+        {% endif %}
+    </ul>
+{% endblock %}
+
+{% block asideright %}
+
+<aside class="right">
+    <button id="collapseAsideRight"><span class="visually-hidden">Minimizar barra lateral</span></button>
+
+    <details open="open">
+        <summary>Dados gerais</summary>
+        <div class="details-container">
+            <dl>
+                <dt>Adesão:</dt>
+                <dd>{{ pit.adesao.get_verbose_simples|format }}</dd>
+            </dl>
+        </div>
+    </details>
+
+    <details open="open">
+        <summary>PESs/Setores relacionados</summary>
+        <div class="details-container">
+            {% if not tem_erro_nos_setores_envolvidos %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>PESs</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for se in setores_envolvidos %}
+                            <tr>
+                                <td>
+                                    {% if not se.tem_erro %}
+                                        <a href="/pgd2/visualizar_pes/{{ se.pes.id }}">{{ se }}</a>
+                                    {% else %}
+                                        <span class="status status-warning">{{ se }}</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+                <p class="alert alert-warning">Não foi possível localizar um PES aprovado para os setores envolvidos neste período. Verifique os PESs relacionados ao PIT.</p>
+            {% endif %}
+        </div>
+    </details>
+
+    {% if pit.data_verificacao_ponto or request.user.is_superuser %}
+    <details open="open">
+        <summary>Outros dados</summary>
+        <div class="details-container">
+            <dl>
+                {% if pit.data_verificacao_ponto %}
+                    <dt>{{ pit|verbose:'data_verificacao_ponto' }}</dt>
+                    <dd>{{ pit.data_verificacao_ponto|format }}</dd>
+                {% endif %}
+                {% if request.user.is_superuser %}
+                    <dt>{{ pit|verbose:'deve_enviar_pela_api' }}</dt>
+                    <dd>{{ pit.deve_enviar_pela_api|format }}</dd>
+                    <dt>{{ pit|verbose:'data_hora_ultimo_envio_api' }}</dt>
+                    <dd>{{ pit.data_hora_ultimo_envio_api|format }}</dd>
+                {% endif %}
+            </dl>
+        </div>
+    </details>
+    {% endif %}
+
+</aside>
+
+{% endblock %}
+
+{% block content %}
+
+    {{ block.super }}
+
+    {% if modo == 'registro' %}
+
+        {% if msg_erro_setor_pes %}
+            <p class="alert alert-danger"><strong>Problema de setor ou PES</strong>: {{ msg_erro_setor_pes }}.</p>
+        {% endif %}
+
+        {% if not eu_mesmo_posso_editar %}
+            <p class="alert alert-warning"><strong>Atenção</strong>: este {{ nomenclatura.plano_individual_de_trabalho_sigla_pgd2 }} não pode ser editado. 
+                Dessa forma, todos os cálculos de horas, PESs relacionados, período e outros não serão atualizados até que este PIT seja homologado.</p>
+        {% endif %}
+
+        {% if justificativa_observacao_solicitacao %}
+            <div class="alert alert-info">
+                <p><strong>Solicitou Aprovação/Homologação conforme</strong>:</p>
+                <ol class="pb-0">
+                    <li>{{ justificativa_observacao_solicitacao }}</li>
+                </ol>
+            </div>
+        {% endif %}
+
+        {% if pode_editar and erros_pode_solicitar_aprovacao_homologacao_pit %}
+            <div class="alert alert-danger">
+                <p><strong>Atenção</strong>: caso deseje solicitar Aprovação/Homologação você deve observar os seguintes pontos:</p>
+                <ol class="pb-0">
+                    {% for erro in erros_pode_solicitar_aprovacao_homologacao_pit %}
+                        <li>{{ erro }}</li>
+                    {% endfor %}
+                </ol>
+            </div>
+        {% endif %}
+
+        {% if tem_erro_nos_setores_envolvidos %}
+            {% for se in setores_envolvidos %}
+                <div class="alert alert-warning">
+                    {{ se }}
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        {% if erro_habilitacao_setor %}
+            <div class="alert alert-danger">
+                {{ erro_habilitacao_setor }}
+            </div>
+        {% endif %}
+
+        {% if pode_visualizar_nao_homologados %}
+            {% include "include_calculos_horas_pit.html" %}            
+        {% endif %}
+
+        <div class="tab-pane" data-title="Observações/Regras" data-tab="torientacoes" data-tab-info="True">
+            <div class="alert alert-info">
+                <p><strong>Importante</strong>:</p>
+                <ol>
+                    <li>Essas <strong>Observações/Regras sobre Preenchimento Individual de Trabalho do Servidor</strong> devem ser lidas antes do preenchimento deste plano.</li>
+                    <li>Essas informações são disponibilizados pela Gestão e nelas constam conceitos, regras e demais detalhes que devem ser considerados para o preenhcimento deste plano.</li>
+                </ol>
+            </div>
+
+            {% if orientacoes_vigentes_sistemico %}
+                {% box "Orientações Sistêmicas" %}
+                    {% for orientacao in orientacoes_vigentes_sistemico %}
+                        <h4>{{ orientacao|format }} </h4>
+                        {{ orientacao.orientacao|format|safe }}
+                    {% endfor %}
+                {% endbox %}
+            {% endif %}
+
+            {% if orientacoes_vigentes_nao_sistemico %}
+                {% box "Orientações Locais" %}
+                    {% for orientacao in orientacoes_vigentes_nao_sistemico %}
+                        <h4>{{ orientacao|format }} </h4>
+                        {{ orientacao.orientacao|format|safe }}
+                    {% endfor %}
+                {% endbox %}
+            {% endif %}
+        </div>
+
+        <div class="tab-pane" data-title="Dados básicos" data-tab="dadosbasicostab" data-checked="{% if pit_dados_basicos.percentual_teletrabalho %}True{% else %}False{% endif %}">
+            {% if pode_editar_dados_basicos %}
+                <ul class="action-bar">
+                    <li>
+                        <a href="{% url 'editar_dados_basicos_pit_pgd2' pit.id %}" class="btn primary">{% icone "edit" %} Editar</a>
+                    </li>
+                    {% if pode_cancelar_edicao_dados_basicos %}
+                        <li>
+                            <a href="{% url 'cancelar_edicao_dados_basicos_pit_pgd2' pit.id %}" class="btn danger">{% icone "undo" %} Desfazer edição</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            {% endif %}
+
+            {% if pit_dados_basicos.original %}
+                <span class="status status-alert">Dados básicos alterados</span>
+            {% endif %}
+            
+            <dl class="definition-list flex">
+                <div class="list-item">
+                    <dt>Período</dt>
+                    <dd>{{ pit_dados_basicos.data_inicio|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>{{ pit_dados_basicos|verbose:'regime_execucacao' }}</dt>
+                    <dd>{{ pit_dados_basicos.get_regime_execucacao_display|format|safe }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>{{ pit_dados_basicos|verbose:'percentual_teletrabalho' }}</dt>
+                    <dd>{{ pit_dados_basicos.percentual_teletrabalho|format|safe }}</dd>
+                </div>
+            </dl>
+        </div>
+
+        <div class="tab-pane" data-title="Cronograma de Trabalho Presencial" data-tab="trabalhopresencial" data-checked="{% if trabalho_presencial_horarios_agrupado_por_semana %}True{% else %}False{% endif %}">
+            
+            <dl>
+                <dt>Total:</dt>
+                <dd>{{ pit.get_tempo_trabalho_presencial_horas }}</dd>
+            </dl>
+
+            {% if pode_cadastrar_trabalho_presencial %}
+                <ul class="action-bar">
+                    <li>
+                        <a href="{% url 'cadastrar_trabalho_presencial_pit_pgd2' pit.id %}" class="btn success">{% icone "plus" %} Adicionar</a>
+                    </li>
+                    {% if pode_cancelar_em_lote_edicao_trabalho_presencial %}
+                        <li>
+                            <a href="{% url 'cancelar_em_lote_edicao_trabalho_presencial_pit_pgd2' pit.id %}" class="btn danger">Desfazer edições</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            {% endif %}
+            {% if not trabalho_presencial_horarios_agrupado_por_semana %}
+                <p class="alert alert-warning">Não há horários cadastrados.</p>        
+            {% else %}
+                <form method="get" action="/pgd2/remover_trabalho_presencial_pit/{{ pit.id }}" id="form_horario_planejamento_setor">
+                    {% csrf_token %}
+                    {% if pode_cadastrar_trabalho_presencial %}
+                        <div class="actions">
+                            <input value="Remover selecionados" name="remover_htp" type="submit" class="btn danger">
+                        </div>
+                    {% endif %}
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th rowspan="2" scope="col" class="action-checkbox-column">
+                                        {% if pode_cadastrar_trabalho_presencial %}
+                                            <input type="checkbox" id="action-toggle" name="hta">
+                                        {% endif %}
+                                    </th>
+                                    <th>Data</th>
+                                    <th>Hora inicial</th>
+                                    <th>Hora final</th>
+                                    <th>Conforme horário de funcionamento do setor?</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for semana, dados in trabalho_presencial_horarios_agrupado_por_semana.items %}
+                                    <tr>
+                                        <td colspan="6">
+                                            <strong> Semana de {{ dados.inicio|format }} a {{ dados.final|format }} </strong>
+                                        </td>
+                                    </tr>
+                                    {% for dia_pes_hs in dados.hfss %}
+                                        <tr>
+                                            <td>
+                                                {% if pode_cadastrar_trabalho_presencial %}
+                                                    <input type="checkbox" name="checks[]" value="{{ dia_pes_hs.id }}" class="hta">
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if se_pit_ja_foi_homologado_ao_menos_uma_vez and not dia_pes_hs.homologado and not dia_pes_hs.original %}
+                                                    <span class="status status-alert">Novo cronograma</span>
+                                                {% endif %}
+
+                                                {% if dia_pes_hs.eh_copia and dia_pes_hs.alterado %}
+                                                    <span class="status status-alert">Alterado</span>
+                                                {% endif %}
+
+                                                {{ dia_pes_hs.data|date:"d/m/Y" }}</br>
+                                                <i>({{ dia_pes_hs.data|date:"l" }})</i>
+                                            </td>
+                                            <td>
+                                                {{ dia_pes_hs.hora_inicio|time:"H:i:s" }}
+                                            </td>
+                                            <td>
+                                                {{ dia_pes_hs.hora_final|time:"H:i:s" }}
+                                            </td>
+                                            <td>
+                                                {% if dia_pes_hs.estah_conforme_horario_funcionamento_setor %}
+                                                    <img src="/static/admin/img/icon-yes.svg" alt="True">
+                                                {% else %}
+                                                    <img src="/static/admin/img/icon-no.svg" alt="False">
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </form>    
+            {% endif %}
+        </div>
+
+        <div class="tab-pane" data-title="Cronograma de Atendimento em Teletrabalho" data-tab="horaatendimento" data-checked="{% if atendimento_teletrabalho_horarios_agrupado_por_semana %}True{% else %}False{% endif %}">
+            <dl>
+                <dt>Total:</dt>
+                <dd>{{ pit.get_tempo_atendimento_teletrabalho_horas }}</dd>
+            </dl>
+            {% if pode_cadastrar_atendimento_teletrabalho %}
+                <ul class="action-bar">
+                    <li>
+                        <a href="{% url 'cadastrar_atendimento_teletrabalho_pit_pgd2' pit.id %}" class="btn success">{% icone "plus" %} Adicionar</a>
+                    </li>
+                    {% if pode_cancelar_em_lote_edicao_atendimento_teletrabalho %}
+                        <li>
+                            <a href="{% url 'cancelar_em_lote_edicao_atendimento_teletrabalho_pit_pgd2' pit.id %}" class="btn danger">Desfazer edições</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            {% endif %}
+            {% if not atendimento_teletrabalho_horarios_agrupado_por_semana %}
+                <p class="alert alert-warning">Não há horários cadastrados.</p>        
+            {% else %}
+                <form method="get" action="/pgd2/remover_atendimento_teletrabalho_pit/{{ pit.id }}" id="form_horario_planejamento_setor">
+                    {% csrf_token %}
+                    {% if pode_cadastrar_atendimento_teletrabalho %}
+                        <div class="actions">
+                            <input value="Remover selecionados" name="remover_hat" type="submit" class="btn danger">
+                        </div>
+                    {% endif %}
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th rowspan="2" scope="col" class="action-checkbox-column">
+                                        {% if pode_cadastrar_atendimento_teletrabalho %}
+                                            <input type="checkbox" id="action-toggle" name="hat">
+                                        {% endif %}
+                                    </th>
+                                    <th>Data</th>
+                                    <th>Hora inicial</th>
+                                    <th>Hora final</th>
+                                    <th>Conforme horário de funcionamento do setor?</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for semana, dados in atendimento_teletrabalho_horarios_agrupado_por_semana.items %}
+                                    <tr>
+                                        <td colspan="6">
+                                            <strong> Semana de {{ dados.inicio|format }} a {{ dados.final|format }} </strong>
+                                        </td>
+                                    </tr>
+                                    {% for dia_pes_hs in dados.hfss %}
+                                        <tr>
+                                            <td>
+                                                {% if pode_cadastrar_atendimento_teletrabalho %}
+                                                    <input type="checkbox" name="checks[]" value="{{ dia_pes_hs.id }}" class="hat">
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if se_pit_ja_foi_homologado_ao_menos_uma_vez and not dia_pes_hs.homologado and not dia_pes_hs.original %}
+                                                    <span class="status status-alert">Novo cronograma</span>
+                                                {% endif %}
+
+                                                {% if dia_pes_hs.eh_copia and dia_pes_hs.alterado %}
+                                                    <span class="status status-alert">Alterado</span>
+                                                {% endif %}
+
+                                                {{ dia_pes_hs.data|date:"d/m/Y" }}</br>
+                                                <i>({{ dia_pes_hs.data|date:"l" }})</i>
+                                            </td>
+                                            <td>
+                                                {{ dia_pes_hs.hora_inicio|time:"H:i:s" }}
+                                            </td>
+                                            <td>
+                                                {{ dia_pes_hs.hora_final|time:"H:i:s" }}
+                                            </td>
+                                            <td>
+                                                {% if dia_pes_hs.estah_conforme_horario_funcionamento_setor %}
+                                                    <img src="/static/admin/img/icon-yes.svg" alt="True">
+                                                {% else %}
+                                                    <img src="/static/admin/img/icon-no.svg" alt="False">
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </form>    
+            {% endif %}
+        </div>
+
+        <div class="tab-pane" data-title="Entregas" data-checked="{% if entregas_pit %}True{% else %}False{% endif %}" data-tab="entregas">
+
+            <form method="get" action="/pgd2/remover_entrega_pit/{{ pit.id }}" id="form_entrega_pit">
+                {% csrf_token %}
+
+                {% if pode_cadastrar_entrega %}
+                    <ul class="action-bar">
+                        <li class="has-child">
+                            <a class="btn success" href="#">Adicionar</a>
+                            <ul>
+                                <li>
+                                    <a href="{% url 'selecionar_entrega_pes_cadastrar_entrega_pit_pgd2' pit.id %}">
+                                        Entrega vinculada a entrega do PES
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="{% url 'cadastrar_entrega_pit_pgd2' pit.id %}">
+                                        Entrega não vinculada a entrega do PES
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+                        {% if existe_entrega_que_pode_ser_removida_no_pit %}
+                            <li>
+                                <a id="seleciona_entregas" class="btn" onclick="selecionar_todas_entregas2()" href="javascript:">Marcar todas</a>
+                            </li>
+                            <li>
+                                <input value="Remover selecionadas" name="remover_entregas_pit" type="submit" class="btn danger">
+                            </li>
+                        {% endif %}
+                    </ul>
+                {% endif %}
+
+                {% if not entregas_pit %}
+                    <p class="alert alert-warning mt-3">Não há entregas cadastradas.</p>        
+                {% else %}
+                    {% for entrega in entregas_pes_pit %}
+                        {% if entrega.pes_entrega.cancelado %}
+                            <div class="general-box danger">
+                        {% else %}
+                            <div class="general-box">
+                        {% endif %}
+                            <div class="primary-info">
+                                <div class="status-info-container">
+                                    <span class="status status-default">{{ entrega.pes_entrega.pes.setor }} ({{ entrega.pes_entrega.pes.setor.uo }})</span>
+                                    {% if entrega.pes_entrega.cancelado %}
+                                        <span class="status status-error">Entrega PES cancelada</span>
+                                    {% endif %}
+                                </div>
+
+                                <h4>Entrega PES: <a href="/pgd2/visualizar_entrega_pes/{{ entrega.pes_entrega.id }}">{{ entrega.pes_entrega.titulo|format }}</a></h4>
+                                <div class="extra-info">
+                                    {% if entrega.pes_entrega.descricao %}
+                                        <h5>Descrição</h5>
+                                        {{ entrega.pes_entrega.descricao|linebreaks }}
+                                    {% endif %}
+                                    <h5>Critérios de avaliação da entrega</h5>
+                                    {{ entrega.pes_entrega.criterios_avaliacao|linebreaks }}
+
+                                    <h5>Entregas</h5>
+                                    {% include 'includes/table_entregas.html' with entregas=entrega.pit_entregas %}
+                                </div>
+                            </div>
+                            <dl class="secondary-info">
+                                <div class="list-item">
+                                    <dt>{% icone "square" %} Métrica/Meta:</dt>
+                                    <dd>
+                                        {{ entrega.pes_entrega.get_metrica_display|format }} ({{ entrega.pes_entrega.get_meta_str|format }})
+                                    </dd>
+                                </div>
+                                <div class="list-item">
+                                    <dt>{% icone "calendar" %} Prazo:</dt>
+                                    <dd>
+                                        {{ entrega.pes_entrega.data_prazo|format }} 
+                                    </dd>
+                                </div>
+                            </dl>
+                        </div>
+                    {% endfor %}
+
+                    {% if entregas_pit_sem_pes %}
+                        <div class="general-box">
+                            <div class="primary-info">
+                                <h4>Entregas não relacionadas à entregas de PES</h4>
+                                <div class="extra-info">
+                                    {% include 'includes/table_entregas.html' with entregas=entregas_pit_sem_pes %}
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+
+                {% endif %}
+            </form>    
+            
+        </div>
+        
+    {% endif %}
+
+    {% if modo == 'solicitacoes_aprova_homologa' %}
+        {% if not solicitacoes_aprovacao_homologacao_pit %}
+            <p class="alert alert-warning">Não há solicitações de aprovação/homologação.</p>        
+        {% endif %}
+
+        {% for sol_ah in solicitacoes_aprovacao_homologacao_pit %}
+            <div class="general-box">
+                <div class="primary-info">
+                    <div class="status-info-container">
+                        {% if sol_ah.finalizado %}
+                            <span class="status status-success">Finalizado</span>
+                        {% else %}
+                            <span class="status status-error">Em andamento</span>
+                            {% if sol_ah.tem_pendencia_aprovacao %}
+                                <span class="status status-error">Aprovação(ões) pendente(es)</span>
+                            {% else %}
+                                {% if sol_ah.tem_pendencia_homologacao %}
+                                    <span class="status status-error">Homologação pendente</span>
+                                {% endif %}
+                            {% endif %}
+                        {% endif %}
+                    </div>
+                    <h4>
+                        Solicitado em {{ sol_ah.data_envio }}
+                    </h4>
+                    <div class="extra-info">
+                        <div class="table-responsive">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Setor</th>
+                                        <th>Tipo Parecer</th>
+                                        <th>Parecer</th>
+                                        <th>Data Parecer</th>
+                                        <th>Servidor Parecer</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for ssetor in sol_ah.pitsolicitacaoanalisesetor_set.all %}
+                                        <tr>
+                                            <td>
+                                                {{ ssetor.setor|format }} (ou superior quando for caso)
+                                            </td>
+                                            <td>
+                                                {{ ssetor.get_tipo_parecer_str }}
+                                            </td>
+                                            <td>
+                                                {{ ssetor.parecer|format }}
+                                            </td>
+                                            <td>
+                                                {{ ssetor.data_parecer|format }}
+                                            </td>
+                                            <td>
+                                                {{ ssetor.servidor_parecer|format }}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>        
+        {% endfor %}
+    {% endif %}
+
+    {% if modo == 'historico' %}
+        <div class="legenda">
+            <p>Legenda:</p>
+            <ul>
+                <li class="info">Antes da primeira aprovação/homologação do {{ nomenclatura.plano_individual_de_trabalho_sigla_pgd2 }}</li>
+                <li class="warning">Após primeira aprovação/homologação do {{ nomenclatura.plano_individual_de_trabalho_sigla_pgd2 }}</li>
+            </ul>
+        </div>    
+        
+        {% autopaginate registros_acoes 15 %}
+        {% paginate %}
+
+        <ul class="timeline">
+            {% for registro_acao in registros_acoes %}
+                {% if registro_acao.realizada_apos_aprovacao_pit %}
+                    <li class="warning">
+                {% else %}
+                    <li class="info">
+                {% endif %}
+                    <div class="timeline-date">
+                        {{ registro_acao.data|format }}
+                    </div>
+                    <div class="timeline-icon"></div>
+                    <div class="timeline-content">
+                        <h4>
+                            {{ registro_acao.get_tipo_display }} por {{ registro_acao.user|format }} 
+                        </h4>
+                        <p>
+                            {{ registro_acao.observacao }}
+                        </p>
+                        <p>
+                            <ul>
+                            {% for depa in registro_acao.get_de_para %}
+                                <li>
+                                    <strong>Editou</strong> "{{ depa.dado }}" 
+                                    <ul>
+                                        <li><strong>DE: </strong> "{{ depa.de }}" </li>
+                                        <li><strong>PARA: </strong> "{{ depa.para }}" </li>
+                                    </ul>
+                                </li>
+                                    
+                            {% endfor %}
+                            </ul>
+                        </p>
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+
+        {% paginate %}
+    {% endif %}
+
+    {% if modo == 'consultar_api' %}
+        {% if dados_na_base_api_pgd2 %}
+            <div class="alert alert-info">
+                Os dados enviados em {{ pit.data_hora_ultimo_envio_api|format }} constam na base de dados da API do PGD 2 (GOV BR).
+            </div>
+        {% else %}
+            <div class="alert alert-danger">
+                {% if pit.data_hora_ultimo_envio_api %}
+                    Os dados enviados em {{ pit.data_hora_ultimo_envio_api|format }} não constam ou não foi possível obter informações na base de dados da API do PGD 2 (GOV BR).
+                {% else %}
+                    Não foi possível obter os dados na base de dados da API do PGD 2 (GOV BR).
+                {% endif %}
+            </div>
+        {% endif %}
+    {% endif %}
+
+    <script>
+        (function ($) {
+            $(document).on('click', '#action-toggle', function() {
+                var c = $(this).attr("name");
+                $("."+c).not(this).prop('checked', this.checked);
+            });
+        })(django.jQuery);
+
+        function selecionar_todas_entregas2(){
+			var inputs = document.getElementsByClassName('entpit');
+            var seleciona = document.getElementById('seleciona_entregas');
+            if (seleciona.innerHTML == 'Marcar todas'){
+                for(var i=0; i<inputs.length; i++){
+                    inputs[i].checked = true;
+                }
+                seleciona.innerHTML = 'Desmarcar todas';
+            }else{
+                if (seleciona.innerHTML == 'Desmarcar todas'){
+                    for(var i=0; i<inputs.length; i++){
+                        inputs[i].checked = false;
+                    }
+                    seleciona.innerHTML = 'Marcar todas';
+                }
+            }
+		}        
+    </script>
+
+{% endblock %}

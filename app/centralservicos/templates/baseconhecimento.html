@@ -1,0 +1,170 @@
+{% extends super_template %}
+
+{% block extrahead %}
+    <script>
+        jQuery(document).ready(function() {
+            jQuery(".boxes.services .btn").click(function() {
+                var grupo = $(this).data("grupo");
+                $("li[data-base-conhecimento=" + grupo + "]").each(function () {
+                    $(this).toggleClass("d-none");
+                });
+                $(this).find(".showMore, .showLess").toggleClass('d-none');
+                return false;
+            });
+        });
+    </script>
+{% endblock %}
+
+{% block bodyclass %}hasAsideRight{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if perms.centralservicos.add_baseconhecimento %}
+            <li><a href="/admin/centralservicos/baseconhecimento/add/" class="btn success">{% icone "plus" %} Adicionar Artigo</a></li>
+        {% endif %}
+        {% if perms.centralservicos.view_baseconhecimento %}
+            <li><a href="/admin/centralservicos/baseconhecimento/?area__id__exact={{ area.id }}" class="btn default">{% icone "eye" %} Visualizar todos</a></li>
+        {% endif %}
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+    <div class="search-and-filters large-filters">
+        <form name="buscarartigo_form" id="buscarartigo_form" method="POST" class="featured-form">
+            {% csrf_token %}
+            {% render_form form render_full=False submit_label=False %}
+        </form>
+    </div>
+
+    {% for categoria in lista_categorias %}
+        <div class="tab-pane" data-tab="{{ categoria.nome|slugify }}" data-title="{{ categoria.nome }}">
+            <ul class="boxes services flex-container">
+                {% if eh_atendente_desta_area %}
+                    {% for grupo in categoria.get_grupos_servicos_com_base_conhecimento %}
+                        <li class="box-item">
+                            <span class="fas fa-{{ grupo.icone }}" aria-hidden="true"></span>
+                            <h4>{{ grupo.nome }}</h4>
+                            {% if grupo.detalhamento %}
+                                <p class="obs">{{ grupo.detalhamento }}</p>
+                            {% endif %}
+                            {% if grupo.categorias.all %}
+                                <dl class="tags-container">
+                                    <dt>Categorias:</dt>
+                                    <dd>
+                                        <ul class="tags">
+                                            {% for categoria in grupo.categorias.all %}
+                                                <li>{{ categoria.nome }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                    </dd>
+                                </dl>
+                            {% endif %}
+                            <ol class="numbered-list">
+                                {% for baseconhecimento in grupo.get_bases_conhecimento %}
+                                    <li class="list-item {% if forloop.counter > 5 %}d-none{% endif %}" {% if forloop.counter > 5 %}data-base-conhecimento="{{ grupo.id }}"{% endif %}>
+                                        <a href="/centralservicos/baseconhecimento/{{ baseconhecimento.id }}/"><span class="fas fa-file-alt" aria-hidden="true"></span> {{ baseconhecimento.titulo }}</a>
+                                    </li>
+                                    {% if forloop.last %}
+                                        </ol>
+                                        {% if forloop.counter > 5 %}
+                                            <a href="#" class="btn default mt-4" data-grupo="{{ grupo.id }}">
+                                                <span class="showMore">{% icone "chevron-down" %} Mostrar mais</span>
+                                                <span class="showLess d-none">{% icone "chevron-up" %} Mostrar menos</span>
+                                            </a>
+                                        {% endif %}
+                                    {% endif %}
+                                {% endfor %}
+                        </li>
+                    {% endfor %}
+                {% else %}
+                    {% for grupo in categoria.get_grupos_servicos_com_base_conhecimento_faq %}
+                        <li class="box-item">
+                            <span class="fas fa-{{ grupo.icone }}" aria-hidden="true"></span>
+                            <h4>{{ grupo.nome }}</h4>
+                            {% if grupo.detalhamento %}
+                                <p class="obs">{{ grupo.detalhamento }}</p>
+                            {% endif %}
+                            {% if grupo.categorias.all %}
+                                <dl class="tags-container">
+                                    <dt>Categorias:</dt>
+                                    <dd>
+                                        <ul class="tags">
+                                            {% for categoria in grupo.categorias.all %}
+                                                <li>{{ categoria.nome }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                    </dd>
+                                </dl>
+                            {% endif %}
+                            <ol class="numbered-list">
+                                {% for baseconhecimento in grupo.get_bases_conhecimento_faq %}
+                                    <li class="list-item {% if forloop.counter > 5 %}d-none{% endif %}" {% if forloop.counter > 5 %}data-base-conhecimento="{{ grupo.id }}"{% endif %}>
+                                        <a href="/centralservicos/baseconhecimento/{{ baseconhecimento.id }}/"><span class="fas fa-file-alt" aria-hidden="true"></span> {{ baseconhecimento.titulo }}</a>
+                                    </li>
+                                    {% if forloop.last %}
+                                        </ol>
+                                        {% if forloop.counter > 5 %}
+                                            <a href="#" class="btn default" data-grupo="{{ grupo.id }}">
+                                                <span class="showMore">{% icone "chevron-down" %} Mostrar mais</span>
+                                                <span class="showLess d-none">{% icone "chevron-up" %} Mostrar menos</span>
+                                            </a>
+                                        {% endif %}
+                                    {% endif %}
+                                {% endfor %}
+                        </li>
+                    {% endfor %}
+                {% endif %}
+            </ul>
+        </div>
+        {% empty %}
+        <p class="alert alert-warning">Nenhum registro foi encontrado.</p>
+    {% endfor %}
+
+{% endblock %}
+
+{% block asideright %}
+
+    <aside class="right">
+
+        <details open="open">
+            <summary>Artigos Populares</summary>
+            <div class="details-container">
+                {% if mais_populares %}
+                    <ol class="numbered-list">
+                        {% for baseconhecimento in mais_populares %}
+                            <li class="list-item">
+                                <a href="/centralservicos/baseconhecimento/{{ baseconhecimento.id }}/">
+                                    {% icone "file-alt" %} {{ baseconhecimento.titulo }}
+                                </a>
+                            </li>
+                        {% endfor %}
+                    </ol>
+                {% else %}
+                    <p class="alert alert-warning">Não há artigos populares.</p>
+                {% endif %}
+            </div>
+        </details>
+
+        <details open="open">
+            <summary>Últimos Artigos</summary>
+            <div class="details-container">
+                {% if ultimos_cadastrados %}
+                    <ol class="numbered-list">
+                        {% for baseconhecimento in ultimos_cadastrados %}
+                            <li class="list-item">
+                                <a href="/centralservicos/baseconhecimento/{{ baseconhecimento.id }}/">
+                                    {% icone "file-alt" %} {{ baseconhecimento.titulo }}
+                                </a>
+                            </li>
+                        {% endfor %}
+                    </ol>
+                {% else %}
+                    <p class="alert alert-warning">Não há artigos populares.</p>
+                {% endif %}
+            </div>
+        </details>
+
+    </aside>
+
+{% endblock %}

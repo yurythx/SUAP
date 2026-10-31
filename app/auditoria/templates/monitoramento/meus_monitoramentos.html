@@ -1,0 +1,75 @@
+{% extends super_template %}
+{% load static %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        <li><a href="{% static 'auditoria/manual/manual_do_gestor.pdf' %}" class="btn default">{% icone "file-pdf" %} Orientações ao Gestor</a></li>
+    </ul>
+{% endblock %}
+
+{% block content %}
+    {% if meus_relatorios.exists %}
+        <ul class="flex-container boxes services">
+            {% for relatorio in meus_relatorios %}
+                <li class="box-item">
+                    <h4>
+                        <a href="{% url 'auditoria:visualizar_relatorio' relatorio.id %}">
+                            Relatório {{ relatorio }}
+                        </a>
+                    </h4>
+                    <div class="flex-container notes">
+                        {% if relatorio.em_andamento > 0 %}
+                            <a href="{% url 'auditoria:monitoramentos_em_monitoramento' relatorio.id %}" class="note warning">
+                                <strong>{{ relatorio.em_andamento }}</strong> Em monitoramento
+                            </a>
+                        {% endif %}
+                        {% if relatorio.concluidos > 0 %}
+                            <a href="{% url 'auditoria:monitoramentos_concluidos' relatorio.id %}" class="note success">
+                                <strong>{{ relatorio.concluidos }}</strong> Atendidas
+                            </a>
+                        {% endif %}
+                        {% if relatorio.finalizados > 0 %}
+                            <a href="{% url 'auditoria:monitoramentos_finalizados' relatorio.id %}" class="note danger">
+                                <strong>{{ relatorio.finalizados }}</strong> Não atendidas
+                            </a>
+                        {% endif %}
+                        {% if relatorio.cancelados > 0 %}
+                            <a href="{% url 'auditoria:monitoramentos_cancelados' relatorio.id %}" class="note default">
+                                <strong>{{ relatorio.cancelados }}</strong> Canceladas
+                            </a>
+                        {% endif %}
+                        {% if relatorio.vencidos > 0 %}
+                            <a href="{% url 'auditoria:monitoramentos_expirados' relatorio.id %}" class="note danger">
+                                <strong>{{ relatorio.vencidos }}</strong> Expirados
+                            </a>
+                        {% endif %}
+                        {% if relatorio.vencendo_em_sete_dias > 0 %}
+                            <a href="{% url 'auditoria:monitoramentos_expirando' relatorio.id %}" class="note warning">
+                                <strong>{{ relatorio.vencendo_em_sete_dias }}</strong> Expiram em 7 dias
+                            </a>
+                        {% endif %}
+                    </div>
+                    <ol class="numbered-list">
+                        {% for recomendacao in relatorio.recomendacoes.all %}
+                            {% for monitoramento in recomendacao.monitoramentos.all %}
+                                <li class="list-item {% if monitoramento.ultima_solicitacao.esperando %} danger {% elif monitoramento.tem_posicionamento_nao_lido %} warning {% else %} default {% endif %}">
+                                    <a href="{% url 'auditoria:visualizar_monitoramento' monitoramento.id %}">
+                                        {{ monitoramento.recomendacao }} - {{ monitoramento.unidade|format }}
+                                        {% if monitoramento.tem_posicionamento_nao_lido %}
+                                            <span class="unread-indicator">(novo posicionamento divulgado)</span>
+                                        {% endif %}
+                                        {% if monitoramento.tem_manifestacao_a_enviar %}
+                                            <span class="unread-indicator">(manifestação não enviada)</span>
+                                        {% endif %}
+                                    </a>
+                                </li>
+                            {% endfor %}
+                        {% endfor %}
+                    </ol>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="alert alert-warning">Nenhuma recomendação encontrada.</p>
+    {% endif %}
+{% endblock %}

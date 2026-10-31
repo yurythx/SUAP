@@ -1,0 +1,215 @@
+{% extends super_template %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        <li>
+            <a class="btn warning confirm" href="{{ request.full_path }}">
+                Repetir Processamento
+            </a>
+        </li>
+        <li>
+            <a class="btn default" href="/ponto/abrir_opcao_recesso/{{ recesso_opcao.id }}">
+                Acessar Cadastro
+            </a>
+        </li>
+    </ul>
+{% endblock %}
+
+{% block content %}
+    <p class="alert alert-info">
+        Processamento do público alvo.
+    </p>
+
+    <div id="process-container">
+        <div class="progress success">
+            <p>0%</p> <!-- automático -->
+        </div>
+        <div class="info">
+            <!-- automático -->
+            <div>0 de {{ servidores_alvo_count }} servidor(es).</div>
+        </div>
+        <div class="wait">
+            <span class="fas fa-spinner fa-spin" aria-hidden="true"></span> Aguarde...
+        </div>
+        <div class="error false">
+            <!-- automático -->
+        </div>
+    </div>
+{% endblock %}
+
+{% block footer %}
+    <script>
+        $(document).ready(function () {
+            const servidoresAlvoCount = parseInt('{{ servidores_alvo_count }}');
+            const servidoresAlvoIds = `
+                {% for servidor_alvo_id in servidores_alvo_ids %}
+                    {{ servidor_alvo_id }},
+                {% endfor %}
+            `
+            .replaceAll('\n', '')
+            .replaceAll(' ', '')
+            .split(',')
+            .filter((idStr) => `${idStr}`.trim().length > 0)
+            .map((idStr) => parseInt(idStr));
+            
+            const addProcessCount = (value) => {
+                const processContainer = $(`#process-container`);
+                let processCount = $(processContainer).data("process-count") || 0;
+                processCount += value;
+                $(processContainer).data("process-count", processCount);
+            }
+
+            const getProcessCount = () => {
+                const processContainer = $(`#process-container`);
+                const processCount = $(processContainer).data("process-count") || 0;
+                return processCount;
+            }
+
+            const setProgress = (processPerc) => {
+                const processContainer = $(`#process-container`);
+                const progressContainer = $(processContainer).find(`.progress`);
+                const progressContainerBar = $(progressContainer).find(`p`);
+                const processPercDisplay = `${Math.trunc(processPerc)}%`;
+                $(progressContainer).data("progress", `p${processPercDisplay}`);
+                $(progressContainer).attr("data-progress", `p${processPercDisplay}`);
+                $(progressContainerBar).attr('style', `width: ${processPerc}%;`);
+                $(progressContainerBar).empty().append(processPercDisplay);
+            }
+
+            const setInfo = (infoText) => {
+                const processContainer = $(`#process-container`);
+                const infoContainer = $(processContainer).find(`.info`);
+                const infoItem = document.createElement('div');
+                infoItem.innerText = infoText;
+                $(infoContainer).empty().append(infoItem);
+            }
+
+            const addError = (errorText) => {
+                const processContainer = $(`#process-container`);
+                const errorContainer = $(processContainer).find(`.error`);
+                let processErrorCount = $(processContainer).data("process-error-count") || 0;
+                processErrorCount++;
+                $(processContainer).data("process-error-count", processErrorCount);
+                const errorItem = document.createElement('div');
+                errorItem.innerText = errorText;
+                $(errorContainer).append(errorItem);
+            }
+
+            const getProcessErrorCount = () => {
+                const processContainer = $(`#process-container`);
+                const processErrorCount = $(processContainer).data("process-error-count") || 0;
+                return processErrorCount;
+            }
+
+            const hideWait = () => {
+                const processContainer = $(`#process-container`);
+                const waitContainer = $(processContainer).find(`.wait`);
+                $(waitContainer).hide();
+            }
+
+            const processSuccess = () => {
+                $.ajax({
+                    method: "POST",
+                    dataType: "json",
+                    url: `/ponto/processar_fechar_cadastro_e_escolha_automatica/${parseInt('{{ recesso_opcao.id }}')}/`,
+                    data: {
+                        processamento_concluido: "1",
+                    },                
+                    success: function(result, textStatus, jqXHR) {
+                        hideWait();
+                        showFeedbackMessage(`Processamento concluído com sucesso. ${'<a href="/ponto/abrir_opcao_recesso/{{ recesso_opcao.id }}">Acessar Cadastro</a>'}`, 'success');
+                    },                    
+                    error: function(error) {
+                        hideWait();
+                        showFeedbackMessage('Processamento concluído com erros. Tente novamente.', 'error');
+                    }
+                })
+            }
+
+            const callAjax = (servidoresAlvoIds) => {
+                $.ajax({
+                    method: "POST",
+                    dataType: "json",
+                    url: `/ponto/processar_fechar_cadastro_e_escolha_automatica/${parseInt('{{ recesso_opcao.id }}')}/`,
+                    data: {
+                        servidores_ids: servidoresAlvoIds.join(","),
+                    },                
+                    success: function(result, textStatus, jqXHR) {
+                        addProcessCount(servidoresAlvoIds.length);
+                        const processCount = getProcessCount();
+
+                        let processPerc = (processCount * 100) / servidoresAlvoCount;
+                        setProgress(processPerc);
+
+                        setInfo(`${processCount} de ${servidoresAlvoCount} servidor(es).`);
+
+                        const servidoresResultInfo = result.data;
+
+                        servidoresResultInfo.forEach((servidorInfo) => {
+                            let infoItem = document.createElement('div');
+                            infoItem.innerText = `${servidorInfo.servidor}`;
+                            
+                            if (servidorInfo.error) {
+                                addError(`${infoItem.innerText}: Erro de processamento (${servidorInfo.message}).`);
+                            }                            
+                        });
+
+                        if (processCount >= servidoresAlvoCount) {
+                            const processErrorCount = getProcessErrorCount();
+                            
+                            if (processErrorCount === 0) {
+                                processSuccess();
+                            } else {
+                                showFeedbackMessage('Processamento concluído com erros. Tente novamente.', 'error');
+                                hideWait();
+                            }
+                        }
+                    },
+                    
+                    error: function(error) {
+                        addProcessCount(servidoresAlvoIds.length);
+                        const processCount = getProcessCount();
+
+                        let processPerc = (processCount * 100) / servidoresAlvoCount;
+                        setProgress(processPerc);
+
+                        setInfo(`${processCount} de ${servidoresAlvoCount} servidor(es).`);
+
+                        addError(`Erro de processamento.`);
+
+                        if (processCount >= servidoresAlvoCount) {
+                            const processErrorCount = getProcessErrorCount();
+
+                            if (processErrorCount === 0) {
+                                processSuccess();
+                            } else {
+                                showFeedbackMessage('Processamento concluído com erros. Tente novamente.', 'error');
+                                hideWait();
+                            }
+                        }
+                    }
+                });
+            }
+            
+            // ----------------
+            // diminuir o número de solicitações AJAX com o agrupamento de servidores por solicitação ajax
+            
+            const servidoresAlvoIdsGroupLength = Math.trunc(servidoresAlvoCount / 10) + 1;
+            let servidoresAlvoIdsGroupCurrent = [];
+
+            for (let idx = 0; idx < servidoresAlvoIds.length; idx++) {
+                servidoresAlvoIdsGroupCurrent.push(servidoresAlvoIds[idx]);
+                
+                if (servidoresAlvoIdsGroupCurrent.length === servidoresAlvoIdsGroupLength) {
+                    callAjax(servidoresAlvoIdsGroupCurrent);
+                    servidoresAlvoIdsGroupCurrent = [];
+                }
+            }
+
+            if (servidoresAlvoIdsGroupCurrent.length > 0) {
+                callAjax(servidoresAlvoIdsGroupCurrent);
+            }
+        });
+
+    </script>
+{% endblock %}

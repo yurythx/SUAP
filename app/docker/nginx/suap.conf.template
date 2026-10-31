@@ -1,0 +1,107 @@
+log_format timed_combined '$remote_addr $sent_http_user $remote_user [$time_local] '
+                          '"$request" $status $body_bytes_sent '
+                          '"$http_referer" "$http_user_agent" $request_time $upstream_response_time';
+
+server {
+    server_name ${NGINX_SERVER_NAME};
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header Host $http_host;
+
+    set_real_ip_from   172.20.0.2; # Put the Ip of your varnish/proxy here
+    real_ip_header     X-Forwarded-For; # Put the Header that your varnish/proxy set
+
+    error_page 500 502 503 504 /500.html;
+    error_page 413 /413.html;
+
+    location = /500.html {
+        root /opt/suap/docker/nginx;
+        internal;
+    }
+
+    location = /413.html {
+        root /opt/suap/docker/nginx;
+        internal;
+    }
+
+    access_log /opt/suap/deploy/logs/nginx/access.log timed_combined;
+    error_log /opt/suap/deploy/logs/nginx/error.log;
+
+    client_max_body_size 101M;
+
+    location /static {
+        alias /opt/suap/static;
+        access_log off;
+        expires 30d;
+        add_header Cache-Control "public";
+    }
+
+    location /media/private-media {
+        deny all;
+        return 403;
+    }
+
+    location /media {
+        alias /opt/suap/deploy/media;
+    }
+
+    location /manuais {
+        alias /opt/suap/docs_old/usuario/.build/html/;
+        access_log off;
+        expires 30d;
+        add_header Cache-Control "public";
+    }
+
+    location /docs {
+        alias /opt/suap/docs_old/tecnica/.build/html;
+        access_log off;
+        expires 30d;
+        add_header Cache-Control "public";
+    }
+
+    location / {
+        proxy_pass_header Server;
+        proxy_set_header Host $http_host;
+        proxy_redirect off;
+        proxy_set_header X-Real_IP $remote_addr;
+        proxy_set_header X-Scheme $scheme;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_connect_timeout 1200s;
+        proxy_send_timeout 1200s;
+        proxy_read_timeout 1200s;
+        
+        # tamanho do cabecalho http (resolve erros Google ClassRoom IDP)
+        proxy_buffer_size   128k;
+        proxy_buffers   4 256k;
+        proxy_busy_buffers_size   256k;
+        proxy_pass http://web:8000/;
+    }
+}
+
+# Configuração necessária para os terminais acessarem os dados.
+# Os terminais precisam que os Web Services não estejam com SSL
+server { # os terminais java acessam a porta 8080
+    listen 8080;
+    server_name ${NGINX_SERVER_NAME};
+    access_log /opt/suap/deploy/logs/nginx/access.log timed_combined;
+    error_log /opt/suap/deploy/logs/nginx/error.log;
+
+    set_real_ip_from   10.22.0.241;      # Put the Ip of your varnish/proxy here
+    real_ip_header     X-Forwarded-For;  # Put the Header that your varnish/proxy set
+
+    client_max_body_size 101M;
+
+    location /static {
+        alias /opt/suap/static;
+    }
+    location / {
+	    proxy_pass_header Server;
+	    proxy_set_header Host $http_host;
+	    proxy_redirect off;
+	    proxy_set_header X-Real_IP $remote_addr;
+	    proxy_set_header X-Scheme $scheme;
+	    proxy_connect_timeout 600s;
+	    proxy_send_timeout 600s;
+	    proxy_read_timeout 600s;
+        proxy_pass http://web:8000;
+    }
+}

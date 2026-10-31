@@ -1,0 +1,39 @@
+{% load pipeline %}
+{% comment %} 
+   Sentry JS (frontend). A parte dinâmica (versão/ambiente/servidor) é injetada
+   inline em window.__SENTRY_SUAP__; toda a configuração estática
+   (ignoreErrors/denyUrls/beforeSend) vive em comum/js/sentry.js, minificada pelo
+   bundle 'sentry'. Herda o contexto do pai (use_sentry, sentry_js, suap_version,
+   sentry_environment, server_alias).
+
+   O Loader só é injetado se o bundle tiver executado (window.sentryOnLoad
+   definido). Os dois vêm de hosts distintos e falham de forma independente: se o
+   Loader subisse sem o bundle, ele faria Sentry.init() com a config default (sem
+   ignoreErrors, sem release, environment "production") e reportaria justamente o
+   ruído que o filtro existe para descartar. Como o bundle é síncrono, sentryOnLoad
+   já está definido (ou não) aqui.
+
+   Trade-off: script criado via appendChild é async, então o Loader instala os
+   handlers de erro mais tarde que a tag síncrona de antes — erros bem no início da
+   página passam a escapar, inclusive alguns reais. Aceitável porque nenhum código
+   do SUAP chama Sentry.* (só o Loader usa), então nada quebra por o stub
+   window.Sentry chegar depois.
+{% endcomment %}
+{% if use_sentry and sentry_js %}
+    <script>
+        window.__SENTRY_SUAP__ = {
+            release: "{{ suap_version }}",
+            environment: "{{ sentry_environment }}_frontend",
+            serverName: "{{ server_alias }}"
+        };
+    </script>
+    {% javascript 'sentry' %}
+    <script>
+        if (window.sentryOnLoad) {
+            var loader = document.createElement('script');
+            loader.src = "{{ sentry_js }}";
+            loader.crossOrigin = "anonymous";
+            document.head.appendChild(loader);
+        }
+    </script>
+{% endif %}

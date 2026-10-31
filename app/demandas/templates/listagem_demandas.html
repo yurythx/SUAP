@@ -1,0 +1,230 @@
+{% extends super_template %}
+{% load demandas_templatetags %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if perms.demandas.add_demanda %}
+            <li><a href="/admin/demandas/demanda/add/" class="btn success">{% icone "plus" %} Adicionar demanda</a></li>
+        {% endif %}
+        <li><a href="{% url 'demandas' %}" class="btn default">{% icone "tachometer-alt" %} Dashboard</a></li>
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+    {# ── Filtros ── #}
+    {% box "Filtros" class="collapsed" %}
+        <form method="get" action="">
+            <div class="form-row">
+                <div class="form-group col-md-3">
+                    <label>Busca</label>
+                    <input type="text" name="q" value="{{ request.GET.q }}"
+                           class="form-control" placeholder="ID, título ou descrição">
+                </div>
+                <div class="form-group col-md-2">
+                    <label>Área</label>
+                    <select name="area" class="form-control">
+                        <option value="">Todas</option>
+                        {% for a in areas %}
+                            <option value="{{ a.pk }}" {% if request.GET.area == a.pk|stringformat:"s" %}selected{% endif %}>
+                                {{ a.area }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group col-md-2">
+                    <label>Situação</label>
+                    <select name="situacao" class="form-control">
+                        <option value="">Todas</option>
+                        {% for val, label in situacoes %}
+                            <option value="{{ val }}" {% if request.GET.situacao == val %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group col-md-2">
+                    <label>Tipo</label>
+                    <select name="tipo" class="form-control">
+                        <option value="">Todos</option>
+                        {% for val, label in tipos %}
+                            <option value="{{ val }}" {% if request.GET.tipo == val %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group col-md-2">
+                    <label>Tag</label>
+                    <select name="tag" class="form-control">
+                        <option value="">Todas</option>
+                        {% for t in tags %}
+                            <option value="{{ t.pk }}" {% if request.GET.tag == t.pk|stringformat:"s" %}selected{% endif %}>
+                                {{ t.nome }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group col-md-3">
+                    <label>Sub-demandas</label>
+                    <select name="com_subdemandas" class="form-control">
+                        <option value="">Todas</option>
+                        <option value="1" {% if request.GET.com_subdemandas == "1" %}selected{% endif %}>Com sub-demandas</option>
+                        <option value="0" {% if request.GET.com_subdemandas == "0" %}selected{% endif %}>Sem sub-demandas</option>
+                    </select>
+                </div>
+                <div class="form-group col-md-3">
+                    <label>Entrega</label>
+                    <select name="entrega" class="form-control">
+                        <option value="">Qualquer</option>
+                        <option value="pendente" {% if request.GET.entrega == "pendente" %}selected{% endif %}>Aguardando homologação</option>
+                        <option value="vencida"  {% if request.GET.entrega == "vencida" %}selected{% endif %}>Entrega vencida</option>
+                    </select>
+                </div>
+                <div class="form-group col-md-2">
+                    <button type="submit" class="btn primary">{% icone "search" %} Filtrar</button>
+                    &nbsp;
+                    <a href="{% url 'demandas_listagem' %}" class="btn">Limpar</a>
+                </div>
+            </div>
+        </form>
+    {% endbox %}
+
+    {# ── Resultado ── #}
+    {% box "Demandas" badge=total %}
+
+        {% if demandas_lista %}
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Demanda</th>
+                        <th>Área</th>
+                        <th>Situação</th>
+                        <th>Prioridade</th>
+                        <th>Entrega</th>
+                        <th>Sub-demandas</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in demandas_lista %}
+                        {% with d=item.demanda %}
+
+                        {# ── linha da demanda raiz ── #}
+                        <tr>
+                            <td>{{ d.pk }}</td>
+                            <td>
+                                <a href="{{ d.get_absolute_url }}">
+                                    {% if item.tem_subdemandas %}
+                                        {% icone "sitemap" %}
+                                    {% endif %}
+                                    {{ d.titulo|truncatewords:12 }}
+                                </a>
+                                {% if d.privada %}
+                                    <span class="status status-error" title="Demanda privada">{% icone "lock" %}</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ d.area }}</td>
+                            <td>
+                                {% if d.situacao == 'Concluída' %}
+                                    <span class="status status-success">{{ d.situacao }}</span>
+                                {% elif d.situacao == 'Cancelada' %}
+                                    <span class="status status-default">{{ d.situacao }}</span>
+                                {% elif d.situacao == 'Em homologação' or d.situacao == 'Homologada' %}
+                                    <span class="status status-alert">{{ d.situacao }}</span>
+                                {% elif d.situacao == 'Em desenvolvimento' or d.situacao == 'Em implantação' %}
+                                    <span class="status status-info">{{ d.situacao }}</span>
+                                {% else %}
+                                    <span class="status status-default">{{ d.situacao }}</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ d.prioridade|default:"—" }}</td>
+                            <td>
+                                {% if item.entrega_vencida %}
+                                    <span class="status status-error"
+                                          title="Prazo vencido em {{ item.entrega_vencida.prazo_feedback|date:'d/m/Y' }}">
+                                        {% icone "exclamation-triangle" %} Vencida
+                                    </span>
+                                {% elif item.entrega_pendente %}
+                                    <span class="status status-alert"
+                                          title="Enviada em {{ item.entrega_pendente.enviada_em|date:'d/m/Y' }}">
+                                        {% icone "clock" %} Aguardando
+                                        {% if item.entrega_pendente.prazo_feedback %}
+                                            · {{ item.entrega_pendente.prazo_feedback|date:"d/m" }}
+                                        {% endif %}
+                                    </span>
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.tem_subdemandas %}
+                                    <span title="{{ d.total_subdemandas }} sub-demanda{{ d.total_subdemandas|pluralize }}">
+                                        {{ d.percentual_conclusao }}%
+                                        <small>({{ d.subdemandas_encerradas }}/{{ d.total_subdemandas }})</small>
+                                    </span>
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+                        </tr>
+
+                        {# ── linhas das sub-demandas (aninhadas) ── #}
+                        {% for sub in item.subdemandas %}
+                            <tr>
+                                <td>
+                                    {% icone "level-up-alt" style="transform:rotate(90deg)" %}
+                                    {{ sub.pk }}
+                                </td>
+                                <td>
+                                    <a href="{{ sub.get_absolute_url }}">{{ sub.titulo|truncatewords:12 }}</a>
+                                    {% if sub.prioridade_interna %}
+                                        <small class="text-muted">· {{ sub.prioridade_interna }}ª</small>
+                                    {% endif %}
+                                </td>
+                                <td>{{ sub.area }}</td>
+                                <td>
+                                    {% if sub.situacao == 'Concluída' %}
+                                        <span class="status status-success">{{ sub.situacao }}</span>
+                                    {% elif sub.situacao == 'Cancelada' %}
+                                        <span class="status status-default">{{ sub.situacao }}</span>
+                                    {% elif sub.situacao == 'Em homologação' or sub.situacao == 'Homologada' %}
+                                        <span class="status status-alert">{{ sub.situacao }}</span>
+                                    {% elif sub.situacao == 'Em desenvolvimento' or sub.situacao == 'Em implantação' %}
+                                        <span class="status status-info">{{ sub.situacao }}</span>
+                                    {% else %}
+                                        <span class="status status-default">{{ sub.situacao }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>—</td>
+                                <td>
+                                    {# indicador de entrega da sub-demanda #}
+                                    {% for e in sub.entregas.all %}
+                                        {% if e.status == 'ENVIADA' %}
+                                            {% if e.prazo_vencido %}
+                                                <span class="status status-error">{% icone "exclamation-triangle" %} Vencida</span>
+                                            {% else %}
+                                                <span class="status status-alert">{% icone "clock" %} Aguardando</span>
+                                            {% endif %}
+                                        {% endif %}
+                                    {% empty %}
+                                        —
+                                    {% endfor %}
+                                </td>
+                                <td>—</td>
+                            </tr>
+                        {% endfor %}
+
+                        {% endwith %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="alert alert-info">Nenhuma demanda encontrada com os filtros aplicados.</p>
+        {% endif %}
+
+    {% endbox %}
+
+{% endblock %}

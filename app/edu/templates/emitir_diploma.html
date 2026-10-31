@@ -1,0 +1,92 @@
+{% extends super_template %}
+
+{% block action-bar %}
+<ul class="action-bar">
+    {% help_button %}
+</ul>
+{% endblock %}
+
+{% block content %}
+
+    {% if form.cleaned_data.tuma %}
+        {{ form.cleaned_data.tuma }}
+    {% endif %}
+
+    {% if form.cleaned_data.aluno %}
+        {% if registros.exists %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Registros de emissões do aluno</caption>
+                    <thead>
+                    <tr>
+                        <th rowspan="2" class="no-print">Ações</th>
+                        <th colspan="4" class="text-center">Dados da Emissão</th>
+                        <th colspan="{% if aluno.requer_autenticacao_sistec_para_emissao_diploma %}5{% else %}4{% endif %}" class="text-center">Dados do Registro</th>
+                        <th rowspan="2" class="no-print">Opções</th>
+                    </tr>
+                    <tr>
+                        <th>Via</th>
+                        <th>Data de Emissão</th>
+                        <th>Processo</th>
+                        <th>Nº do Formulário</th>
+                        <th>Data do Registro</th>
+                        <th>Registro</th>
+                        <th>Livro</th>
+                        <th>Folha</th>
+                        {% if aluno.requer_autenticacao_sistec_para_emissao_diploma %}
+                            <th>Autenticação SISTEC</th>
+                        {% endif %}
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for registro in registros %}
+                        <tr>
+                            <td class="no-print">{% icon "view" "/edu/registroemissaodiploma/{{ registro.pk }}/" %}</td>
+                            <td><strong>{{ registro.via }}ª</strong></td>
+                            <td>{{ registro.data_expedicao|format }}</td>
+                            <td>{{ registro.processo|default:registro.observacao|format }}</td>
+                            <td>{{ registro.numero_formulario|format }}</td>
+                            <td>{{ registro.data_registro|format }}</td>
+                            <td>{{ registro.numero_registro|format }}</td>
+                            <td>{{ registro.get_livro|format }}</td>
+                            <td>{{ registro.folha|format }}</td>
+                            {% if aluno.requer_autenticacao_sistec_para_emissao_diploma %}
+                                <td>{{ registro.autenticacao_sistec|format }}</td>
+                            {% endif %}
+                            <td class="no-print">
+                                <ul class="action-bar">
+                                    {% if not aluno.curso_campus.assinatura_digital and not aluno.curso_campus.assinatura_eletronica %}
+                                        {% if registro.data_registro %}
+                                            <li><a href="/edu/imprimir_diploma/{{ registro.pk }}/" class="btn">Imprimir diploma</a></li>
+                                        {% endif %}
+                                        {% if registro.data_registro %}
+                                            <li><a href="/edu/registroemissaodiploma_pdf/{{ registro.pk }}/" class="btn">Imprimir registro</a></li>
+                                        {% endif %}
+                                    {% endif %}
+                                    {% if registro.eh_ultima_via %}
+                                        <li><a href="/edu/emitir_segunda_via_diploma/{{ registro.pk }}/" class="btn">Emitir nova via</a></li>
+                                    {% endif %}
+                                </ul>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Nenhum diploma/certificado foi emitido para {{ form.cleaned_data.aluno }} ainda.</p>
+        {% endif %}
+    {% endif %}
+
+    {% if not registros.exists %}
+        {% box 'Emissão de Diploma' %}
+            {% render_form form %}
+            <script>
+            {% if not aluno.requer_autenticacao_sistec_para_emissao_diploma %}
+                $("#id_autenticacao_sistec").parent().hide();
+            {% endif %}
+            </script>
+        {% endbox %}
+    {% endif %}
+
+{% endblock %}

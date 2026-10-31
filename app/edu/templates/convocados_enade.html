@@ -1,0 +1,114 @@
+{% extends super_template %}
+
+{% block action-bar %}
+
+    {% if acesso_total %}
+        <ul class="action-bar">
+            <li><a href="/edu/adicionar_aluno_avulso_enade/{{ obj.pk }}/{{ curso_campus.pk }}/" class="btn success popup">Adicionar aluno avulso</a></li>
+            {% if obj|method:"pode_processar_lista_convocados"|call:request.user %}
+                <li><a href="/edu/atualizar_lista_convocados_enade/{{ obj.pk }}/?curso_campus={{ curso_campus.pk }}" class="btn primary">Reprocessar convocações</a></li>
+            {% endif %}
+            <li><a class="btn default" href="/edu/convocacao_enade/{{obj.pk }}/">Visualizar convocação</a></li>
+            {% if publico_comunicador %}
+                <li class="has-child">
+                    <a href="#" class="btn">Enviar mensagem</a>
+                    <ul>
+                        {% for publico in publico_comunicador %}
+                            <li><a href="/edu/enviar_mensagem/?enade={{ obj.id }}&curso_campus={{curso_campus.id }}&tipo_convocacao={{ publico.0}}{% if not obj.is_avaliacao_teorica %}&periodo={{ periodo_id }}{% endif %}">{{ publico.1}}</a></li>
+                        {% endfor %}
+                    </ul>
+                </li>
+            {% endif %}
+            <li class="has-child">
+                <a href="#" class="btn">Exportar</a>
+                <ul>
+                    <li><a href="/edu/imprimir_lista_convocados_enade_pdf/{{ obj.pk }}/?curso={{ curso_campus.pk }}">Lista de convocados em PDF</a></li>
+                    <li><a href="?xls=1">Lista de convocados em XLS</a></li>
+                    {% if obj.is_avaliacao_teorica %}
+                        <li><a href="{% url 'download_estudantes_ingressantes_avaliacao_teorica' obj.pk curso_campus.pk %}">Inscrições em lote de ingressantes</a></li>
+                        <li><a href="{% url 'download_estudantes_concluintes_avaliacao_teorica' obj.pk curso_campus.pk %}">Inscrições em lote de concluintes</a></li>
+
+                    {% else %}
+                        <li><a href="{% url 'download_professores_orientadores_avaliacao_pratica' obj.pk curso_campus.pk %}">Professores orientadores</a></li>
+                        <li><a href="{% url 'download_professores_supervisores_avaliacao_pratica' obj.pk curso_campus.pk %}">Professores supervisores</a></li>
+                        <li><a href="{% url 'download_estudantes_habilitados_avaliacao_pratica' obj.pk curso_campus.pk %}">Inscrições em lote de convocados</a></li>
+                    {% endif %}
+                </ul>
+            </li>
+
+        </ul>
+    {% endif %}
+
+{% endblock %}
+
+{% block content %}
+
+    {% box "Dados da convocação" %}
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>Convocação</dt>
+                <dd>{{ obj.descricao }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Tipo de convocação</dt>
+                <dd>{{ obj.get_tipo_convocacao_display|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Curso</dt>
+                <dd>{{ curso_campus.descricao }}</dd>
+            </div>
+        </dl>
+    {% endbox %}
+    <br><br>
+    <form action="" method="post">
+        {% csrf_token %}
+
+        {% regroup lista_convocados|dictsort:"aluno.curso_campus.descricao_historico" by aluno.curso_campus.descricao_historico as convocados_por_curso %}
+
+        {% for lista_convocados in convocados_por_curso %}
+            {% regroup lista_convocados.list|dictsort:"tipo_convocacao" by tipo_convocacao as lista_convocados_por_tipo %}
+            {% for convocados_por_tipo in lista_convocados_por_tipo %}
+                {% box convocados_por_tipo.list.0.get_tipo_convocacao_display badge=convocados_por_tipo.list|length class='collapsed' boxid='convocados{{ forloop.counter }}' %}
+                    {% include 'tabela_convocados_enade.html' %}
+                {% endbox %}
+            {% endfor %}
+        {% endfor %}
+
+        {% if acesso_total %}
+            <div class="submit-row">
+                <input class="btn danger" type="submit" name="excluir" value="Excluir registros selecionados" />
+                {% if dispensa_enape_em_lote %}
+                <a class="btn warning" href="/edu/dispensar_participacao_enade_em_lote/{{ obj.pk }}/{{ curso_campus.pk }}/" name="dispensa_enade" id="dispensa_enade">Dispensar alunos</a>
+                {% endif %}
+            </div>
+        {% endif %}
+    </form>
+    {% if dispensa_enape_em_lote %}
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const checkboxes = document.querySelectorAll(".convocados-checkbox");
+            const link = document.getElementById("dispensa_enade");
+
+            link.addEventListener("click", function(event) {
+                event.preventDefault(); // Impede o link de seguir o href original
+
+                const valoresSelecionados = [];
+                checkboxes.forEach(function(checkbox) {
+                    if (checkbox.checked) {
+                        valoresSelecionados.push(checkbox.value);
+                    }
+                });
+
+                if (valoresSelecionados.length > 0) {
+                    const href = link.getAttribute("href");
+                    const novoHref = href + valoresSelecionados.join(",") + "/";
+                    link.setAttribute("href", novoHref);
+                    window.location.href = novoHref;
+                } else {
+                    alert("Nenhum convocado foi selecionado.");
+                }
+            });
+        });
+    </script>
+    {% endif %}
+{% endblock %}

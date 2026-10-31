@@ -1,0 +1,141 @@
+{% extends super_template %}
+
+{% block extrahead %}
+	{{ form.media }}
+	{% endblock %}
+{% block content %}
+
+{% box 'Dados gerais' %}
+<table>
+	<tr>
+		<td>Unidade Gestora</td>
+		<td>{{ ug }}</td>
+	</tr>
+	<tr>
+		<td>{{ form.recursos.label }}</td>
+		<td>
+			<form>
+				{{ form.recursos }}
+			</form>
+		</td>
+	</tr>
+</table>
+{% endbox %}
+
+{% if eventos %}
+<p class="alert alert-warning">Os eventos listados abaixo não estão atualizados. Solicite a atualização dos eventos ao administrador do módulo de orçamento.</p>
+{% box 'Lista de eventos que precisam ser atualizados' %}
+<table>
+	<thead>
+		<tr>
+			<th width="60px">Código</th>
+			<th width="250px">Nome</th>
+			<th>Descrição</th>
+		</tr>
+	</thead>
+	<tbody>
+		{% for evento in eventos %}
+		<tr>
+			<td class="text-center">{{ evento.codigo }}</td>
+			<td>{{ evento.nome }}</td>
+			<td>{{ evento.descricao|default:"Não informada" }}</td>
+		</tr>
+		{% endfor %}
+	</tbody>
+</table>
+{% endbox %}
+{% else %}
+{% if despesas %}
+{% regroup despesas|dictsortreversed:"unidade_gestora_nome" by unidade_gestora_nome as lista_ugrs %}
+<div id="recursos" class="cx_tabela">
+	<div id="tbl_ugr">
+		<table>
+			<thead>
+				<tr>
+					<th width="18px"></th>
+					<th width="50px" class="text-center">Código</th>
+					<th>Unidade Gestora</th>
+					<th width="130px" class="text-center">Descentralizado</th>
+					<th width="130px" class="text-center">Utilizado</th>
+					<th width="130px" class="text-center">Disponível</th>
+				</tr>
+			</thead>
+			{% for ugr in lista_ugrs %}
+			<tr>
+				<td>{% icon "view" "/orcamento/execucaoorcamentaria/ug/{{ ug.id }}/ugr/{{ ugr.list.0.unidade_gestora_id }}/" %}</td>
+				<td class="text-center">{{ ugr.list.0.unidade_gestora_codigo }}</td>
+				<td>{{ ugr.list.0.unidade_gestora_nome }}</td>
+				<td style="text-align:right">
+					<a href="/orcamento/notacreditodotacao/ug/{{ ug.id }}/ugr/{{ ugr.list.0.unidade_gestora_id }}/">
+						{{ ugr.list|sum_values_by_key:"descentralizado"|mascara_dinheiro }}
+					</a>
+				</td>
+				<td style="text-align:right">{{ ugr.list|sum_values_by_key:"utilizado"|mascara_dinheiro }}</td>
+				<td style="text-align:right">{{ ugr.list|sum_values_by_key:"saldo_disponivel"|mascara_dinheiro }}</td>
+			</tr>
+			{% endfor %}
+			<tfoot>
+				<tr>
+					<td colspan="3">Total</td>
+					<td>{{ despesas|sum_values_by_key:"descentralizado"|mascara_dinheiro }}</td>
+					<td>{{ despesas|sum_values_by_key:"utilizado"|mascara_dinheiro }}</td>
+					<td>{{ despesas|sum_values_by_key:"saldo_disponivel"|mascara_dinheiro }}</td>
+				</tr>
+			</tfoot>
+		</table>
+	</div>
+	{% regroup despesas|dictsort:"natureza_despesa_id" by natureza_despesa_id as lista_despesas %}
+	<div style="display:none;" id="tbl_nat">
+		<table>
+			<thead>
+				<tr>
+					<th width="18px"></th>
+					<th width="50px" class="text-center">Código</th>
+					<th>Natureza de Depesa/Fonte de Recurso</th>
+					<th width="100px" class="text-center">Descentralizado</th>
+					<th width="100px" class="text-center">Utilizado</th>
+					<th width="100px" class="text-center">Disponível</th>
+				</tr>
+			</thead>
+			<tbody>
+				{% for despesas in lista_despesas %}
+				<tr>
+					<td>{% icon "view" "/orcamento/execucaoorcamentaria/ug/{{ ug.id }}/naturezadespesa/{{ despesas.list.0.natureza_despesa_id }}/" %}</td>
+					<td style="font-weight:bold;text-align:center;">{{ despesas.list.0.natureza_despesa_id }}</td>
+					<td>{{ despesas.list.0.natureza_despesa_nome }}</td>
+					<td style="font-weight:bold;text-align:right;">{{ despesas.list|sum_values_by_key:"descentralizado"|mascara_dinheiro }}</td>
+					<td style="font-weight:bold;text-align:right;">{{ despesas.list|sum_values_by_key:"utilizado"|mascara_dinheiro }}</td>
+					<td style="font-weight:bold;text-align:right;">{{ despesas.list|sum_values_by_key:"saldo_disponivel"|mascara_dinheiro }}</td>
+				</tr>
+				{% regroup despesas.list|dictsort:"fonte_recurso_nome" by fonte_recurso_nome as lista_despesa %}
+				{% for despesa in lista_despesa %}
+				<tr>
+					<td></td>
+					<td class="text-center">{{ despesa.list.0.fonte_recurso_id }}</td>
+					<td>{{ despesa.list.0.fonte_recurso_nome }}</td>
+					<td class="text-end">{{ despesa.list|sum_values_by_key:"descentralizado"|mascara_dinheiro }}</td>
+					<td class="text-end">{{ despesa.list|sum_values_by_key:"utilizado"|mascara_dinheiro }}</td>
+					<td class="text-end">{{ despesa.list|sum_values_by_key:"saldo_disponivel"|mascara_dinheiro }}</td>
+				</tr>
+				{% endfor %}
+				{% endfor %}
+			</tbody>
+			<tfoot>
+				<tr>
+					<td colspan="3">Total:</td>
+					<td>{{ despesas|sum_values_by_key:"descentralizado"|mascara_dinheiro }}</td>
+					<td>{{ despesas|sum_values_by_key:"utilizado"|mascara_dinheiro }}</td>
+					<td>{{ despesas|sum_values_by_key:"saldo_disponivel"|mascara_dinheiro }}</td>
+				</tr>
+			</tfoot>
+		</table>
+	</div>
+</div>
+{% endif %}
+{% endif %}
+
+<div id="botoes" class="botoes" >
+	<a class="lnk_botao voltar">Voltar</a>
+</div>
+
+{% endblock %}

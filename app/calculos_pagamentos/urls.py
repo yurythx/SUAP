@@ -1,0 +1,37 @@
+from django.urls import path
+
+from . import views
+
+urlpatterns = [
+    path('get_valores/', views.get_valores),
+    path('gerar_documentocalculosubstituicao/<int:pk>/', views.gerar_documentocalculosubstituicao),
+    path('calculosubstituicao/<int:pk>/', views.calculosubstituicao),
+    path('calculoprogressao/<int:pk>/', views.calculoprogressao),
+    path('calculopericulosidade/<int:pk>/', views.calculopericulosidade),
+    path('calculoinsalubridade/<int:pk>/', views.calculoinsalubridade),
+    path('calculort/<int:pk>/', views.calculort),
+    path('calculorsc/<int:pk>/', views.calculorsc),
+    path('calculoiq/<int:pk>/', views.calculoiq),
+    path('', views.calculos),
+    path('calculomudancaregime/<int:pk>/', views.calculomudancaregime),
+    path('calculotransporte/<int:pk>/', views.calculotransporte),
+    path('calculopermanencia/<int:pk>/', views.calculopermanencia),
+    path('calculonomeacaocd/<int:pk>/', views.calculofgscds),
+    path('calculoexoneracaocd/<int:pk>/', views.calculofgscds),
+    path('calculodesignacaofg/<int:pk>/', views.calculofgscds),
+    path('calculodispensafg/<int:pk>/', views.calculofgscds),
+    path('criar_pagamento/<int:pk>/', views.criar_pagamento),
+    path('pagamento/<int:pk>/', views.pagamento),
+    path('gerar_arquivo_nao_processados/', views.gerar_arquivo_nao_processados),
+    path('relatorio_detalhado/<int:pk>/', views.relatorio_detalhado),
+    path('arquivo_aceitos/', views.arquivo_aceitos),
+    path('arquivo_rejeitados/', views.arquivo_rejeitados),
+    path('pagamento_lancado_manualmente/', views.pagamento_lancado_manualmente),
+    path('regerar_arquivo/<int:pk>/', views.regerar_arquivo),
+    path('calculoterminocontratoprofsubs/<int:pk>/', views.calculoterminocontrato),
+    path('calculoterminocontratointerplibras/<int:pk>/', views.calculoterminocontrato),
+    path('informar_irpf/<int:pk>/', views.informar_irpf),
+    path('calculopreescolar/<int:pk>/', views.calculopreescolar),
+    path('listar_matriculas/<int:arquivo_id>/', views.listar_matriculas),
+    path('gerar_documento/<int:calculo_pk>/<int:tipo_documento>/', views.gerar_documento),
+]

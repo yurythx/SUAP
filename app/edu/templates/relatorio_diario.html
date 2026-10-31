@@ -1,0 +1,142 @@
+{% extends super_template %}
+
+{% block content %}
+    <ul class="action-bar">
+        {% if exibir_botao_executar %}
+            <li>
+                <a class="btn" href="/edu/meus_relatorios/2/">Executar Consulta Salva Anteriormente</a>
+            </li>
+        {% endif %}
+        {% help_button %}
+    </ul>
+    <div id="formbox">
+        {% render_form form %}
+    </div>
+    <div id="resultadobox">
+        {% if agrupamento %}
+            <script>
+                $('#formbox').hide();
+            </script>
+            {% if filtros %}
+                {% box "Filtros" %}
+                    <ul class="action-bar">
+                        <li>
+                            <a class="btn" href="/edu/relatorio_diario/">Limpar Filtros</a>
+                        </li>
+                        <li>
+                            <a class="btn" onclick="javascript:$('#formbox').toggle();$('#resultadobox').toggle();return false;">Alterar
+                                Filtros</a>
+                        </li>
+                    </ul>
+                    <dl class="definition-list flex">
+                        {% for filtro in filtros %}
+                        <div class="list-item flex-basis-100">
+                            <dt>{{ filtro.chave }}</dt>
+                            <dd>{{ filtro.valor }}</dd>
+                        </div>
+                            {% endfor %}
+                    </dl>
+                {% endbox %}
+            {% endif %}
+            {% box "Resultado da Pesquisa ({{ diarios.count }} diários)" %}
+                {% if impede_exportar %}
+                    <p class="alert alert-info">As opções de exportação de diários estão disponíveis apenas para consultas com até 500 registros. Refine sua pesquisa para reduzir a quantidade de resultados.</p>
+                {% endif %}
+                {% if diarios.exists %}
+                    {% autopaginate diarios 25 'page' '/edu/relatorio_diario/' %}
+                    <ul class="action-bar">
+                        <li>
+                            <a class="btn success popup" data-reload-on-close="false"
+                               href="/edu/salvar_relatorio/2/{{ query_string }}/">Salvar Consulta</a>
+                        </li>
+                        {% if not impede_exportar %}
+                            {% if perms.edu.emitir_boletins %}
+                                <li>
+                                    <a class="btn" href="/edu/relatorio_diario/?{{ request.META.QUERY_STRING }}&imprimir={{ request.GET.etapa }}">Exportar para PDF</a>
+                                </li>
+                            {% endif %}
+                            <li>
+                                <a class="btn" href="/edu/relatorio_diario/?{{ request.META.QUERY_STRING }}&xls=1">Exportar para XLS</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                    {% if agrupamento == 'Campus' %}
+                        {% regroup diarios by turma.curso_campus.diretoria.setor.uo.nome as diarios_agrupados %}
+                    {% elif agrupamento == 'Componente' %}
+                        {% regroup diarios by componente_curricular.componente.sigla as diarios_agrupados %}
+                    {% else %}
+                        {% regroup diarios by turma.curso_campus as diarios_agrupados %}
+                    {% endif %}
+
+                    {% for item_diario in diarios_agrupados %}
+                        <h4>{{ item_diario.grouper|format }}</h4>
+                        <div class="table-responsive">
+                        <table class="mb-2">
+                            <caption>Listagem de diários por Campus</caption>
+                            <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Código</th>
+                                <th>Diário</th>
+                                <th>Professores</th>
+                                {% for campo in campos_exibicao %}
+                                    {% for label in form.EXIBICAO_CHOICES %}
+                                        {% if label.0 == campo %}
+                                            <th>{{ label.1 }}</th>
+                                        {% endif %}
+                                    {% endfor %}
+                                {% endfor %}
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for diario in item_diario.list %}
+                                <tr>
+                                    <td>{% index_paginacao %}</td>
+                                    {% if perms.edu.view_diario %}
+                                        <td><a href="/edu/diario/{{ diario.pk }}/">{{ diario.pk }}</a></td>
+                                    {% else %}
+                                        <td>{{ diario.pk }}</td>
+                                    {% endif %}
+                                    <td>{{ diario.componente_curricular.componente }}</td>
+                                    <td>
+                                        <ul>
+                                        {% for professor_diario in diario.get_professores %}
+                                            <li>
+                                                {{ professor_diario.professor|format }}
+                                                <br>
+                                                <dl>
+                                                    <dt>Carga Horária</dt>
+                                                    <dd>{{ professor_diario.percentual_ch }}%</dd>
+                                                    <dt>Período Letivo</dt>
+                                                    <dd>
+                                                        {% if professor_diario.periodo_letivo_ch %}
+                                                            {{ diario.ano_letivo }}.{{ professor_diario.periodo_letivo_ch }}
+                                                        {% else %}
+                                                            {{ diario.ano_letivo }}.1 e {{ diario.ano_letivo }}.2
+                                                        {% endif %}
+                                                    </dd>
+                                                </dl>
+                                                <br>
+                                            </li>
+                                        {% endfor %}
+                                        </ul>
+                                    </td>
+                                    {% for campo in campos_exibicao %}
+                                        <td>{{ diario|getattrr:campo|format }}</td>
+                                    {% endfor %}
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                        </div>
+                    {% endfor %}
+                    {% paginate %}
+                {% else %}
+                    <p class='alert alert-warning'>
+                        Nenhum diário encontrado.
+                    </p>
+                {% endif %}
+            {% endbox %}
+        {% endif %}
+    </div>
+{% endblock %}

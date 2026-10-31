@@ -1,0 +1,267 @@
+{% extends "calculos_pagamentos/templates/calculo.html" %}
+
+{% block dados_calculo %}
+    <table class="info">
+        <tr>
+            <td>Servidor Interessado</td>
+            <td><a href="{{ calculo.servidor.get_absolute_url }}">{{ calculo.servidor.pessoa_fisica.nome|format }} ({{ calculo.servidor.matricula|format }})</a></td>
+            <td>Categoria</td>
+            <td>{{ calculo.servidor.categoria|format }}</td>
+        </tr>
+        <tr>
+            <td>Justificativa</td>
+            <td colspan="3">{{ calculo.justificativa|safe }}</td>
+        </tr>
+        <tr>
+            <td>Observações</td>
+            <td colspan="3">{{ calculo.observacoes|safe }}</td>
+        </tr>
+        <tr>
+            <td>Último atestador</td>
+            <td>{{ calculo.atestador|format }}</td>
+            <td>Data de Cadastro</td>
+            <td>{{ calculo.data_criacao|format }}</td>
+        </tr>
+        <tr>
+            <td>{{ calculo|verbose:"contrato"|format }}</td>
+            <td colspan="3">{{ calculo.contrato|format }}</td>
+        </tr>
+        <tr>
+            {# IFMA/Tássio: Estilo abaixo para melhor visualização na impressão #}
+            <td style="min-width:200px">{{ calculo|verbose:"meses_devidos_ferias"|format }}</td>
+            <td>{{ calculo.meses_devidos_ferias|format }}</td>
+            <td>{{ calculo|verbose:"meses_devidos_grat_nat"|format }}</td>
+            <td>{{ calculo.meses_devidos_grat_nat|format }}</td>
+        </tr>
+        <tr>
+            <td>{{ calculo|verbose:"pss_grat_nat"|format }}</td>
+            <td>{{ calculo.pss_grat_nat|format }}%</td>
+            <td>{{ calculo|verbose:"total_irpf_grat_nat"|format }}</td>
+            <td>
+                R${{ calculo.total_irpf_grat_nat|format }} /
+                <a class="btn success" title="Informar valor" href="/calculos_pagamentos/informar_irpf/{{ calculo.pk }}">Informar valor</a>
+            </td>
+        </tr>
+        <tr>
+            <td>{{ calculo|verbose:"total_adiantamento_grat_nat"|format }}</td>
+            <td colspan="3">R${{ calculo.total_adiantamento_grat_nat|format }}</td>
+        </tr>
+    </table>
+{% endblock %}
+
+{% block periodos %}
+
+    {% box "Períodos do Cálculo" %}
+
+        {% if periodos.exists %}
+            <table>
+                <thead>
+                    <tr style="word-break: break-word;"> {# IFMA/Tássio: Esse style funciona, mas não mostra hifens #}
+                        <th>#</th>
+                        <th>{{ periodos.0|verbose:'data_inicio' }}</th>
+                        <th>{{ periodos.0|verbose:'data_fim' }}</th>
+                        <th>{{ periodos.0|verbose:'nivel' }}</th>
+                        <th>{{ periodos.0|verbose:'jornada' }}</th>
+                        <th>
+                            {% if calculo.servidor.eh_docente %}
+                                {{ periodos.0|verbose:'titulacao' }}
+                            {% else %}
+                                {{ periodos.0|verbose:'iq' }}
+                            {% endif %}
+                        </th>
+                        <th>{{ periodos.0|verbose:'periculosidade' }}</th>
+                        <th>{{ periodos.0|verbose:'insalubridade' }}</th>
+                        <th>{{ periodos.0|verbose:'dias_uteis' }}</th>
+                        <th>{{ periodos.0|verbose:'transporte' }}</th>
+                        <th>{{ periodos.0|verbose:'data_inicio_desc_alim' }}</th>
+                        <th>{{ periodos.0|verbose:'data_fim_desc_alim' }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for periodo in periodos %}
+                        <tr>
+                            <td>{{ forloop.counter }}°</td>
+                            <td>{{ periodo.data_inicio|format }}</td>
+                            <td>{{ periodo.data_fim|format }}</td>
+                            <td>
+                                {% if calculo.servidor.eh_docente %}
+                                    {{ periodo.nivel|format }}
+                                {% else %}
+                                    E - 101<br>({{ periodo.nivel|format }})
+                                {% endif %}
+                            </td>
+                            <td>{{ periodo.jornada|format }}</td>
+                            <td>
+                                {% if calculo.servidor.eh_docente %}
+                                    {{ periodo.titulacao|format }}
+                                {% else %}
+                                    {{ periodo.iq|format }}%
+                                {% endif %}
+                            </td>
+                            <td>{{ periodo.periculosidade|format }}</td>
+                            <td>{{ periodo.insalubridade|format }}%</td>
+                            <td>{{ periodo.dias_uteis|format }}</td>
+                            <td>R${{ periodo.transporte|format }}</td>
+                            <td>{{ periodo.data_inicio_desc_alim|format }}</td>
+                            <td>{{ periodo.data_fim_desc_alim|format }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="alert alert-warning">OPS! Houve um erro ao buscar os períodos.</p>
+        {% endif %}
+    {% endbox %}
+
+{% endblock %}
+
+{% block detalhamentos %}
+    {% box "Rendimentos" %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Rubrica</th>
+                    <th>Período</th>
+                    <th>Quantidade de Dias</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for detalhamento in detalhamentos %}
+                    {% if detalhamento.valor_contr %}
+                        <tr>
+                            <td>{{ calculo|verbose:"total_contr" }} - {{ detalhamento.data_inicio.month }}/{{ detalhamento.data_inicio.year }}</td>
+                            <td>{{ detalhamento.data_inicio|format }} a {{ detalhamento.data_fim|format }}</td>
+                            <td>{{ detalhamento.quant_dias|format }}</td>
+                            <td>R${{ detalhamento.valor_contr|format }}</td>
+                        </tr>
+                    {% endif %}
+                    {% if detalhamento.valor_per %}
+                        <tr>
+                            <td>{{ calculo|verbose:"total_per" }} - {{ detalhamento.data_inicio.month }}/{{ detalhamento.data_inicio.year }}</td>
+                            <td>{{ detalhamento.data_inicio|format }} a {{ detalhamento.data_fim|format }}</td>
+                            <td>{{ detalhamento.quant_dias|format }}</td>
+                            <td>R${{ detalhamento.valor_per|format }}</td>
+                        </tr>
+                    {% endif %}
+                    {% if detalhamento.valor_ins %}
+                        <tr>
+                            <td>{{ calculo|verbose:"total_ins" }} - {{ detalhamento.data_inicio.month }}/{{ detalhamento.data_inicio.year }}</td>
+                            <td>{{ detalhamento.data_inicio|format }} a {{ detalhamento.data_fim|format }}</td>
+                            <td>{{ detalhamento.quant_dias|format }}</td>
+                            <td>R${{ detalhamento.valor_ins|format }}</td>
+                        </tr>
+                    {% endif %}
+                    {% if detalhamento.valor_transp %}
+                        <tr>
+                            <td>{{ calculo|verbose:"total_transp" }} - {{ detalhamento.data_inicio.month }}/{{ detalhamento.data_inicio.year }}</td>
+                            <td>{{ detalhamento.data_inicio|format }} a {{ detalhamento.data_fim|format }}</td>
+                            <td>{{ detalhamento.quant_dias_uteis|format }} (úteis)</td>
+                            <td>R${{ detalhamento.valor_transp|format }}</td>
+                        </tr>
+                    {% endif %}
+                {% endfor %}
+                {% if calculo.total_iden %}
+                    <tr>
+                        <td colspan="3">{{ calculo|verbose:"total_iden" }}</td>
+                        <td>R${{ calculo.total_iden|format }}</td>
+                    </tr>
+                {% endif %}
+                {% if calculo.total_ferias %}
+                    <tr>
+                        <td colspan="3">{{ calculo|verbose:"total_ferias" }}</td>
+                        <td>R${{ calculo.total_ferias|format }}</td>
+                    </tr>
+                {% endif %}
+                {% if calculo.total_grat_nat %}
+                    <tr>
+                        <td colspan="3">{{ calculo|verbose:"total_grat_nat" }}</td>
+                        <td>R${{ calculo.total_grat_nat|format }}</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    {% endbox %}
+    {% box "Descontos" %}
+        {% box "Auxílio Alimentação" %}
+            {% if calculo.total_alim %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Rubrica</th>
+                            <th>Período</th>
+                            <th>Quantidade de Dias Úteis</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for detalhamento in detalhamentos_alim %}
+                            <tr>
+                                <td>{{ calculo|verbose:"total_alim" }} - {{ detalhamento.data_inicio.month }}/{{ detalhamento.data_inicio.year }}</td>
+                                <td>{{ detalhamento.data_inicio|format }} a {{ detalhamento.data_fim|format }}</td>
+                                <td>{{ detalhamento.quant_dias|format }}</td>
+                                <td>R${{ detalhamento.valor_alim|format }}</td>
+                            </tr>
+                        {% endfor %}
+                        <tr>
+                            <td colspan="3"><b>TOTAL</b></td>
+                            <td>R${{ calculo.total_alim|format }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="alert alert-warning">Não há desconto de Auxilio Alimentação neste cálculo.</p>
+            {% endif %}
+        {% endbox %}
+        {% box "Outros Descontos" %}
+            {% if calculo.total_pss_grat_nat or calculo.total_irpf_grat_nat or calculo.total_adiantamento_grat_nat %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Rubrica</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if calculo.total_pss_grat_nat %}
+                            <tr>
+                                <td>{{ calculo|verbose:"total_pss_grat_nat" }}</td>
+                                <td>R${{ calculo.total_pss_grat_nat|format }}</td>
+                            </tr>
+                        {% endif %}
+                        {% if calculo.total_irpf_grat_nat %}
+                            <tr>
+                                <td>{{ calculo|verbose:"total_irpf_grat_nat" }}</td>
+                                <td>
+                                    R${{ calculo.total_irpf_grat_nat|format }} /
+                                    <a class="btn success" title="Informar valor" href="/calculos_pagamentos/informar_irpf/{{ calculo.pk }}">Informar valor</a>
+                                </td>
+                            </tr>
+                        {% endif %}
+                        {% if calculo.total_adiantamento_grat_nat %}
+                            <tr>
+                                <td>{{ calculo|verbose:"total_adiantamento_grat_nat" }}</td>
+                                <td>R${{ calculo.total_adiantamento_grat_nat|format }}</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="alert alert-warning">Não há Outros Descontos neste cálculo.</p>
+            {% endif %}
+        {% endbox %}
+    {% endbox %}
+{% endblock %}
+
+{% block totalizacao %}
+    {% box "Totalização" %}
+        <table>
+            <tbody>
+                <tr>
+                    <td><b>TOTAL A RECEBER</b></td>
+                    <td style="text-align: center"><b>R${{ calculo.total|format }}</b></td>
+                </tr>
+            </tbody>
+        </table>
+    {% endbox %}
+{% endblock %}

@@ -1,0 +1,91 @@
+{% extends super_template %}
+
+{% block extrahead %}
+<script src="/static/almoxarifado/js/jquery.form.js"></script>
+<script src="/static/djtools/jquery/jquery.autocomplete.js"></script>
+<script src="/static/djtools/jquery/jquery.bgiframe.min.js"></script>
+<script src="/static/admin/js/admin/RelatedObjectLookups.js"></script>
+<script src="/static/almoxarifado/js/mascaras.js"></script>
+<script src="/static/almoxarifado/js/mask.js"></script>
+<script src="/static/almoxarifado/js/auxiliar.js"></script>
+<script src="/static/almoxarifado/js/jquery.autocomplete.js"></script>
+<script src="/static/almoxarifado/js/validacao.js"></script>
+<script>
+    adicionar_item = function() {
+        var numeroItem = numeroUltimoItem() + 1;
+        var item = $("<div class='form-row several-items' id='item_" + numeroItem + "'>" + "<label for='material_" + numeroItem + "'>Material:</label>" + "<input type='text' id='material_" + numeroItem + "' name='itens' value='' class='autocomplete' />" + "<label class='inline' for='qtd_" + numeroItem + "'>Quantidade:</label>" + "<input name='quantidades' id='qtd_" + numeroItem + "' type='text' maxlength='6' size='5'/>" + "<a href='#item_" + numeroItem + "' class='deletelink btn danger' onclick='removeItemMaterial(\"item_" + numeroItem + "\")'>Remover</a>" + "</div>");
+        $("div#Itens > fieldset > div#ultima_linha").before(item);
+        $("#item_" + numeroItem).attr("ordem", numeroItem);
+        //setando a ordem
+        $("#material_" + numeroItem).autocomplete("/almoxarifado/buscar_material_consumo_estoque_uo/" + $('select[name=uo_id]').val() + "/", {
+            "minChars" : 3
+        });
+        //setando o autocomplete
+        $("#qtd_" + numeroItem).on('input', function() {this.value = this.value.replace(/\D/g, '');});
+        
+        //setando o onkeyup
+    };
+
+    limpar_materiais = function() {
+        $("div#Itens div.form-row").remove();
+        adicionar_item();
+    };
+
+    $(document).ready(function() {
+        adicionar_item();
+    });
+
+</script>
+{% endblock %}
+
+{% block content %}
+
+<form action="/almoxarifado/requisicao_uo_pedido/" method="post" id="requisicao_uo_pedido">
+    {% csrf_token %}
+
+    <fieldset class="module aligned">
+        <div class="form-row">
+            <div class="field-box">
+                <label>Pessoa Solicitante: </label>
+                <input type="text" disabled="disabled" value="{{ user.get_profile.nome }}" class="autocomplete" />
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="field-box">
+                <label>Almoxarifado de Destino: </label>
+                <input type="text" disabled="disabled" value="{{ get_uo.setor.sigla }}" />
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="field-box">
+                <label>Almoxarifado Fornecedor: </label>
+                <select name="uo_id" onchange="limpar_materiais()">
+                    {% for uo in uos %}
+                    <option value="{{ uo.id }}">{{ uo.setor.sigla }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+    </fieldset>
+
+    {% box "Materiais" %}
+        <ul class="action-bar">
+            <li><a href="#" name="addItem" class="btn addlink success" onclick="adicionar_item()">Adicionar Material</a></li>
+        </ul>
+
+        <p class="help">Só é possivel fazer requisição de materiais que possuam estoque no almoxarifado da unidade escolhida.</p>
+
+        <div id="Itens">
+            <fieldset class="module aligned">
+                <div id="ultima_linha" class="inline-related"></div>
+            </fieldset>
+        </div>
+    {% endbox %}
+
+    <div class="submit-row">
+        <input class="default" type="button" value="Efetuar" onclick="validate_and_submit('/almoxarifado/validar/req_pedido/', '#requisicao_uo_pedido')" />
+    </div>
+
+</form>
+
+{% endblock %}

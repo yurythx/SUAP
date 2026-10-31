@@ -1,0 +1,75 @@
+{% block extrahead %}
+    <script src="/static/plan_v2/js/pills.js"></script>
+{% endblock %}
+
+<ul class="pills">
+    <li data-pill="todos_itens" class="active"><a href="#">Todas as dimensões</a></li>
+    {% for dimensao in query_dados %}
+        <li data-pill="{{ dimensao|slugify }}"><a href="#">{{ dimensao }}</a></li>
+    {% endfor %}
+</ul>
+
+{% for dimensao in query_dados %}
+    <div class='pill' id="{{ dimensao|slugify }}">
+    {% for macroprocesso in dimensao.macroprocesso_set.all %}
+        {% box "{{ dimensao }} - {{ macroprocesso.nome }}" boxid="macro_{{ macroprocesso.id }}" %}
+            {% if user|in_group:"Administrador de Planejamento Institucional" %}
+                <ul class="action-bar">
+                    <li><a href="{% url 'pdi_objetivoestrategico_add' pdi.pk %}" class="btn popup success">Adicionar Objetivo Estratégico</a></li>
+                </ul>
+            {% endif %}
+            {% for pdi_macroprocesso in macroprocesso.pdimacroprocesso_set.all %}
+                {% for objetivo in pdi_macroprocesso.objetivoestrategico_set.all %}
+                    <div class="general-box">
+                        <div class="primary-info">
+                            <h4>{{ objetivo }}</h4>
+                            {% if pode_adicionar_objetivo_estrategico %}
+                                <ul class="action-bar">
+                                    <li><a href='{% url "pdi_meta_add" pdi.pk objetivo.id %}' class="btn popup success">Adicionar Meta</a></li>
+                                    <li><a href="{% url 'pdi_objetivoestrategico_change' pdi.pk objetivo.id %}" class="btn popup primary">Editar</a></li>
+                                </ul>
+                            {% endif %}
+                            {% if objetivo.meta_set.all %}
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            {% if pode_editar_meta %}
+                                                <th>#</th>
+                                            {% endif %}
+                                            <th>Meta</th>
+                                            <th>Responsável</th>
+                                            <th class="no-print">Opções</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for meta in objetivo.meta_set.all %}
+                                            <tr>
+                                                {% if pode_editar_meta %}
+                                                    <td><a href='{% url "pdi_meta_change" pdi.pk objetivo.id meta.id %}' class="popup icon icon-edit"><span class="visually-hidden">Editar Meta</span></a></td>
+                                                {% endif %}
+                                                <td>{{ meta.titulo }}</td>
+                                                <td>{{ meta.responsavel|default:"-" }}</td>
+                                                <td class="no-print">
+                                                    {% if pode_acessar_indicadores %}
+                                                        <ul class="action-bar">
+                                                            <li><a href="{% url 'pdi_meta_indicadores' pdi.id meta.id %}" class="btn default">Indicadores</a></li>
+                                                        </ul>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            {% else %}
+                                <p class="alert alert-warning">Nenhuma meta cadastrada para este objetivo estratégico.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% empty %}
+                    <p class="alert alert-warning">Nenhum objetivo estratégico cadastrado para este macroprocesso..</p>
+                {% endfor %}
+            {% endfor %}
+        {% endbox %}
+    {% endfor %}
+    </div>
+{% endfor %}

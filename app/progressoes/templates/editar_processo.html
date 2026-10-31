@@ -1,0 +1,359 @@
+{% extends super_template %}
+
+{% block object-status %}
+    {% if processo.is_a_iniciar %}
+        <span class="status status-error text-nowrap-normal">{{ processo.get_status_display }}</span>
+    {% elif processo.is_em_tramite %}
+        <span class="status status-em-tramite text-nowrap-normal">{{ processo.get_status_display }}</span>
+    {% elif processo.is_finalizado %}
+        <span class="status status-aceito text-nowrap-normal">{{ processo.get_status_display }}</span>
+    {% endif %}
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if processo.status == processo.STATUS_A_INICIAR %}
+            {% if processo.obter_avaliacoes %}
+                <li><a href="/progressoes/liberar_avaliacoes/{{ processo.id }}/" class="btn success">Liberar avaliações e Iniciar trâmite do processo</a></li>
+            {% endif %}
+        {% endif %}
+        {% if processo.status != processo.STATUS_FINALIZADO %}
+            <li><a class="btn primary" href='/admin/progressoes/processoprogressao/{{ processo.id }}/'>Editar</a></li>
+        {% endif %}
+        {% if processo.status == processo.STATUS_EM_TRAMITE %}
+        <li><a class="btn" href="/progressoes/recalcular_medias/{{ processo.id }}/">Recalcular médias</a></li>
+        <li><a class="btn" href="/progressoes/recalcular_intersticio/{{ processo.id }}/">Recalcular interstício</a></li>
+            {% if processo.pode_finalizar %}
+                <li><a href="/progressoes/finalizar_processo/{{ processo.id }}/" class="btn success">Finalizar processo</a></li>
+            {% endif %}
+            <li><a href="/progressoes/cancelar_tramite/{{ processo.id }}/" class="btn danger">Cancelar trâmite do processo</a></li>
+        {% endif %}
+        {% if processo.status == processo.STATUS_FINALIZADO %}
+            {% if app_processo_eletronico_instalada and not processo.processo_eletronico %}
+                <li class="has-child">
+                    <a class="btn" href="#">Processo Eletrônico</a>
+                    <ul>
+                        <li>
+                            <a href="/progressoes/selecionar_protocolo_processo_eletronico/{{ processo.id }}/" class="popup">
+                                Selecionar um Processo Eletrônico existente
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/progressoes/gerar_protocolo_processo_eletronico/{{ processo.id }}/" class="confirm">
+                                Gerar novo Processo Eletrônico
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+            {% elif not app_processo_eletronico_instalada and not processo.protocolo %}
+                <li class="has-child">
+                    <a class="btn" href="#">Protocolo</a>
+                    <ul>
+                        <li>
+                            <a href="/progressoes/selecionar_protocolo_processo_eletronico/{{ processo.id }}/" class="popup">
+                                Selecionar um Protocolo existente
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/progressoes/gerar_protocolo_processo_eletronico/{{ processo.id }}/" class="confirm">
+                                Gerar novo Protocolo
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+            {% endif %}
+            <li><a class="btn" href="/progressoes/imprimir_processo/{{ processo.id }}/">Imprimir Processo</a></li>
+            <li><a href="/progressoes/reabrir_processo/{{ processo.id }}/" class="btn danger">Reabrir Processo</a></li>
+        {% else %}
+            <li><a class="btn" href="javascript:history.back()">Voltar</a></li>
+        {% endif %}
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+    {% box 'Dados gerais' %}
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>Servidor avaliado</dt>
+                <dd>{{ processo.avaliado }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Data de início da contagem</dt>
+                <dd>{{ processo.data_inicio_contagem_progressao|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Data de fim da contagem</dt>
+                <dd>
+                    {% if processo.tem_saldo and processo.saldo_usado %}
+                        <s>{{ processo.data_fim_contagem_progressao|format }}</s>
+                        {{ processo.data_fim_ajustada|format }}
+                    {% else %}
+                        {{ processo.data_fim_contagem_progressao|format }}
+                    {% endif %}
+                </dd>
+            </div>
+            {% if processo.is_tipo_progressao_merito %}
+                <div class="list-item flex-basis-50">
+                    <dt>Padrão de Vencimento Atual</dt>
+                    <dd>{{ processo.padrao_anterior }}</dd>
+                </div>
+                <div class="list-item flex-basis-50">
+                    <dt>Padrão de vencimento novo</dt>
+                    <dd>{{ processo.padrao_novo }}</dd>
+                </div>
+            {% endif %}
+
+            {% if processo.saldo_usado %}
+                <div class="list-item flex-basis-50">
+                    <dt>Saldo</dt>
+                    <dd><span class="status status-info">{{ processo.saldo_formatado }}</span></dd>
+                </div>
+                <div class="list-item flex-basis-50">
+                    <dt>Saldo usado?</dt>
+                    <dd>{{ processo.saldo_usado|format }}</dd>
+                </div>
+            {% endif %}
+
+            <div class="list-item">
+                <dt>Média do processo</dt>
+                <dd>{{ processo.media_processo }}</dd>
+            </div>
+            {% if not app_processo_eletronico_instalada and processo.protocolo %}
+                <div class="list-item">
+                    <dt>Protocolo</dt>
+                    <dd><a href="{{ processo.protocolo.get_absolute_url }}">{{ processo.protocolo }}</a></dd>
+                </div>
+            {% elif app_processo_eletronico_instalada and processo.processo_eletronico %}
+                <div class="list-item">
+                    <dt>Processo Eletrônico</dt>
+                    <dd><a href="{{ processo.processo_eletronico.get_absolute_url }}">{{ processo.processo_eletronico }}</a></dd>
+                </div>
+            {% endif %}
+            <div class="list-item">
+                <dt>Resultado final</dt>
+                <dd>
+                    {% if processo.is_aprovado %}
+                        <span class="status status-success">{{ processo.obter_situacao_final_processo_as_text }}</span>
+                    {% elif processo.is_reprovado %}
+                        <span class="status status-error">{{ processo.obter_situacao_final_processo_as_text }}</span>
+                    {% else %}
+                        <span class="status status-alert">{{ processo.obter_situacao_final_processo_as_text }}</span>
+                    {% endif %}
+                </dd>
+            </div>
+        </dl>
+    {% endbox %}
+
+    {% box 'Períodos de avaliação' %}
+        {% if processo.status == processo.STATUS_A_INICIAR %}
+            <ul class="action-bar">
+                <li><a href="/progressoes/adicionar_periodo/{{ processo.id }}/" class="btn success popup">Adicionar período</a></li>
+            </ul>
+        {% endif %}
+        {% if processo.processoprogressaoperiodo_set.all %}
+            {% for periodo in processo.processoprogressaoperiodo_set.all %}
+                <div class="general-box">
+                    <div class="primary-info">
+                        {% if not periodo.processoprogressaoavaliacao_set.exists %}
+                            <div class="status-info-container">
+                                <span class="status status-error">Nenhum avaliador cadastrado</span>
+                            </div>
+                        {% endif %}
+                        <h4><small>{{ forloop.counter }}</small><strong>{{ periodo.setor }}</strong> ({{ periodo.data_inicio }} a {{ periodo.data_fim }})</h4>
+                        {% if processo.status == processo.STATUS_A_INICIAR %}
+                            <ul class="action-bar">
+                                <li><a href="/progressoes/adicionar_avaliadores/{{ periodo.id }}/" class="btn success popup">Adicionar/Editar avaliadores</a></li>
+                                <li><a href="/progressoes/editar_periodo/{{ periodo.id }}/" class="btn primary popup">Editar</a></li>
+                                <li><a href="/progressoes/remover_periodo/{{ periodo.id }}/" class="btn danger">Remover</a></li>
+                            </ul>
+                        {% endif %}
+                        {% if periodo.processoprogressaoavaliacao_set.exists %}
+                            <div class="extra-info">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Avaliador</th>
+                                            <th>Situação</th>
+                                            <th class="no-print">Opções</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for avaliacao in periodo.processoprogressaoavaliacao_set.all %}
+                                            <tr>
+                                                <td>{{ avaliacao.avaliador }} ({{ avaliacao.get_tipo_avaliador_display }})</td>
+                                                <td>
+                                                    {% if avaliacao.is_avaliada %}
+                                                        <span class="status status-success text-nowrap-normal">Avaliação realizada</span>
+                                                    {% else %}
+                                                        <span class="status status-alert text-nowrap-normal">Avaliação pendente</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td class="no-print">
+                                                    <ul class="action-bar">
+                                                        <li><a href="/progressoes/abrir_avaliacao/{{ avaliacao.id_encoded }}/" class="btn">Abrir Avaliação</a></li>
+                                                        <li>
+                                                            <a class="btn" href="/progressoes/assinar_avaliacao/{{ avaliacao.id_encoded }}/">
+                                                                Assinaturas ({{ avaliacao.assinaturas_realizadas_requeridas.0 }}/{{ avaliacao.assinaturas_realizadas_requeridas.1 }})
+                                                            </a>
+                                                        </li>
+                                                    </ul>
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% endif %}
+                    </div>
+                    <dl class="secondary-info">
+                        <div class="list-item">
+                            <dt>Modelo/Ficha de Avaliação:</dt>
+                            <dd>{{ periodo.avaliacao_modelo }}</dd>
+                        </div>
+                        {% if processo.status != processo.STATUS_A_INICIAR %}
+                            <div class="list-item">
+                                <dt>Média do Período:</dt>
+                                <dd>{{ periodo.media_periodo }}</dd>
+                            </div>
+                        {% endif %}
+                    </dl>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p class="alert alert-warning">Não há períodos cadastrados.</p>
+        {% endif %}
+    {% endbox %}
+
+    {% if processo.observacaoafastamentoefetivoexercicio_set.exists %}
+        {% box 'Dias que contribuiram para o cálculo da data fim da progressão (Despacho 124/2022 - ASSEL/DIGPE/RE/IFRN)' %}
+            <table>
+                <thead>
+                    <th>#</th>
+                    <th>Dias Afetados</th>
+                    <th>Quantidade de Dias de Afastamentos Encontrados</th>
+                    <th>Afastamentos</th>
+                </thead>
+                <tbody>
+                    {% for obs in processo.observacaoafastamentoefetivoexercicio_set.all %}
+                        <tr>
+                            <td>{{ forloop.counter }}</td>
+                            <td>{{ obs.data_afetada }}</td>
+                            <td>{{ obs.qtd_dias_afastamento }}</td>
+                            <td>
+                                <ul>
+                                {% for afastamento in obs.afastamentos.all %}
+                                    <li>{{ afastamento.afastamento.nome }} ({{ afastamento.data_inicio }} a {{ afastamento.data_termino }})</li>
+                                {% endfor %}
+                                </ul>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endbox %}
+    {% endif %}
+
+    {% if afastamentos_no_periodo %}
+        {% box 'Afastamentos que interrompem o Tempo de Serviço e/ou suspendem Estágio Probatório' %}
+            <table>
+                <thead>
+                    <th>Período</th>
+                    <th class="text-end">Dias</th>
+                    <th>Tipo de Afastamento</th>
+                    <th>Descrição</th>
+                    <th>Interrompe Tempo de Serviço</th>
+                    <th>Suspende Estágio Probatório</th>
+                </thead>
+                <tbody>
+                    {% for afastamento in afastamentos_no_periodo %}
+                        <tr>
+                            <td>{{ afastamento.periodo }}</td>
+                            <td class="text-end">{{ afastamento.dias }}</td>
+                            <td>{{ afastamento.tipo }}</td>
+                            <td>{{ afastamento.nome }}</td>
+                            <td>{{ afastamento.interrompe_tempo_servico|format }}</td>
+                            <td>{{ afastamento.suspende_estagio_probatorio|format }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td>Total de dias:</td>
+                        <td>{{ total_dias_interrompem_estagio_probatorio }}</td>
+                        <td colspan="4"></td>
+                    </tr>
+                </tfoot>
+            </table>
+        {% endbox %}
+    {% endif %}
+
+    {% if afastamento_regra_24_meses %}
+        {% box 'Licença saúde superior a 24 meses' %}
+            <div class="alert alert-info">
+                <p><strong>Informação:</strong></p>
+                <ul>
+                    <li>Conforme <strong>alínea "b", inciso VIII do <a href="https://www.planalto.gov.br/ccivil_03/leis/l8112cons.htm#art102" target="blank">Art. 102 da Lei 8.112/90</a></strong>, as licenças para tratamento da própria saúde superiores ao limite de vinte e quatro meses, cumulativo ao longo do tempo de serviço público prestado à União, em cargo de provimento efetivo <strong>não são considerados como efetivo exercício</strong>.</li>
+                </ul>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Afastamento</th>
+                        <th>Dias</th>
+                        <th>Total de Dias</th>
+                    </tr>
+                </thead>
+                {% for k, v in afastamento_regra_24_meses.items %}
+                <tr>
+                    <td>{{ k }}</td>
+                    <td>{{ v }}</td>
+                    <td>{{ v|length }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+        {% endbox %}
+    {% endif %}
+
+    {% if afastamentos_interrompem_progressao %}
+        {% box 'Afastamentos que interrompem progressão por mérito' %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Afastamento</th>
+                        <th>Período Afastamento</th>
+                        <th>Total de Dias</th>
+                    </tr>
+                </thead>
+                {% for d in afastamentos_interrompem_progressao %}
+                <tr>
+                    <td>{{ d.nome }}</td>
+                    <td>{{ d.data_inicio|format }} - {{ d.data_termino|format }}</td>
+                    <td>{{ d.total_dias }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+        {% endbox %}
+    {% endif %}
+
+    {% box 'Histórico de setores e funções' %}
+        <div class="legenda">
+            <p>Legenda:</p>
+            <ul>
+                <li class="success">Início da contagem</li>
+                <li class="info">Mudança de setor</li>
+                <li class="danger">Fim da contagem</li>
+            </ul>
+        </div>
+        {% if historico_setor %}
+            {{ timeline_historico_setor|safe }}
+        {% endif %}
+        {% if historico_setor_siape %}
+            {{ timeline_historico_setor_siape|safe }}
+        {% endif %}
+        {% if historico_funcao %}
+            {{ timeline_historico_funcao|safe }}
+        {% endif %}
+    {% endbox %}
+
+{% endblock %}

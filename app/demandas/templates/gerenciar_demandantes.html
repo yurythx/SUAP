@@ -1,0 +1,125 @@
+{% extends super_template %}
+{% load demandas_templatetags %}
+
+{% block content %}
+    {% box "Demandantes" badge=area_atuacao.demandantes.all.count %}
+        <div class="card-container">
+            {% if area_atuacao.demandante_responsavel %}
+                <div class="card info">
+                    <div class="photo">
+                        <img alt="{{ area_atuacao.demandante_responsavel.get_profile.nome_usual }}" src="{{ area_atuacao.demandante_responsavel.get_vinculo.get_foto_75x100_url }}">
+                    </div>
+                    <h4 class="title">{{ area_atuacao.demandante_responsavel|format }}</h4>
+                    <dl>
+                        <dt>Função:</dt>
+                        <dd>Demandante responsável da área</dd>
+                        {% demandas_tags_por_demandante area_atuacao.demandante_responsavel as tags %}
+                        {% if tags.exists %}
+                            <dt>Responsável por módulo(s):</dt>
+                            <dd>
+                                <ul class="tags with-link pt-2">
+                                    {% for tag in tags %}
+                                        <li><a href="/admin/demandas/demanda/?tags={{ tag.id }}&demandantes={{ demandante.id }}&tab=tab_ativas">{{ tag }}</a></li>
+                                    {% endfor %}
+                                </ul>
+                            </dd>
+                        {% endif %}
+                    </dl>
+                    
+                    {% demandas_ativas_por_demandante area_atuacao.demandante_responsavel as demandas %}
+                    {% if demandas.exists %}
+                        <div class="content">
+                            <hr class="my-4">
+                            <a href="/admin/demandas/demanda/?area={{ area_atuacao.pk }}&demandantes={{ area_atuacao.demandante_responsavel.pk }}&tab=tab_ativas" class="indicator"><span class="indicator-number">{{ demandas.count }}</span><span class="indicator-description"><strong class="indicator-title">demanda{{ demandas|pluralize }}</strong> <span class="indicator-info">ativa{{ demandas|pluralize }}</span></span></a>
+                            
+                            <hr class="mt-4">
+                            <ul class="action-bar">
+                                <li><a class="btn primary popup" href="{% url 'demanda_substituir_demandante' area_atuacao.id area_atuacao.demandante_responsavel.id %}">{% icone "sync" %} Atualizar ou substituir</a></li>
+                            </ul>
+                        </div>
+                    {% endif %}
+                </div>
+            {% endif %}
+
+            {% for demandante in area_atuacao.demandantes.all %}
+                {% if area_atuacao.demandante_responsavel.pk != demandante.pk %}
+                    <div class="card">
+                        <div class="photo">
+                            <img alt="{{ demandante.get_profile.nome_usual }}" src="{{ demandante.get_vinculo.get_foto_75x100_url }}">
+                        </div>
+                        <h4 class="title">{{ demandante|format }}</h4>
+                        <dl>
+                            <dt>Função:</dt>
+                            <dd>Demandante</dd>
+
+                            {% demandas_tags_por_demandante demandante as tags %}
+                            <dt>Responsável por módulo(s):</dt>
+                            {% if tags.exists %}
+                                <dd>
+                                    <ul class="tags with-link pt-2">
+                                        {% for tag in tags %}
+                                            <li><a href="/admin/demandas/demanda/?tags={{ tag.id }}&demandantes={{ demandante.id }}&tab=tab_ativas">{{ tag }}</a></li>
+                                        {% endfor %}
+                                    </ul>
+                                </dd>
+                            {% else %}
+                                <dd><span class="status status-alert">Sem módulos relacionados</span></dd>
+                            {% endif %}
+                        </dl>
+
+                        <div class="content">
+                            {% demandas_ativas_por_demandante demandante as demandas %}
+                            {% if demandas.exists %}
+                                <hr class="my-4">
+                                <a href="/admin/demandas/demanda/?area={{ area_atuacao.pk }}&demandantes={{ demandante.pk }}&tab=tab_ativas" class="indicator"><span class="indicator-number">{{ demandas.count }}</span><span class="indicator-description"><strong class="indicator-title">demanda{{ demandas|pluralize }}</strong> <span class="indicator-info">ativa{{ demandas|pluralize }}</span></span></a></p>
+                                
+                                <hr class="mt-4">
+                                <ul class="action-bar">
+                                    <li><a class="btn primary popup" href="{% url 'demanda_substituir_demandante' area_atuacao.id demandante.id %}">{% icone "sync" %} Atualizar ou substituir</a></li>
+                                </ul>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    {% endbox %}
+
+    {% box "Módulos" badge=area_atuacao.demandantes_por_tags.items|length %}
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Módulo</th>
+                        <th>Demandantes</th>
+                        <th class="no-print text-end">Opções</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for tag, demandantes in area_atuacao.demandantes_por_tags.items %}
+                        <tr>
+                            <td>{{ tag }}</td>
+                            <td>
+                                {% if demandantes %}
+                                    <div class="d-flex flex-wrap gap-2">
+                                        {% for demandante in demandantes %}
+                                            {{ demandante|format_user_with_photo }}
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <span class="status status-alert">Sem demandantes relacionados</span>
+                                {% endif %}
+                            </td>
+                            <td class="no-print">
+                                <ul class="action-bar">
+                                    <li><a class="btn primary popup" href="{% url 'gerenciar_demandantes_editar' area_atuacao.id tag.id %}">{% icone "edit" %} Editar demandantes</a></li>
+                                    <li><a class="btn default" href="/admin/demandas/demanda/?tags={{ tag.id }}&tab=tab_ativas">{% icone "eye" %} Visualizar demandas</a></li>
+                                </ul>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endbox %}
+{% endblock %}

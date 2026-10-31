@@ -1,0 +1,189 @@
+{% extends super_template %}
+
+{% block object-status %}
+    {% if steps %}
+        {{ steps|safe }}
+    {% endif %}
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if manifestacao|method:"pode_enviar"|call:request.user %} 
+            <li>
+                <a href="{% url 'auditoria:entregar_manifestacao' manifestacao.id %}" class="btn success">
+                    {% icone "share" %} Enviar manifestação
+                </a>
+            </li>
+        {% endif %}
+        {% if manifestacao|method:"pode_editar_manifestacao"|call:request.user %} 
+            <li>
+                <a href="{% url 'auditoria:editar_manifestacao' manifestacao.id %}" class="btn primary">
+                    {% icone "trash" %} Editar manifestação
+                </a>
+            </li>
+        {% endif %}
+        {% if manifestacao|method:"pode_remover"|call:request.user %} 
+            <li>
+                <a href="{% url 'auditoria:remover_manifestacao' manifestacao.id %}" class="btn danger">
+                    {% icone "trash" %} Remover manifestação
+                </a>
+            </li>
+        {% endif %}
+        {% if manifestacao|method:"pode_receber"|call:request.user %} 
+            <li>
+                <a href="{% url 'auditoria:receber_manifestacao' manifestacao.id %}" class="btn success">
+                    {% icone "hourglass" %} Receber manifestação
+                </a>
+            </li>
+        {% endif %}
+        {% if manifestacao|method:"pode_adicionar_posicionamento"|call:request.user %} 
+            <li>
+                <a href="{% url 'auditoria:adicionar_posicionamento' manifestacao.id %}" class="btn success">
+                    {% icone "plus" %} Adicionar posicionamento
+                </a>
+            </li>
+        {% endif %}
+        {% if manifestacao|method:"pode_reclassificar"|call:request.user %} 
+            <li>
+                <a href="{% url 'auditoria:reclassificar_manifestacao' manifestacao.id %}" class="btn primary">
+                    {% icone "plus" %} Reclassificar manifestação
+                </a>
+            </li>
+        {% endif %}
+    </ul>
+{% endblock %}
+
+{% block content %}
+    {% if manifestacao.solicitacao_providencia.expirada %}
+        <div class="alert alert-warning">
+            O prazo para envio dessa manifestação expirou em {{ manifestacao.solicitacao_providencia.get_prazo_atual|format }}. 
+        </div>
+    {% endif %}
+    {% if manifestacao|method:"envio_restrito_a_chefia"|call:request.user %}
+        <p class="alert alert-info">Somente o chefe do setor tem permissão para enviar essa manifestação.</p>
+    {% endif %}
+    
+    {% box "Dados gerais" %}
+        <dl class="definition-list flex">
+            <div class="list-item flex-basis">
+                <dt>Manifestação Número</dt>
+                <dd>{{ manifestacao.id }}</dd>
+            </div>
+            <div class="list-item flex-basis">
+            <dt>Tipo da Manifestação</dt>
+               {% if manifestacao.eh_da_auditoria %}
+                    {% if eh_auditor %}
+                        <dd>{{ manifestacao.get_tipo_display }}</dd>
+                    {% else %}
+                        <dd>Notificação</dd>
+                    {% endif %}
+                {% else %}
+                    <dd>{{ manifestacao.get_tipo_display }}</dd>
+                {% endif %}
+            </div>
+            <div class="list-item flex-basis">
+                <dt>Recomendação</dt>
+                <dd>
+                    <a href='{{ manifestacao|method:"get_content_object_url"|call:request.user }}'> 
+                        {{ manifestacao.content_object.recomendacao.identificador }} 
+                    </a>
+                </dd>
+            </div>
+            <div class="list-item flex-basis">
+                <dt>Unidade</dt>
+                <dd>{{ manifestacao.unidade }}</dd>
+            </div>
+            {% if manifestacao.prorrogacao_prazo %}
+                <div class="list-item flex-basis-50">
+                    <dt>Prazo Solicitado</dt>
+                    <dd>{{ manifestacao.prazo_solicitado }}</dd>
+                </div>
+                <div class="list-item flex-basis-50">
+                    <dt>Prazo Atual</dt>
+                    <dd>{{ manifestacao.prazo_atual }}</dd>
+                </div>
+                <div class="list-item flex-basis-50">
+                    <dt>Status</dt>
+                    <dd>{{ manifestacao.prorrogacao.get_formated_status }}</dd>
+                </div>
+            {% endif %}
+            {% if eh_auditor or manifestacao.eh_do_auditado %}
+                <div class="list-item flex-basis-25'">
+                    <dt>Criada por</dt>
+                    <dd>{{ manifestacao.incluido_por|format }}</dd>
+                </div>
+            {% endif %}
+            <div class="list-item flex-basis-25">
+                <dt>Criada em</dt>
+                <dd>{{ manifestacao.criado_em|format }}</dd>
+            </div>
+            {% if eh_auditor %}
+                <div class="list-item flex-basis-25">
+                    <dt>Enviada por</dt>
+                    <dd>{{ manifestacao.enviada_por|format }}</dd>
+                </div>
+                <div class="list-item flex-basis-25">
+                    <dt>Enviada em</dt>
+                    <dd>{{ manifestacao.enviada_em|format }}</dd>
+                </div>
+                <div class="list-item flex-basis-25">
+                    <dt>Recebida por</dt>
+                    <dd>{{ manifestacao.recebida_por|format }}</dd>
+                </div>
+                <div class="list-item flex-basis-25">
+                    <dt>Recebida em</dt>
+                    <dd>{{ manifestacao.recebida_em|format }}</dd>
+                </div>
+            {% else %}
+                <div class="list-item flex-basis-25">
+                    <dt>Enviada em</dt>
+                    <dd>{{ manifestacao.enviada_em|default:"-" }}</dd>
+                </div>
+                <div class="list-item flex-basis-25">
+                    <dt>Recebida em</dt>
+                    <dd>{{ manifestacao.recebida_em|default:"-" }}</dd>
+                </div>
+            {% endif %}
+        </dl>
+    {% endbox %}
+
+    <div class="tab-pane" data-tab="texto" data-title="Manifestação">
+        <div class="richtext">{{ manifestacao.texto|safe }}</div>
+    </div>
+
+    <div class="tab-pane" data-title="Documentos" data-tab="documentos" data-counter="{{ numero_documentos }}">
+        {% if manifestacao|method:"pode_adicionar_documento"|call:request.user %}
+            <ul class="action-bar">
+                <li>
+                    <a href="{% url 'auditoria:listar_manifestacoes_anexar' manifestacao.id %}" class="btn success"> 
+                        Adicionar Documento SUAP
+                    </a>
+                </li>
+                <li>
+                    <a href="{% url 'auditoria:upload_documento_manifestacao' manifestacao.id %}" class="btn success"> 
+                        Adicionar Documento Externo
+                    </a>
+                </li>
+            </ul>
+        {% endif %}
+        {% for manifestacao_documento in manifestacao.documentos.all %}
+            <div class="general-box {% if manifestacao_documento.removido_em %} danger doc-error {% endif %}">
+                {% include 'includes/manifestacao_documento.html' with obj=manifestacao_documento %}
+            </div>
+        {% empty %}
+            <p class="alert alert-warning">Nenhum documento adicionado à manifestação.</p>
+        {% endfor %}
+    </div>
+    <div class="tab-pane" data-title="Posicionamentos" data-tab="posicionamentos">
+        {% for posicionamento in manifestacao.posicionamentos.all %}
+            {% if posicionamento|method:"pode_visualizar"|call:request.user %}
+                {% include 'includes/box_posicionamento.html' with posicionamento=posicionamento %}
+            {% endif %}
+        {% empty %}
+            <p class="alert alert-warning">Nenhum posicionamento cadastrado.</p>
+        {% endfor %}
+    </div>
+    <div class="tab-pane" data-tab="solicitacao" data-title="Detalhamento da solicitação">
+        <div class="richtext">{{ manifestacao.solicitacao_providencia|safe }}</div>
+    </div>
+{% endblock %}

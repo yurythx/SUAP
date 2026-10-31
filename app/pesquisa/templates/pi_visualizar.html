@@ -1,0 +1,513 @@
+{% extends super_template %}
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if perms.pesquisa.change_registropropriedadeintelectual %}
+            {% if pi.eh_desenho_industrial %}
+                <li>
+                    <a class="btn success disable_on_click"
+                       href="/pesquisa/importar_dados_di_inpi/{{ pi.pk }}/">Importar Dados do INPI</a>
+                </li>
+            {% endif %}
+            {% if pi.tem_termo_cessao %}
+                <li>
+                    <a class="btn primary"
+                       href="/pesquisa/adicionar_termo_cessao_pi/{{ pi.pk }}/">Editar Termo de Cessão</a>
+                </li>
+            {% else %}
+                <li>
+                    <a class="btn success"
+                       href="/pesquisa/adicionar_termo_cessao_pi/{{ pi.pk }}/">Adicionar Termo de Cessão</a>
+                </li>
+            {% endif %}
+            {% if pi.certificado_registro %}
+                <li>
+                    <a class="btn primary"
+                       href="/pesquisa/adicionar_certificado_registro_pi/{{ pi.pk }}/">Editar Certificado de Registro</a>
+                </li>
+            {% else %}
+                <li>
+                    <a class="btn success"
+                       href="/pesquisa/adicionar_certificado_registro_pi/{{ pi.pk }}/">Adicionar Certificado de Registro</a>
+                </li>
+            {% endif %}
+            {% if pi.ativo %}
+                <li>
+                    <a class="btn danger" href="/pesquisa/arquivar_pi/{{ pi.pk }}/">Arquivar</a>
+                </li>
+            {% else %}
+                <li>
+                    <a class="btn success" href="/pesquisa/arquivar_pi/{{ pi.pk }}/">Desarquivar</a>
+                </li>
+            {% endif %}
+        {% endif %}
+    </ul>
+{% endblock %}
+{% block content %}
+    {{ block.super }}
+    {% if pi %}
+        {% box 'Dados da Propriedade Intelectual' %}
+            <dl class="definition-list flex">
+                <div class="list-item flex-basis-100">
+                    <dt>Título</dt>
+                    <dd>
+                        {{ pi.titulo|format }}
+                    </dd>
+                </div>
+                <div class="list-item flex-basis-50">
+                    <dt>Número do Processo</dt>
+                    <dd>
+                        {{ pi.numero_processo|format }}
+                    </dd>
+                </div>
+                <div class="list-item flex-basis-50">
+                    <dt>Tipo</dt>
+                    <dd>
+                        {{ pi.tipo|format }}
+                    </dd>
+                </div>
+                {% if pi.data %}
+                    <div class="list-item flex-basis-50">
+                        <dt>Data do Depósito</dt>
+                        <dd>
+                            {{ pi.data|format }}
+                        </dd>
+                    </div>
+                {% endif %}
+                {% if pi.data_concessao %}
+                    <div class="list-item flex-basis-50">
+                        <dt>Data da Concessão</dt>
+                        <dd>
+                            {{ pi.data_concessao|format }}
+                        </dd>
+                    </div>
+                {% endif %}
+                <div class="list-item flex-basis-100">
+                    <dt>Titulares</dt>
+                    <dd>
+                        {{ pi.titulares|format }}
+                    </dd>
+                </div>
+                <div class="list-item flex-basis-100">
+                    <dt>Inventores</dt>
+                    <dd>
+                        {{ pi.inventores|format }}
+                    </dd>
+                </div>
+                {% if pi.tem_termo_cessao %}
+                    <div class="list-item flex-basis-50">
+                        <dt>Termo de cessão</dt>
+                        {% if pi.termo_cessao %}
+                            <dd>
+                                <a href="{{ pi.termo_cessao.url }}" class="btn default">{% icone "download" %} Arquivo PDF</a>
+                            </dd>
+                        {% endif %}
+                        {% if pi.id_documento_termo_cessao %}
+                            <dd>
+                                <a href="/documento_eletronico/visualizar_documento/{{ pi.id_documento_termo_cessao }}/"
+                                   class="btn default">{% icone "eye" %} Visualizar</a>
+                            </dd>
+                        {% endif %}
+                    </div>
+                {% endif %}
+                {% if pi.certificado_registro %}
+                    <div class="list-item flex-basis-50">
+                        <dt>Certificado de Registro</dt>
+                        <dd>
+                            <a href="{{ pi.certificado_registro.url }}" class="btn default">{% icone "download" %} Arquivo PDF</a>
+                        </dd>
+                    </div>
+                {% endif %}
+                {% if pi.locarno_edicao %}
+                    <div class="list-item flex-basis-100">
+                        <dt>Classificação Locarno</dt>
+                        <dd>
+                            <b>Edição:</b> {{ pi.locarno_edicao }} <b>Código:</b> {{ pi.locarno_codigo }} <b>Descrição:</b> {{ pi.locarno_descricao }}
+                        </div>
+                    {% endif %}
+                    {% if pi.motivo_arquivamento %}
+                        <div class="list-item flex-basis-100">
+                            <dt>Motivo do arquivamento</dt>
+                            <dd>
+                                {{ pi.motivo_arquivamento }}
+                                <br>
+                                <small>Em {{ pi.arquivado_em|format }} por {{ pi.arquivado_por.user|format }}</small>
+                            </dd>
+                        </div>
+                    {% endif %}
+                    {% if publicacoes.exists %}
+                        <div class="list-item flex-basis-100">
+                            <dt>Situação</dt>
+                            <dd>
+                                {{ pi.get_ultimo_despacho.get_descricao_despacho }}
+                            </dd>
+                        </div>
+                    {% endif %}
+                </dl>
+            {% endbox %}
+            <div class="tab-pane"
+                 data-title="Publicações"
+                 data-tab="publicacoes"
+                 data-checked="{% if publicacoes.exists %}True{% else %}False{% endif %}">
+                {% if publicacoes.exists %}
+                    <div>
+                        <table class="table-responsive">
+                            <thead>
+                                <tr>
+                                    <th>Número do Despacho</th>
+                                    <th>RPI</th>
+                                    <th>Data</th>
+                                    <th>Título</th>
+                                    <th>Detalhamento</th>
+                                    <th>Complemento</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% autopaginate publicacoes 50 %}
+                                {% paginate %}
+                                {% for despacho in publicacoes %}
+                                    <tr>
+                                        <td>{{ despacho.codigo|format }}</td>
+                                        <td>{{ despacho.rpi }}</td>
+                                        <td>{{ despacho.data }}</td>
+                                        <td>{{ despacho.get_descricao_despacho|format }}</td>
+                                        <td>{{ despacho.get_detalhamento|format }}</td>
+                                        <td>{{ despacho.complemento|format }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="alert alert-warning">Nenhuma publicação encontrada.</p>
+                {% endif %}
+            </div>
+            <div class="tab-pane"
+                 data-title="Serviços"
+                 data-tab="servicos"
+                 data-checked="{% if servicos.exists %}True{% else %}False{% endif %}">
+                {% if servicos.exists %}
+                    <div>
+                        <table class="table-responsive">
+                            <thead>
+                                <tr>
+                                    <th>Número do Serviço</th>
+                                    <th>Protocolo</th>
+                                    <th>Data</th>
+                                    <th>Descrição do Serviço</th>
+                                    <th>Valor (R$)</th>
+                                    <th>Complemento</th>
+                                    {% if pode_relacionar_processo %}
+                                        <th>Processo relacionado</th>
+                                        <th class="no-print">Opções</th>
+                                    {% endif %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% autopaginate servicos 50 %}
+                                {% paginate %}
+                                {% for servico in servicos %}
+                                    <tr>
+                                        <td>{{ servico.numero }}</td>
+                                        <td>{{ servico.protocolo }}</td>
+                                        <td>{{ servico.data }}</td>
+                                        <td>{{ servico.descricao }}</td>
+                                        <td>{{ servico.valor|format_money }}</td>
+                                        <td>{{ servico.dados_pagamento|format }}</td>
+                                        {% if pode_relacionar_processo %}
+                                            <td>
+                                                {% if servico.id_processo %}
+                                                    <ul class="action-bar">
+                                                        <li>
+                                                            <a href="/processo_eletronico/processo/{{ servico.id_processo }}/"
+                                                               class="btn">{% icone "eye" %} Ver processo</a>
+                                                        </li>
+                                                    </ul>
+                                                {% endif %}
+                                            </td>
+                                            <td class="no-print">
+                                                <ul class="action-bar">
+                                                    {% if servico.id_processo %}
+                                                        <li>
+                                                            <a href="/pesquisa/relacionar_processo_pi/{{ servico.id }}/"
+                                                               class="btn primary">Editar Processo</a>
+                                                        </li>
+                                                    {% else %}
+                                                        <a href="/pesquisa/relacionar_processo_pi/{{ servico.id }}/"
+                                                           class="btn success">Relacionar Processo</a>
+                                                    {% endif %}
+                                                </ul>
+                                            </td>
+                                        {% endif %}
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="alert alert-warning">Nenhum serviço encontrado.</p>
+                {% endif %}
+            </div>
+            {% if visualiza_anuidade %}
+                <div class="tab-pane"
+                     data-title="Anuidades"
+                     data-tab="anuidades"
+                     data-checked="{% if anuidades.exists %}True{% else %}False{% endif %}">
+                    <dl class="definition-list flex">
+                        <div class="list-item flex-basis-50">
+                            <dt>Depósito da patente</dt>
+                            <dd>
+                                {{ pi.data|format }}
+                            </dd>
+                        </div>
+                        <div class="list-item flex-basis-50">
+                            <dt>Validade da patente</dt>
+                            <dd>
+                                {{ pi.get_validade|format }}
+                            </dd>
+                        </div>
+                        <div class="list-item flex-basis-50">
+                            <dt>Primeiro pagamento (3ª anuidade)</dt>
+                            <dd>
+                                {{ pi.get_data_primeiro_pagamento|format }}
+                            </dd>
+                        </div>
+                        <div class="list-item flex-basis-50">
+                            <dt>Último pagamento ({{ pi.get_numero_ultima_anuidade }})</dt>
+                            <dd>
+                                {{ pi.get_data_ultimo_pagamento|format }}
+                            </dd>
+                        </div>
+                    </dl>
+                    <br>
+                    <br>
+                    {% if anuidades.exists %}
+                        <div>
+                            <table class="table-responsive">
+                                <thead>
+                                    <tr>
+                                        <th>Anuidade</th>
+                                        <th>Ordinário</th>
+                                        <th>Extraordinário</th>
+                                        <th>Data do pagamento</th>
+                                        <th>GRU</th>
+                                        <th>Valor (R$)</th>
+                                        <th>Situação</th>
+                                        {% if pode_relacionar_processo %}<th>Processo relacionado</th>{% endif %}
+                                        <th class="no-print">Opções</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% autopaginate anuidades 50 %}
+                                    {% paginate %}
+                                    {% for anuidade in anuidades %}
+                                        <tr>
+                                            <td>{{ anuidade.anuidade }}</td>
+                                            <td>{{ anuidade.inicio_ordinario }} a {{ anuidade.fim_ordinario }}</td>
+                                            <td>{{ anuidade.inicio_extraordinario }} a {{ anuidade.fim_extraordinario }}</td>
+                                            <td>{{ anuidade.data|format }}</td>
+                                            <td>{{ anuidade.gru|format }}</td>
+                                            <td>{{ anuidade.valor|format_money }}</td>
+                                            <td>{{ anuidade.get_situacao|safe }}</td>
+                                            {% if pode_relacionar_processo %}
+                                                <td>
+                                                    {% if anuidade.id_processo %}
+                                                        <ul class="action-bar">
+                                                            <li>
+                                                                <a href="/processo_eletronico/processo/{{ anuidade.id_processo }}/"
+                                                                   class="btn">{% icone "eye" %} Ver processo</a>
+                                                            </li>
+                                                        </ul>
+                                                    {% endif %}
+                                                </td>
+                                            {% endif %}
+                                            <td class="no-print">
+                                                <ul class="action-bar">
+                                                    {% if perms.pesquisa.change_registropropriedadeintelectual %}
+                                                        {% if anuidade.estah_pendente %}
+                                                            <li>
+                                                                <a href="/pesquisa/informar_pagamento_anuidade/{{ anuidade.id }}/"
+                                                                   class="btn success">Informar pagamento</a>
+                                                            </li>
+                                                            <li>
+                                                                <a href="/pesquisa/informar_responsavel_anuidade/{{ anuidade.id }}/"
+                                                                   class="btn success">Registrar responsável pelo pagamento</a>
+                                                            </li>
+                                                        {% endif %}
+                                                        {% if pode_relacionar_processo %}
+                                                            {% if anuidade.id_processo %}
+                                                                <li>
+                                                                    <a href="/pesquisa/relacionar_processo_pi_anuidade/{{ anuidade.id }}/"
+                                                                       class="btn primary">Editar Processo</a>
+                                                                </li>
+                                                            {% else %}
+                                                                <li>
+                                                                    <a href="/pesquisa/relacionar_processo_pi_anuidade/{{ anuidade.id }}/"
+                                                                       class="btn success">Relacionar Processo</a>
+                                                                </li>
+                                                            {% endif %}
+                                                        {% endif %}
+                                                    {% endif %}
+                                                </ul>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="alert alert-warning">Nenhuma anuidade encontrada.</p>
+                    {% endif %}
+                </div>
+            {% endif %}
+            {% if visualiza_quinquenio %}
+                <div class="tab-pane"
+                     data-title="Quinquênio"
+                     data-tab="quinquenio"
+                     data-checked="{% if anuidades.exists %}True{% else %}False{% endif %}">
+                    <dl class="definition-list flex">
+                        <div class="list-item flex-basis-50">
+                            <dt>Data do Depósito</dt>
+                            <dd>
+                                {{ pi.data|format }}
+                            </dd>
+                        </div>
+                        <div class="list-item flex-basis-50">
+                            <dt>Validade do registro</dt>
+                            <dd>
+                                {{ pi.get_validade|format }}
+                            </dd>
+                        </div>
+                        <div class="list-item flex-basis-50">
+                            <dt>Primeiro pagamento (2ª quinquênio)</dt>
+                            <dd>
+                                {{ pi.get_data_primeiro_pagamento|format }}
+                            </dd>
+                        </div>
+                        <div class="list-item flex-basis-50">
+                            <dt>Último pagamento (Renovação 3)</dt>
+                            <dd>
+                                {{ pi.get_data_ultimo_pagamento|format }}
+                            </dd>
+                        </div>
+                    </dl>
+                    <br>
+                    <br>
+                    {% if anuidades.exists %}
+                        <div>
+                            <table class="table-responsive">
+                                <thead>
+                                    <tr>
+                                        <th>Anuidade</th>
+                                        <th>Ordinário</th>
+                                        <th>Extraordinário</th>
+                                        <th>Data do pagamento</th>
+                                        <th>GRU</th>
+                                        <th>Valor (R$)</th>
+                                        <th>Situação</th>
+                                        {% if pode_relacionar_processo %}<th>Processo relacionado</th>{% endif %}
+                                        <th class="no-print">Opções</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% autopaginate anuidades 50 %}
+                                    {% paginate %}
+                                    {% for anuidade in anuidades %}
+                                        <tr>
+                                            <td>{{ anuidade.anuidade }}</td>
+                                            <td>{{ anuidade.inicio_ordinario }} a {{ anuidade.fim_ordinario }}</td>
+                                            <td>{{ anuidade.inicio_extraordinario }} a {{ anuidade.fim_extraordinario }}</td>
+                                            <td>{{ anuidade.data|format }}</td>
+                                            <td>{{ anuidade.gru|format }}</td>
+                                            <td>{{ anuidade.valor|format_money }}</td>
+                                            <td>{{ anuidade.get_situacao|safe }}</td>
+                                            {% if pode_relacionar_processo %}
+                                                <td>
+                                                    {% if anuidade.id_processo %}
+                                                        <ul class="action-bar">
+                                                            <li>
+                                                                <a href="/processo_eletronico/processo/{{ anuidade.id_processo }}/"
+                                                                   class="btn">{% icone "eye" %} Ver processo</a>
+                                                            </li>
+                                                        </ul>
+                                                    {% endif %}
+                                                </td>
+                                            {% endif %}
+                                            <td class="no-print">
+                                                <ul class="action-bar">
+                                                    {% if perms.pesquisa.change_registropropriedadeintelectual %}
+                                                        {% if anuidade.estah_pendente %}
+                                                            <li>
+                                                                <a href="/pesquisa/informar_pagamento_anuidade/{{ anuidade.id }}/"
+                                                                   class="btn success">Informar pagamento</a>
+                                                            </li>
+                                                        {% endif %}
+                                                        {% if pode_relacionar_processo %}
+                                                            {% if anuidade.id_processo %}
+                                                                <li>
+                                                                    <a href="/pesquisa/relacionar_processo_pi_anuidade/{{ anuidade.id }}/"
+                                                                       class="btn primary">Editar Processo</a>
+                                                                </li>
+                                                            {% else %}
+                                                                <li>
+                                                                    <a href="/pesquisa/relacionar_processo_pi_anuidade/{{ anuidade.id }}/"
+                                                                       class="btn success">Relacionar Processo</a>
+                                                                </li>
+                                                            {% endif %}
+                                                        {% endif %}
+                                                    {% endif %}
+                                                </ul>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="alert alert-warning">Nenhuma anuidade encontrada.</p>
+                    {% endif %}
+                </div>
+            {% endif %}
+            {% if pode_relacionar_processo %}
+                <div class="tab-pane"
+                     data-title="Processos Relacionados"
+                     data-tab="processos"
+                     data-checked="{% if processos.exists %}True{% else %}False{% endif %}">
+                    {% if processos.exists %}
+                        <div class="table-responsive">
+                            <table>
+                                <caption>Processos relacionados</caption>
+                                <thead>
+                                    <tr>
+                                        <th>Processo</th>
+                                        <th>Assunto</th>
+                                        <th>Data do Cadastro</th>
+                                        <th>Última Modificação</th>
+                                        <th>Tipo</th>
+                                        <th>Setor de Origem</th>
+                                        <th>Setor Atual</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% autopaginate processos 50 %}
+                                    {% paginate %}
+                                    {% for processo in processos %}
+                                        <tr>
+                                            <td>{{ processo }}</td>
+                                            <td>{{ processo.assunto }}</td>
+                                            <td>{{ processo.data_hora_criacao.date|format }}</td>
+                                            <td>{{ processo.ultima_modificacao.date|format }}</td>
+                                            <td>{{ processo.tipo_processo }}</td>
+                                            <td>{{ processo.setor_criacao }}</td>
+                                            <td>{{ processo.setor_atual|format }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="alert alert-warning">Nenhum processo relacionado encontrado.</p>
+                    {% endif %}
+                </div>
+            {% endif %}
+        {% endif %}
+    {% endblock %}

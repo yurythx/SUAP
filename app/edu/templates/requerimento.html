@@ -1,0 +1,221 @@
+{% extends super_template %}
+
+{% block content %}
+
+    {% if alertas %}
+        <div class="alert alert-warning">
+            <p><strong>Atenção:</strong></p>
+            <ul>
+                {% for alerta in alertas %}
+                    <li>{{ alerta }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+
+    {% if pode_realizar_procedimentos %}
+        {% if not obj.pode_ser_executado_automaticamente %}
+            <ul class="action-bar">
+                {% if obj.situacao == 'Arquivado' and not obj.avaliacaorequerimento_set.exists %}
+                    <li><a href="/edu/desarquivar_requerimento/{{ obj.pk }}" class="btn primary">Desarquivar</a></li>
+                {% endif %}
+                {% help_button %}
+            </ul>
+        {% else %}
+            {% if obj.deferido is None %}
+                {% if nada_consta_quite %}
+                    <p class="alert alert-info">
+                        Os procedimentos deste requerimento de {{ obj.get_tipo_display }} serão processados automaticamente pelo sistema após deferimento.
+                    </p>
+                {% endif %}
+                <ul class="action-bar">
+                    {% if nada_consta_quite %}
+                        <li><a href="?processar=" class="btn success">Deferir</a></li>
+                    {% else %}
+                        <li><a href="/edu/solicitacoes_nada_consta/{{ obj.aluno_id }}/" class="btn popup">Visualizar Solicitações de Nada Consta</a></li>
+                    {% endif %}
+                    <li><a href="/edu/indeferir_requerimento/{{ obj.pk }}/" class="btn danger popup">Indeferir</a></li>
+                </ul>
+            {% endif %}
+        {% endif %}
+    {% endif %}
+
+    {% box "Dados gerais" %}
+        <dl class="definition-list flex">
+            <div class="list-item flex-basis-50">
+                <dt>{{ obj|verbose:'tipo' }}</dt>
+                <dd>{{ obj.get_tipo_display|format }}</dd>
+            </div>
+            <div class="list-item flex-basis-50">
+                <dt>Data do Requerimento</dt>
+                <dd>{{ obj.data|format }}</dd>
+            </div>
+            <div class="list-item flex-basis-100">
+                <dt>Aluno</dt>
+                <dd>
+                    {{ obj.aluno.pessoa_fisica.nome }}
+                    (<a href="{{ obj.aluno.get_absolute_url }}">{{ obj.aluno.matricula }}</a>)
+                </dd>
+            </div>
+            <div class="list-item flex-basis-100">
+                <dt>{{ obj|verbose:'localizacao'|normalizar }}</dt>
+                <dd>{{ obj.localizacao|format }}</dd>
+            </div>
+        </dl>
+    {% endbox %}
+
+    {% box "Solicitação" %}
+        <dl class="definition-list flex">
+            {% if obj.turno %}
+                <div class="list-item flex-basis-100">
+                    <dt>{{ obj|verbose:'turno' }}</dt>
+                    <dd>{{ obj.turno|format }}</dd>
+                </div>
+            {% endif %}
+            {% if obj.curso_campus %}
+                <div class="list-item flex-basis-100">
+                    <dt>{{ obj|verbose:'curso_campus' }}</dt>
+                    <dd>{{ obj.curso_campus|format }}</dd>
+                </div>
+            {% endif %}
+            {% if obj.turma %}
+                <div class="list-item flex-basis-100">
+                    <dt>{{ obj|verbose:'turma' }}</dt>
+                    <dd>{{ obj.turma|format }}</dd>
+                </div>
+            {% endif %}
+            {% if obj.inicio %}
+                <div class="list-item flex-basis-50">
+                    <dt>Data do Requerimento</dt>
+                    <dd>{{ obj.data_inicio|format }}</dd>
+                </div>
+                <div class="list-item flex-basis-50">
+                    <dt>Data do Atendimento</dt>
+                    <dd>{{ obj.data_fim|format }}</dd>
+                </div>
+            {% endif %}
+            {% if obj.descricao %}
+            <div class="list-item flex-basis-100">
+                <dt>Descrição</dt>
+                <dd>{{ obj.descricao|format }}</dd>
+            </div>
+            {% endif %}
+            {% if obj.anexo %}
+            <div class="list-item flex-basis-100">
+                <dt>Anexo</dt>
+                <dd><a href="{{ obj.anexo.url }}">{{ obj.anexo.name }}</a></dd>
+            </div>
+            {% endif %}
+            {% for chave, valor in obj.get_detalhamento %}
+            <div class="list-item flex-basis-100">
+                <dt>{{ chave }}</dt>
+                <dd>{{ valor|safe }}</dd>
+            </div>
+            {% endfor %}
+        </dl>
+    {% endbox %}
+
+    {% if obj.pode_ser_encaminhado %}
+        {% box "Encaminhamento" %}
+            {% if obj.avaliacaorequerimento_set.exists %}
+
+                {% if is_coordenador and obj.avaliacao_foi_deferida %}
+                    <ul class="action-bar">
+                        <li><a href="?desfazer_encaminhamento=1" class="btn danger">Desfazer Encaminhamento</a></li>
+                    </ul>
+                {% endif %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Responsável</th>
+                            <th>Deferido</th>
+                            <th>Parecer</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for avaliacao in obj.avaliacaorequerimento_set.all %}
+                            <tr>
+                                <td>{{ avaliacao.vinculo }}</td>
+                                <td>{{ avaliacao.deferido|format }}</td>
+                                <td>{{ avaliacao.parecer|format }}</td>
+                                <td>
+                                    {% if avaliacao.requerimento.pode_ser_avaliado and avaliacao.vinculo_id == request.user.get_vinculo.id %}
+                                    <a href="/edu/avaliar_requerimento/{{ avaliacao.id }}/" class="btn success popup">Avaliar</a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                {% if is_coordenador %}
+                <ul class="action-bar">
+                    <li><a href="/edu/encaminhar_solicitacao_aproveitamento_disciplina/{{ obj.pk }}/" class="btn success popup">Encaminhar</a></li>
+                </ul>
+                {% endif %}
+                <div class="alert alert-warning">
+                    Os avaliadores desse requerimento ainda não foram definidos.
+                </div>
+            {% endif %}
+        {% endbox %}
+
+    {% else %}
+        {% if obj.deferido is None or request.POST %}
+            {% if not obj.pode_ser_executado_automaticamente %}
+                {% box "Deferimento" %}
+                    {% if pode_realizar_procedimentos and not obj.situacao == 'Arquivado' %}
+                        {% if pode_realizar_procedimentos %}
+                            {% render_form form %}
+                        {% endif %}
+                    {% else %}
+                        <dl class="definition-list flex">
+                            <div class="list-item flex-basis-100">
+                                <dt>{{ obj|verbose:'situacao'|format|normalizar }}</dt>
+                                <dd>{{ obj.situacao|format }}</dd>
+                            </div>
+                            <div class="list-item flex-basis-100">
+                                <dt>{{ obj|verbose:'deferido'|format|normalizar }}</dt>
+                                <dd>{{ obj.get_situacao_avaliacao|format }}</dd>
+                            </div>
+                            <div class="list-item flex-basis-100">
+                                <dt>Observação/Motivo</dt>
+                                <dd>{{ obj.observacao|format }}</dd>
+                            </div>
+                            <div class="list-item flex-basis-100">
+                                <dt>{{ obj|verbose:'atendente' }}</dt>
+                                <dd>{{ obj.atendente|format }}</dd>
+                            </div>
+                        </dl>
+                    {% endif %}
+                {% endbox %}
+            {% endif %}
+        {% else %}
+            {% box "Deferimento" %}
+                <dl class="definition-list flex">
+                    <div class="list-item flex-basis-50">
+                        <dt>{{ obj|verbose:'deferido' }}</dt>
+                        <dd>{{ obj.deferido|format }}</dd>
+                    </div>
+                    <div class="list-item flex-basis-50">
+                        <dt>{{ obj|verbose:'situacao' }}</dt>
+                        <dd>{{ obj.get_situacao_display|format }}</dd>
+                    </div>
+                    <div class="list-item flex-basis-50">
+                        <dt>{{ obj|verbose:'termino' }}</dt>
+                        <dd>{{ obj.termino|format }}</dd>
+                    </div>
+                    <div class="list-item flex-basis-50">
+                        <dt>{{ obj|verbose:'atendente' }}</dt>
+                        <dd>{{ obj.atendente|format }}</dd>
+                    </div>
+                    <div class="list-item flex-basis-100">
+                        <dt>Observação</dt>
+                        <dd>{{ obj.observacao|format }}</dd>
+                    </div>
+                </dl>
+            {% endbox %}
+        {% endif %}
+    {% endif %}
+
+{% endblock %}

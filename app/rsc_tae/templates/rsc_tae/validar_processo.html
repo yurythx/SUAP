@@ -1,0 +1,434 @@
+{% extends super_template %}
+{% load static %}
+
+{% block extracss %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static 'rsc_tae/css/rsc-tae.css' %}">
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        <li>
+            <a class="btn success popup" data-reload-on-close="true" href="{% url 'rsc_tae:confirmar_validacao' processo.id %}">
+                Validar processo
+            </a>
+        </li>
+        <li>
+            <a class="btn warning popup" data-reload-on-close="true" href="{% url 'rsc_tae:solicitar_correcao' processo.id %}">
+                Solicitar correção
+            </a>
+        </li>
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+{% box 'Dados do processo' %}
+<dl class="definition-list flex">
+    <div class="list-item">
+        <dt>Servidor</dt>
+        <dd>{{ processo.vinculo }}</dd>
+    </div>
+    <div class="list-item">
+        <dt>RSC Pretendido</dt>
+        <dd>{{ processo.nivel_requisitado.nome }}</dd>
+    </div>
+    <div class="list-item">
+        <dt>Situação</dt>
+        <dd>{{ processo.get_situacao_badge }}</dd>
+    </div>
+    <div class="list-item">
+        <dt>Pontuação declarada</dt>
+        <dd>{{ resumo_total_pontos|format }} pts ({{ resumo_total_itens }} iten{{ resumo_total_itens|pluralize:"s" }})</dd>
+    </div>
+</dl>
+{% endbox %}
+
+<div>
+
+    {# ── Abas de navegação ── #}
+    <div>
+
+        {# Abas de navegação #}
+        <ul class="nav nav-tabs rsc-validar-tabs" role="tablist">
+            <li class="nav-item">
+                <button type="button" class="nav-link active"
+                        data-rsc-validar-tab="tab-documento" role="tab"
+                        aria-selected="true" aria-controls="tab-documento">
+                    Documento preliminar
+                </button>
+            </li>
+            <li class="nav-item">
+                <button type="button" class="nav-link"
+                        data-rsc-validar-tab="tab-memorial" role="tab"
+                        aria-selected="false" aria-controls="tab-memorial">
+                    Memorial descritivo
+                </button>
+            </li>
+            <li class="nav-item">
+                <button type="button" class="nav-link"
+                        data-rsc-validar-tab="tab-formulario" role="tab"
+                        aria-selected="false" aria-controls="tab-formulario">
+                    Formulário preenchido
+                </button>
+            </li>
+            <li class="nav-item">
+                <button type="button" class="nav-link"
+                        data-rsc-validar-tab="tab-data-exercicio" role="tab"
+                        aria-selected="false" aria-controls="tab-data-exercicio">
+                    Data de exercício no cargo
+                </button>
+            </li>
+        </ul>
+
+        {# ── Aba: Documento preliminar ── #}
+        <div id="tab-documento" class="rsc-validar-pane rsc-validar-pane--active" role="tabpanel">
+            {% for secao in documentos_preliminares_secoes %}
+                <h5 class="mt-3">{{ secao.label }}</h5>
+                {% if secao.documento %}
+                    <div class="table-responsive mt-2">
+                        <table>
+                            <caption class="visually-hidden">Informações do documento — {{ secao.label }}</caption>
+                            <tr>
+                                <th>Arquivo</th>
+                                <td>
+                                    <a class="no-confirm" href="{{ secao.documento.arquivo.url }}" target="_blank" rel="noopener">
+                                        {{ secao.documento.nome_original|default:secao.documento.arquivo.name }}
+                                    </a>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Data</th>
+                                <td>{{ secao.documento.data_obtencao_titulacao|date:"d/m/Y"|default:"—" }}</td>
+                            </tr>
+                            <tr>
+                                <th>Situação</th>
+                                <td>
+                                    {% if secao.avaliacao %}
+                                        {{ secao.avaliacao.get_situacao_display }}
+                                    {% else %}
+                                        Pendente
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% if secao.avaliacao and secao.avaliacao.observacao %}
+                            <tr>
+                                <th>Observação anterior</th>
+                                <td class="rsc-pre-wrap">{{ secao.avaliacao.observacao }}</td>
+                            </tr>
+                            {% endif %}
+                        </table>
+                    </div>
+
+                    <div class="rsc-validar-iframe-wrapper mt-3">
+                        <iframe src="{{ secao.documento.arquivo.url }}" width="100%" height="680" allow="fullscreen" title="{{ secao.label }}"></iframe>
+                    </div>
+                {% else %}
+                    <p class="alert alert-warning mt-3">{{ secao.label }}: nenhum documento foi enviado pelo servidor.</p>
+                {% endif %}
+            {% endfor %}
+
+            {% if documentos_preliminares_log %}
+            <details class="mt-3">
+                <summary class="text-muted small">Ver histórico de movimentações</summary>
+                <div class="table-responsive mt-2">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Documento</th>
+                                <th>Ação</th>
+                                <th>Executado por</th>
+                                <th>Observação</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for lg in documentos_preliminares_log %}
+                            <tr>
+                                <td>{{ lg.data_cadastro|date:"d/m/Y H:i" }}</td>
+                                <td>{{ lg.documento.get_tipo_display|default:"—" }}</td>
+                                <td>{{ lg.get_acao_display }}</td>
+                                <td>{{ lg.executado_por_vinculo|default:"—" }}</td>
+                                <td class="rsc-pre-wrap">{{ lg.observacao|default:"" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+            {% endif %}
+        </div>
+
+        {# ── Aba: Memorial descritivo ── #}
+        <div id="tab-memorial" class="rsc-validar-pane" role="tabpanel" hidden>
+            <div class="mt-3">
+
+            {# SEÇÃO 1 — Identificação do Servidor #}
+            {% box '1. Identificação do Servidor' %}
+                <dl class="definition-list flex">
+                    <div class="list-item">
+                        <dt>Nome</dt>
+                        <dd>{{ processo.vinculo.pessoa.nome|default:"-" }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>SIAPE</dt>
+                        <dd>{{ servidor.matricula|default:"-" }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Cargo</dt>
+                        <dd>{{ servidor.cargo_emprego|default:"-" }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Data de ingresso na IFE</dt>
+                        <dd>{{ servidor.data_inicio_exercicio_na_instituicao|date:"d/m/Y"|default:"-" }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Nível de Classificação</dt>
+                        <dd>{{ servidor.cargo_classe|default:"-" }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Lotação</dt>
+                        <dd>{{ processo.vinculo.setor|default:"-" }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Função/Encargo (se houver)</dt>
+                        <dd>{{ servidor.funcao_exercicio|default:servidor.funcao|default:"-" }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>E-mail</dt>
+                        <dd>{{ servidor.email|default:"-" }}</dd>
+                    </div>
+                </dl>
+            {% endbox %}
+
+            {# SEÇÃO 2 — Informações do Requerimento #}
+            {% box '2. Informações do Requerimento' %}
+                <dl class="definition-list flex">
+                    <div class="list-item">
+                        <dt>Nível de RSC pretendido</dt>
+                        <dd>RSC-{{ processo.nivel_requisitado.ordem_romana }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Pontuação mínima necessária</dt>
+                        <dd>{{ pontos_minimos|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Pontuação total apresentada</dt>
+                        <dd>{{ total_pontos|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Quantidade de critérios específicos utilizados</dt>
+                        <dd>{{ itens_preenchidos }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Pontuação total excedente (banco de pontos)</dt>
+                        <dd>{{ pontuacao_excedente|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Saldo de pontuação de concessão anterior</dt>
+                        <dd>{{ processo.saldo_pontuacao_anterior|format|default:"0,00" }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Nº do processo de concessão anterior (se houver)</dt>
+                        <dd>{{ processo.processo_anterior.pk|default:"-" }}</dd>
+                    </div>
+                </dl>
+            {% endbox %}
+
+            {# SEÇÃO 3 — Memorial e Descrição das Atividades por Requisito Legal #}
+            {% box '3. Memorial e Descrição das Atividades por Requisito Legal' %}
+                <p class="text-muted small">
+                    Itens organizados conforme os requisitos do Art. 3º do Decreto (incisos I a VI),
+                    com documentos comprobatórios anexados.
+                </p>
+
+                <div class="rsc-memorial-texto">
+                    <h5 class="mt-3">Introdução</h5>
+                    {% if memorial_descritivo.introducao %}
+                        <p class="rsc-pre-wrap">{{ memorial_descritivo.introducao }}</p>
+                    {% else %}
+                        <p class="text-muted">Não informada.</p>
+                    {% endif %}
+                </div>
+
+                {% for grupo in grupos_requisito %}
+                <h5 class="mt-4">{{ grupo.label }}</h5>
+                {% if grupo.requisito.descricao %}
+                <p class="text-muted small mb-2">{{ grupo.requisito.descricao }}</p>
+                {% endif %}
+                <div class="table-responsive">
+                    <table class="table table-bordered table-sm">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="rsc-th-num">Nº</th>
+                                <th>Critério Específico</th>
+                                <th class="rsc-th-unit">Unidade</th>
+                                <th class="text-end rsc-th-pts-un">Pts/un.</th>
+                                <th class="text-end rsc-th-pts">Pts obtidos</th>
+                                <th class="rsc-th-docs">Documentos comprobatórios</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for linha in grupo.linhas %}
+                            <tr>
+                                <td>{{ linha.item.numero }}</td>
+                                <td>{{ linha.item.titulo }}</td>
+                                <td>{{ linha.quantidade_efetiva|format }} <span class="hint hint--top" aria-label="{{ linha.item.unidade_medida }}">{% icone "question-circle" %}</span></td>
+                                <td class="text-end">{{ linha.item.pontuacao_unidade|format }}</td>
+                                <td class="text-end"><strong>{{ linha.pontuacao_total|format }}</strong></td>
+                                <td>
+                                    {% for anexo in linha.anexos %}
+                                        <div class="small">
+                                            <a href="{{ anexo.arquivo.url }}" target="_blank" rel="noopener">
+                                                {{ anexo.nome_original|default:anexo.arquivo.name }}
+                                            </a>
+                                        </div>
+                                    {% empty %}
+                                        <span class="text-muted small">—</span>
+                                    {% endfor %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="4" class="text-end fw-bold">Subtotal</td>
+                                <td class="text-end fw-bold">{{ grupo.subtotal_pontos|format }}</td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                {% empty %}
+                    <div class="alert alert-warning" role="alert">
+                        Nenhum item preenchido. Preencha os critérios na aba <strong>Formulário</strong>.
+                    </div>
+                {% endfor %}
+
+                {% if grupos_requisito %}
+                    <div class="table-responsive mt-3">
+                        <table>
+                            <caption>Resumo de pontuação</caption>
+                            <tbody>
+                                <tr>
+                                    <th>Total (Critério I + II + III + IV + V + VI)</th>
+                                    <th class="text-end">{{ total_pontos|format }}</th>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                {% endif %}
+            {% endbox %}
+
+            {# SEÇÃO 4 — Conclusão do Servidor #}
+            {% box '4. Conclusão do Servidor' %}
+                <div class="rsc-memorial-texto">
+                    {% if memorial_descritivo.conclusao %}
+                        <p class="rsc-pre-wrap">{{ memorial_descritivo.conclusao }}</p>
+                    {% else %}
+                        <p class="text-muted">Conclusão não informada pelo servidor.</p>
+                    {% endif %}
+                </div>
+                <p>
+                    À vista das informações apresentadas, totalizo
+                    <strong>{{ total_pontos|format }}</strong> pontos
+                    e atendo aos critérios legais e regulamentares para o nível
+                    <strong>RSC-{{ processo.nivel_requisitado.ordem_romana }}</strong> do RSC-PCCTAE.
+                    Solicito a análise pela CRSC-PCCTAE.
+                </p>
+            {% endbox %}
+
+            </div>
+        </div>
+
+        {# ── Aba: Formulário preenchido ── #}
+        <div id="tab-formulario" class="rsc-validar-pane" role="tabpanel" hidden>
+            {% if grupos_requisito %}
+            <div class="table-responsive mt-3">
+                {% for grupo in grupos_requisito %}
+                <table class="mb-4">
+                    <caption><strong>{{ grupo.label }}</strong></caption>
+                    <thead>
+                        <tr>
+                            <th>Nº</th>
+                            <th>Saber / Competência</th>
+                            <th class="text-end">Qtd.</th>
+                            <th class="text-end">Pts/unid.</th>
+                            <th class="text-end">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for linha in grupo.linhas %}
+                        <tr>
+                            <td>{{ linha.item.numero }}</td>
+                            <td>
+                                {{ linha.item.titulo }}
+                                {% if linha.anexos %}
+                                <div class="small text-muted mt-1">
+                                    {% for anexo in linha.anexos %}
+                                    <a class="no-confirm" href="{{ anexo.arquivo.url }}" target="_blank" rel="noopener">
+                                        {{ anexo.nome_original|default:anexo.arquivo.name }}
+                                    </a>{% if not forloop.last %}, {% endif %}
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">{{ linha.quantidade_efetiva|format }}</td>
+                            <td class="text-end">{{ linha.item.pontuacao_unidade|format }}</td>
+                            <td class="text-end"><strong>{{ linha.pontuacao_total|format }}</strong></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="4" class="text-end"><strong>Subtotal do requisito</strong></td>
+                            <td class="text-end"><strong>{{ grupo.subtotal_pontos|format }}</strong></td>
+                        </tr>
+                    </tfoot>
+                </table>
+                {% endfor %}
+            </div>
+            <p class="text-end mt-2">
+                <strong>Total geral: {{ resumo_total_pontos|format }} pts — {{ resumo_total_itens }} iten{{ resumo_total_itens|pluralize:"s" }}</strong>
+            </p>
+            {% else %}
+                <p class="text-muted mt-3">Nenhum item preenchido no formulário.</p>
+            {% endif %}
+        </div>
+
+        {# ── Aba: Data de exercício no cargo ── #}
+        <div id="tab-data-exercicio" class="rsc-validar-pane" role="tabpanel" hidden>
+            <div class="mt-3">
+                <p class="alert alert-info">
+                    Esta data é a referência dos avaliadores: documentos com período anterior a ela não devem ser aceitos ou serão ajustados pelos avaliadores.
+                    Confira o valor recuperado do cadastro do servidor e corrija se estiver errado.
+                </p>
+
+                <dl class="definition-list flex">
+                    <div class="list-item">
+                        <dt>Data cadastrada do servidor (RH)</dt>
+                        <dd>{{ data_exercicio_cargo_servidor|date:"d/m/Y"|default:"— não informada" }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Data em vigor no processo</dt>
+                        <dd>{{ data_exercicio_cargo_efetiva|date:"d/m/Y"|default:"— não definida" }}</dd>
+                    </div>
+                </dl>
+
+                <form method="post" action="{% url 'rsc_tae:salvar_data_exercicio_cargo' processo.id %}" class="form mt-3">
+                    {% csrf_token %}
+                    {% render_form data_exercicio_form render_full=False submit_label=False %}
+                    <button type="submit" class="btn success mt-2">Salvar data de exercício no cargo</button>
+                </form>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}
+
+{% block extrascripts %}
+<script src="{% static 'rsc_tae/js/rsc-validar.js' %}" defer></script>
+{% endblock %}

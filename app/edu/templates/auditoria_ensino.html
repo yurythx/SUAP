@@ -1,0 +1,147 @@
+{% extends super_template %}
+
+{% block object-status %}
+    {% if pendencia %}
+        <span class="status status-alert">{{ pendencia }}</span>
+    {% endif %}
+    
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if obj|method:"pode_gerar"|call:request.user %}
+            <li><a href="/edu/auditoria/{{ obj.id }}/gerar/" class="btn success">Gerar auditoria</a></li>
+        {% endif %}
+
+        {% if obj|method:"pode_atender"|call:request.user %}
+            <li><a href="/edu/auditoria/{{ obj.id }}/atender/" class="btn success">Iniciar atendimento</a></li>
+        {% endif %}
+
+        {% if pode_resolver %}
+            <li><a href="/edu/resolver_auditoria/{{ obj.id }}/" class="btn success popup">Resolver auditoria</a></li>
+            {% if obj.is_auditoria_aluno_sem_sistec %}
+                <li><a href="/edu/atualizar_situacao_registros_auditoria/{{ obj.id }}/" class="btn primary">Reprocessar situação dos registros</a></li>
+            {% endif %}
+        {% endif %}
+
+        {% if obj|method:"pode_informar_dados"|call:request.user %}
+            <li><a href="/edu/informar_fonte_dados_auditoria/{{ obj.id }}/" class="btn primary popup">Informar fonte de dados</a></li>
+        {% endif %}
+        
+        {% if obj|method:"pode_desfazer"|call:request.user %}
+            <li><a href="/edu/auditoria/{{ obj.id }}/desfazer/" class="btn warning">Desfazer Auditoria</a></li>
+        {% endif %}
+
+        {% if obj|method:"pode_editar_atendente"|call:request.user %}
+            <li><a href="/edu/editar_atendente_auditoria/{{ obj.id }}/" class="btn primary popup">Editar Atendente</a></li>
+        {% endif %}
+
+        {% if obj|method:"pode_notificar_campus"|call:request.user %}
+            <li><a href="/edu/auditoria/{{ obj.id }}/notificar_campus/" class="btn confirm" data-confirm="Deseja notificar os usuários do campus sobre as divergências desta auditoria?">Notificar campus</a></li>
+        {% endif %}
+        
+        {% if obj|method:"pode_exportar"|call:request.user %} 
+            <li><a href="/edu/auditoria/{{ obj.id }}/exportar/" class="btn">Exportar XLS</a></li>
+        {% endif %}
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+    {% if qtd_cursos_sem_sistec %}
+        <p class="alert alert-warning"><strong>Atenção:</strong> Há {{ qtd_cursos_sem_sistec }} cursos sem código SISTEC no campus {{ obj.campus }}. <a href="/admin/edu/cursocampus/?ativo__exact=1&diretoria__setor__uo={{ obj.campus_id }}&tab=sem_sistec">Acesse a listagem desses cursos para correção</a>.</p>
+    {% endif %}
+
+    {% if qtd_fic_sem_sistec %}
+        <p class="alert alert-warning"><strong>Atenção:</strong> Há {{ qtd_fic_sem_sistec }} cursos FIC- sem código SISTEC no campus {{ obj.campus }}. <a href="/admin/edu/minicurso/?diretoria__setor__uo={{ obj.campus_id }}&tab=sem_sistec">Acesse a listagem desses cursos para correção</a>.</p>
+    {% endif %}
+
+    <dl class="definition-list flex">
+        <div class="list-item">
+            <dt>Campus</dt>
+            <dd>{{ obj.campus }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Nível de ensino</dt>
+            <dd>{% if obj.nivel_ensino %}{{ obj.nivel_ensino|format }}{% else %}Todos{% endif %}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Situação</dt>
+            <dd>{{ obj.get_situacao }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Criada Em</dt>
+            <dd>{{ obj.data_auditoria }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Auditor</dt>
+            <dd>{{ obj.get_auditor }}</dd>
+        </div>
+    </dl>
+    
+    {% if obj.is_auditoria_sistec %}
+        {% box "Dados SISTEC" %}
+            <dl class="definition-list flex">
+                <div class="list-item flex-basis-50">
+                    <dt>Data de Início</dt>
+                    <dd>{{ obj.data_inicio_auditoria|format }}</dd>
+                </div>
+                <div class="list-item flex-basis-50">
+                    <dt>Data Final</dt>
+                    <dd>{{ obj.data_fim_auditoria|format }}</dd>
+                </div>
+                <div class="list-item flex-basis-50">
+                    <dt>Solicitada Por</dt>
+                    <dd>{{ obj.solicitante }}</dd>
+                </div>
+                <div class="list-item flex-basis-50">
+                    <dt>Fonte de Dados</dt>
+                    <dd><a href="{{ obj.fonte_dados.url }}">{{ obj.fonte_dados|filename }}</a></dd>
+                </div>
+            </dl>
+        {% endbox %}
+    {% endif %}
+   
+    {% if obj.data_ciencia_atendente %}
+        {% box "Atendimento" %}
+            <dl class="definition-list flex">
+                <div class="list-item flex-basis-50">
+                    <dt>Atendente</dt>
+                    <dd>{{ obj.atendente|format }}</dd>
+                </div>
+                <div class="list-item flex-basis-50">
+                    <dt>Atendente Ciente Em</dt>
+                    <dd>{{ obj.data_ciencia_atendente|format }}</dd>
+                </div>
+                <div class="list-item flex-basis-50">
+                    <dt>Resolvido Em</dt>
+                    <dd>{{ obj.data_resolucao_auditoria|format }}</dd>
+                </div>
+                <div class="list-item flex-basis-50">
+                    <dt>Há registros pendentes</dt>
+                    <dd>{{ obj.resolvido_parcialmente|format }}</dd>
+                </div>
+                <div class="list-item flex-basis-100">
+                    <dt>Justificativa</dt>
+                    <dd>{{ obj.justificativa|format }}</dd>
+                </div>
+            </dl>
+        {% endbox %}
+    {% endif %}
+
+    {% if obj.is_auditoria_gerada %}
+        <div class="tab-pane" data-title="Divergentes" data-tab="divergente" data-counter={{ divergentes|length }}>
+            {% include "includes/registros_auditoria.html" with registros=divergentes tab=0 exibe_acoes=pode_resolver acoes_em_lote=pode_resolver exibe_situacao=True %}
+        </div>
+        <div class="tab-pane" data-title="Ignorados em auditorias anteriores" data-tab="ignorado" data-counter={{ ignorados_auditoria_atual|length }}>
+            {% include "includes/registros_auditoria.html" with registros=ignorados_auditoria_atual tab=1 exibe_acoes=True acoes_em_lote=False exibe_situacao=True %}
+        </div>
+        {% if is_auditoria_sistec %}
+            <div class="tab-pane" data-title="Convergentes" data-tab="convergente" data-counter={{ convergentes|length }}>
+                {% include "includes/registros_auditoria.html" with registros=convergentes tab=2 exibe_acoes=False acoes_em_lote=False exibe_situacao=False %}
+            </div>
+        {% endif %}
+    {% endif %}
+
+    
+{% endblock %}

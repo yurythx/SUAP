@@ -1,0 +1,366 @@
+{% load pipeline %}
+{% load static %}
+<!DOCTYPE HTML>
+<html lang="{{ LANGUAGE_CODE }}" {% if LANGUAGE_BIDI %}dir="rtl"{% endif %}>
+<head>
+{% block head %}
+<title>{% block title %}{{ title }} - {% endblock %}SUAP: Sistema Unificado de Administração Pública</title>
+<meta charset="utf-8">
+<meta name="keywords" content="suap, administração, pública, mec, ifrn">
+<meta content="SUAP: Sistema Unificado de Administração Pública" name="description">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+{% if not test_mode %}
+<link rel="manifest" href="/djtools/manifest/">
+{% endif %}
+<link rel="icon" type="image/png" href="/static/comum/img/suap.png">
+<link rel="apple-touch-icon" sizes="128x128" href="/static/comum/img/suap.png">
+<link rel="icon" sizes="192x192" href="/static/comum/img/suap.png">
+{% block blockbots %}<meta name="robots" content="NONE,NOARCHIVE">{% endblock %}
+
+{# Favicon #}
+{% block favicon %}
+    {% if debug %}
+        <link rel="shortcut icon" href="{% static 'comum/img/favicon-debug.png' %}">
+	{% elif perms.comum.view_registronotificacao and notificacoes_nao_lidas > 0 %}
+		<link rel="shortcut icon" href="{% static 'comum/img/favicon-warning.png' %}">
+	{% else %}
+		<link rel="shortcut icon" href="{% static 'comum/img/favicon.png' %}">
+	{% endif %}
+{% endblock %}
+
+{# Themes Suap #}
+{% stylesheet theme %}
+
+{% if debug and local %}
+    <link rel="stylesheet" type="text/css" href="{% static 'djtools/themes/default/dev.css' %}">
+{% endif %}
+
+{% block extracss %}{% endblock %}
+
+{% include "admin/sentry.html" %}
+
+{# jQuery #}
+{% javascript 'jquery' %}
+
+{# jQuery UI [Ui Core: All, Interactions: All, Widgets: DatePicker, Effects: All] #}
+{% javascript 'jquery.ui.custom' %}
+{% javascript 'main' %}
+
+{% javascript 'select2' %}
+{% stylesheet 'select2' %}
+
+{# nouislider #}
+{% javascript 'nouislider' %}
+{% javascript 'base64' %}
+
+{# Usado na documentação automática #}
+{% if eh_para_documentar %}
+    {% javascript 'highlight' %}
+{% endif %}
+
+<script>
+jQuery(document).ready(function() {
+    initAll();
+    initMenu();
+
+    /* Telas estreitas começam recolhidas: o `hideSidebar` vai no início do body (abaixo); aqui só o aria dos botões, ainda não lidos lá */
+    if (window.matchMedia("(max-width: 940px)").matches) {
+        jQuery(".toggleSidebar").attr("aria-expanded", "false");
+    }
+});
+{% if id_ %}
+    $(window).on("unload", function(){
+        $.ajax({
+            type: "POST",
+            url: "/apagar_chave_sessao/{{ id_ }}/",
+        });
+    });
+{% endif %}
+</script>
+{% javascript 'tabs' %}
+{% javascript 'widgets' %}
+
+{{ form.media }}
+
+{% block extrahead %}{% endblock %}
+
+{% endblock %}
+
+{% for url in extra_js %}<script src="{{ url }}"></script>{% endfor %}
+{% for url in extra_css %}<link rel="stylesheet" type="text/css" href="{{ url }}">{% endfor %}
+
+</head>
+
+<body class="theme-{{ theme|slugify }} {% if is_popup %}popup_ {% endif %}{% if debug %}debug {% endif %}{% if request.session.retraido %}hideSidebar {% endif %}{% block bodyclass %}{% endblock %}">
+<script>
+/* Menu principal: telas estreitas (mesmo breakpoint do layout em post.scss) começam recolhidas. Antes da 1ª pintura: com a classe só
+   no ready, a barra (aberta por padrão, 270px sobre a página) aparecia e encolhia, deixando uma faixa escura na lateral. */
+if (window.matchMedia("(max-width: 940px)").matches) document.body.classList.add("hideSidebar");
+</script>
+
+{% if not is_popup %}
+<ul id="accesskeys">
+    <li><a href="#content" accesskey="1">Ir para o conteúdo</a></li>
+    <li><a href="#__buscar_menu__" accesskey="2">Ir para a busca</a></li>
+    <li><a href="#mainmenu" accesskey="3">Ir para o menu principal</a></li>
+    <li><a href="/" accesskey="4">Ir para a página inicial</a></li>
+    <li><a href="#footer" accesskey="5">Ir para o rodapé</a></li>
+    <li><a href="/comum/logout/" accesskey="6">Sair</a></li>
+    <li><a href="/comum/acessibilidade/" accesskey="7">Acessibilidade</a></li>
+    <li><a href="/centralservicos/listar_area_servico/" accesskey="8">Abrir chamado</a></li>
+</ul>
+{% endif %}
+
+{% if not hide_messages %}
+    {# mensagens de sucesso #}
+    {% render_mensagens messages 'alert' 'feedback_message' %}
+
+    {# erros de validação #}
+    {% render_mensagens error_message 'errornote' %}
+{% endif %}
+
+{% block before_holder %}{% endblock %}
+
+<div class="holder">
+    {% block aside %}
+        {% if not is_popup %}
+            <button type="button" id="toggleSidebar" class="toggleSidebar" aria-controls="menu-lateral" aria-expanded="{% if request.session.retraido %}false{% else %}true{% endif %}">{% icone "chevron-left" %} <span class="visually-hidden">Mostrar/Esconder barra lateral</span></button>
+            <aside class="nav" id="menu-lateral">
+                <header>
+                    <h1><a href="{{ public_index_url }}" title="SUAP: Sistema Unificado de Administração Pública">SUAP: Sistema Unificado de Administração Pública</a></h1>
+                    {% if perms.comum.view_registronotificacao %}
+                        <div class="notifications">
+                            <a href="/comum/notificacoes/" title="Notificações">
+                                <span class="counter {% if notificacoes_nao_lidas == 0 %}hidden{% endif %}">{% if notificacoes_nao_lidas > 99 %}99+{% else %}{{ notificacoes_nao_lidas }}{% endif %}</span>
+                                {% icone "bell" %}
+                                <span class="visually-hidden">Notificações</span>
+                            </a>
+                        </div>
+                    {% endif %}
+                    {% if user.is_authenticated %}
+                        <div id="user-tools">
+                            <a href="{{ user.get_relacionamento.get_absolute_url }}" class="user-profile">
+                                <div class="photo-circle sm">
+                                    <img src="{{ user.get_vinculo.get_foto_75x100_url }}" onerror="this.onerror=null;this.src='/static/comum/img/default.jpg';" alt="Foto de {{ user.get_profile.nome_usual|default:user.username|normalizar }}">
+                                </div>
+                                <span title="Vínculo: {{ user.username }}">{{ user.get_profile.nome_usual|default:user.username|normalizar }}</span>
+                            </a>
+                            <a href="/comum/minha_conta/" class="minha-conta" title="Minha conta">
+                                {% icone "user" %}
+                                <span class="visually-hidden">Minha conta</span>
+                            </a>
+                        </div>
+                    {% endif %}
+                </header>
+                {% if user.is_authenticated or request.session.matricula_aluno_como_resposavel %}
+                    <form id="__buscar_menu__" action="" onsubmit="return false;" class="buscar_menu" role="search">
+                        <label for="__filterinput__" class="visually-hidden">Buscar menu</label>
+                        <input type="search" placeholder="Buscar menu" id="__filterinput__" {% block buscar_menu %}{% endblock %} />
+                    </form>
+
+                    {% if user.is_authenticated %}
+                        <nav id="mainmenu" aria-label="Menu principal">
+                            <ul class="_main_menu">
+                                <li class="menu-inicio"><a href="/">{% icone "home" %} <span>Início</span></a></li>
+                                {{ menu_as_html|safe }}
+                                <li class="menu-logout"><a href="/comum/logout/" title="Sair">{% icone "sign-out-alt" %} <span>Sair</span></a></li>
+                            </ul>
+                        </nav>
+                    {% endif %}
+                {% endif %}
+            </aside>
+
+            <div id="mobilemenu">
+                <button type="button" class="toggleSidebar" title="Mostrar/esconder barra lateral" aria-controls="menu-lateral" aria-expanded="{% if request.session.retraido %}false{% else %}true{% endif %}">{% icone "bars" %}<span class="visually-hidden">Mostrar/esconder barra lateral</span></button>
+                {% if perms.comum.view_registronotificacao %}
+                    <a href="/comum/notificacoes/" {% if notificacoes_nao_lidas %}class="error"{% endif %} title="{{ notificacoes_nao_lidas }} notificações não lidas">
+                        {% icone "bell" %}
+                        <span class="visually-hidden">Notificações</span>
+                    </a>
+                {% endif %}
+                <a href="/" title="Início">{% icone "home" %}<span class="visually-hidden">Início</span></a>
+                {% if user.is_authenticated %}
+                    <a href="/comum/minha_conta/" title="Minha conta">{% icone "user" %}<span class="visually-hidden">Minha conta</span></a>
+                    <a href="{{ user.get_relacionamento.get_absolute_url }}" title="Vínculo">
+                        <div class="photo-circle smaller">
+                            <img src="{{ user.get_vinculo.get_foto_75x100_url }}" alt="Foto de {{ user.get_profile.nome_usual|default:user.username|normalizar }}">
+                        </div>
+                        <span title="Vínculo: {{ user.username }}" class="visually-hidden">{{ user.get_profile.nome_usual|default:user.username|normalizar }}</span>
+                    </a>
+                {% endif %}
+            </div>
+        {% endif %}
+    {% endblock %}
+
+    {% block asideleft %}
+    {% endblock %}
+
+    <main id="content">
+        {% if not is_popup %}
+        <nav id="breadcrumbs" aria-label="Trilha de navegação">
+            {% for title, url in breadcrumbs %}
+                <a href="{{ url }}"{% if forloop.last %} aria-current="page"{% endif %}>{{ title }}</a>
+            {% endfor %}
+        </nav>
+        {% endif %}
+
+        {% block content_title %}
+            <div class="title-container">
+                {% if title %}<h2>{{ title|escape }}</h2>{% endif %}
+                {% block subtitle %}{% endblock %}
+                <div class="object-status">{% block object-status %}{% endblock %}</div>
+                <div class="action-bar-container">{% block action-bar %}{% endblock %}</div>
+            </div>
+        {% endblock %}
+
+        {% block content %}
+            {% block object-tools %}{% endblock %}
+            {{ content }}
+        {% endblock %}
+
+        {% block shortcuts %}
+            {% if not is_popup %}
+                <ul class="action-links">
+                    {% block action-links %}
+                    {% endblock %}
+                    {% if False %}
+                        {% if 'force_anonymize' in request.get_full_path %}
+                            <li><a href="#" class="btn" id="anonymize-data">{% icone "eye" %} Exibir Dados</a></li>
+                        {% else %}
+                            <li><a href="#" class="btn" id="anonymize-data">{% icone "eye-slash" %} Ocultar Dados Sensíveis</a></li>
+                        {% endif %}
+                    {% endif %}
+                    {% if exibir_botao_reportar_erro %}
+                        <li><a href="/erros/reportar_erro/?url={{ request.get_full_path|base64encode }}" class="btn default">{% icone "bug" %} Reportar erro</a></li>
+                    {% endif %}
+                    <li><a id="shortcutLink" href="/comum/cadastrar_atalho/?url={{ request.get_full_path|base64encode }}" class="btn default popup">{% icone "link" %} Adicionar atalho</a></li>
+                    <li><button id="actionPrint" class="btn">{% icone "print" %} Imprimir</button></li>
+                    <li><button id="topodapagina" class="btn">{% icone "caret-up" %} Topo da Página</button></li>
+                </ul>
+            {% endif %}
+        {% endblock %}
+    </main>
+
+    {% block asideright %}{% endblock %}
+
+    {% block mainfooter %}
+        {% if not is_popup %}
+            <footer id="footer">
+                <div class="flex-container">
+                    <div class="flex-item flex-grow-2">
+                        <h3>Sobre o Suap</h3>
+                        <h4>Sistema Unificado de Administração Pública</h4>
+                        <p>Um software desenvolvido por uma instituição pública para instituições públicas.</p>
+                        <ul class="mt-3">
+                            <li><a href="https://portal.suap.ifrn.edu.br">{% icone "link" %} Portal do Suap</a></li>
+                            <li><a href="https://portal.ifrn.edu.br">{% icone "link" %} Portal do IFRN</a></li>
+                        </ul>
+                    </div>
+                    <div class="flex-item flex-grow-2">
+                        <h3>Links úteis</h3>
+                        <ul class="links-uteis">
+                            <li><a href="/comum/minha_conta/">{% icone "user" %} Minha conta</a></li>
+                            <li><a href="https://ajuda.suap.ifrn.edu.br/">{% icone "question-circle" %} Central de ajuda</a></li>
+                            <li><a href="/comum/temas/">{% icone "palette" %} Temas</a></li>
+                            <li><a href="/comum/acessibilidade/">{% icone "universal-access" %} Acessibilidade</a></li>
+                            <li><a href="/comum/design_system/">{% icone "code" %} Design System</a></li>
+                            {% render_quick_access quick_access %}
+                        </ul>
+                    </div>
+                    <div class="flex-item">
+                        <h3>Informações técnicas</h3>
+                        <dl>
+                            <dt>Servidor:</dt>
+                            <dd>{{ host_name|format }}</dd>
+                            <dt>Última extração do SIAPE:</dt>
+                            <dd>{% data_ultima_importacao_siape %}</dd>
+                            <dt>Última atualização do SUAP:</dt>
+                            <dd><a href="/admin/demandas/atualizacao/">{% data_ultima_atualizacao_suap %}</a></dd>
+                            <dt>Responsável:</dt>
+                            <dd>Diretoria de Gestão de Tecnologia da Informação/IFRN</dd>
+                            <dt hidden>Desenvolvimento:</dt>
+                            <dd><a href="https://www.djangoproject.com/" class="footer-django">Feito com Django</a></dd>
+                        </dl>
+                    </div>
+                </div>
+                {% block footer %}{% endblock %}
+            </footer>
+
+            <a href="#0" class="go-to-bottom">Ir para Rodapé</a>
+
+            {% if debug %}
+                <div id="debug"><strong>DEBUG</strong> | {% debug_info %}</div>
+            {% endif %}
+        {% endif %}
+    {% endblock %}
+</div>
+
+{% block scripts %}
+<script>
+jQuery(document).ready(function() {
+    open_menu_item("{{ menu_item_id }}");
+    $(window).on("unload", function () {
+        $('input[type=submit]').removeAttr('disabled');
+    });
+
+    {% if not prevent_multiple_form_submit %}
+        input_submit_on_click();
+    {% endif %}
+
+    // remove o label padrão do django
+    var labeless = $('input.labeless');
+   	labeless.prev().remove();
+	labeless.next().addClass('help_marginless');
+	labeless.next().removeClass('help');
+
+	// reseta o formulário da página
+	$('#btn_reset_forms').click(function () {
+		$('form').each(function() {
+			this.reset();
+		});
+	});
+});
+</script>
+{% include 'components/bootstrap_js.html' %}
+{% javascript 'fancybox' %}
+{% if is_popup and not request|is_ajax %}
+    <script>
+    $(document).ready(function(){
+        parent.$(".fancybox-content").height($(document).height());
+    });
+    setInterval(function(){ parent.$(".fancybox-content").height($(document).height()); }, 3000);
+    </script>
+{% endif %}
+{% endblock %}
+{% block extrascripts %}{% endblock %}
+{% if not is_popup and not test_mode %}
+    {% if use_pwa %}
+        <script>
+        if ("serviceWorker" in navigator && "PushManager" in window) {
+          navigator.serviceWorker
+            .register("/service-worker.js")
+            .then(function (swRegistration) {
+              // console.log("Service worker registered!");
+            })
+            .catch(function (error) {
+              console.error("Service worker error:", error);
+            });
+        } else {
+          console.log("Push messaging is not supported!");
+        }
+        </script>
+        <script src="/push-web-notification.js"></script>
+    {% else %}
+        <script>
+        if ("serviceWorker" in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                for(let registration of registrations) {
+                    registration.unregister();
+                }
+            });
+        }
+        </script>
+    {% endif %}
+{% endif %}
+</body>
+</html>

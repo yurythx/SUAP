@@ -1,0 +1,149 @@
+{% extends super_template %}
+
+{% block content %}
+    {% if confirmando_remocao %}
+        {% if not compensacoes_selecionadas_ids %}
+            <p class="alert alert-danger">Nenhuma compensação selecionada.</p>
+        {% elif not senha_remocao_confere %}
+            <p class="alert alert-danger">Senha incorreta.</p>
+        {% endif %}
+    {% endif %}
+
+    {% if compensacoes_por_data_debito or compensacoes_por_data_saldo or compensacoes_por_saldo_externo %}
+        {% render_form form %}
+    {% endif %}
+
+    {% if compensacoes.exists %}
+        {% box '?' %}
+            <form method="post">
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <th class="no-print"><input type="checkbox" class="selecao_all" name="selecao"/></th>
+                            <th>Carga Horária Compensada</th>
+                            <th>Data do Débito</th>
+                            <th>Data da Compensação/Saldo</th>
+                            <th>Saldo Externo Utililzado</th>
+                            <th>Situação</th>
+                            <th class="no-print">Opções</th>
+                        </thead>
+                        <tbody>
+                            {% for compensacao in compensacoes %}
+                                <tr>
+                                    <td class="no-print"><input type="checkbox" class="selecao" name="selecao_{{ compensacao.id }}"/></td>
+                                    <td class="ch-compensada" data-ch-compensada-em-segundos="{{ compensacao.ch_compensada_em_segundos }}">
+                                        {{ compensacao.ch_compensada|time:'H:i:s' }}
+                                    </td>
+                                    <td>
+                                        {{ compensacao.data_aplicacao }}
+                                        {% if compensacao.opcoes_compensacao_envolvidas.exists %}
+                                            {% for opcao_compensacao in compensacao.opcoes_compensacao_envolvidas %}
+                                                <span class="status status-em-tramite inline">
+                                                   {{ opcao_compensacao }}
+                                                </span>
+                                            {% endfor %}
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ compensacao.data_compensacao|format }}</td>
+                                    <td>{{ compensacao.saldo_externo_compensacao|format }}</td>
+                                    <td>
+                                        <span class='status
+                                            {% if compensacao.situacao == compensacao.SITUACAO_VALIDO %}
+                                                status-finalizado
+                                            {% elif compensacao.situacao == compensacao.SITUACAO_INVALIDO %}
+                                                status-rejeitado
+                                            {% endif %}
+                                            text-nowrap-normal'>
+                                            {{ compensacao.get_situacao }}
+                                        </span>
+                                    </td>
+                                    <td class="no-print">
+                                        <a class="btn default popup" href="/ponto/abrir_compensacao_horario/{{ compensacao.id }}/">Visualizar</a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <h4>Após selecionar as compensações que deseja remover, informe sua senha para confirmar:</h4>
+
+                {% csrf_token %}
+
+                <input type="hidden" name="data_inicio" value="{{ data_inicio|date:'dmY' }}"/>
+                <input type="hidden" name="data_fim" value="{{ data_fim|date:'dmY' }}"/>
+                {% for saldo_externo_id in saldos_externos_ids %}
+                    <input type="hidden" name="saldos_externos_ids" value="{{ saldo_externo_id }}"/>
+                {% endfor %}    
+
+                <fieldset class="module aligned">
+                    <div class="form-row">
+                        <div class="field-box">
+                            <label for="id_password" class="required">Senha:</label>
+                            <input id="id_password" type="password" name="password"/>
+                        </div>
+                    </div>
+                </fieldset>
+
+                <div class="submit-row">
+                    <input type="hidden" name="remover" value="sim"/>
+                    <input type="submit" class="btn danger no-confirm" value="Remover"/>
+                </div>
+            </form>
+        {% endbox %}
+    {% elif form.is_bound and form.is_valid or compensacoes_em_duplicidade %}
+        <p class="alert alert-warning">Nenhum informe de compensação foi encontrado.</p>
+    {% endif %}
+
+    <script src="/static/js/ponto-util-v2.js"></script>
+    <script>
+        var qtd_total_compensacoes = {{ compensacoes.count }};
+        var qtd_selecionada_compensacoes = {{ compensacoes_selecionadas_ids|length }};
+
+        init_compensacoes_selecionadas();
+        update_view_totais();
+        
+        $(document).ready(function () {
+            $("input[type=checkbox].selecao_all").click(function () {
+                var checked = "";
+                if ($(this).is(":checked"))
+                    checked = "checked";
+                $("input[type=checkbox].selecao").prop("checked", checked);
+                update_view_totais();
+            });
+
+            $("input[type=checkbox].selecao").click(function () {
+                $("input[type=checkbox].selecao_all").prop("checked", "");
+                update_view_totais();
+            });
+        })
+
+        function init_compensacoes_selecionadas(){
+            {% for compensacao_selecionada_id in compensacoes_selecionadas_ids %}
+                $("input[type=checkbox].selecao[name=selecao_{{ compensacao_selecionada_id }}]").prop("checked", "checked");
+            {% endfor %}
+            {% if compensacoes.count == compensacoes_selecionadas_ids|length %}
+                $("input[type=checkbox].selecao_all").prop("checked", "checked");
+            {% endif %}
+        }
+
+        function update_view_totais() {
+            qtd_selecionada_compensacoes = 0;
+            var total_ch_liberada = 0;
+
+            $("input[type=checkbox].selecao").each(function () {
+                if ($(this).is(":checked")){
+                    qtd_selecionada_compensacoes++;
+                    total_ch_liberada += parseInt($(this).parent().parent().find("td.ch-compensada").attr("data-ch-compensada-em-segundos"));
+                }
+            });
+
+            $("div.box > h3:first-child").html(
+                "Informes de compensação (" +
+                ""+qtd_total_compensacoes+"" +
+                " / "+qtd_selecionada_compensacoes + " selecionada" + (qtd_selecionada_compensacoes === 1 ? "" : "s") +
+                " - <strong>" + formata_segundos(total_ch_liberada) + "</strong> de carga horária a ser liberada" +
+                ")");
+        }
+    </script>
+{% endblock %}

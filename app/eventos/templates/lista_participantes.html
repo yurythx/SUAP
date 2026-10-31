@@ -1,0 +1,81 @@
+{% extends super_template %}
+
+{% block extrahead %}
+    <script>
+        $(document).ready(function() {
+            $("input[name=ids]").change(function () {
+                $("input[name=adicionar]").each(function (index) {
+                    $(this).prop('checked', !this.checked);
+                    $(this).change();
+                });
+            });
+            $("input[name=adicionar]").change(function () {
+                var id = $(this).data('id');
+                console.log(id);
+                $('#remover'+id).prop('checked', !this.checked);
+            });
+        });
+    </script>
+{% endblock %}
+
+{% block content %}
+{% if inscritos.exists %}
+    {% autopaginate inscritos 25 %}
+
+    <div class="search-and-filters">
+        <div class="filter">
+            <label for="q">Nome/CPF:</label>
+            <input type="text" id="q" name="q" value="{{ request.GET.q|default:'' }}">
+        </div>
+        <div class="filter">
+            <a class="btn default" onclick="document.location.href='?_popup=1&q='+$('#q').val();">Buscar</a>
+        </div>
+    </div>
+
+    <form method="post" action="">
+    {% csrf_token %}
+    {% paginate %}
+    <table>
+        <thead>
+            <tr>
+                <th>
+                    <input type="checkbox" name="ids" value="0" />
+                    <b>Presente</b>
+                </th>
+                <th>Nome</th>
+                <th>E-mail</th>
+                <th>CPF</th>
+                <th>Tipo</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for participante in inscritos %}
+            <tr>
+                <td>
+                    {% if pode_gerenciar %}
+                        <input type="checkbox" id="adicionar{{ participante.pk }}" name="adicionar" value="{{ participante.pk }}" data-id="{{ participante.id }}"
+                               {% if participante.pk in presentes %}checked{% endif %}>
+                        <input type="checkbox" id="remover{{ participante.pk }}" name="remover" value="{{ participante.pk }}" style="display:none"
+                               {% if participante.pk not in presentes %}checked{% endif %}>
+                    {% else %}
+                        {{ forloop.counter }}
+                    {% endif %}
+                </td>
+                <td><label for="adicionar{{ participante.pk }}">{{ participante.nome|format }}</label></td>
+                <td>{{ participante.email|format }}</td>
+                <td>{{ participante.cpf|format }}</td>
+                <td>{{ participante.tipo|format }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <div class="submit-row">
+        <button type="submit" class="btn success">Confirmar presença dos inscritos selecionados</button>
+    </div>
+    {% paginate %}
+    </form>
+{% else %}
+    <div class="alert alert-warning">Nenhum registro encontrado.</div>
+{% endif %}
+
+{% endblock %}

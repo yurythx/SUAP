@@ -1,0 +1,117 @@
+{% extends super_template %}
+
+
+
+{% block extrahead %}
+<script src="/static/djtools/graficos/highcharts.js"></script>
+<script src="/static/djtools/graficos/exporting.js"></script>
+{% endblock %}
+
+{% block content %}
+    <div class="search-and-filters">
+        {% render_form form %}
+    </div>
+    {% box 'Vacinas' %}
+        {% if form.is_bound %}
+            {% if registros.exists %}
+                <script>
+                    {% for grafico in pie_chart_lists %}
+                        {{ grafico|safe }}
+                    {% endfor %}
+                </script>
+
+                <div class="graficos-container">
+                    {% for grafico in pie_chart_lists %}
+                        <div id="{{ grafico.id }}" class="grafico-item"></div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="alert alert-warning">Não há registro de vacinas.</p>
+            {% endif %}
+        {% else %}
+            <p class="alert alert-warning">Utilize os filtros para ver o gráfico.</p>
+        {% endif %}
+    {% endbox %}
+
+    {% box 'Cartões Vacinais' %}
+        {% if form.is_bound %}
+            {% if alunos_com_cartoes %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Aluno</th>
+                            <th>Turma</th>
+                            <th>Campus</th>
+                            <th>Vacinas Cadastradas</th>
+                            <th>Vacinas Aprazadas (Próximos 15 dias)</th>
+                            <th class="no-print">Opções</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% autopaginate alunos_com_cartoes 30 'paginas_vacinados' %}
+                        {% paginate %}
+                        {% for aluno in alunos_com_cartoes %}
+                            <tr>
+                                <td>{{ aluno|format }}</td>
+                                <td>{{ aluno.get_ultima_turma_cursada|format }}</td>
+                                <td>{{ aluno.curso_campus.diretoria.setor.uo }}</td>
+                                <td>{{ aluno.get_vinculo.vinculo_paciente_prontuario.cartaovacinal_set.first.get_vacinas|format }}</td>
+                                <td>{{ aluno.get_vinculo.vinculo_paciente_prontuario.get_vacinas_aprazadas_proximos_15dias|format }}</td>
+                                <td class="no-print">
+                                    <a href="/saude/prontuario/{{ aluno.get_vinculo.id }}/" class="btn default">Ver Prontuário</a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="alert alert-warning">Nenhum cartão vacinal encontrado.</p>
+            {% endif %}
+        {% else %}
+            <p class="alert alert-warning">Utilize os filtros para ver a lista.</p>
+        {% endif %}
+    {% endbox %}
+
+    {% box 'Vacinas Atrasadas' %}
+
+        {% if form.is_bound %}
+            <ul class="action-bar">
+                <li><a class="btn" href="{{ request.get_full_path }}&envia_mensagem=1">Enviar Mensagem</a></li>
+            </ul>
+            {% if vacinas_atrasadas %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Turma</th>
+                            <th>Campus</th>
+                            <th>Vacinas Cadastradas</th>
+                            <th>Vacina em Atraso</th>
+                            <th class="no-print">Opções</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% autopaginate vacinas_atrasadas 30 'paginas_atrasados' %}
+                        {% paginate %}
+                        {% for registro in vacinas_atrasadas %}
+                            <tr>
+                                <td>{{ registro.prontuario.vinculo.relacionamento|format }}</td>
+                                <td>{{ registro.prontuario.vinculo.relacionamento.get_ultima_turma_cursada|format }}</td>
+                                <td>{{ registro.prontuario.vinculo.relacionamento.curso_campus.diretoria.setor.uo }}</td>
+                                <td>{{ registro.get_vacinas|format }}</td>
+                                <td>{{ registro.get_vacinas_atrasadas_com_previsao }}</td>
+                                <td class="no-print">
+                                    <a href="/saude/prontuario/{{ registro.prontuario.vinculo_id }}/" class="btn default">Ver Prontuário</a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="alert alert-warning">Nenhuma vacina em atraso.</p>
+            {% endif %}
+        {% else %}
+                <p class="alert alert-warning">Utilize os filtros para ver a lista.</p>
+            {% endif %}
+     {% endbox %}
+{% endblock %}

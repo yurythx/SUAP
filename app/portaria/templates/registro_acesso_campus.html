@@ -1,0 +1,117 @@
+{% extends super_template %}
+
+{% block action-bar %}
+<ul class="action-bar">
+    <li><a class="btn success" href="/portaria/listar_pessoas/">Registrar Visita</a></li>
+</ul>
+{% endblock %}
+
+{% block content %}
+
+    <div class="search-and-filters large-filters">
+        {% render_form form %}
+    </div>
+
+    {% if lista_acessos %}
+
+        {% autopaginate lista_acessos 25 %}
+        {% paginate %}
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Foto</th>
+                    <th>Nome</th>
+                    <th>Vínculo com o {% get_valor_por_chave "comum" "instituicao_sigla" %}</th>
+                    <th>Objetivo</th>
+                    <th>Crachá</th>
+                    <th>Data/Hora da Entrada</th>
+                    <th>Data/Hora da Saída</th>
+                    <th>Chave de Acesso ao Wi-fi</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for acesso in lista_acessos %}
+                <tr>
+                    {% if acesso.is_interno %}
+                        <td>
+                            <div class="photo-circle">
+                                <img alt="{{ acesso.vinculo.pessoa.nome|title }}" src="{{ acesso.vinculo.get_foto_75x100_url }}">
+                            </div>
+                        </td>
+                        <td>
+                            <dl>
+                                <dt class="visually-hidden">Nome</dt>
+                                <dd>{{ acesso.vinculo.pessoa.nome|title }}</dd>
+                                <dt>Matrícula:</dt>
+                                <dd>{{ acesso.get_matricula }}</dd>
+                                <dt>E-mail:</dt>
+                                <dd>{{ acesso.vinculo.email_notificacao }}</dd>
+                            </dl>
+                        </td>
+                        <td>{{ acesso.vinculo.get_relacionamento_title|title }}</td>
+                    {% else %}
+                        <td><img class="foto-miniatura" alt="{{ acesso.pessoa_externa|title }}" src="{{ acesso.pessoa_externa.get_foto_75x100_url }}"/></td>
+                        <td>
+                            <dl>
+                                <dt class="visually-hidden">Nome</dt>
+                                <dd>{{ acesso.pessoa_externa.nome|title }}</dd>
+                                <dt>RG:</dt>
+                                <dd>{{ acesso.pessoa_externa.get_rg }}</dd>
+                                <dt>CPF:</dt>
+                                <dd>{{ acesso.pessoa_externa.get_cpf }}</dd>
+                                <dt>E-mail:</dt>
+                                <dd>{{ acesso.pessoa_externa.email }}</dd>
+                            </dl>
+                        </td>
+                        <td><span class="status status-error">Nenhum</span></td>
+                    {% endif %}
+
+                    <td>{{ acesso.objetivo|capfirst }}</td>
+                    <td>{{ acesso.cracha }}</td>
+                    <td>{{ acesso.data_hora_entrada }}</td>
+
+                    {% if acesso.data_hora_saida %}
+                        <td>{{ acesso.data_hora_saida }}</td>
+                    {% else %}
+                        <td>
+                            <a class="btn success popup"
+                               href="/portaria/cadastrar_baixa_em_acesso/?ida={{ acesso.id }}">Registrar Saída</a>
+                        </td>
+                    {% endif %}
+
+                    {% if acesso.chave_wifi %}
+                        <td>
+                            <dl>
+                                <dt>Senha do Wi-fi:</dt>
+                                <dd data-clipboard="{{ acesso.senha|format  }}"><code>{{ acesso.senha|format }}</code></dd>
+                                <dt>Chave:</dt>
+                                <dd data-clipboard="{{ acesso.chave_wifi }}"><code>{{ acesso.chave_wifi }}</code></dd>
+                                <dt>Validade:</dt>
+                                <dd>{{ acesso.quantidade_dias_chave_wifi }} dia(s)</dd>
+                            </dl>
+                        </td>
+                    {% else %}
+                        {% if is_gerar_chave_wifi %}
+                            {% if acesso.data_hora_saida %}
+                                <td><span class="status status-error">Não gerada</span></td>
+                            {% else %}
+                                <td>
+                                    <a class="btn popup" href="/portaria/registrar_chave_wifi/?ida={{ acesso.id }}">Gerar Chave</a>
+                                </td>
+                            {% endif %}
+                        {% else %}
+                            <td><span class="status status-error">Geração de chave WI-FI indisponível para o campus</span></td>
+                        {% endif %}
+                    {% endif %}
+                </tr>
+            {% endfor %}
+
+            </tbody>
+        </table>
+
+    {% else %}
+        <p class="alert alert-warning">Nenhuma visita encontrada.</p>
+    {% endif %}
+
+{% endblock %}

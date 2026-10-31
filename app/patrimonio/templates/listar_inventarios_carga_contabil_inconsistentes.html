@@ -1,0 +1,159 @@
+{% extends super_template %}
+
+{% block extrahead %}
+<script>
+jQuery(document).ready(function() {
+    $("input[name=inventarios]").each(function() {
+        if($(this).is(':checked')){
+            $(this).parent().parent().addClass('highlight');
+        }
+    });
+    $("input[name=inventarios]").click(function(){
+        $(this).parent().parent().toggleClass('highlight');
+    });
+});
+function marcar_todos() {
+    var todos = $('#inventarios_form input:checkbox');
+    todos.prop('checked', true);
+    todos.parent().parent().addClass('highlight');
+}
+function desmarcar_todos() {
+    var todos = $('#inventarios_form input:checkbox');
+    todos.prop('checked', false); 
+    todos.parent().parent().removeClass('highlight');
+}
+</script>
+{% endblock %}
+
+{% block content %}
+ 	{% if inventarios.exists and pode_alterar %}
+    <div class="tab-pane" data-title="Requisição para Itens Inconsistentes">
+    {% box 'Filtro' %}
+        <form>
+            {% render_form form_filtro %}
+        </form>
+       {% endbox %}
+    {% box 'Requisição para Itens Inconsistentes' %}
+   
+	<form id="inventarios_form" action="" method="post">
+		<fieldset>
+			{% csrf_token %}
+			<div class="destino form-row">
+			    {{ form_inconsistente.servidor_destino.errors }}
+				<label>{{ form_inconsistente.servidor_destino.label }}:</label> {{ form_inconsistente.servidor_destino }}
+			</div>
+            <div class="destino form-row">
+				<label>{{ form_inconsistente.descricao.label }}:</label> {{ form_inconsistente.descricao }}
+			</div>
+            <div class="submit-row">
+                <input type="submit" class="btn success" />
+            </div>
+			<table>
+			    <thead>
+			        <tr>
+			        	<th>
+			                {{ form_inconsistente.inventarios.errors }}
+                            <a href="#" id="marcar_todos" onclick="marcar_todos(); return false;">Todos</a> -
+                            <a href="#" id="desmarcar_todos" onclick="desmarcar_todos(); return false;">Nenhum</a>
+                        </th>
+			            <th>Nº</th>
+	                    <th>Descrição</th>
+	                    <th>Responsável</th>
+	                    <th>Campus do Responsável</th>
+	                    <th>Carga Contábil</th>
+				    </tr>
+			    </thead>
+			    <tbody>
+					{% paginate %}
+                    {% autopaginate inventarios 100 %}
+					{% for inventario in inventarios %}
+			        <tr>
+			            <td align="center">
+			                <input type="checkbox" name="inventarios" value="{{ inventario.id }}" {% if inventario.id in inventarios_ids %}checked="checked"{% endif %}>
+			            </td>
+			            <td align="center">
+			                <a href="{{ inventario.get_absolute_url }}">
+			                    {{ inventario.numero }}
+			                </a>
+			            </td>
+			            <td>{{ inventario.entrada_permanente.descricao }}</td>
+			            <td>{{ inventario.responsavel_vinculo|format }}</td>
+	                    <td align="center">
+    	                    {{ inventario.responsavel_vinculo.setor.uo }}
+        	            </td>
+			            <td align="center">{{ inventario.carga_contabil.campus }} </td>
+			        </tr>
+			        {% endfor %}
+                    {% paginate %}
+			    </tbody>
+			</table>
+			<div class="submit-row">
+			    <input type="submit" />
+			</div>
+		</fieldset>
+	</form>
+	{% endbox %}
+{% else %}
+	<p class="alert alert-warning">Nenhum item encontrado.</p>
+{% endif %}
+
+</div>
+<div class="tab-pane" data-title="Inventários Inconsistentes com Responsável em Outros Campi">
+{% if inventarios_inconsistentes_campus %}
+    {% box 'Inventários Inconsistentes com Responsável em Outros Campi' %}
+        <table>
+			<thead>
+				<tr>
+					<th>Número</th>
+					<th>Descrição</th>
+                    <th>Responsável</th>
+					<th>Campus Responsável</th>
+					<th>Carga Contábil</th>
+				</tr>
+			</thead>
+			<tbody>
+				{% for inventario in inventarios_inconsistentes_campus %}
+				<tr>
+                    <td><a href="/patrimonio/inventario/{{ inventario.numero }}/">{{ inventario.numero }}</a></td>
+					<td>{{ inventario.get_descricao }}</td>
+					<td>{{ inventario.responsavel_vinculo|format }}</td>
+					<td>{{ inventario.responsavel_vinculo.setor.uo }}</td>
+                    <td>{{ inventario.carga_contabil.campus }}</td>
+				</tr>
+				{% endfor %}
+			</tbody>
+		</table>
+    {% endbox %}
+    {% else %}
+        <p class="alert alert-warning"> Nenhum Inventário inconsistente com Responsável em Outros Campi </p>
+{% endif %}
+</div>
+<div class="tab-pane" data-title="Inventários Pendentes em Outras Requisições">
+{% if inventarios_pendentes %}
+{% box 'Inventários Pendentes em Outras Requisições' %}
+		<table>
+			<thead>
+				<tr>
+					<th>Número</th>
+					<th>Descrição</th>
+					<th>ED</th>
+					<th>Valor</th>
+				</tr>
+			</thead>
+			<tbody>
+				{% for inventario in inventarios_pendentes %}
+				<tr>
+					<td><a href="/patrimonio/inventario/{{ inventario.numero }}/">{{ inventario.numero }}</td>
+					<td>{{ inventario.get_descricao }}</td>
+					<td>{{ inventario.entrada_permanente.categoria }}</td>
+					<td align="right">{{ inventario.entrada_permanente.valor|mascara_dinheiro }}</td>
+				</tr>
+				{% endfor %}
+			</tbody>
+		</table>
+	{% endbox %}
+{% else %}
+    <p class="alert alert-warning"> Nenhum Inventário pendente em outras requisições. </p>
+{% endif %}
+</div>
+{% endblock %}

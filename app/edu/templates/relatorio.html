@@ -1,0 +1,451 @@
+{% extends super_template %}
+
+{% block action-bar %}
+    {% if request.user.historicorelatorio_set.exists %}
+        <ul class="action-bar">
+            <li><a href="/edu/meus_relatorios/1/" class="btn popup">Executar consulta salva anteriormente</a></li>
+        </ul>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    {% if not formatacao %}
+        <div id="formbox">
+            <p class="alert alert-info">Selecione um ou mais filtros para listar alunos.</p>
+            {% render_form form %}
+        </div>
+    {% else %}
+        <form method="post" id="relatorioform" class="mt-2">
+            {% csrf_token %}
+            <div id="resultadobox">
+                <script>
+                    $('#formbox').hide();
+                </script>
+                {% box "Filtros" %}
+                    <ul class="action-bar">
+                        <li><a class="btn success" href="/edu/relatorio/">Realizar Nova Consulta</a></li>
+                        <li><a href="/edu/relatorio/?editar=1&{{ request.META.QUERY_STRING }}" class="btn primary">Editar
+                            Consulta</a></li>
+                        <li><a data-reload-on-close="false" href="/edu/salvar_relatorio/1/{{ query_string }}/"
+                               class="btn popup">Salvar Consulta</a></li>
+                    </ul>
+                    {% if filtros %}
+                        <dl class="definition-list">
+                            {% for filtro in filtros %}
+                                <dt>{{ filtro.chave }}</dt>
+                                <dd>{{ filtro.valor }}</dd>
+                            {% endfor %}
+                        </dl>
+                    {% else %}
+                        <p class="alert alert-warning">Nenhum filtro selecionado.</p>
+                    {% endif %}
+                {% endbox %}
+
+                {% box "Resultado da Pesquisa ({{ alunos.count }} alunos)" %}
+                    {% if alunos.exists %}
+                        {% autopaginate alunos quantidade_itens %}
+                        <ul class="action-bar">
+                            {% if formatacao == 'simples' %}
+                                {% if perms.edu.gerar_relatorio %}
+                                    <li class="has-child">
+                                        <a href="#" class="btn primary">Imprimir Etiquetas</a>
+                                        <ul>
+                                            <li>
+                                                <button class="btn confirm" type="submit"
+                                                        data-confirm="No momento da impressão será necessário configurar o papel para Carta e marcar a opção de 100% de tamanho. Deseja continuar?"
+                                                        name="etiquetas" value="62681">PIMACO - 6081/6181/0081/62581/62681
+                                                </button>
+                                            </li>
+                                            <li>
+                                                <button class="btn confirm" type="submit"
+                                                        data-confirm="No momento da impressão será necessário configurar o papel para Carta e marcar a opção de 100% de tamanho. Deseja continuar?"
+                                                        name="etiquetas" value="A4255">PIMACO - 6080/6180/6280/0080/62580/62680/A4255/A4055
+                                                </button>
+                                            </li>
+                                            <li>
+                                                <button class="btn confirm" type="submit"
+                                                        data-confirm="No momento da impressão será necessário configurar o papel para Carta e marcar a opção de 100% de tamanho. Deseja continuar?"
+                                                        name="etiquetas" value="A4366">PIMACO - A4655
+                                                </button>
+                                            </li>
+                                        </ul>
+                                    </li>
+                                {% endif %}
+                                <li>
+                                    <button type="submit" class="btn" name="cracha" value="1">Imprimir Crachás
+                                    </button>
+                                </li>
+                                <li>
+                                    <button type="submit" class="btn" name="carometros" value="1">Imprimir Carômetros
+                                    </button>
+                                </li>
+                                <li>
+                                    <button type="submit" class="btn" name="assinaturas" value="1">Imprimir Folhas de
+                                        Assinatura
+                                    </button>
+                                </li>
+                                <li>
+                                    <button type="submit" class="btn confirm" name="imprimir" value="1"
+                                            data-confirm="Apenas os três primeiro campos selecionados serão exibidos neste relatório. Para exibir todos selecione a opção 'Exportar para XLS'">
+                                        Exportar para PDF
+                                    </button>
+                                </li>
+                            {% endif %}
+                            <li>
+                                <button type="submit" class="btn" name="xls" value="1">Exportar para XLS</button>
+                            </li>
+                            <li>
+                                <button type="submit" class="btn" name="xls_anonimo" value="1">Exportar Dados Anonimizados</button>
+                            </li>
+                        </ul>
+                        {% if formatacao == 'simples' %}
+                            {% if agrupamento == 'Campus' %}
+                                {% regroup alunos by curso_campus.diretoria.setor.uo.nome as alunos_agrupados %}
+                            {% elif agrupamento == 'Turma' %}
+                                {% regroup alunos|dictsort:"turma.codigo" by turma.codigo as alunos_agrupados %}
+                            {% else %}
+                                {% regroup alunos by curso_campus as alunos_agrupados %}
+                            {% endif %}
+
+                            {% for item_aluno in alunos_agrupados %}
+                                <h4>{{ item_aluno.grouper }}</h4>
+
+                                <p class="alert alert-warning">
+                                    <strong>Atenção: </strong> Ao selecionar um ou mais alunos da listagem abaixo, as
+                                    ações de impressão
+                                    e exportação levarão em consideração somente os itens selecionados na página atual.
+                                </p>
+                                <div class="table-responsive">
+                                <table class="mb-2">
+                                    <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th><input type="checkbox"
+                                                   onchange="var is = this.parentNode.parentNode.parentNode.parentNode.getElementsByTagName('input');for(var i=0; i<is.length; i++){ is[i].checked = this.checked;}">
+                                        </th>
+                                        <th>Matrícula</th>
+                                        <th>Nome</th>
+                                        {% for campo in campos_exibicao %}
+                                            {% for label in exibicao_choices %}
+                                                {% if label.0 == campo %}
+                                                    <th>{{ label.1 }}</th>
+                                                {% endif %}
+                                            {% endfor %}
+                                        {% endfor %}
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    {% for aluno in item_aluno.list %}
+                                        {{ aluno|set_periodo_letivo_referencia:form.cleaned_data.periodo_letivo }}
+                                        {{ aluno|set_ano_letivo_referencia:form.cleaned_data.ano_letivo }}
+                                        <tr>
+                                            <td>{% index_paginacao %}</td>
+                                            <td><input value="{{ aluno.pk }}" name="select_aluno" type="checkbox"/></td>
+                                            <td>
+                                                {% if perms.edu.view_aluno %}
+                                                    <a target="_blank" href="{{ aluno.get_absolute_url }}">{{ aluno.matricula }}</a>
+                                                {% else %}
+                                                    {{ aluno.matricula }}
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ aluno.get_nome_social_composto }}</td>
+                                            {% for campo in campos_exibicao %}
+                                                <td>{{ aluno|getattrr:campo|format }}</td>
+                                            {% endfor %}
+                                        </tr>
+                                    {% endfor %}
+                                    </tbody>
+                                </table>
+                                </div>
+                            {% endfor %}
+                            {% paginate %}
+                        {% elif formatacao == 'educacenso' %}
+                            {% if agrupamento == 'Campus' %}
+                                {% regroup alunos by curso_campus.diretoria.setor.uo.nome as alunos_agrupados %}
+                            {% else %}
+                                {% regroup alunos by curso_campus as alunos_agrupados %}
+                            {% endif %}
+                            {% for item_aluno in alunos_agrupados %}
+                                <h4>{{ item_aluno.grouper }}</h4>
+                                <div class="table-responsive">
+                                <table class="mb-2">
+                                    <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Matrícula</th>
+                                        <th>Nome</th>
+                                        <th>CPF</th>
+                                        <th>Diretoria</th>
+                                        <th>Turma</th>
+                                        <th>Situação Matrícula</th>
+                                        <th>Situação Período</th>
+                                        <th>Rendimento</th>
+                                        <th>Movimento</th>
+                                        <th>Concluínte</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    {% for aluno in item_aluno.list %}
+                                        <tr>
+                                            <td>{% index_paginacao %}</td>
+                                            <td><a href="{{ aluno.get_absolute_url }}">{{ aluno.matricula }}</a></td>
+                                            <td>{{ aluno.get_nome_social_composto }}</td>
+                                            <td>{{ aluno.pessoa_fisica.cpf }}</td>
+                                            <td>{{ aluno.curso_campus.diretoria }}</td>
+                                            <td>{{ aluno.matricula_periodo.get_codigo_turma|format }}</td>
+                                            <td>{{ aluno.situacao }}</td>
+                                            <td>{{ aluno.matricula_periodo.situacao }}</td>
+                                            <td>{{ aluno.matricula_periodo.get_rendimento|format }}</td>
+                                            <td>{{ aluno.matricula_periodo.get_movimento|format }}</td>
+                                            <td>{{ aluno.matricula_periodo.get_concluinte|format }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                    </tbody>
+                                </table>
+                                </div>
+                            {% endfor %}
+                            {% paginate %}
+                        {% elif formatacao == 'censup' %}
+                            {% if agrupamento == 'Campus' %}
+                                {% regroup alunos by curso_campus.diretoria.setor.uo.nome as alunos_agrupados %}
+                            {% else %}
+                                {% regroup alunos by curso_campus as alunos_agrupados %}
+                            {% endif %}
+                            {% for item_aluno in alunos_agrupados %}
+                                <h4>{{ item_aluno.grouper }}</h4>
+                                <div class="table-responsive">
+                                <table class="mb-2">
+                                    <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Matrícula</th>
+                                        <th>Nome</th>
+                                        <th>CPF</th>
+                                        <th>Curso</th>
+                                        <th>CH Total Curso</th>
+                                        <th>CH Cumprida</th>
+                                        <th>Situação Matrícula</th>
+                                        <th>Situação Período</th>
+                                        <th>Situação Vínculo Curso</th>
+                                        <th>Turno</th>
+                                        <th>Reserva de Vagas</th>
+                                        <th>Apoio Social</th>
+                                        <th>Atividade Extracurricular</th>
+                                        <th>C.H. Curso</th>
+                                        <th>C.H. Cumprida</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    {% for aluno in item_aluno.list %}
+                                        <tr>
+                                            <td>{% index_paginacao %}</td>
+                                            <td><a href="{{ aluno.get_absolute_url }}">{{ aluno.matricula }}</a></td>
+                                            <td>{{ aluno.get_nome_social_composto }}</td>
+                                            <td>{{ aluno.pessoa_fisica.cpf }}</td>
+                                            <td>
+                                                {% if aluno.curso_campus %}
+                                                    <a href="/edu/cursocampus/{{ aluno.curso_campus.pk }}">{{ aluno.curso_campus.descricao_historico }}</a>
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if aluno.matriz %}
+                                                    {{ aluno.matriz.get_carga_horaria_total_prevista }}
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if aluno.matriz %}
+                                                    {{ aluno.get_carga_horaria_total_cumprida }}
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ aluno.situacao }}</td>
+                                            <td>{{ aluno.matricula_periodo.situacao }}</td>
+                                            <td>{{ aluno.matricula_periodo.get_situacao_censup|format }}</td>
+                                            <td>{{ aluno.turno|format }}</td>
+                                            <td>{{ aluno.tem_cota|format }}</td>
+                                            <td>{% if aluno.tem_apoio_social %}
+                                                <ul>
+                                                    {% for apoio in aluno.tem_apoio_social %}
+                                                        <li>{{ apoio|format }}</li>
+                                                    {% endfor %}
+                                                </ul>
+                                            {% else %}{{ aluno.tem_apoio_social|format }}{% endif %}</td>
+                                            <td>{% if aluno.tem_atividade_extracurricular %}
+                                                <ul>
+                                                    {% for atividade_extracurricular in aluno.tem_atividade_extracurricular %}
+                                                        <li>{{ atividade_extracurricular|format }}</li>
+                                                    {% endfor %}
+                                                </ul>
+                                            {% else %}{{ aluno.tem_atividade_extracurricular|format }}{% endif %}</td>
+                                            <td>{{ aluno.matriz.get_carga_horaria_total_prevista|format }}</td>
+                                            <td>{{ aluno.get_ch_componentes_cumpridos|format }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                    </tbody>
+                                </table>
+                                </div>
+                            {% endfor %}
+                            {% paginate %}
+                        {% elif formatacao == 'pordisciplinapendente' or formatacao == 'pordisciplinacursando' %}
+                            {% if agrupamento == 'Campus' %}
+                                {% regroup alunos by curso_campus.diretoria.setor.uo.nome as alunos_agrupados %}
+                            {% else %}
+                                {% regroup alunos by curso_campus as alunos_agrupados %}
+                            {% endif %}
+                            {% for item_aluno in alunos_agrupados %}
+                                <h4>{{ item_aluno.grouper }}</h4>
+                                <div class="table-responsive">
+                                <table class="mb-2">
+                                    <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Matrícula</th>
+                                        <th>Nome</th>
+                                        <th>Curso</th>
+                                        <th>Disciplinas</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    {% for aluno in item_aluno.list %}
+                                        {{ aluno|set_periodo_letivo_referencia:form.cleaned_data.periodo_letivo }}
+                                        {{ aluno|set_ano_letivo_referencia:form.cleaned_data.ano_letivo }}
+                                        <tr>
+                                            <td>{% index_paginacao %}</td>
+                                            <td><a href="{{ aluno.get_absolute_url }}?tab=historico">{{ aluno.matricula }}</a></td>
+                                            <td>{{ aluno.get_nome_social_composto }}</td>
+                                            <td>
+                                                {% if aluno.curso_campus %}
+                                                    <a href="/edu/cursocampus/{{ aluno.curso_campus.pk }}">{{ aluno.curso_campus.descricao_historico }}</a>
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                            <td class="text-center">
+                                                {% if formatacao == 'pordisciplinacursando' %}
+                                                    <a class="popup" data-reload-on-close="false" href="/edu/relatorio_disciplinas_aluno/{{ aluno.pk }}/cursando/?ano_letivo={{ ano_letivo.pk|default:"" }}&periodo_letivo={{ periodo_letivo|default:"" }}">
+                                                        {{ aluno.get_matriculas_diario_cursando.count }}
+                                                    </a>
+                                                {% else %}
+                                                    <a class="popup" data-reload-on-close="false" href="/edu/relatorio_disciplinas_aluno/{{ aluno.pk }}/pendente/">
+                                                        {{ aluno.get_componentes_obrigatorios_pendentes.count }}
+                                                    </a>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                    </tbody>
+                                </table>
+                                </div>
+                            {% endfor %}
+                            {% paginate %}
+                        {% elif formatacao == 'tcc' %}
+                            <div class="table-responsive">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Matrícula</th>
+                                        <th>Aluno</th>
+                                        <th>Nível de ensino</th>
+                                        <th>Tipo</th>
+                                        <th>Título</th>
+                                        <th>Banca</th>
+                                        <th>Data prevista</th>
+                                        <th>Data da defesa</th>
+                                        <th>Nota</th>
+                                        <th>Situação</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for aluno in alunos %}
+                                        {% for projeto_final in aluno.get_projetos_finais %}
+                                            <tr>
+                                                <td>{{ forloop.parentloop.counter }}</td>
+                                                <td>{{ aluno.matricula }}</td>
+                                                <td>{{ aluno.pessoa_fisica.nome }}</td>
+                                                <td>{{ aluno.curso_campus.modalidade.nivel_ensino }}</td>
+                                                <td>{{ projeto_final.tipo }}</td>
+                                                <td>{{ projeto_final.titulo }}</td>
+                                                <td>
+                                                    Presidente: {{ projeto_final.presidente|format }}<br>
+                                                    Examinador: {{ projeto_final.examinador_interno|format }}<br>
+                                                    Examinador: {{ projeto_final.examinador_externo|format }}
+                                                </td>
+                                                <td>{{ projeto_final.data_defesa }}</td>
+                                                <td>{{ projeto_final.resultado_data }}</td>
+                                                <td>{{ projeto_final.nota }}</td>
+                                                <td>{{ projeto_final.get_situacao_display }}</td>
+                                            </tr>
+                                        {% endfor %}
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                            </div>
+                        {% elif formatacao == 'relatorio_conselho_classe' or formatacao == 'pe_de_meia' %}
+                            <p class='alert alert-info'>Os dados desse relatório estão disponíveis para visualização apenas no arquivo de exportação. Clique no botão "Exportar para XLS" para gerá-lo.</p>
+                        {% else %}
+                            {{ tabela }}
+                        {% endif %}
+                    {% else %}
+                        <p class='alert alert-warning'>Nenhum aluno encontrado.</p>
+                    {% endif %}
+                    <div class="submit-row">
+                        <ul class="action-bar">
+                            {% if formatacao == 'simples' %}
+                                {% if perms.edu.gerar_relatorio %}
+                                    <li class="has-child">
+                                        <a href="#" class="btn primary">Imprimir Etiquetas</a>
+                                        <ul>
+                                            <li>
+                                                <button class="btn confirm"
+                                                        data-confirm="No momento da impressão será necessário configurar o papel para Carta e marcar a opção de 100% de tamanho. Deseja continuar?"
+                                                        name="etiquetas" value="6181">PIMACO -
+                                                    6081/6181/0081/62581/62681
+                                                </button>
+                                            </li>
+                                            <li>
+                                                <button class="btn confirm"
+                                                        data-confirm="No momento da impressão será necessário configurar o papel para Carta e marcar a opção de 100% de tamanho. Deseja continuar?"
+                                                        name="etiquetas" value="A4255">PIMACO -
+                                                    6080/6180/6280/0080/62580/62680/A4255/A4055
+                                                </button>
+                                            </li>
+                                            <li>
+                                                <button class="btn confirm"
+                                                        data-confirm="No momento da impressão será necessário configurar o papel para Carta e marcar a opção de 100% de tamanho. Deseja continuar?"
+                                                        name="etiquetas" value="A4366">PIMACO - A4655
+                                                </button>
+                                            </li>
+                                        </ul>
+                                    </li>
+                                    <li>
+                                        <button type="submit" class="btn" name="carometros" value="1">Imprimir
+                                            Carômetros
+                                        </button>
+                                    </li>
+                                    <li>
+                                        <button type="submit" class="btn" name="assinaturas" value="1">Imprimir Folhas
+                                            de Assinatura
+                                        </button>
+                                    </li>
+                                {% endif %}
+                                <li>
+                                    <button type="submit" class="btn" name="imprimir" value="1">Exportar para PDF
+                                    </button>
+                                </li>
+                            {% endif %}
+                            <li>
+                                <button type="submit" class="btn" name="xls" value="1">Exportar para XLS</button>
+                            </li>
+                        </ul>
+                    </div>
+                {% endbox %}
+            </div>
+        </form>
+    {% endif %}
+{% endblock %}

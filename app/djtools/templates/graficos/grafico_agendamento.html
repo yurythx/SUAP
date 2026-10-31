@@ -1,0 +1,96 @@
+<script>
+    var LIMITE_INFERIOR = '{{ grafico.get_limite_inferior_str }}';
+    var LIMITE_SUPERIOR = '{{ grafico.get_limite_superior_str }}';
+    function paint_div(color, viatura_id, dsaida, hsaida, dvolta, hvolta, viagem, tooltip) {
+        if (!maior_ou_igual(dsaida, LIMITE_INFERIOR)){
+            dsaida = LIMITE_INFERIOR;
+            hsaida = '00:00';
+        }
+        if (!menor_ou_igual(dvolta, LIMITE_SUPERIOR)){
+            dvolta = LIMITE_SUPERIOR;
+            hvolta = '23:00';
+        }
+        if (tooltip == null){
+            tooltip = dsaida+' '+hsaida+'-'+dvolta+' '+hvolta+': '+viagem;
+        }
+        _hsaida = hsaida.split(':')[0]*1;
+        _hvolta = hvolta.split(':')[0]*1;
+        if (dsaida == dvolta) {
+            for (var i=_hsaida; i<_hvolta+1; i++){
+                div = document.getElementById(dsaida+'-'+i+'-'+viatura_id)
+                // A célula da grade pode não existir para esta data/hora/viatura; sem
+                // o guard, div.classList estoura "reading 'classList'" (Sentry SUAP-TDD).
+                if (!div) continue;
+                if (div.classList.contains('alert')) color = 'error';
+                if (color == 'success') {
+                    div.innerHTML = "<span class='sr-only'>Viatura disponível no período solicitado</span>";
+                } else if (color == 'error') {
+                    div.innerHTML = "<span class='sr-only'>Viatura indisponível no período solicitado</span>";
+                } else if (color == 'alert') {
+                    div.innerHTML = "<span class='sr-only'>Viatura indisponível</span>";
+                }
+                div.classList.add(color);
+                div.title = tooltip;
+                div.style.cursor = 'help';
+            }
+        } else {
+            do {
+                paint_div(color, viatura_id, dsaida, hsaida, dsaida, '23:00', viagem, tooltip);
+                hsaida = "00:00";
+            } while ((dsaida = dia_seguinte(dsaida))!=dvolta);
+            paint_div(color, viatura_id, dsaida, '00:00', dvolta, hvolta, viagem, tooltip);
+        }
+    }
+    function menor_ou_igual(d1, d2){
+        d1 = d1.split('/');
+        d1 = d1[1]+"/"+d1[0]+"/"+d1[2];
+        var d1 = new Date(d1);
+        d2 = d2.split('/');
+        d2 = d2[1]+"/"+d2[0]+"/"+d2[2];
+        var d2 = new Date(d2);
+        return(d1.getTime()<d2.getTime()||d1.getTime()==d2.getTime());
+    }
+    function maior_ou_igual(d1, d2){
+        d1 = d1.split('/');
+        d1 = d1[1]+"/"+d1[0]+"/"+d1[2];
+        var d1 = new Date(d1);
+        d2 = d2.split('/');
+        d2 = d2[1]+"/"+d2[0]+"/"+d2[2];
+        var d2 = new Date(d2);
+        return(d1.getTime()>d2.getTime()||d1.getTime()==d2.getTime());
+    }
+    function dia_seguinte(data){
+        data = data.split('/');
+        data = data[1]+"/"+data[0]+"/"+data[2];
+        var d = new Date(data);
+        d.setDate(d.getDate()+1);
+        day = d.getDate() < 10 ? "0"+d.getDate() : d.getDate();
+        month = d.getMonth() < 9 ? "0"+(d.getMonth()+1) : (d.getMonth()+1);
+        return(day+"/"+month+"/"+(1900+d.getYear()));
+    }
+</script>
+
+<div class="table-responsive">
+    <table class="compact">
+        <thead>
+            <tr>
+                <th>Viatura</th>
+                {% for dia in grafico.dias %}
+                    <th class="text-center" colspan="24">{{ dia }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in grafico.items %}
+                <tr>
+                    <th class="text-nowrap">{{ item.1 }}</th>
+                    {% for dia in grafico.dias %}
+                        {% for hora in grafico.horas %}
+                            <td id="{{ dia }}-{{ hora }}-{{ item.0 }}" title="{{ hora }} h" class="default {% if forloop.last %}last{% endif %}"><span class="visually-hidden">Viatura disponível</span></td>
+                        {% endfor %}
+                    {% endfor %}
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

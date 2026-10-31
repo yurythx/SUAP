@@ -1,0 +1,162 @@
+<div class="tab-pane ajax-rendered"
+     data-title="Avaliação"
+     data-tab="avaliacao"
+     data-checked="{% if perguntas_avaliacao.exists %}{% if avaliacao_configurada_corretamente %}True{% else %}False{% endif %}{% endif %}">
+    <ul class="action-bar">
+        <li>
+            <a class="btn popup success"
+               href="{% url 'adicionar_pergunta_avaliacao' evento.id %}">{% icone "plus" %} Adicionar pergunta</a>
+        </li>
+        <li>
+            <a href="{% url 'adicionar_opcao_resposta_avaliacao_geral' evento.id %}"
+               class="btn success popup">{% icone "plus" %} Adicionar opção geral de resposta</a>
+        </li>
+        <li>
+            <a href="{% url 'exportar_respostas_avaliacao' evento.id %}"
+               class="btn default">{% icone "download" %} Exportar XLS com identificadores</a>
+        </li>
+        <li>
+            <a href="{% url 'exportar_respostas_avaliacao' evento.id %}?anonimo=1"
+               class="btn default">{% icone "download" %} Exportar XLS anônimo</a>
+        </li>
+    </ul>
+    {% if not perguntas_avaliacao.exists %}
+        <p class="alert alert-warning">Não há avaliação configurada para este evento.</p>
+    {% else %}
+        {% box 'Perguntas de avaliação' badge=perguntas_avaliacao.count %}
+            {% for pergunta in perguntas_avaliacao %}
+                <div class="general-box">
+                    <div class="primary-info">
+                        <div class="status-info-container">
+                            {% if pergunta.eh_objetiva_ou_multipla_escolha and not pergunta.opcaoresposta_set.exists %}
+                                <span class="status status-alert">Pergunta sem opções de resposta. Por padrão, irá utilizar opção geral de respostas cadastradas neste evento.</span>
+                            {% endif %}
+                        </div>
+                        <h4>
+                            <small>{{ pergunta.ordem|format }}</small> {{ pergunta.titulo|format }}
+                        </h4>
+                        <ul class="action-bar">
+                            {% if pergunta.eh_objetiva_ou_multipla_escolha %}
+                                <li>
+                                    <a href="{% url 'adicionar_opcao_resposta_avaliacao_pergunta' evento.id pergunta.id %}"
+                                       class="btn success popup">{% icone "plus" %} Adicionar opção de resposta</a>
+                                </li>
+                            {% endif %}
+                            <li>
+                                <a href="{% url 'editar_pergunta_avaliacao' pergunta.id %}"
+                                   class="btn primary popup">{% icone "edit" %} Editar</a>
+                            </li>
+                            <li>
+                                <a href="{% url 'remover_pergunta_avaliacao' pergunta.id %}"
+                                   class="btn danger">{% icone "trash" %} Remover</a>
+                            </li>
+                        </ul>
+                        {% if pergunta.opcaoresposta_set.exists %}
+                            <div class="extra-info">
+                                <div class="table-responsive">
+                                    <table>
+                                        <caption>Opções de resposta para a pergunta "{{ pergunta.titulo|format }}"</caption>
+                                        <thead>
+                                            <tr>
+                                                <th class="no-print">Ações</th>
+                                                <th>Ordem</th>
+                                                <th>Texto</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for opcao_resposta in pergunta.opcaoresposta_set.all %}
+                                                <tr>
+                                                    <td class="list-display-icons no-print">
+                                                        <a href="{% url 'editar_opcao_resposta_avaliacao' opcao_resposta.id %}"
+                                                           class="icon icon-edit popup"
+                                                           title="Editar opção de resposta"><span class="visually-hidden">Editar</span></a>
+                                                        <a href="{% url 'remover_opcao_resposta_avaliacao' opcao_resposta.id %}"
+                                                           class="icon icon-delete confirm"
+                                                           title="Remover opção de resposta"><span class="visually-hidden">Remover</span></a>
+                                                    </td>
+                                                    <td>#{{ opcao_resposta.ordem|format }}</td>
+                                                    <td>{{ opcao_resposta.texto|format }}</td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                    <dl class="secondary-info">
+                        <div class="list-item">
+                            <dt>{% icone "circle" %} Tipo:</dt>
+                            <dd>
+                                {{ pergunta.get_tipo_pergunta_display }}
+                            </dd>
+                        </div>
+                        <div class="list-item">
+                            <dt>{% icone "circle" %} Obrigatória:</dt>
+                            <dd>
+                                {{ pergunta.obrigatoria|format }}
+                            </dd>
+                        </div>
+                    </dl>
+                </div>
+            {% endfor %}
+        {% endbox %}
+        {% box 'Relatório Geral' badge=avaliacao_total_respondentes %}
+            {% if avaliacao_total_respondentes %}
+                {% for item in avaliacao_relatorio_geral %}
+                    <h4>{{ item.pergunta.titulo }}</h4>
+                    {% if item.contagem_opcoes %}
+                        <div class="table-responsive">
+                            <table>
+                                <caption>Respostas agrupadas</caption>
+                                <thead>
+                                    <tr>
+                                        <th>Opção</th>
+                                        <th>Quantidade</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for opcao, total in item.contagem_opcoes %}
+                                        <tr>
+                                            <td>{{ opcao.texto|format }}</td>
+                                            <td>{{ total|format }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        {% for resposta in item.respostas_textuais %}
+                            <p>{{ resposta|format }}</p>
+                        {% empty %}
+                            <p class="alert alert-warning">Sem respostas para esta pergunta.</p>
+                        {% endfor %}
+                    {% endif %}
+                {% endfor %}
+            {% else %}
+                <p class="alert alert-warning">Nenhuma resposta de avaliação foi registrada.</p>
+            {% endif %}
+        {% endbox %}
+        {% box 'Respostas Individuais (Anônimas)' badge=avaliacao_total_respondentes %}
+            {% if avaliacao_respostas_individuais %}
+                {% for respondente in avaliacao_respostas_individuais %}
+                    <div class="general-box">
+                        <div class="primary-info">
+                            <h4>Respondente #{{ respondente.respondente }}</h4>
+                            <dl class="definition-list">
+                                {% for resposta in respondente.respostas %}
+                                    <dt>{{ resposta.pergunta.titulo }}</dt>
+                                    <dd>
+                                        {{ resposta.valor|default:"-"|format }}
+                                    </dd>
+                                {% endfor %}
+                            </dl>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p class="alert alert-warning">Nenhuma resposta individual disponível.</p>
+            {% endif %}
+        {% endbox %}
+    {% endif %}
+</div>

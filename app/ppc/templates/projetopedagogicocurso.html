@@ -1,0 +1,1012 @@
+{% extends super_template %}
+
+{% block extrahead %}
+    <script>
+        function change_tab(aba){
+            if (aba.includes("/")) {
+                window.location.href = aba
+            }else{
+                if (aba.includes("#")) {
+                    a = aba.substring(0, aba.indexOf("#"));
+                    ancora = aba.substring(aba.indexOf("#")+1);
+                    changeTabs(a);
+                    const elemAncora = document.getElementById(ancora);
+                    if (elemAncora) elemAncora.scrollIntoView();
+                }
+                else{
+                    changeTabs(aba)
+                }
+            }
+        };
+    </script>
+{% endblock %}
+
+{% block object-status %}
+    {% if situacoes %}
+        <ul class="steps">
+            {% for situacao in situacoes %}
+                <li><span class="step-{% if situacao.1 == 'Iniciado' %}info{% elif situacao.1 == 'Aprovado' or situacao.1 == 'Finalizado' %}success{% else %}alert{% endif %} {% if situacao.0 == projeto.situacao %}active{% endif %}">{{ situacao.1 }}</span></li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        {{ projeto.get_situacao_display|status }}
+    {% endif %}
+{% endblock %}
+
+{% block action-bar %}
+    <span id="menutop"></span>
+    <ul class="action-bar">
+        {% if pode_enviar_elaboracao %}
+            <li><a class="btn success" href="/ppc/alterar_situacao_ppc/{{ projeto.pk }}/{{ projeto.EM_ELABORACAO }}/">{% icone "share" %} Enviar para elaboração</a></li>
+        {% endif %}
+        {% for doc in documentos_emissao %}
+            <li><a class="btn success popup" href="{% url 'emitir_documento_projetopedagogicocurso' projeto.pk doc %}">{% icone "share" %} Emitir {{ doc }}</a></li>
+            <li><a class="btn success popup" href="{% url 'emitir_documento_projetopedagogicocurso' projeto.pk doc 'vincular' %}">{% icone "share" %} Vincular {{ doc }} existente</a></li>
+        {% endfor %}
+        {% if pode_convocar_camara %}
+            <li><a class="btn primary popup" href="/ppc/projetopedagogicocurso/{{ projeto.pk }}/convocar_camara/">{% icone "edit" %} {% if projeto.data_convocacao_camara %}Editar{% else %}Informar{% endif %} dados da Câmara</a></li>
+        {% endif %}
+        {% if pode_convocar_consepex %}
+            <li><a class="btn primary popup" href="/ppc/projetopedagogicocurso/{{ projeto.pk }}/convocar_consepex/">{% icone "edit" %} {% if projeto.data_convocacao_consepex %}Editar{% else %}Informar{% endif %} dados do CONSEPEX</a></li>
+        {% endif %}
+        {% if pode_convocar_consup %}
+            <li><a class="btn primary popup" href="/ppc/projetopedagogicocurso/{{ projeto.pk }}/convocar_consup/">{% icone "edit" %} {% if projeto.data_convocacao_consup %}Editar{% else %}Informar{% endif %} dados do CONSUP</a></li>
+        {% endif %}
+        {% if pode_gerar_matrizes %}
+            <li><a class="btn warning popup" href="{% url 'gerar_matriz_projetopedagogicocurso' projeto.pk %}">{% icone "project-diagram" %} Gerar matrizes curriculares</a></li>
+        {% endif %}
+        {% if pode_finalizar %}
+            <li><a class="btn success" href="/ppc/projetopedagogicocurso/{{ projeto.pk }}/finalizar/">{% icone "share" %} Finalizar</a></li>
+        {% endif %}
+        {% if projeto.is_finalizado %}
+            <li><a class="btn" href="{% url 'ppc_pdf' projeto.pk %}">{% icone "file-pdf" %} Baixar PPC</a></li>
+        {% else %}
+            <li><a class="btn" href="{% url 'minuta_projetopedagogicocurso' projeto.pk %}">{% icone "file-pdf" %} Baixar minuta</a></li>
+        {% endif %}
+        <li><a class="btn default" href="{{ solicitacao.get_absolute_url }}">{% icone "eye" %} Visualizar solicitação</a></li>
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+    {% if criticals %}
+        {% for critical in criticals %}
+            {% if critical.1 %}
+                <p class="alert alert-danger"><strong>Atenção:</strong> <a onclick="javascript:change_tab('{{ critical.1 }}')">{{ critical.0 }}</a></p>
+            {% else %}
+                <p class="alert alert-danger"><strong>Atenção:</strong> {{ critical.0 }}</p>
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+
+    {% if alerts %}
+        {% for alert in alerts %}
+            {% if alert.1 %}
+                <p class="alert alert-warning"><strong>Atenção:</strong> <a onclick="javascript:change_tab('{{ alert.1 }}')">{{ alert.0 }}</a></p>
+            {% else %}
+                <p class="alert alert-warning"><strong>Atenção:</strong> {{ alert.0 }}</p>
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+
+    {% if infos %}
+        {% for info in infos %}
+        {% if info.1 %}
+                <p class="alert alert-info"><strong>Atenção:</strong> <a onclick="javascript:change_tab('{{ info.1 }}')">{{ info.0 }}</a></p>
+            {% else %}
+                <p class="alert alert-info"><strong>Atenção:</strong> {{ info.0 }}</p>
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+
+    {% if deliberacao_ad_referendum and not deliberacao_ad_referendum.estah_finalizado %}
+        <p class="alert alert-warning"><strong>Atenção:</strong> Aguardando a finalização da deliberação Ad Referendum.</p>
+    {% endif %}
+
+    {% if resolucao_ad_referendum and not resolucao_ad_referendum.estah_finalizado %}
+        <p class="alert alert-warning"><strong>Atenção:</strong> Aguardando a finalização da resolução Ad Referendum.</p>
+    {% endif %}
+
+    {% if pendencias %}
+        <p class="alert alert-warning"><strong>Atenção:</strong> Este projeto possui <a onclick="javascript:change_tab('pendencias#abas')">pendências não resolvidas</a>.</p>
+    {% endif %}
+
+    {% box "Dados gerais" %}
+        <dl class="definition-list flex">
+            <div class="list-item flex-basis-100">
+                <dt>Nome do curso</dt>
+                <dd>{{ projeto.nome_curso }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Modelo de PPC</dt>
+                <dd><a href="{{ projeto.modelo_ppc.get_absolute_url }}">{{ projeto.modelo_ppc }}</a></dd>
+            </div>
+            <div class="list-item">
+                <dt>Diretriz</dt>
+                <dd><a href="{{ projeto.diretriz.get_absolute_url }}">{{ projeto.diretriz }}</a></dd>
+            </div>
+            {% if projeto.tipo_tramitacao %}
+                <div class="list-item">
+                    <dt>Tipo de tramitação</dt>
+                    <dd>{{ projeto.get_tipo_tramitacao_display|format }}</dd>
+                </div>
+            {% endif %}
+            {% if projeto.resolucao_criacao %}
+                <div class="list-item">
+                    <dt>Resolução de aprovação</dt>
+                    <dd>
+                        {% if projeto.url_resolucao_criacao %}
+                            <a href="{{ projeto.url_resolucao_criacao }}">{{ projeto.resolucao_criacao|format }}</a>
+                        {% else %}
+                            {{ projeto.resolucao_criacao|format }}
+                        {% endif %}
+                    </dd>
+                </div>
+            {% endif %}
+            {% if projeto.proreitoria %}
+                <div class="list-item">
+                    <dt>Pró-Reitoria</dt>
+                    <dd>{{ projeto.proreitoria|format }}</dd>
+                </div>
+            {% endif %}
+        </dl>
+    {% endbox %}
+    
+    <span id="abas"></span>
+
+    <div class="tab-pane" data-title="Dados do curso" data-tab="curso">
+        {% if pode_editar_dados_curso %}
+            <ul class="action-bar">
+                <li><a class="btn primary" href="/admin/ppc/projetopedagogicocurso/{{ projeto.pk }}/change/">{% icone "edit" %} Editar</a></li>
+            </ul>
+        {% endif %}
+
+        {% box "Identificação" %}
+            <dl class="definition-list flex">
+                <div class="list-item flex-basis-100">
+                    <dt>Nome do curso</dt>
+                    <dd>{{ projeto.nome_curso }}</dd>
+                </div>
+                <div class="list-item flex-basis-100">
+                    <dt>Nome do curso no diploma e histórico</dt>
+                    <dd>{{ projeto.nome_diploma_historico|format }}</dd>
+                </div>
+                <div class="list-item flex-basis-50">
+                    <dt>Título do certificado masculino</dt>
+                    <dd>{{ projeto.titulo_certificado_masculino|format }}</dd>
+                </div>
+                <div class="list-item flex-basis-50">
+                    <dt>Título do certificado feminino</dt>
+                    <dd>{{ projeto.titulo_certificado_feminino|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Identificador do PPC</dt>
+                    <dd>{{ projeto.identificador_ppc|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Código CENSUP</dt>
+                    <dd>{{ projeto.codigo_censup|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Código e-MEC</dt>
+                    <dd>{{ projeto.codigo_emec|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Código SISTEC</dt>
+                    <dd>{{ projeto.codigo_sistec|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Código EDUCACENSO</dt>
+                    <dd>{{ projeto.codigo_educacenso|format }}</dd>
+                </div>
+            </dl>
+        {% endbox %}
+
+        {% box "Carga horária do curso" badge="{{ projeto.ch_curso }}" %}
+            <dl class="definition-list flex">
+                <div class="list-item">
+                    <dt>Componentes obrigatórios</dt>
+                    <dd>{{ projeto.ch_cc_obrigatorio }}h</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Componentes optativos</dt>
+                    <dd>{{ projeto.ch_cc_optativo }}h</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Componentes eletivos</dt>
+                    <dd>{{ projeto.ch_cc_eletivo }}h</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Prática profissional</dt>
+                    <dd>{{ projeto.ch_pratica }}h</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Atividade complementar</dt>
+                    <dd>{{ projeto.ch_ac }}h</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Atividade teórico-prática de aprofundamento</dt>
+                    <dd>{{ projeto.ch_atpa }}h</dd>
+                </div>
+            </dl>
+        {% endbox %}
+
+        {% box "Carga horária por tipo de componente" badge="{{ projeto.get_ch_exigida_matriz }}" %}
+            <dl class="definition-list flex">
+                <div class="list-item">
+                    <dt>Componente regular</dt>
+                    <dd>{{ projeto.ch_cc_regular }}h</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Componente de atividade de extensão</dt>
+                    <dd>{{ projeto.ch_cc_extensao }}h</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Componente de TCC</dt>
+                    <dd>{{ projeto.ch_cc_tcc }}h</dd>
+                </div>
+            </dl>
+        {% endbox %}
+
+        {% box "Dados complementares" %}
+            <dl class="definition-list flex">
+                <div class="list-item">
+                    <dt>Área de Concentração</dt>
+                    <dd>{{ projeto.area_concentracao|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Periodicidade</dt>
+                    <dd>{{ projeto.get_periodicidade_display|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Formação de Professores</dt>
+                    <dd>{{ projeto.formacao_de_professores|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Exige etapa única</dt>
+                    <dd>{{ projeto.diretriz.exige_etapa_unica|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Exige TCC</dt>
+                    <dd>{{ projeto.diretriz.exige_tcc|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Exige colação de grau</dt>
+                    <dd>{{ projeto.diretriz.exige_colacao_grau|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Exige ENADE</dt>
+                    <dd>{{ projeto.diretriz.exige_enade|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Emite certificação intermediária</dt>
+                    <dd>{{ projeto.diretriz.emite_certificacao_parcial|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Certificado intermediário acumulável com diploma de conclusão de curso</dt>
+                    <dd>{{ projeto.diretriz.certificado_parcial_acumulavel|format }}</dd>
+                </div>
+                {% if projeto.solicitacao.eixo_tecnologico %}
+                <div class="list-item">
+                    <dt>Eixo Tecnológico</dt>
+                    <dd>{{ projeto.solicitacao.eixo_tecnologico|format }}</dd>
+                </div>
+                {% endif %}
+            </dl>
+        {% endbox %}
+    </div>
+
+    <div class="tab-pane ajax-rendered" data-title="Conteúdo" data-tab="conteudo">
+        {% if request.GET.tab == "conteudo" %}
+
+            <ul class="action-bar">
+                {% if pode_assumir_revisao %}
+                    <li><a class="btn" href="/ppc/assumir_revisao/{{ projeto.pk }}/ppc/">Revisar todos</a></li>
+                {% endif %}
+                <li><a class="btn popup" href="{% url 'conteudo_visualizar' projeto.pk %}">Visualizar</a></li>
+            </ul>
+
+            {% if em_elaboracao or em_revisao %}
+                {% progressbar percentual_concluido %}
+                <p class="progress-description">Progresso {% if em_elaboracao %}de envio da elaboração para revisão{% else %}da revisão de conteúdo homologada{% endif %}</p>
+                {% endif %}
+
+            <dl class="definition-list flex">
+                <div class="list-item flex-basis-100">
+                    <dt>Situação</dt>
+                    <dd>{{ projeto.get_situacao_conteudo|status }}</dd>
+                </div>
+            </dl>
+
+            <div class="alert alert-info">
+                <p>Os seguintes marcadores estão disponíveis para preenchimento dos conteúdos:</p>
+                <ul>
+                    <li>{% verbatim %}{{ nome_curso }}{% endverbatim %}: Incorpora no texto o nome do curso.</li>
+                    <li>{% verbatim %}{{ nome_diploma_historico }}{% endverbatim %}: Incorpora no texto o nome do curso que é exibido no diploma e histórico.</li>
+                    <li>{% verbatim %}{{ eixo_tecnologico }}{% endverbatim %}: Incorpora no texto o eixo tecnológico indicado na solicitação do PPC.</li>
+                    <li>{% verbatim %}{{ ch_curso }}{% endverbatim %}: Incorpora no texto a carga horária do curso.</li>
+                    <li>{% verbatim %}{{ ch_matriz }}{% endverbatim %}: Incorpora no texto a carga horária das disciplinas da matriz.</li>
+                    <li>{% verbatim %}{{ ch_pratica }}{% endverbatim %}: Incorpora no texto a carga horária da prática profissional.</li>
+                    <li>{% verbatim %}{{ quadro_matriz }}{% endverbatim %}: Incorpora no texto o quadro da matriz curricular do curso.</li>
+                    <li>{% verbatim %}{{ quadro_requisitos }}{% endverbatim %}: Incorpora no texto o quadro de pré-requisitos e correquisitos dos planos de disciplinas da matriz.</li>
+                    <li>{% verbatim %}{{ quadro_optativas }}{% endverbatim %}: Incorpora no texto o quadro dos planos de disciplinas optativas da matriz curricular.</li>
+                    <li>{% verbatim %}{{ certificacao_intermediaria }}{% endverbatim %}: Incorpora no texto as certificações intermediárias do PPC.</li>
+                    {% for marcador in lista_marcadores_dinamicos %}
+                        <li>{{ marcador }}</li>
+                    {% endfor %}
+                    <li>{% verbatim %}{{ bibliografia }}{% endverbatim %}: Importa as referências cadastradas nas seções "Bibliografia Básica" e "Bibliografia Complementar" dos planos de disciplinas aprovados vinculados ao PPC.</li>
+                    <li>{% verbatim %}{{ quebra_de_pagina }}{% endverbatim %}: Insere uma quebra de página no texto.</li>
+                </ul>
+            </div>
+            
+            {% for secao in secoes %}
+                <span id="id_secao_{{ secao.id }}"></span>
+                {% box secao.titulo %}
+                    {% if pode_assumir_revisao %}
+                        <ul class="action-bar">
+                            <a class="btn success" href="/ppc/assumir_revisao/{{ projeto.pk }}/secao/{{ secao.id }}/">Revisar {{ secao.titulo }}</a>
+                        </ul>
+                    {% endif %}
+
+                    <div class="table-responsive">
+                        <table>
+                            <caption>Conteúdos da seção: {{ secao.titulo }}</caption>
+                            <thead>
+                            <th>Ordem de Exibição</th>
+                            <th>Texto</th>
+                            {% if em_elaboracao %}
+                                <th>Orientação de Preenchiento</th>
+                            {% endif %}
+                            {% if em_revisao %}
+                                <th>Revisão</th>
+                            {% endif %}
+                            <th>Situação</th>
+                            <th class="no-print text-end">Opções</th>
+                            </thead>
+                            <tbody>
+                            {% for conteudo in projeto|method:"get_conteudos_por_secao"|call:secao.id %}
+                                <tr>
+                                    <td>{{ forloop.counter }}</td>
+                                    <td>{{ conteudo.texto|safe }}</td>
+                                    {% if em_elaboracao %}
+                                        <td>{{ conteudo.conteudo_modelo.orientacao_preenchimento }}</td>
+                                    {% endif %}
+                                    {% if em_revisao %}
+                                        <td>
+                                            {% if conteudo.revisor %}
+                                                <strong>Revisor</strong>: {{ conteudo.revisor|format }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                    {% endif %}
+                                    <td>{{ conteudo.get_situacao_display|status }}</td>
+                                    <td class="no-print">
+                                        <ul class="action-list">
+                                            {% if conteudo.conteudo_modelo.editavel %}
+                                                {% if conteudo|method:"pode_editar"|call:request.user %}
+                                                    {% if em_elaboracao %}
+                                                        <li><a class="btn success" href="{% url 'alterar_situacao_conteudoppc' conteudo.pk 2 %}">{% icone "share" %} Concluir edição</a></li>
+                                                    {% endif %}
+                                                    <li><a class="btn primary popup" href="/admin/ppc/conteudoppc/{{ conteudo.pk }}/change/">{% icone "edit" %} Editar</a></li>
+                                                {% endif %}
+                                                {% if conteudo|method:"pode_assumir_revisao"|call:request.user %}
+                                                    <li><a class="btn success" href="/ppc/assumir_revisao/{{ conteudo.pk }}/conteudo/">{% icone "square" %} Revisar</a></li>
+                                                {% endif %}
+                                                {% if conteudo|method:"pode_retomar_edicao"|call:request.user %}
+                                                    <li><a class="btn" href="/ppc/retomar_edicao/{{ conteudo.pk }}/">{% icone "undo" %} Retomar edição</a></li>
+                                                {% endif %}
+                                                {% if conteudo|method:"pode_revisar"|call:request.user %}
+                                                    <li><a class="btn success" href="{% url 'alterar_situacao_conteudoppc' conteudo.pk 5 %}">{% icone "toggle-on" %} Homologar</a></li>
+                                                    <li><a class="btn warning popup" href="{% url 'alterar_situacao_conteudoppc' conteudo.pk 4 %}">{% icone "share" %} Enviar para correção</a></li>
+                                                {% endif %}
+                                                {% if conteudo|method:"pode_desfazer_homologacao"|call:request.user %}
+                                                    <li><a class="btn warning" href="{% url 'alterar_situacao_conteudoppc' conteudo.pk 3 %}">{% icone "undo" %} Desfazer homologação</a></li>
+                                                {% endif %}
+                                                {% if pode_revisar and conteudo.situacao != '5' %}
+                                                    <li><a class="btn popup" href="/ppc/adicionar_comentario_conteudo_ppc/{{ conteudo.pk }}/">{% icone "comments" %} Comentar</a></li>
+                                                {% endif %}
+                                            {% endif %}
+                                            <li><a class="btn popup" href="{% url 'pdf_conteudoppc' conteudo.pk %}">{% icone "file-pdf" %} Visualizar em PDF</a></li>
+                                            <li><a class="btn default popup" href="{% url 'historico_conteudoppc' conteudo.pk %}">{% icone "history" %} Histórico</a></li>
+                                        </ul>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endbox %}
+            {% endfor %}
+        {% endif %}
+    </div>
+
+    <div class="tab-pane" data-title="Matrizes curriculares" data-tab="matrizes" data-counter="{{ projeto.matrizppc_set.count }}">
+            <ul class="action-bar">
+                {% if pode_elaborar %}
+                    <li><a class="btn success popup" href="/ppc/projetopedagogicocurso/{{ projeto.pk }}/adicionar_matrizppc/">{% icone "plus" %} Adicionar matriz curricular</a></li>
+                {% endif %}
+            </ul>
+
+            {% if alertas_matriz %}
+                <div class="alert alert-warning">
+                    <p><strong>Atenção:</strong> Os planos abaixo não foram vinculados em todas as matrizes deste PPC.</p>
+                    <ul>
+                    {% for alerta in alertas_matriz %}
+                        <li>{{ alerta }}</li>
+                    {% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
+
+            {% if projeto.matrizppc_set.exists %}
+                <div class="table-responsive">
+                    <table>
+                        <caption>Matrizes curriculares</caption>
+                        <thead>
+                        <tr>
+                            <th>Ações</th>
+                            <th>Nome</th>
+                            <th>Quantidade de períodos</th>
+                            <th>Turno</th>
+                            <th>Situação da matriz</th>
+                            <th>Progresso do cadastro da matriz</th>
+                            {% if projeto.diretriz.possui_modalidadepraticaprofissional %}
+                                <th>Situação da prática profissional</th>
+                            {% endif %}
+                            <th>Matriz gerada</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for matrizppc in projeto.matrizppc_set.all %}
+                            <tr>
+                                <td class="no-print field-get_acoes">
+                                    {% icon "view" "{{ matrizppc.get_absolute_url }}" "Visualizar" %}
+                                    {% if pode_elaborar %}
+                                        {% icon "edit" "/ppc/matrizppc/{{ matrizppc.pk }}/editar/" "Editar" "popup" %}
+                                        {% icon "delete" "/comum/excluir/ppc/matrizppc/{{ matrizppc.pk }}/" "Excluir" "no-confirm popup" %}
+                                    {% endif %}
+                                </td>
+                                <td>{{ matrizppc.nome }}</td>
+                                <td>{{ matrizppc.quantidade_periodos }}</td>
+                                <td>{{ matrizppc.turno|format }}</td>
+                                <td>{{ matrizppc.get_situacao_matriz_display|status }}</td>
+                                <td>
+                                    {% progressbar matrizppc.get_percentual_ch_informada_matriz %}
+                                </td>
+                                {% if projeto.diretriz.possui_modalidadepraticaprofissional %}
+                                    <td>{{ matrizppc.get_situacao_modalidadepraticaprofissional_display|status }}</td>
+                                {% endif %}
+                                <td>{{ matrizppc.possui_matriz_gerada|format }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="alert alert-warning">Nenhuma matriz cadastrada ainda.</p>
+            {% endif %}
+    </div>
+
+    <div class="tab-pane" data-title="Bibliografia" data-tab="bibliografia">
+        <p class="alert alert-info">A bibliografia é gerada com base nos planos de disciplinas aprovados e vinculados a este PPC.</p>
+        {% box "Bibliografias" %}
+            {% if projeto|method:"pode_elaborar"|call:request.user or projeto|method:"pode_revisar"|call:request.user %}
+                <ul class="action-bar">
+                    <li><a class="btn" href="/ppc/projetopedagogicocurso/{{ projeto.pk }}/gerar_bibliografia/">{% icone "sync" %} {% if projeto.bibliografia_html %}Reprocessar{% else %}Gerar{% endif %} bibliografia</a></li>
+                </ul>
+            {% endif %}
+            {% if projeto.bibliografia_html %}
+                {{ projeto.bibliografia_html|safe }}
+            {% else %}
+                <p class="alert alert-warning">Nenhuma bibliografia encontrada.</p>
+            {% endif %}
+        {% endbox %}
+    </div>
+
+    {% if projeto.diretriz.emite_certificacao_parcial %}
+        <div class="tab-pane" data-title="Certificação intermediária" data-tab="certificacao" data-counter="{{ projeto.certificacaoparcial_set.count }}">
+
+            {% box "Certificações intermediárias" %}
+                <ul class="action-bar">
+                    {% if pode_elaborar %}
+                        <li><a class="btn success popup" href="{% url 'adicionar_certificacaointermediaria' projeto.pk %}">{% icone "plus" %} Adicionar certificação intermediária</a></li>
+                    {% endif %}
+                </ul>
+
+                {% for cp in projeto.certificacaoparcial_set.all %}
+                    {% box cp.descricao %}
+
+                        <ul class="action-bar">
+                            {% if pode_elaborar %}
+                                <li><a class="btn success popup" href="{% url 'vincular_planodisciplina_certificacaointermediaria' cp.pk %}">Adicionar plano de disciplina</a></li>
+                                <li><a class="btn primary popup" href="{% url 'editar_certificacaointermediaria' cp.pk %}">Editar certificação intermediária</a></li>
+                                <li><a class="btn danger" href="/comum/excluir/ppc/certificacaoparcial/{{ cp.pk }}/">Remover certificação intermediária</a></li>
+                            {% endif %}
+                        </ul>
+
+                        <dl class="definition-list flex">
+                            <div class="list-item">
+                                <dt>Modalidade</dt>
+                                <dd>{{ cp.modalidade_certificacao }}</dd>
+                            </div>
+                            <div class="list-item">
+                                <dt>Titulação</dt>
+                                <dd>{{ cp.titulacao_masculino }} | {{ cp.titulacao_feminino }} </dd>
+                            </div>
+                            <div class="list-item">
+                                <dt>CH de componentes optativos</dt>
+                                <dd>{{ cp.ch_componentes_optativos }}h</dd>
+                            </div>
+                            <div class="list-item">
+                                <dt>CH total</dt>
+                                <dd>{{ cp.get_carga_horaria_total }}h</dd>
+                            </div>
+                        </dl>
+
+                        {% with planos=cp.planodisciplinacertificacaoparcial_set.all %}
+                            {% if planos.exists %}
+                                <div class="table-responsive">
+                                    <table>
+                                        <caption>Planos de disciplina</caption>
+                                        <thead>
+                                            <th class="no-print">Ações</th>
+                                            <th>Disciplina</th>
+                                            <th>Carga horária</th>
+                                            <th>Identificador do plano</th>
+                                            <th>Situação do plano</th>
+                                        </thead>
+                                        <tbody>
+                                        {% for plano in planos %}
+                                            <tr>
+                                                <td class="no-print field-get_acoes">
+                                                    {% icon "view" "/ppc/planodisciplina/{{ plano.plano_disciplina_id }}/" "Visualizar" %}
+                                                    {% if pode_elaborar %}
+                                                        {% icon "delete" "/comum/excluir/ppc/planodisciplinacertificacaoparcial/{{ plano.pk }}/" "Excluir " %}
+                                                    {% endif %}
+                                                </td>
+                                                <td>{{ plano.plano_disciplina.nome_disciplina }}</td>
+                                                <td>{{ plano.plano_disciplina.ch_disciplina }}h</td>
+                                                <td>{{ plano.plano_disciplina_id }}</td>
+                                                <td>
+                                                    {{ plano.plano_disciplina.get_situacao_display|status }}
+                                                    {% if not plano.plano_disciplina.ativo %}
+                                                        <p>{{ "Inativo"|status }}</p>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% else %}
+                                <p class="alert alert-warning">Nenhum plano de disciplina adicionado.</p>
+                            {% endif %}
+                        {% endwith %}
+                    {% endbox %}
+                {% endfor %}
+            {% endbox %}
+        </div>
+    {% endif %}
+
+    <div class="tab-pane" data-title="Equipe" data-tab="equipe" data-counter="{{ qtd_equipe }}">
+        {% box "Comissão de elaboração" %}
+            <ul class="action-bar">
+                {% if pode_adicionar_portaria_elaboracao %}
+                    <li><a class="btn popup" href="/ppc/projetopedagogicocurso/{{ projeto.pk }}/adicionar_portaria/">Atualizar comissão</a></li>
+                {% endif %}
+                {% if pode_atualizar_comissao_elaboracao %}
+                    <li><a class="btn success popup" href="/ppc/projetopedagogicocurso/{{ projeto.pk }}/adicionar_elaborador/">Adicionar elaborador</a></li>
+                    {% if projeto.possui_coordenador_comissao_elaboracao %}
+                        <li><a class="btn warning" href="/ppc/projetopedagogicocurso/{{ projeto.pk }}/concluir_atualizacao_portaria/">Concluir atualização</a></li>
+                    {% endif %}
+                {% endif %}
+            </ul>
+
+            {% if not projeto.possui_coordenador_comissao_elaboracao %}
+                <p class="alert alert-warning"><strong>Atenção:</strong> A Comissão deve possuir 1 coordenador.</p>
+            {% elif pode_atualizar_comissao_elaboracao %}
+                <p class="alert alert-warning"><strong>Atenção:</strong> A portaria da comissão de elaboradores foi atualizada. Após adição e remoção dos membros, finalize a atualização da comissão com a ação "Concluir atualização".</p>
+            {% elif projeto.is_comissao_em_atualizacao %}
+                <p class="alert alert-warning"><strong>Atenção:</strong> Existe um procedimento de atualização dos membros da comissão em andamento.</p>
+            {% endif %}
+
+            {% if projeto.elaboradorppc_set.exists %}
+                <div class="table-responsive">
+                    <table>
+                        <caption>Membros</caption>
+                        <thead>
+                            <tr>
+                                {% if pode_editar_elaborador or pode_atualizar_comissao_elaboracao %}
+                                    <th class="no-print">Ações</th>
+                                {% endif %}
+                                <th>Servidor</th>
+                                <th>Função</th>
+                                <th>Permissão</th>
+                                <th>Data Inicial</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for elaborador in projeto.elaboradorppc_set.all %}
+                            <tr>
+                                {% if pode_editar_elaborador or pode_atualizar_comissao_elaboracao %}
+                                    <td class="no-print field-get_acoes">
+                                        {% if pode_editar_elaborador %}
+                                            {% icon "edit" "/ppc/editar_elaborador_ppc/{{ elaborador.pk }}/" "Editar" "popup" %}
+                                        {% endif %}
+                                        {% if pode_atualizar_comissao_elaboracao %}
+                                            {% icon "delete" "/ppc/projetopedagogicocurso/{{ elaborador.pk }}/remover_elaborador/" "Remover" %}
+                                        {% endif %}
+                                    </td>
+                                {% endif %}
+                                <td>{{ elaborador.vinculo }}</td>
+                                <td>{{ elaborador.get_funcao_display }}</td>
+                                <td>{{ elaborador.get_permissao_display }}</td>
+                                <td>{{ elaborador.data_inicial }}</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="alert alert-warning">Nenhum elaborador adicionado.</p>
+            {% endif %}
+
+            {% if projeto.atualizacaocomissaoelaboracao_set.exists %}
+                {% box "Atualizações de portaria " %}
+                    {% for atualizacao in projeto.atualizacaocomissaoelaboracao_set.all %}
+                        {% with portaria=atualizacao.get_portaria %}
+                            <ul class="flex-container boxes services">
+                                <li class="box-item">
+                                    <h4><a href="{{ portaria.get_absolute_url }}">{{ portaria }} ({{ atualizacao.data|format }})</a></h4>
+                                    {% if atualizacao.historicoelaboradorppc_set.exists %}
+                                        <ol>
+                                            {% for historico in atualizacao.historicoelaboradorppc_set.all %}
+                                                <li>O elaborador {{ historico.vinculo }} foi {{ historico.get_acao_display|lower }}.</li>
+                                            {% endfor %}
+                                        </ol>
+                                    {% else %}
+                                        <p class="alert alert-warning">Não houve alteração de membros.</p>
+                                    {% endif %}
+                                </li>
+                            </ul>
+                        {% endwith %}
+                    {% endfor %}
+                {% endbox %}
+            {% endif %}
+        {% endbox %}
+
+        {% box "Colaboradores" %}
+            {% if pode_adicionar_revisor %}
+                <ul class="action-bar">
+                    <li><a class="btn success popup" href="/ppc/projetopedagogicocurso/{{ projeto.pk }}/adicionar_colaborador/">Adicionar colaborador</a></li>
+                </ul>
+            {% endif %}
+            {% if projeto.colaboradorppc_set.exists %}
+                <div class="table-responsive">
+                    <table>
+                        <caption>Membros</caption>
+                        <thead>
+                        <tr>
+                            {% if pode_adicionar_revisor %}
+                                <th class="no-print">Ações</th>
+                            {% endif %}
+                            <th>Servidor</th>
+                            <th>Ativo</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for colaborador in projeto.colaboradorppc_set.all %}
+                            <tr>
+                                {% if pode_adicionar_revisor %}
+                                    <td class="no-print field-get_acoes">
+                                        {% icon "edit" "/ppc/projetopedagogicocurso/{{ colaborador.pk }}/editar_colaborador/" "Editar" "popup" %}
+                                    </td>
+                                {% endif %}
+                                <td>{{ colaborador.servidor }}</td>
+                                <td>{{ colaborador.ativo|format }}</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="alert alert-warning">Nenhum colaborador adicionado.</p>
+            {% endif %}
+        {% endbox %}
+
+        {% box "Revisores" %}
+            {% if pode_adicionar_revisor %}
+                <ul class="action-bar">
+                    <li><a class="btn success popup" href="/ppc/adicionar_revisor_ppc/{{ projeto.pk }}/">Adicionar revisor</a></li>
+                </ul>
+            {% endif %}
+
+            {% if projeto.revisorppc_set.exists %}
+                <div class="table-responsive">
+                    <table>
+                        <caption>Membros</caption>
+                        <thead>
+                        <tr>
+                            {% if pode_adicionar_revisor %}
+                                <th class="no-print">Ações</th>
+                            {% endif %}
+                            <th>Servidor</th>
+                            <th>Papel</th>
+                            <th>Data de cadastro</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for revisor in projeto.revisorppc_set.all %}
+                            <tr>
+                                {% if pode_adicionar_revisor %}
+                                    <td class="no-print field-get_acoes">
+                                        {% icon "edit" "/ppc/editar_revisor_ppc/{{ revisor.pk }}/" "Editar" "popup" %}
+                                        {% icon "delete" "/comum/excluir/ppc/revisorppc/{{ revisor.pk }}/" "Excluir Revisor" "no-confirm popup" %}
+                                    </td>
+                                {% endif %}
+                                <td>{{ revisor.servidor }}</td>
+                                <td>{{ revisor.papel }}</td>
+                                <td>{{ revisor.data_inicial }}</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="alert alert-warning">Nenhum revisor adicionado.</p>
+            {% endif %}
+
+        {% endbox %}
+    </div>
+
+    {% if not em_elaboracao %}
+        <div class="tab-pane" data-title="Reitoria" data-tab="reitoria" data-checked="{% if pendencia_reitoria %}False{% else %}True{% endif %}">
+            {% box "Dados da reitoria" %}
+                <ul class="action-bar">
+                    {% if pode_informar_reitoria %}
+                        <li><a class="btn popup" href="/ppc/projetopedagogicocurso/{{ projeto.pk }}/informar_reitoria/">Informar Reitor e Pró-Reitores</a></li>
+                    {% endif %}
+                </ul>
+
+                <dl class="definition-list flex">     
+                    <div class="list-item flex-basis-50">
+                        <dt>Reitor{% if projeto.reitor.sexo == 'F' %}a{% endif %}</dt>
+                        <dd>{{ projeto.reitor|format }}</dd>
+                    </div>
+                    <div class="list-item flex-basis-50">
+                        <dt>Pró-Reitor{% if projeto.proen.sexo == 'F' %}a{% endif %} de Ensino</dt>
+                        <dd>{{ projeto.proen|format }}</dd>
+                    </div>
+                    <div class="list-item flex-basis-50">
+                        <dt>Pró-Reitor{% if projeto.proex.sexo == 'F' %}a{% endif %} de Extensão</dt>
+                        <dd>{{ projeto.proex|format }}</dd>
+                    </div>
+                    <div class="list-item flex-basis-50">
+                        <dt>Pró-Reitor{% if projeto.propi.sexo == 'F' %}a{% endif %} de Pesquisa e Inovação</dt>
+                        <dd>{{ projeto.propi|format }}</dd>
+                    </div>
+                </dl>
+            {% endbox %}
+        </div>
+    {% endif %}
+
+    {% if not em_elaboracao and not em_revisao %}
+        {% if camara %}
+            <div class="tab-pane" data-title="Câmara" data-tab="camara">
+
+                {% if projeto.camara_inexistente %}
+                    <p class="alert alert-info">No momento da análise deste PPC, a câmara ainda não havia sido instituída, o que inviabilizou a emissão do seu parecer.</p>
+                {% else %}
+
+                    {% box "{{ camara }}" %}
+                        <dl class="definition-list flex">
+                            <div class="list-item">
+                                <dt>Coordenador</dt>
+                                <dd>{{ camara.coordenador }}</dd>
+                            </div>
+                            <div class="list-item">
+                                <dt>Secretário</dt>
+                                <dd>{{ camara.secretario }}</dd>
+                            </div>
+                            <div class="list-item">
+                                <dt>Data da reunião</dt>
+                                <dd>{{ projeto.data_convocacao_camara|format }}</dd>
+                            </div>
+                            <div class="list-item">
+                                <dt>Decisão</dt>
+                                <dd>{{ projeto.get_decisao_camara_display|format }}</dd>
+                            </div>
+                        </dl>
+                    {% endbox %}
+                {% endif %}
+            </div>
+        {% endif %}
+
+        <div class="tab-pane" data-title="CONSEPEX" data-tab="consepex">
+
+            {% if projeto.consepex_inexistente %}
+                <p class="alert alert-info">No momento da análise deste PPC, o CONSEPEX ainda não havia sido instituído, o que inviabilizou a emissão da deliberação do conselho.</p>
+            {% endif %}
+
+            <dl class="definition-list flex">
+                <div class="list-item">
+                    <dt>Secretaria</dt>
+                    <dd>{{ projeto.get_setor_conselhos }}</dd>
+                </div>
+                {% if not projeto.consepex_inexistente %}
+                    <div class="list-item">
+                        <dt>Data da reunião</dt>
+                        <dd>{{ projeto.data_convocacao_consepex|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Decisão</dt>
+                        <dd>{{ projeto.get_decisao_consepex_display|format }}</dd>
+                    </div>
+                {% endif %}
+            </dl>
+        </div>
+
+        {% if projeto.is_tramite_criacao or projeto.consepex_inexistente %}
+            <div class="tab-pane" data-title="CONSUP" data-tab="consup">
+                <dl class="definition-list flex">
+                    <div class="list-item">
+                        <dt>Secretaria</dt>
+                        <dd>{{ projeto.get_setor_conselhos }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Data da reunião</dt>
+                        <dd>{{ projeto.data_convocacao_consup|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Decisão</dt>
+                        <dd>{{ projeto.get_decisao_consup_display|format }}</dd>
+                    </div>
+                </dl>
+            </div>
+        {% endif %}
+        
+    {% endif %}
+
+    {% if exibe_pendencias %}
+        <div class="tab-pane" data-title="Pendências" data-tab="pendencias" {% if pendencias %}data-counter="{{ pendencias|length }}"{% else %}data-checked="True"{% endif %}>
+            {% for grupo in pendencias %}
+                {% box grupo.0 %}
+                    {% for item in grupo.1 %}
+                        <p class="checklist error">{% if item.1 %}<a onclick="javascript:change_tab('{{ item.1 }}')">{% endif %}{{ item.0 }}{% if item.1 %}</a>{% endif %}<strong>Pendente</strong></p>
+                        {% empty %}
+                        <p class="alert alert-info">Nenhuma pendência encontrada.</p>
+                    {% endfor %}
+                {% endbox %}
+                {% empty %}
+                <p class="alert alert-info">Nenhuma pendência encontrada.</p>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="tab-pane" data-title="Documentos" data-tab="documentos" data-counter="{{ documentos.count }}">
+        {% regroup documentos by get_tipo_documento_display as documentos_por_etapa %}
+        {% for group in documentos_por_etapa %}
+            {% box group.grouper %}
+                {% for documento in group.list %}
+                    {% with doc=documento.get_documento %}
+                        <div class="general-box">
+                            <div class="primary-info">
+                                <div class="status-info-container">
+                                    {{ doc.get_status_display|status }}
+                                    {% if documento.ad_referendum %}
+                                        <span class="status status-info">Ad Referendum</span>
+                                    {% endif %}
+                                    {% if documento.rejeicao %}
+                                        <span class="status status-error">{{ group.grouper }} de rejeição</span>
+                                    {% endif %}
+                                </div>
+                                <h4>{{ doc }}</h4>
+                                <ul class="action-bar">
+                                    <li><a href="{{ doc.get_absolute_url }}" class="btn success">Acessar documento</a></li>
+                                    {% if documento|method:"pode_vincular_documento"|call:request.user %} 
+                                        <li>
+                                            <a href="{% url 'vincular_documentoeletronico_documentoppc' documento.pk %}" class="btn popup">Vincular novo documento</a>
+                                        </li>
+                                    {% endif %}
+                                    {% if documento.is_documento_invalido %}
+                                        <li {% if projeto.situacao != documento.situacao_ppc %} class="hint hint-bottom" aria-label="A remoção deste documento é permitida apenas se a situação atual do PPC corresponder à situação em que o documento foi emitido."{% endif %}>
+                                            <a href="/comum/excluir/ppc/documentoppc/{{ documento.pk }}/" class="btn {% if projeto.situacao != documento.situacao_ppc %}disabled{% else %}danger{% endif %}">Remover</a>
+                                        </li>
+                                    {% endif %}
+                                    
+                                </ul>
+                                <div class="extra-info">
+                                    <h5>Assunto:</h5>
+                                    <p>{{ doc.assunto }}</p>
+                                </div>
+                            </div>
+                            <dl class="secondary-info">
+                                <div class="list-item">
+                                    <dt>Emitido por:</dt>
+                                    <dd>{{ documento.emissor|format }} em {{ documento.data_emissao|format }}</dd>
+                                </div>
+                                <div class="list-item">
+                                    <dt>Situação do PPC na emissão:</dt>
+                                    <dd>{{ documento.get_situacao_ppc_display }}</dd>
+                                </div>
+                                {% if doc.tem_assinaturas %}
+                                    <div class="list-item">
+                                        <dt>Assinado por:</dt>
+                                        <dd>{{ doc.get_assinado_por|safe|format }}</dd>
+                                    </div>
+                                {% endif %}
+                                {% if doc.estah_finalizado %}
+                                    <div class="list-item">
+                                        <dt>Finalizado em:</dt>
+                                        <dd>{{ doc.get_data_finalizacao|format }}</dd>
+                                    </div>
+                                {% endif %}
+                                {% if documento.decisao %}
+                                    <div class="list-item">
+                                        <dt>Decisão:</dt>
+                                        <dd>{{ documento.get_decisao_display|format }}</dd>
+                                    </div>
+                                {% endif %}
+                                
+                            </dl>
+                        </div>
+                    {% endwith %}
+                {% endfor %}
+            {% endbox %}
+        {% endfor %}
+    </div>
+
+    <div class="tab-pane" data-title="PAFC" data-tab="pafc" data-counter="{{ pafcs|length }}">
+        <div class="table-responsive mt-5">
+            {% if pafcs %}
+                <table>
+                    <caption>Projeto de Autorização de Funcionamento de Curso</caption>
+                    <thead>
+                        <th class="no-print">Ações</th>
+                        <th>Nome</th>
+                        <th>Diretoria</th>
+                        <th>Situação</th>
+                    </thead>
+                    <tbody>
+                        {% for pafc in pafcs %}
+                            <tr>
+                                <td class="no-print field-get_acoes">
+                                    {% icon "view" "/pafc/pafc/{{ pafc.id }}/" "Visualizar" %}
+                                </td>
+                                <td>{{ pafc }}</td>
+                                <td>{{ pafc.setor|format }}</td>
+                                <td>{{ pafc.get_situacao_display|format }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="alert alert-warning">Nenhum PAFC vinculado a este PPC.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="tab-pane" data-title="Histórico de movimentações" data-tab="movimentacoes">
+        {% if movimentacoes %}
+            <ul class="timeline compact">
+                {% for movimentacao in movimentacoes %}
+                    <li class="{% if movimentacao.get_situacao_display == 'Iniciado' %}info{% elif movimentacao.get_situacao_display == 'Aprovado' or movimentacao.get_situacao_display == 'Finalizado' %}success{% elif movimentacao.get_situacao_display == 'Reprovado' %}danger{% else %}warning{% endif %}">
+                        <div class="timeline-date">{{ movimentacao.data }}</div>
+                        <div class="timeline-icon"></div>
+                        <div class="timeline-content">
+                            {% if movimentacao.acao %}
+                                <h4>{{ movimentacao.acao }}<br><small>({% if movimentacao.usuario %}ação realizada por {{ movimentacao.usuario|format }}{% else %}ação realizada pelo sistema{% endif %})</small></h4>
+                            {% else %}
+                                <h4>{{ movimentacao.get_situacao_display }}<br><small>({% if movimentacao.usuario %}situação alterada por {{ movimentacao.usuario|format }}{% else %}situação alterada pelo sistema{% endif %})</small></h4>
+                            {% endif %}
+                        </div>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="alert alert-warning">Ainda não houve movimentação.</p>
+        {% endif %}
+    </div>
+
+{% endblock %}

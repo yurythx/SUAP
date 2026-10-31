@@ -1,0 +1,87 @@
+{% load django_tables2 %}
+{% load i18n %}
+
+{% if table.to_export %}
+    <ul class="action-bar">
+        <li><a class="btn" href="{% querystring 'relatorio'='xls' %}">Gerar XLS</a></li>
+        <li><a class="btn" href="{% querystring 'relatorio'='csv' %}">Gerar CSV</a></li>
+    </ul>
+{% endif %}
+
+{% block table %}
+
+    {% autopaginate table.rows table.per_page_field %}
+    {% paginate %}
+    <div class="table-responsive">
+    <table{% if table.attrs %} {{ table.attrs.as_html }}{% endif %}>
+        {% block table.thead %}
+            {% if table.show_header %}
+                <thead>
+                <tr>
+                    {% for column in table.columns %}
+                        {% if column.orderable %}
+                            <th scope="col" {{ column.attrs.th.as_html }}><a
+                                    href="{% querystring table.prefixed_order_by_field=column.order_by_alias.next %}">{{ column.header }}</a>
+                            </th>
+                        {% else %}
+                            <th scope="col" {{ column.attrs.th.as_html }}>{{ column.header }}</th>
+                        {% endif %}
+                    {% endfor %}
+                </tr>
+                </thead>
+            {% endif %}
+        {% endblock table.thead %}
+        {% block table.tbody %}
+            <tbody>
+            {% for row in table.page.object_list|default:table.rows %} {# support pagination #}
+                {% block table.tbody.row %}
+                    <tr {{ row.attrs.as_html }}>
+                        {% for column, cell in row.items %}
+                            <td {{ column.attrs.td.as_html }}>
+                                {% if column.localize == None %}{{ cell|format }}{% else %}{% if column.localize %}
+                                    {{ cell|localize|format }}{% else %}{{ cell|unlocalize|format }}{% endif %}{% endif %}</td>
+                        {% endfor %}
+                    </tr>
+                {% endblock table.tbody.row %}
+            {% empty %}
+                {% block table.tbody.empty_text %}
+                    {% if table.empty_text %}
+                        <tr>
+                            <td colspan="{{ table.columns|length }}">{{ table.empty_text }}</td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="{{ table.columns|length }}">Não foi encontrado nenhum resultado</td>
+                        </tr>
+                    {% endif %}
+                {% endblock table.tbody.empty_text %}
+            {% endfor %}
+            </tbody>
+        {% endblock table.tbody %}
+        {% block table.tfoot %}
+            {% if table.get_foot_collumns %}
+                <tfoot>
+                <tr>
+                    {% for column in table.columns %}
+                        <td>{{ column.footer }}</td>
+                    {% endfor %}
+                </tr>
+
+                {% if table.tfoot_sum %}
+                    <tr>
+                        {% for column in table.get_foot_collumns %}
+                            {% if column %}
+                                <td>{{ column|format }} </td>
+                            {% else %}
+                                <td>&nbsp;</td>
+                            {% endif %}
+                        {% endfor %}
+                    </tr>
+                {% endif %}
+                </tfoot>
+            {% endif %}
+        {% endblock table.tfoot %}
+    </table>
+    </div>
+    {% paginate %}
+{% endblock table %}

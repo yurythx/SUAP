@@ -1,0 +1,148 @@
+{% extends super_template %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if pode_editar %}
+            <li><a href="/ponto/editar_saldo_externo_ch/{{ saldo_externo.id }}/" class="btn primary">Editar</a></li>
+        {% endif %}    
+        {% if pode_encaminhar_para_validacao %}
+            <li><a href="/ponto/encaminhar_validacao_saldo_externo_ch/{{ saldo_externo.id }}" class="btn success confirm">Encaminhar para Validação</a></li>
+        {% endif %}    
+        {% if pode_validar %}
+            <li><a href="/ponto/validar_saldo_externo_ch/{{ saldo_externo.id }}" class="btn warning popup">Validar</a></li>
+        {% endif %}    
+        {% if pode_cancelar_validacao %}
+            <li><a href="/ponto/cancelar_validacao_saldo_externo_ch/{{ saldo_externo.id }}" class="btn warning confirm">Cancelar Validação</a></li>
+        {% endif %}    
+        {% if pode_excluir %}
+            <li><a href="/admin/ponto/saldoexterno/{{ saldo_externo.id }}/delete/" class="btn danger">Remover</a></li>
+        {% endif %}    
+        {% if pode_tentar_compensar %}
+            <li><a href="/ponto/informar_compensacao_v2/{{ saldo_externo.data_inicio|date:'dmY' }}/{{ saldo_externo.data_fim|date:'dmY' }}/?periodo_objetivo=compensar_o_debito_do_periodo" class="btn default">Informar Compensação</a></li>
+        {% endif %}
+        <li><a href="/admin/ponto/saldoexterno/" class="btn default">Saldos Externos</a></li>
+
+    </ul>
+{% endblock %}
+
+{% block object-status %}
+    {{ saldo_externo.get_situacao_display_html }}    
+{% endblock %}
+
+{% block content %}
+    {% if tem_compensacoes_informadas and not pode_visualizar_utilizacao_saldo %}
+        <p class="alert alert-warning"><strong>Atenção: </strong>o servidor já utilizou parte ou todo o saldo.</p>
+    {% endif %}
+
+    {% box "Dados gerais" %}
+        <div class="table-responsive">
+            <table class="info large">
+                <tbody>
+                    <tr>
+                        <td>Servidor (Destinatário)</td>
+                        <td>{{ saldo_externo.servidor|format }}</td>
+                    </tr>
+                    <tr>
+                        <td>Período de Utilização do Saldo</td>
+                        <td>
+                            {{ saldo_externo.get_periodo_saldo_display }}
+                            {% if saldo_externo.periodo_utilizacao_is_fim_de_semana %}
+                                <span class="status status-error">O período de utilização é inteiramente no fim de semana.</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Valor do Saldo</td>
+                        <td class="true">{{ saldo_externo.get_valor_saldo_display }}</td>
+                    </tr>
+                    {% if pode_visualizar_utilizacao_saldo %}
+                        <tr>
+                            <td>Valor Utilizado do Saldo</td>
+                            <td>{{ saldo_externo.get_valor_saldo_utilizado_display }}</td>
+                        </tr>
+                        <tr>
+                            <td>Valor Restante do Saldo</td>
+                            <td class="true">{{ saldo_externo.get_valor_saldo_restante_display }}</td>
+                        </tr>
+                    {% endif %}    
+                    <tr>
+                        <td>Detalhamento</td>
+                        <td>{{ saldo_externo.detalhamento|format }}</td>
+                    </tr>
+                    {% if saldo_externo.origem %}
+                        <tr>
+                            <td>Origem da Informação</td>
+                            <td>
+                                {% if saldo_externo.origem.get_absolute_url %}
+                                    <a href="{{ saldo_externo.origem.get_absolute_url }}">
+                                        {{ saldo_externo.get_origem_display }}
+                                    </a>
+                                {% else %}
+                                    {{ saldo_externo.get_origem_display }}
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endif %}
+                    <tr>
+                        <td>Validador</td>
+                        <td>
+                            {% if saldo_externo.validador %}
+                                {{ saldo_externo.validador|format }}&nbsp;
+                                {% if saldo_externo.validador == saldo_externo.servidor and not validador_eh_reitor_hoje %}
+                                    <span class="status status-error">A auto-validação não é permitida.</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="status status-error">Você deverá escolher um Validador através da opção 'Editar'.</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% if saldo_externo.validador_observacoes %}
+                        <tr>
+                            <td>Observações sobre a validação</td>
+                            <td>{{ saldo_externo.validador_observacoes|format }}</td>
+                        </tr>
+                    {% endif %}    
+                    <tr>
+                        <td>Situação</td>
+                        <td>{{ saldo_externo.get_situacao_display_html }}</td>
+                    </tr>
+                    <tr>
+                        <td>Cadastro</td>
+                        <td>{{ saldo_externo.data_cadastro|format }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    {% endbox %}
+
+    {% if tem_compensacoes_informadas and pode_visualizar_utilizacao_saldo %}
+        {% box 'Detalhamento da Utilização do Saldo' %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <th>Duração</th>
+                        <th>Data do Débito</th>
+                        <th class="no-print">Ações</th>
+                    </thead>
+                    <tbody>
+                        {% for compensacao in saldo_externo.compensacoes_informadas %}
+                            <tr>
+                                <td>{{ compensacao.ch_compensada|date:"H:i:s" }}</td>
+                                <td>
+                                    {{ compensacao.data_aplicacao }}
+                                </td>
+                                <td class="no-print">
+                                    <ul class="action-bar">
+                                        <li>
+                                            <a class="btn default popup" href="/ponto/abrir_compensacao_horario/{{ compensacao.id }}/?_popup=1"><span class="fa fa-search" aria-hidden="true"></span>Detalhes do Informe</a>
+                                        </li>
+                                    </ul>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endbox %}
+    {% endif %}
+{% endblock %}

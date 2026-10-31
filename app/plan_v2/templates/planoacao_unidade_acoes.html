@@ -1,0 +1,84 @@
+{% load plan_v2_filters %}
+
+{% block extrahead %}
+    <script src="/static/plan_v2/js/pills.js"></script>
+{% endblock %}
+
+<ul class="pills">
+    <li data-pill="todos_itens" class="active"><a href="#">Todas as dimensões</a></li>
+    {% for dimensao in dimensoes.keys %}
+        <li data-pill="{{ dimensao|slugify }}"><a href="#">{{ dimensao }}</a></li>
+    {% endfor %}
+</ul>
+
+{% if dimensoes %}
+    {% for dimensao, dados_dim in dimensoes.items %}
+        <div class='pill' id="{{ dimensao|slugify }}">
+            {% for macroprocesso in dados_dim.macroprocessos %}
+                {% box macroprocesso.nome boxid="macro_{{ macroprocesso.id }}" %}
+                    {% for meta in macroprocesso.metas %}
+                        <div class="general-box">
+                            <div class="primary-info">
+                                <h4><strong>Meta:</strong> {{ meta.nome }}</h4>
+                                {% if acao_pa_pode_incluir %}
+                                    <ul class="action-bar">
+                                        <li><a href="{% url 'paua_acao_add' plano_acao.id meta.id %}" class="btn popup success">Adicionar Ação</a></li>
+                                    </ul>
+                                {% endif %}
+                                <div class="extra-info">
+                                    {% if meta.acoes %}
+                                        <table>
+                                            <thead>
+                                                <tr>
+                                                    <th>Unidade Adm.</th>
+                                                    <th>Ação</th>
+                                                    <th>Responsáveis</th>
+                                                    <th>Validação</th>
+                                                    <th class="no-print">Opções</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for acao in meta.acoes %}
+                                                    <tr>
+                                                        <td>{{ acao.unidade }}</td>
+                                                        <td>{{ acao.titulo }}</td>
+                                                        <td>
+                                                            {% if acao.setores_responsaveis %}
+                                                                {% for setor in acao.setores_responsaveis %}
+                                                                    {{ setor }}
+                                                                {% endfor %}
+                                                            {% else %}
+                                                                A definir
+                                                            {% endif %}
+                                                        </td>
+                                                        <td><span class="{{ acao.validacao|status_validacao }}">{{ acao.validacao }}</span></td>
+                                                        <td class="no-print">
+                                                            {% if not acao.setores_responsaveis %}
+                                                                {% if acao_pa_pode_incluir_atividade %}
+                                                                    <a href="{% url 'paua_acao_change' plano_acao.id meta.id acao.id %}" class="popup btn">Definir Responsável</a>
+                                                                {% endif %}
+                                                            {% else %}
+                                                                <ul class="action-bar inside-container">
+                                                                    {% if not user|in_group:"Auditor" %}
+                                                                        <li><a href="{% url 'paua_acao_change' plano_acao.id meta.id acao.id %}" class="btn popup primary">Editar Responsáveis</a></li>
+                                                                    {% endif %}
+                                                                    <li><a href="{% url 'paua_acao_atividades' plano_acao.id  acao.id %}" class="btn default">Atividades</a></li>
+                                                                </ul>
+                                                            {% endif %}
+                                                        </td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    {% else %}
+                                        <p class="alert alert-warning">Nenhum ação cadastrada.</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% endbox %}
+            {% endfor %}
+        </div>
+    {% endfor %}
+{% endif %}

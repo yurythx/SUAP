@@ -1,0 +1,619 @@
+{% extends super_template %}
+{% load gerenciador_projetos_templatetags %}
+
+{% block extrahead %}
+    <script>
+        const tarefaBloqueada = {% if tarefa.bloqueada_para_novas_acoes %}true{% else %}false{% endif %};
+
+        function criarItemChecklist(item) {
+            let status = item.concluido ? 'success' : 'error';
+            let $item = $('<li>', {
+                class: `checklist ${status}`,
+                'data-id': item.id,
+            });
+            let $checkbox = $('<input type="checkbox"{% if tarefa.bloqueada_para_novas_acoes %} disabled{% endif %}>').prop('checked', item.concluido);
+
+            if (!tarefaBloqueada) {
+                $checkbox.on('change', function () {
+                    toggleItem(item.id);
+                });
+            }
+
+            $item.append($checkbox, $('<span>').text(item.descricao));
+            {% if not tarefa.bloqueada_para_novas_acoes %}
+                $item.append(
+                    `<a href="#?tab=checklist" class="btn sm ms-auto danger deletarItem">{% icone "trash" %}<span class="visually-hidden">Excluir item</span></a>`
+                );
+            {% endif %}
+            return $item;
+        }
+
+        function atualizarContador() {
+            let total = $('#checklist li').length;
+            let concluidos = $('#checklist li input:checked').length;
+            $('#box_checklist').prev(".accordion-header").find(".badge").text(`${concluidos} de ${total} itens concluídos`);
+        }
+
+        function carregarItens() {
+            $.getJSON('{% url "gerenciar_checklist" tarefa.id %}', function(data) {
+                $('#checklist').empty();
+                data.itens.forEach(function(item) {
+                    $('#checklist').append(criarItemChecklist(item));
+                });
+                {% if not tarefa.bloqueada_para_novas_acoes %}
+                    $("#checklist").sortable("refresh");
+                {% endif %}
+                $('#box_checklist').prev(".accordion-header").find(".badge").text(`${data.concluidos} de ${data.total} itens concluídos`);
+            });
+        }
+
+        function toggleItem(itemId) {
+            let checkbox = $(`li[data-id=${itemId}] input`);
+            $.post('{% url "gerenciar_checklist" tarefa.id %}', { item_id: itemId, action: 'toggle' }, function(response) {
+                // Atualiza o estado do checkbox com base na resposta do servidor
+                checkbox.prop('checked', response.concluido);
+                
+                let status = response.concluido ? 'success' : 'error';
+                checkbox.parent().removeClass("success").removeClass("error").addClass(status);
+
+                atualizarContador();
+            }).fail(function() {
+                // Se houver falha na operação, alerta o usuário e mantém o estado original do checkbox
+                alert("Erro ao tentar alterar o status do item.");
+                checkbox.prop('checked', !checkbox.prop('checked'));
+            });
+        }
+
+        $(document).ready(function () {
+            function selecionarModoHistoricoTarefa(botao) {
+                $('.historico-tarefa-modo').removeClass('active').attr('aria-pressed', 'false');
+                $(botao).addClass('active').attr('aria-pressed', 'true');
+            }
+
+            $('.historico-tarefa-completo').on('click', function () {
+                selecionarModoHistoricoTarefa(this);
+                $('#historico-tarefa li.obs').removeClass('d-none');
+                return false;
+            });
+
+            $('.historico-tarefa-sem-observacoes').on('click', function () {
+                selecionarModoHistoricoTarefa(this);
+                $('#historico-tarefa li.obs').addClass('d-none');
+                return false;
+            });
+
+            {% if not tarefa.bloqueada_para_novas_acoes %}
+                const csrfToken = document.querySelector('#adicionarNovoItem [name=csrfmiddlewaretoken]').value;
+                $.ajaxSetup({
+                    headers: {'X-CSRFToken': csrfToken},
+                });
+
+                $("#adicionarNovoItem").on('submit', function () {
+                    let descricao = $('#novoItemDescricao').val();
+                    $.post('{% url "gerenciar_checklist" tarefa.id %}', { descricao: descricao, action: 'add' }, function(item) {
+                        $('#checklist').append(criarItemChecklist(item));
+                        $("#checklist").sortable("refresh");
+                        $('#novoItemDescricao').val('');  // Clear input after adding
+                        atualizarContador();
+                    });
+                    return false;
+                });
+
+                $("#checklist").on('click', '.deletarItem', function () {
+                    let itemId = $(this).parent().data("id");
+                    $.post('{% url "gerenciar_checklist" tarefa.id %}', { item_id: itemId, action: 'delete' }, function() {
+                        $(`li[data-id=${itemId}]`).remove();
+                        atualizarContador();
+                    });
+                });
+            {% endif %}
+
+            carregarItens();
+
+            {% if not tarefa.bloqueada_para_novas_acoes %}
+                $("#checklist").sortable({
+                    cursor: "move",
+                    placeholder: "ui-state-highlight",
+                    update: function (event, ui) {
+                        let ordem = $("#checklist li").map(function () { return $(this).data("id"); }).get();
+                        $.post('{% url "gerenciar_checklist" tarefa.id %}', { action: 'reordenar', ordem: ordem });
+                    },
+                });
+            {% endif %}
+        });
+    </script>
+{% endblock %}
+
+{% block bodyclass %}hasAsideRight{% endblock %}
+
+{% block action-bar %}
+    {% if not '_popup' in request.GET %}
+        <ul class="action-bar">
+            {% if pode_editar_tarefas and not tarefa.bloqueada_para_novas_acoes %}
+                <li>
+                    <a class="btn primary" href="{% url 'alterar_tarefa' tarefa.projeto.id tarefa.id %}" title="Editar tarefa">
+                       {% icone "edit" %}
+                       <span class="visually-hidden">Editar</span>
+                    </a>
+                </li>
+            {% endif %}
+            {% if pode_editar_tarefas %}
+                {% if tarefa.pode_alterar_situacao %}
+                    <li class="has-child">
+                        <a class="btn primary" href="#" title="Alterar situação">{% icone "edit" %} Situação</a>
+                        <ul>
+                            {% for codigo, rotulo in tarefa.get_situacoes_disponiveis %}
+                                <li><a class="popup" href="{% url 'alterar_situacao_tarefa' tarefa.id codigo %}">{{ rotulo }}</a></li>
+                            {% endfor %}
+                        </ul>
+                    </li>
+                {% endif %}
+                {% if not tarefa.bloqueada_para_novas_acoes %}
+                    <li class="has-child">
+                        <a class="btn primary" href="#" title="Alterar progresso">{% icone "edit" %} Progresso</a>
+                        <ul>
+                            {% for percentual in tarefa.PROGRESSOS_RAPIDOS %}
+                                <li>
+                                    <form method="post" action="{% url 'alterar_progresso_tarefa' tarefa.id percentual %}">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn">{{ percentual }}%</button>
+                                    </form>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </li>
+                {% endif %}
+            {% endif %}
+            {% if pode_adicionar_observador %}
+                <li>
+                    <form method="post" action="{% url 'adicionar_observador' tarefa.id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn" title="Observar tarefa">
+                            {% icone "eye" %}
+                            <span class="visually-hidden">Observar</span>
+                        </button>
+                    </form>
+                </li>
+            {% elif eh_observador %}
+                <li>
+                    <form method="post" action="{% url 'remover_observador' tarefa.id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn" title="Deixar de observar">
+                            {% icone "eye-slash" %}
+                            <span class="visually-hidden">Deixar de observar</span>
+                        </button>
+                    </form>
+                </li>
+            {% endif %}
+            <li class="has-child">
+                <a class="btn" href="#" title="Ações">
+                    {% icone "cogs" %}
+                    <span class="visually-hidden">Ações</span>
+                </a>
+                <ul>
+                    {% if pode_editar_tarefas %}
+                        {% if not tarefa.bloqueada_para_novas_acoes %}
+                            <li>
+                                <a class="popup" href="{% url 'alterar_atribuidos_tarefa' tarefa.id %}">Alterar atribuições</a>
+                            </li>
+                        {% endif %}
+                        {% if not tarefa.projeto.encerrado %}
+                            <li>
+                                <a href="{% url 'clonar_tarefa' tarefa.id %}">Clonar tarefa</a>
+                            </li>
+                        {% endif %}
+                        {% if tarefa.pode_reabrir %}
+                            <li>
+                                <a class="popup" href="{% url 'reabrir_tarefa' tarefa.id %}">Reabrir tarefa</a>
+                            </li>
+                        {% endif %}
+                        {% if not tarefa.bloqueada_para_novas_acoes %}
+                            <li>
+                                <a href="{% url 'recorrencia_tarefa' tarefa.id %}" class="popup">Recorrência da
+                                tarefa</a>
+                            </li>
+                        {% endif %}
+                        {% if not tarefa.projeto.encerrado %}
+                            <li>
+                                <a href="{% url 'excluir_tarefa' tarefa.id %}">Excluir tarefa</a>
+                            </li>
+                        {% endif %}
+                        {% if not tarefa.bloqueada_para_novas_acoes %}
+                            <li>
+                                <a href="{% url 'atribuir_tarefa_a_campus' tarefa.id %}">Atribuir a campus</a>
+                            </li>
+                        {% endif %}
+                    {% endif %}
+                </ul>
+            </li>
+            <li class="has-child">
+                <a class="btn default" href="#" title="Modo de visualização">
+                    {% icone "th" %}
+                    <span class="visually-hidden">Modo de visualização</span>
+                </a>
+                <ul>
+                    <li>
+                        <a href="{% url 'projeto' tarefa.projeto.id %}">Projeto</a>
+                    </li>
+                    {% if pode_editar_tarefas %}
+                        <li>
+                            <a href="{% url 'dashboard' tarefa.projeto.id %}">Dashboard</a>
+                        </li>
+                    {% endif %}
+                    <li>
+                        <a href="{% url 'minhas_tarefas' %}">Minhas tarefas</a>
+                    </li>
+                </ul>
+            </li>
+        </ul>
+    {% endif %}
+{% endblock %}
+
+{% block object-status %}
+    {{ tarefa.get_situacao_display|status }}
+    {% include "includes/tags_tarefa.html" %}
+{% endblock %}
+
+{% block subtitle %}
+    {% if tarefa.tarefa_pai %}
+        <p>Esta tarefa é filha da tarefa #{{ tarefa.tarefa_pai.id }}: <a href="{% url 'tarefa' tarefa.tarefa_pai.id %}">{{ tarefa.tarefa_pai.titulo }}</a>.</p>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    <dl class="definition-list flex">
+        <div class="list-item">
+            <dt>Prioridade</dt>
+            <dd>{{ tarefa.get_prioridade_display|status }}</dd>
+        </div>
+        {% if tarefa.data_conclusao_estimada %}
+            <div class="list-item">
+                <dt>Data de conclusão estimada</dt>
+                <dd {% if tarefa.data_estimada_ultrapassada %}class="false"{% endif %}>
+                    {{ tarefa.data_conclusao_estimada|format }}
+                </dd>
+            </div>
+        {% endif %}
+        {% if tarefa.atribuido_a.exists %}
+            <div class="list-item">
+                <dt>Atribuído para</dt>
+                <dd class="d-flex flex-wrap gap-2">
+                    {% for atribuido_a in tarefa.atribuido_a.all %}
+                        <div class="person smallest">
+                            <div class="photo-circle smallest">
+                                <img alt="{{ atribuido_a.get_profile.nome_usual }}"
+                                    src="{{ atribuido_a.get_vinculo.get_foto_75x100_url }}" />
+                            </div>
+                            <dl>
+                                <dt class="visually-hidden">Nome:</dt>
+                                <dd>{{ atribuido_a|format }}</dd>
+                            </dl>
+                        </div>
+                    {% endfor %}
+                </dd>
+            </div>
+        {% endif %}
+        <div class="list-item flex-basis-100">
+            <dt>Descrição</dt>
+            <dd>{{ tarefa.descricao|sanitize }}</dd>
+        </div>
+    </dl>
+
+    {% if tarefa.links.exists %}
+        <ol class="counter-container">
+            {% for link in tarefa.links.all %}
+                <li class="counter-item"><a href="{{ link.url }}"> {{ link.titulo }}</a></li>
+            {% endfor %}
+        </ol>
+    {% endif %}
+
+    <div class="tab-pane"
+            id="tabs-historico"
+            data-tab="historico"
+            data-title="Evolução"
+            data-counter="{{ tarefa.get_historicoevolucao.count }}">
+        {% if not tarefa_concluida or tarefa.itens_checklist.exists %}
+            {% box "Checklist" boxid="box_checklist" badge=tarefa.itens_checklist.count %}
+                <ol class="checklist-container" id="checklist">
+                    <!-- Itens do checklist serão carregados aqui -->
+                </ol>
+                {% if not tarefa.bloqueada_para_novas_acoes %}
+                    <form id="adicionarNovoItem" action="" class="d-flex flex-wrap gap mt-3">
+                        {% csrf_token %}
+                        <div class="form-row">
+                            <div class="field-box">
+                                <label for="inputText">Novo item para Checklist:</label>
+                                <input type="text"
+                                        class="flex-fill"
+                                        id="novoItemDescricao"
+                                        placeholder="Informe o nome do novo item do checklist">
+                            </div>
+                        </div>
+                    </form>
+                {% endif %}
+            {% endbox %}
+        {% endif %}
+        {% box "Histórico" badge=tarefa.get_historicoevolucao.count %}
+            {% if perms.gerenciador_projetos.change_historicoevolucao and pode_registrar_evolucao %}
+                <ul class="action-bar">
+                    <li>
+                        <a class="btn success popup"
+                            href="{% url 'gerenciar_historicoevolucao' tarefa.id %}">{% icone "pen" %}
+                            Registrar evolução</a>
+                    </li>
+                </ul>
+                <form method="post"
+                        id="form-comentario-rapido-tarefa"
+                        action="{% url 'adicionar_comentario_rapido_tarefa' tarefa.id %}"
+                         class="featured-form mb-3">
+                    {% csrf_token %}
+                    <div class="form-row">
+                        <div class="field-box flex-fill">
+                            <label for="id_comentario_rapido">Novo comentário:</label>
+                            <textarea name="comentario" id="id_comentario_rapido" rows="2" required></textarea>
+                        </div>
+                    </div>
+                    <div class="submit-row">
+                        <button type="submit" class="btn success">
+                            Comentar
+                        </button>
+                    </div>
+                </form>
+                <hr class="mt-3 mb-4">
+            {% endif %}
+            {% if tarefa.get_historicoevolucao.exists %}
+                <ul class="pills justify-content-end mb-3"
+                    role="group"
+                    aria-label="Formas de exibição do histórico da tarefa">
+                    <li>
+                        <button type="button"
+                                class="historico-tarefa-modo historico-tarefa-completo{% if not tem_historico_sem_observacoes %} active{% endif %}"
+                                aria-pressed="{% if not tem_historico_sem_observacoes %}true{% else %}false{% endif %}">Completo</button>
+                    </li>
+                    {% if tem_historico_sem_observacoes %}
+                        <li>
+                            <button type="button"
+                                    class="historico-tarefa-modo historico-tarefa-sem-observacoes active"
+                                    aria-pressed="true">Somente comentários</button>
+                        </li>
+                    {% endif %}
+                </ul>
+                <ul class="timeline with-photos" id="historico-tarefa">
+                    {% for historico in tarefa.get_historicoevolucao %}
+                        <li class="{% if historico.mensagem_automatica %}obs{% if tem_historico_sem_observacoes %} d-none{% endif %}{% else %}default{% endif %}">
+                            <div class="timeline-date">{{ historico.data_hora|format }}</div>
+                            <div class="timeline-photo"
+                                    title="{{ historico.registrado_por.get_profile.nome_usual }}">
+                                <img alt="{{ historico.registrado_por.get_profile.nome_usual }}"
+                                        src="{{ historico.registrado_por.get_vinculo.get_foto_75x100_url }}">
+                            </div>
+                            <div class="timeline-content">
+                                {% if historico.mensagem_automatica %}
+                                    {% if historico.comentario == "Tarefa criada" %}
+                                        <h4>{{ historico.registrado_por|format }} <small>criou a tarefa.</small></h4>
+                                    {% else %}
+                                        <h4>{{ historico.registrado_por|format }} <small>alterou:</small></h4>
+                                        <p>{{ historico.comentario|safe|linebreaks }}</p>
+                                    {% endif %}
+                                {% else %}
+                                    <h4>
+                                        {{ historico.registrado_por|format }} <small>comentou:</small>
+                                    </h4>
+                                    <p>{{ historico.comentario|linebreaks }}</p>
+                                {% endif %}
+                                {% if historico.anexo %}
+                                    <p><strong>Anexo</strong>: <a href="{{ historico.anexo.url }}">{{ historico.nomeanexo }}</a></p>
+                                {% endif %}
+                            </div>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="alert alert-warning">Nenhum registro cadastrado.</p>
+            {% endif %}
+        {% endbox %}
+    </div>
+    {% if not tarefa_concluida or tarefa.get_anexos.exists %}
+    <div class="tab-pane"
+            id="tabs-anexos"
+            data-tab="anexos"
+            data-title="Anexos"
+            data-counter=" {{ tarefa.get_anexos.count }}">
+        {% if pode_editar_tarefas and not tarefa.bloqueada_para_novas_acoes and not '_popup' in request.GET %}
+            <ul class="action-bar">
+                <li>
+                    <a class="btn success popup"
+                        href="{% url 'adicionar_anexo' tarefa.id %}">{% icone "plus" %} Adicionar anexo</a>
+                </li>
+            </ul>
+        {% endif %}
+        {% if tarefa.get_anexos.exists %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Anexos</caption>
+                    <thead>
+                        <tr>
+                            <th>Descrição</th>
+                            <th>Autor</th>
+                            <th>Data/hora de registro</th>
+                            <th class="no-print">Opções</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for historico in tarefa.get_anexos %}
+                            <tr>
+                                <td>{{ historico.comentario|linebreaks }}</td>
+                                <td>{{ historico.registrado_por|format }}</td>
+                                <td>{{ historico.data_hora|format }}</td>
+                                <td class="no-print">
+                                    <a href="{{ historico.anexo.url }}" class="btn">{% icone "download" %} Baixar anexo</a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Nenhum anexo cadastrado nas evoluções desta tarefa.</p>
+        {% endif %}
+    </div>
+    {% endif %}
+    {% if not tarefa_concluida or tarefa.links.exists %}
+    <div class="tab-pane"
+            id="tabs-links"
+            data-tab="links"
+            data-title="Links"
+            data-counter="{{ tarefa.links.count }}">
+        {% if pode_editar_tarefas and not tarefa.bloqueada_para_novas_acoes and not '_popup' in request.GET %}
+            <ul class="action-bar">
+                <li>
+                    <a class="btn success popup"
+                        href="{% url 'adicionar_link_tarefa' tarefa.id %}">{% icone "plus" %} Adicionar link</a>
+                </li>
+            </ul>
+        {% endif %}
+        {% if tarefa.links.exists %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Links</caption>
+                    <thead>
+                        <tr>
+                            <th>Título</th>
+                            <th>URL</th>
+                            <th>Criado por</th>
+                            <th class="no-print">Opções</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for link in tarefa.links.all %}
+                            <tr>
+                                <td>{{ link.titulo }}</td>
+                                <td><a href="{{ link.url }}" target="_blank" rel="noopener">{{ link.url }}</a></td>
+                                <td>{{ link.criado_por|format }}</td>
+                                <td class="no-print">
+                                    {% if link.pode_editar and not tarefa.bloqueada_para_novas_acoes %}
+                                        <a href="{% url 'editar_link_tarefa' tarefa.id link.id %}" class="btn popup">{% icone "edit" %}<span class="visually-hidden">Editar</span></a>
+                                        <form method="post" action="{% url 'excluir_link_tarefa' link.id %}" class="confirm d-inline-block">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn danger">{% icone "trash" %}<span class="visually-hidden">Remover</span></button>
+                                        </form>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Nenhum link cadastrado para esta tarefa.</p>
+        {% endif %}
+    </div>
+    {% endif %}
+    {% if not tarefa_concluida or tarefa.gerenciador_tarefa_pai_set.exists %}
+    <div class="tab-pane"
+            id="tabs-subtarefas"
+            data-tab="subtarefas"
+            data-title="Subtarefas"
+            data-counter=" {{ tarefa.gerenciador_tarefa_pai_set.count }}">
+        {% if pode_editar_tarefas and not tarefa.bloqueada_para_novas_acoes and not '_popup' in request.GET %}
+            <ul class="action-bar">
+                <li>
+                    <a class="btn success"
+                        href="{% url 'adicionar_tarefa' tarefa.projeto.id %}?tarefa_pai={{ tarefa.id }}">
+                    {% icone "plus" %} Adicionar subtarefa</a>
+                </li>
+            </ul>
+        {% endif %}
+        {% if tarefa.gerenciador_tarefa_pai_set.all %}
+            {% montar_arvore_tarefas tarefa.gerenciador_tarefa_pai_set.all %}
+        {% else %}
+            <p class="alert alert-warning">Nenhuma subtarefa cadastrada.</p>
+        {% endif %}
+    </div>
+    {% endif %}
+{% endblock %}
+
+{% block asideright %}
+    <aside class="right">
+        <details open="open">
+            <summary>Dados da tarefa</summary>
+            <div class="details-container">
+                {% if tarefa.percentual_executado %}
+                    {% progressbar tarefa.percentual_executado %}
+                {% endif %}    
+                {% if tarefa.get_subtarefas.count > 0 %}
+                    <div class="flex-container boxes infos sm">
+                        <div class="box-item">
+                            <h4 class="title">Subtarefas concluídas</h4>
+                            <p class="stat">
+                                {{ tarefa.get_subtarefas_concluidas.count }} <small>de</small>
+                                {{ tarefa.get_subtarefas.count }}
+                            </p>
+                        </div>
+                    </div>
+                {% endif %}
+                <dl class="mt-4">
+                    <dt>Projeto:</dt>
+                    <dd><a href="{% url 'projeto' tarefa.projeto.id %}">{{ tarefa.projeto }}</a></dd>
+                    <div class="list-item">
+                        <dt>ID da tarefa:</dt>
+                        <dd>#{{ tarefa.id }}</dd>
+                    </div>
+                    <dt>Tipo de atividade:</dt>
+                    <dd>{{ tarefa.tipo_atividade }}</dd>
+                    <dt>Aberto por:</dt>
+                    <dd>
+                        {{ tarefa.criado_por|format }} em {{ tarefa.aberto_em }}
+                    </dd>
+                    {% if tarefa.data_inicio %}
+                        <dt>Início em:</dt>
+                        <dd>
+                            {{ tarefa.data_inicio|date }}
+                        </dd>
+                    {% endif %}
+                    {% if tarefa.data_conclusao %}
+                        <dt>Data de conclusão efetiva:</dt>
+                        <dd>
+                            {{ tarefa.data_conclusao|format }}
+                        </dd>
+                    {% endif %}
+                    {% if tarefa.lista %}
+                        <dt>Lista:</dt>
+                        <dd>
+                            {{ tarefa.lista }}
+                        </dd>
+                    {% endif %}
+                </dl>
+            </div>
+        </details>
+        {% if tarefa.recorrenciatarefa_set.exists %}
+            <details open="open">
+                <summary>Recorrência</summary>
+                <div class="details-container">
+                    <ul class="action-bar">
+                        {% for recorrencia in tarefa.recorrenciatarefa_set.all %}
+                            <li>
+                                {{ recorrencia }}
+                                {% if pode_editar_tarefas and not tarefa.bloqueada_para_novas_acoes %}
+                                    <form method="post"
+                                            action="{% url 'remover_recorrencia_tarefa' recorrencia.id %}"
+                                            class="float-end">
+                                        {% csrf_token %}
+                                        <button class="btn danger" type="submit">
+                                            <span class="fas fa-trash-alt" aria-hidden="true"></span><span class="visually-hidden">Remover</span>
+                                        </button>
+                                    </form>
+                                {% endif %}
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </details>
+        {% endif %}
+        {% if tarefa.observadores.exists %}
+            <details open="open">
+                {% box_usuarios "Observadores" tarefa.observadores.all %}
+            </details>
+        {% endif %}
+    </aside>
+{% endblock %}

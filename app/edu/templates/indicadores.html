@@ -1,0 +1,84 @@
+{% extends super_template %}
+
+{% block extrahead %}
+    <script src="/static/djtools/graficos/highcharts.js"></script>
+    <script src="/static/djtools/graficos/exporting.js"></script>
+    <script src="/static/comum/js/controlurlparams.js"></script>
+{% endblock %}
+
+{% block content %}
+
+    {% if parametros %}
+        <script>
+            window.addEventListener("load", function() {
+                let url_original = "/edu/indicadores/?{{ parametros}}";
+                let url_original_corrigida = url_original.replace(/&amp;/g, "&");
+                history.replaceState(null, "", url_original_corrigida);
+            });
+        </script>
+    {% endif %}
+
+    {% box 'Filtros' %}
+        {% render_form form %}
+    {% endbox %}
+
+    {% if form.is_valid %}
+        {% if pode_exportar_xls %}
+            <div class="submit-row">
+                <ul class="action-bar">
+                    <li>
+                        <a href="/edu/indicadores/?{{ parametros }}&xls=1" class="btn">Exportar para XLS</a>
+                    </li>
+                </ul>
+            </div>
+        {% endif %}
+        <ul class="pills">
+            <li class="{% if not uo_selecionada %}active{% endif %}">
+                <a href="#" onclick="$('*').css({'cursor':'wait'}); javascript:removeParam('uo_selecionada'); return false;">Todos os Campi</a>
+            </li>
+            {% for uo in uos %}
+                <li class="{% if uo_selecionada == uo.pk %}active{% endif %}">
+                    <a href="#" onclick="$('*').css({'cursor':'wait'}); javascript:insertParam('uo_selecionada',{{ uo.id }}, 'curso_selecionado'); return false">{{ uo.sigla }}</a>
+                </li>
+            {% endfor %}
+        </ul>
+        {% if cursos %}
+            <ul class="pills">
+                <li class="{% if not curso_selecionado %}active{% endif %}">
+                    <a href="#" onclick="$('*').css({'cursor':'wait'}); javascript:removeParam('curso_selecionado'); return false;">Todos
+                        os Cursos</a>
+                </li>
+                {% for curso in cursos %}
+                    <li class="{% if curso_selecionado == curso.pk %}active{% endif %}">
+                        <a href="#" onclick="$('*').css({'cursor':'wait'}); javascript:insertParam('curso_selecionado',{{ curso.id }}); return false;">
+                           onclick="$('*').css({'cursor':'wait'});" title="{{ curso.descricao }}">{{ curso.codigo }}</a>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+        <table>
+            <thead>
+            <tr>
+                <th>Indicadores</th>
+                {% for ano in anos %}
+                    <th>{{ ano }}</th>
+                {% endfor %}
+            </tr>
+            </thead>
+            <tbody>
+            {% for indicador in indicadores.items %}
+                <tr>
+                    {% for indicador_coluna in indicadores_colunas.items %}
+                        {% if indicador_coluna.0 == indicador.0 %}
+                            <td><a class="hint hint-bottom" aria-label="{{ indicador_coluna.1.1 }}">{{ indicador_coluna.1.0 }}</a></td>
+                        {% endif %}
+                    {% endfor %}
+                    {% for ano in indicador.1.items %}
+                        <td><a class="popup" href="/edu/variaveis/{{ indicador.0 }}/{{ ano.0 }}/{{ uos_links }}/{{ modalidades_pks|join:'_' }}/{{ curso_selecionado }}/?deficiencias={{ deficiencias_pks|join:'_' }}&outras_nees={{ outras_nees_pks|join:'_' }}">{{ ano.1|floatformat:"-2" }}</a></td>
+                    {% endfor %}
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+{% endblock %}

@@ -1,0 +1,104 @@
+{% if lista_acompanhamento %}
+    <ul class="timeline">
+        {% for linha in lista_acompanhamento %}
+            {% if linha.objeto.situacao == 2 %}
+                </ul>
+                <div class="msg status"><hr/></div>
+                <ul class="timeline">
+            {% endif %}
+            <li>
+                <div class="timeline-date">{{ linha.data_hora }}</div>
+                <div class="timeline-photo" title="{{ linha.usuario.get_profile.nome_usual }}">
+                    <img alt="{{ linha.usuario.get_profile.nome_usual }}" src="{{ linha.usuario.get_vinculo.get_foto_75x100_url }}"/>
+                </div>
+                <div class="timeline-content">
+                    {% if linha.tipo == 'acompanhamento' %}
+                        {% if linha.objeto.situacao %}
+                            <h4>{{ linha.usuario|format }} <small>alterou a situação do acompanhamento para:</small> <span class="status status-{% if linha.objeto.situacao == 1 %}alert{% elif linha.objeto.situacao == 2 %}success{% elif linha.objeto.situacao == 3 %}error{% endif %}">{{ linha.objeto.get_situacao_display|format }}</span></h4>
+                        {% else %}
+                            <h4>{{ linha.usuario|format }} <small>adicionou um novo acompanhamento.</small></h4>
+                        {% endif %}
+                        <dl>
+                            {% if linha.objeto.descricao %}
+                                <dt>Comentário:</dt>
+                                <dd>{{ linha.objeto.descricao|linebreaksbr }}</dd>
+                            {% endif %}
+                            {% if linha.objeto.anexo %}
+                                <dt>Anexo:</dt>
+                                <dd><a href="{{ linha.objeto.anexo.url }}">{{ linha.objeto.anexo|filename }}</dd>
+                            {% endif %}
+                            {% if linha.objeto.registroacompanhamentointeressado_set.exists %}
+                                <dt>Visível para:</dt>
+                                <dd>
+                                    <ul>
+                                        {% for interessado_linha in linha.objeto.registroacompanhamentointeressado_set.all %}
+                                            <li>{{ interessado_linha.interessado.vinculo.pessoa|format }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                </dd>
+                            {% endif %}
+                            {% if linha.ciencia_realizada %}
+                                {% if linha.ciencia_realizada.0.data_ciencia %}
+                                    <dt>Sua Ciência:</dt>
+                                    <dd><span class="status status-success">Ciente</span></dd>
+                                {% endif %}
+                            {% endif %}
+                        </dl>
+                        {% if tem_permissao_realizar_procedimentos_etep and interessados.exists %}
+                            {% if linha.objeto.descricao %}
+                                <ul class="action-bar">
+                                    {% if linha.ciencia_realizada %}
+                                        {% if not linha.ciencia_realizada.0.data_ciencia %}
+                                            <li><a class="btn success" href="/etep/dar_ciencia_acompanhamento/{{ linha.ciencia_realizada.0.id }}/">Declarar Ciência</a></li>
+                                        {% endif %}
+                                    {% endif %}
+                                    <li><a class="btn popup" href="/etep/notificar_acompanhamento/{{ linha.objeto.id }}/">Tornar Visível para Interessado</a></li>
+                                    <li><a class="btn popup danger no-confirm" href="/etep/desvincular_acompanhamento/{{ linha.objeto.id }}/">Desvincular Interessado</a></li>
+                                </ul>
+                            {% endif %}
+                        {% endif %}
+                    {% elif linha.tipo == 'solicitacao' %}
+                        <h4>{{ linha.usuario|format }} <small>solicitou o acompanhamento deste aluno.</small></h4>
+                        <dl>
+                            <dt>Motivo:</dt>
+                            <dd>{{ linha.objeto.descricao }}</dd>
+                        </dl>
+                    {% elif linha.tipo == 'solicitacao_atendida' %}
+                        <h4>{{ linha.usuario|format }} <small>avaliou a solicitação como:</small> <span class="status status-{% if linha.objeto.atendida %}success{% else %}error{% endif %}">{% if linha.objeto.atendida %}Deferido{% else %}Indeferido{% endif %}</span></h4>
+                        {% if not linha.objeto.atendida %}
+                            <dl>
+                                <dt>Razão do Indeferimento:</dt>
+                                <dd>{{ linha.objeto.razao_indeferimento }}</dd>
+                            </dl>
+                        {% endif %}
+                    {% elif linha.tipo == 'interessados' %}
+                        <h4>{{ linha.usuario|format }}
+                            {% if linha.objeto.adicionado %}
+                                <small>ativou um interessado.</small>
+                            {% else %}
+                                <small>inativou um interessado.</small>
+                            {% endif %}
+                        </h4>
+                        <dl>
+                            <dt>Interessado:</dt>
+                            <dd>{{ linha.objeto.interessado.interessado|format }}</dd>
+                        </dl>
+                    {% else %}
+                        <h4>{{ linha.usuario|format }} <small>adicionou um novo encaminhamento.</small></h4>
+                        <dl>
+                            <dt>Encaminhamento:</dt>
+                            <dd>{{ linha.objeto.encaminhamento.nome|format }}</dd>
+                        </dl>
+                        {% if False and request.user == linha.usuario and obj.get_situacao != 2 %}
+                            <ul>
+                                <li><a class="danger no-confirm popup" href="/comum/excluir/etep/acompanhamentoencaminhamento/{{ linha.objeto.pk }}/">Remover</a></li>
+                            </ul>
+                        {% endif %}
+                    {% endif %}
+                </div>
+            </li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <p class="alert alert-warning">O aluno não possui nenhum registro para este acompanhamento.</p>
+{% endif %}

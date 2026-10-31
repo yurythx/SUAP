@@ -1,0 +1,568 @@
+{% extends super_template %}
+{% load demandas_templatetags %}
+
+{% block bodyclass %}hasAsideRight{% endblock %}
+
+{% block object-status %}
+    {% if steps %}
+        {{ steps|safe }}
+    {% else %}
+        {{ demanda.situacao|status }}
+    {% endif %}
+    {% if demanda.prioridade == 1 %}
+        <span class="status status-success">{{ demanda.prioridade }}ª prioridade para desenvolvimento</span>
+    {% elif demanda.prioridade <= qtd_demandas_prioritarias_por_area %}
+        <span class="status status-alert">{{ demanda.prioridade }}ª prioridade para desenvolvimento</span>
+    {% elif demanda.prioridade > qtd_demandas_prioritarias_por_area %}
+        <span class="status status-error"
+              title="Esta demanda não está priorizada para desenvolvimento pelos demandantes.">Sem prioridade para desenvolvimento: {{ demanda.prioridade }}ª posição</span>
+    {% endif %}
+    {% if demanda.privada %}
+        <span class="status status-error">Privada</span>
+    {% else %}
+        <span class="status status-info">Pública</span>
+    {% endif %}
+    {% if demanda.eh_subdemanda %}
+           <span class="status status-info">{% icone "sitemap" %} Sub-demanda</span>
+       {% endif %}
+    {% if entrega_pendente.prazo_vencido %}
+        <span class="status status-error">{% icone "exclamation-triangle" %} Entrega vencida</span>
+    {% endif %}
+    
+    <span class="status status-default"
+          title="Esta demanda está com {{ demanda.votos }} pontos na votação">{% icone "heart" %} {{ demanda.votos }}</span>
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if not demanda.eh_situacao_terminal and not perms.demandas.atende_demanda and not eh_demandante and not eh_interessado and not eh_observador and not eh_observador_pendente and not demanda.privada %}
+            <li>
+                <a class="btn success confirm"
+                   href="{% url 'acompanhar' demanda.pk %}"
+                   data-confirm="Você deseja solicitar a sua inclusão como Observador desta demanda?"
+                   title="Acompanhe para receber notificações do andamento desta demanda">{% icone "hand-point-right" %} Acompanhar</a>
+            </li>
+        {% endif %}
+        {% if perms.demandas.atende_demanda and not demanda.eh_situacao_terminal %}
+            <li class="has-child">
+                <a href="#" class="btn primary">{% icone "edit" %} Alterar etapa</a>
+                <ul>
+                    {% for situacao in demanda_etapas %}
+                        <li>
+                            <a href="{% url 'demanda_situacao_alterar' demanda.pk situacao %}">{{ situacao }}</a>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </li>
+        {% endif %}
+        {% if dod.validacao_revisao_solicitada and eh_demandante %}
+            <li>
+                <a href="{% url 'validar_modificacoes_dod' dod.id %}" class="btn">{% icone "check" %} Validar alterações da consolidação</a>
+            </li>
+        {% endif %}
+        <li class="has-child">
+            <a href="#" class="btn">{% icone "bars" %} Outras opções</a>
+            <ul>
+                {% if pode_editar %}
+                    <li>
+                        <a href="{% url 'admin:demandas_demanda_change' demanda.pk %}">Editar</a>
+                    </li>
+                {% endif %}
+                {% if perms.demandas.atende_demanda and not demanda.eh_situacao_terminal %}
+                    {% if demanda.eh_situacao_com_data_previsao %}
+                        <li>
+                            <a href="{% url 'demanda_editar_data_previsao_etapa' demanda.pk %}"
+                               class="popup">Editar data de previsão</a>
+                        </li>
+                    {% endif %}
+                    {% if not demanda.especificacao_tecnica %}
+                        <li>
+                            <a href="{% url 'demanda_especificacao_tecnica' demanda.pk %}">Especificação técnica</a>
+                        </li>
+                    {% endif %}
+                    <li>
+                        <a href="{% url 'demanda_situacao_alterar' demanda.pk 'Suspender' %}">Suspender</a>
+                    </li>
+                {% endif %}
+                {% if not demanda.eh_situacao_terminal %}
+                    {% if perms.demandas.atende_demanda or eh_demandante %}
+                        <li>
+                            <a href="{% url 'demanda_situacao_alterar' demanda.pk 'Cancelar' %}">Cancelar</a>
+                        </li>
+                    {% endif %}
+                {% endif %}
+                <li>
+                    <a href="/demandas/glossario/" class="popup">Glossário</a>
+                </li>
+            </ul>
+        </li>
+    </ul>
+{% endblock %}
+
+{% block subtitle %}
+    {% if demanda.sugestaomelhoria_set.exists %}
+        {% with sugestaomelhoria=demanda.sugestaomelhoria_set.first %}
+            <p>Esta demanda foi criada a partir da Sugestão de Melhoria {{ sugestaomelhoria.pk }}: <a href="{{ sugestaomelhoria.get_absolute_url }}">{{ sugestaomelhoria.titulo }}</a>.</p>
+        {% endwith %}
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    {% if demanda.eh_dependente %}
+        <p class="alert alert-warning">
+            Esta demanda é <strong>dependente da conclusão</strong> da demanda:&nbsp;<a href="{{ demanda.dependencia.get_absolute_url }}">{{ demanda.dependencia }}</a>
+        </p>
+    {% endif %}
+    {% if demanda.eh_pre_requisito %}
+        <div class="alert alert-info">
+            <p>
+                Esta demanda é <strong>pré-requisito</strong> para {{ demanda.demandas_dependentes.count }} demanda{{ demanda.demandas_dependentes.count|pluralize:'s' }}:
+            </p>
+            <ol>
+                {% for demanda_dependente in demanda.demandas_dependentes %}
+                    <li>
+                        <a href="{{ demanda_dependente.get_absolute_url }}">{{ demanda_dependente }}</a>
+                    </li>
+                {% endfor %}
+            </ol>
+        </div>
+    {% endif %}
+    {% if demanda.get_ultimo_historico_situacao.em_atraso %}
+        <p class="alert alert-warning">
+            <strong>Em atraso</strong>: esta etapa estava prevista para conclusão em {{ data_previsao }}.
+        </p>
+    {% elif data_previsao %}
+        <p class="alert alert-info"
+           title="Até {% if demanda.get_ultimo_historico_situacao.data_previsao == hoje %}hoje{% else %}{{ data_previsao }}{% endif %}">
+            <strong>Previsão</strong>: esta etapa está prevista para conclusão em {{ data_previsao|timeuntil }}.
+        </p>
+    {% endif %}
+    {% if demanda.prazo_legal %}
+        {% if demanda.situacao == "Concluída" or demanda.situacao == "Cancelada" %}
+            <p class="alert alert-info">
+                Prazo legal da demanda: <strong>{{ demanda.prazo_legal }}</strong>
+            </p>
+        {% else %}
+            <p class="alert alert-warning">
+                Fique atento ao prazo legal da demanda: <strong>{{ demanda.prazo_legal }}</strong>
+            </p>
+        {% endif %}
+    {% endif %}
+    <dl class="definition-list flex">
+        <div class="list-item">
+            <dt>Área de atuação</dt>
+            <dd>
+                <a href="/admin/demandas/demanda/?area__id__exact={{ demanda.area.pk }}&tab=tab_ativas">{{ demanda.area|format }}</a>
+            </dd>
+        </div>
+        {% if demanda.tags.all %}
+            <div class="list-item">
+                <dt>Módulos</dt>
+                <dd>
+                    <ul class="tags">
+                        {% for tag in demanda.tags.all %}<li>{{ tag.nome }}</li>{% endfor %}
+                    </ul>
+                </dd>
+            </div>
+        {% endif %}
+        <div class="list-item">
+            <dt>Tipo</dt>
+            <dd>{{ demanda.tipo }}</dd>
+        </div>
+    </dl>
+    {% box 'Solicitação original' class='{{ aprovada }}' %}
+        {% if demanda.pode_votar %}
+            <ul class="action-bar inside-container">
+                <li>
+                    <a href="/demandas/concordar_demanda/{{ demanda.pk }}"
+                       class="btn {% if demanda.ja_concordou %}disabled{% else %}success{% endif %}"
+                       title="Concordar com a solicitação da demanda">{% icone "heart" %} Concordar</a>
+                </li>
+                <li>
+                    <a href="/demandas/discordar_demanda/{{ demanda.pk }}"
+                       class="btn {% if demanda.ja_discordou %}disabled{% else %}danger no-confirm{% endif %}"
+                       title="Discordar da solicitação da demanda">{% icone "heart-broken" %} Discordar</a>
+                </li>
+            </ul>
+        {% endif %}
+        <dl class="definition-list flex">
+            <div class="list-item flex-basis-100">
+                <dt>Solicitação</dt>
+                <dd>
+                    <strong>{{ demanda.titulo }}</strong>: {{ demanda.descricao|linebreaksbr }}
+                </dd>
+            </div>
+            {% if demanda.quem_concordou.exists %}
+                <div class="list-item flex-basis-50">
+                    <dt>
+                        Concordaram <span class="badge ms-1">{{ demanda.quem_concordou.all.count }}</span>
+                    </dt>
+                    <dd class="d-flex flex-wrap gap-2">
+                        {% for concordou in demanda.quem_concordou.all %}
+                            <div class="person smallest {% if concordou.usuario == request.user %}success{% endif %} m-0">
+                                <div class="photo-circle smallest">
+                                    <img alt="{{ concordou.usuario.get_profile.nome_usual }}"
+                                         src="{{ concordou.usuario.get_vinculo.get_foto_75x100_url }}">
+                                </div>
+                                <dl>
+                                    <dt class="visually-hidden">Nome</dt>
+                                    <dd>
+                                        {{ concordou.usuario|format }}
+                                    </dd>
+                                </dl>
+                            </div>
+                        {% endfor %}
+                    </dd>
+                </div>
+            {% endif %}
+            {% if demanda.quem_discordou.exists %}
+                <div class="list-item flex-basis-50">
+                    <dt>
+                        Discordaram <span class="badge ms-1">{{ demanda.quem_discordou.all.count }}</span>
+                    </dt>
+                    <dd class="d-flex flex-wrap gap-2">
+                        {% for discordou in demanda.quem_discordou.all %}
+                            <div class="person smallest {% if discordou.usuario == request.user %}error{% endif %} m-0">
+                                <div class="photo-circle smallest">
+                                    <img alt="{{ discordou.usuario.get_profile.nome_usual }}"
+                                         src="{{ discordou.usuario.get_vinculo.get_foto_75x100_url }}">
+                                </div>
+                                <dl>
+                                    <dt class="visually-hidden">Nome</dt>
+                                    <dd>
+                                        {{ discordou.usuario|format }}
+                                    </dd>
+                                </dl>
+                            </div>
+                        {% endfor %}
+                    </dd>
+                </div>
+            {% endif %}
+        </dl>
+    {% endbox %}
+    {% include "tabs/dod.html" %}
+    {% if perms.demandas.atende_demanda or eh_demandante or eh_interessado %}
+        {% include "tabs/linha_tempo.html" %}
+        {% include "tabs/anexos_demanda.html" %}
+    {% endif %}
+    {% if eh_analista or eh_desenvolvedor %}
+        {% include "tabs/nota_interna.html" %}
+    {% endif %}
+    {% include "tabs/subdemandas.html" %}
+    {% include "tabs/entregas.html" %}
+    {% include "tabs/historico.html" %}
+{% endblock %}
+
+{% block asideright %}
+    <aside class="right">
+        <button id="collapseAsideRight">
+            <span class="visually-hidden">Minimizar barra lateral</span>
+        </button>
+        {% block detalhe_demandante %}
+            <details open="open">
+                <summary>
+                    Demandantes <span class="badge">{{ demanda.demandantes.count }}</span>
+                </summary>
+                <div class="details-container">
+                    {% if demanda|method:"pode_editar_demandantes"|call:request.user %}
+                        <ul class="action-bar">
+                            <li>
+                                <a class="btn primary"
+                                   href="{% url 'demanda_alterar_usuario' 'demandantes' demanda.id %}">
+                                {% icone "edit" %} Alterar</a>
+                            </li>
+                        </ul>
+                    {% endif %}
+                    {% for obj in demandantes %}
+                        <div class="person sm {% if obj.usuario == request.user %}success{% endif %}">
+                            <div class="photo-circle sm">
+                                <img alt="{{ obj.usuario.get_profile.nome_usual }}"
+                                     src="{{ obj.usuario.get_vinculo.get_foto_75x100_url }}" />
+                            </div>
+                            <dl>
+                                <dt class="visually-hidden">Demandante:</dt>
+                                <dd class="title">{{ obj.usuario|format }}</dd>
+                                {% if obj.usuario.get_vinculo.eh_funcionario %}
+                                    {% if obj.usuario.get_relacionamento.funcao %}
+                                        <dt class="visually-hidden">Função:</dt>
+                                        <dd>
+                                            {{ obj.usuario.get_relacionamento.funcao_atividade.nome }}
+                                        </dd>
+                                    {% endif %}
+                                    <dt>Setor:</dt>
+                                    <dd>
+                                        <a href="/rh/setor/{{ obj.usuario.get_relacionamento.setor.pk }}/">
+                                            {{ obj.usuario.get_relacionamento.setor|format }}/{{ obj.usuario.get_relacionamento.setor_lotacao.uo.equivalente }}
+                                        </a>
+                                    </dd>
+                                    {% if obj.usuario.get_relacionamento.setor_lotacao.uo.telefone %}
+                                        <dt>Telefone:</dt>
+                                        <dd>
+                                            {{ obj.usuario.get_relacionamento.setor_lotacao.uo.telefone|format }}
+                                        </dd>
+                                    {% endif %}
+                                {% endif %}
+                                {% if obj.afastamento_ou_ferias %}
+                                    <dt class="visually-hidden">Afastamento/férias</dt>
+                                    <dd>
+                                        <small class="false">{{ obj.afastamento_ou_ferias }}</small>
+                                    </dd>
+                                {% endif %}
+                                {% if obj.recesso %}
+                                    <dt class="visually-hidden">Recesso</dt>
+                                    <dd>
+                                        <small class="false">Em recesso</small>
+                                    </dd>
+                                {% endif %}
+                            </dl>
+                        </div>
+                    {% endfor %}
+                </div>
+            </details>
+        {% endblock %}
+
+        {% block detalhe_interessado %}
+            {% if demanda.interessados.exists %}
+                <details open="open">
+                    <summary>
+                        Interessados <span class="badge">{{ demanda.interessados.count }}</span>
+                    </summary>
+                    <div class="details-container">
+                        {% if eh_demandante or eh_demandante_responsavel or request.user.is_superuser %}
+                            <ul class="action-bar sm">
+                                <li>
+                                    <a class="btn primary"
+                                       href="{% url 'demanda_alterar_usuario' 'interessados' demanda.id %}">
+                                    {% icone "edit" %} Alterar</a>
+                                </li>
+                            </ul>
+                        {% endif %}
+                        {% for interessado in demanda.interessados.all %}
+                            <div class="person smallest {% if interessado == request.user %}success{% endif %}">
+                                <div class="photo-circle smallest">
+                                    <img alt="{{ interessado.get_profile.nome_usual }}"
+                                         src="{{ interessado.get_vinculo.get_foto_75x100_url }}">
+                                </div>
+                                <dl>
+                                    <dt class="visually-hidden">Interessado:</dt>
+                                    <dd>
+                                        {{ interessado|format }}
+                                    </dd>
+                                </dl>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </details>
+            {% endif %}
+
+            {% if eh_demandante and demanda.observadores_pendentes.exists %}
+                <details open="open">
+                    <summary>
+                        Observadores pendentes <span class="badge">{{ demanda.observadores_pendentes.count }}</span>
+                    </summary>
+                    <div class="details-container">
+                        {% for observador in demanda.observadores_pendentes.all %}
+                            <div class="person sm {% if observador == request.user %}success{% endif %}">
+                                <div class="photo-circle sm">
+                                    <img alt="{{ observador.get_profile.nome_usual }}"
+                                         src="{{ observador.get_vinculo.get_foto_75x100_url }}">
+                                </div>
+                                <dl>
+                                    <dt class="visually-hidden">Observador:</dt>
+                                    <dd>
+                                        {{ observador|format }}
+                                    </dd>
+                                    {% if observador.get_vinculo.relacionamento %}
+                                        <dt>Setor:</dt>
+                                        <dd>
+                                            <a href="/rh/setor/{{ observador.get_vinculo.relacionamento.setor.pk }}/">
+                                                {{ observador.get_vinculo.relacionamento.setor|format }}/{{ observador.get_vinculo.relacionamento.setor_lotacao.uo.equivalente }}
+                                            </a>
+                                        </dd>
+                                        {% if observador.get_vinculo.relacionamento.setor_lotacao.uo.telefone %}
+                                            <dt>Telefone:</dt>
+                                            <dd>
+                                                {{ observador.get_vinculo.relacionamento.setor_lotacao.uo.telefone|format }}
+                                            </dd>
+                                        {% endif %}
+                                    {% endif %}
+                                </dl>
+                                <ul class="action-bar">
+                                    <li>
+                                        <a href="{% url 'adicionar_observador' demanda.pk observador.pk %}"
+                                           class="btn success">Aceitar</a>
+                                    </li>
+                                    <li>
+                                        <a href="{% url 'remover_observador' demanda.pk observador.pk %}"
+                                           class="btn danger">Negar</a>
+                                    </li>
+                                </ul>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </details>
+            {% endif %}
+
+            {% if demanda.observadores.exists %}
+                <details open="open">
+                    <summary>
+                        Observadores <span class="badge">{{ demanda.observadores.count }}</span>
+                    </summary>
+                    <div class="details-container">
+                        {% if eh_demandante or eh_demandante_responsavel or request.user.is_superuser %}
+                            <ul class="action-bar sm">
+                                <li>
+                                    <a class="btn primary"
+                                       href="{% url 'demanda_alterar_usuario' 'observadores' demanda.id %}">
+                                    {% icone "edit" %} Alterar</a>
+                                </li>
+                            </ul>
+                        {% endif %}
+                        {% for observador in demanda.observadores.all %}
+                            <div class="person smallest {% if observador == request.user %}success{% endif %}">
+                                <div class="photo-circle smallest">
+                                    <img alt="{{ observador.get_profile.nome_usual }}"
+                                         src="{{ observador.get_vinculo.get_foto_75x100_url }}" />
+                                </div>
+                                <dl>
+                                    <dt class="visually-hidden">Observador:</dt>
+                                    <dd>
+                                        {{ observador|format }}
+                                    </dd>
+                                </dl>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </details>
+            {% endif %}
+        {% endblock %}
+
+        <details open="open">
+            <summary>
+                Analistas <span class="badge">{{ demanda.analistas.count }}</span>
+            </summary>
+            <div class="details-container">
+                {% if pode_editar and eh_analista or eh_desenvolvedor or request.user.is_superuser %}
+                    <ul class="action-bar sm">
+                        <li>
+                            <a class="btn primary"
+                               href="{% url 'demanda_alterar_usuario' 'analistas' demanda.id %}">
+                            {% icone "edit" %} Alterar</a>
+                        </li>
+                    </ul>
+                {% endif %}
+                {% for obj in analistas %}
+                    <div class="person sm {% if obj.usuario == request.user %}success{% endif %}">
+                        <div class="photo-circle sm">
+                            <img alt="{{ obj.usuario.get_profile.nome_usual }}"
+                                 src="{{ obj.usuario.get_vinculo.get_foto_75x100_url }}">
+                        </div>
+                        <dl>
+                            <dt class="visually-hidden">Nome:</dt>
+                            <dd class="title">{{ obj.usuario|format }}</dd>
+                            {% if obj.usuario.get_vinculo.eh_funcionario %}
+                                <dt>Setor:</dt>
+                                <dd>
+                                    <a href="/rh/setor/{{ obj.usuario.get_relacionamento.setor.pk }}/">
+                                        {{ obj.usuario.get_relacionamento.setor|format }}/{{ obj.usuario.get_relacionamento.setor_lotacao.uo.equivalente }}
+                                    </a>
+                                </dd>
+                                {% if obj.usuario.get_relacionamento.setor_lotacao.uo.telefone %}
+                                    <dt>Telefone:</dt>
+                                    <dd>
+                                        {{ obj.usuario.get_relacionamento.setor_lotacao.uo.telefone|format }}
+                                    </dd>
+                                {% endif %}
+                            {% endif %}
+                            {% if obj.afastamento_ou_ferias %}
+                                <dt class="visually-hidden">Afastamento/férias</dt>
+                                <dd>
+                                    <small class="false">{{ obj.afastamento_ou_ferias }}</small>
+                                </dd>
+                            {% endif %}
+                            {% if obj.recesso %}
+                                <dt class="visually-hidden">Recesso</dt>
+                                <dd>
+                                    <small class="false">Em recesso</small>
+                                </dd>
+                            {% endif %}
+                        </dl>
+                    </div>
+                {% empty %}
+                    <p class="alert alert-warning">Não há nenhum analista definido para esta demanda.</p>
+                {% endfor %}
+            </div>
+        </details>
+
+        {% if lista %}
+            <details open="open" class="no-print">
+                <summary>Demandas da área</summary>
+                <div class="details-container">
+                    {% for obj in lista %}
+                        <div class="flex-container total-container sm no-icon">
+                            <a class="total-item warning"
+                               href="/admin/demandas/demanda/?area={{ demanda.area.pk }}&tab=tab_em_andamento">
+                                <p class="total">{{ obj.0 }}</p>
+                                <p class="description">Em andamento</p>
+                            </a>
+                            <a class="total-item error"
+                               href="/admin/demandas/demanda/?area={{ demanda.area.pk }}&tab=tab_aguardando_feedback">
+                                <p class="total">{{ obj.1 }}</p>
+                                <p class="description">Aguardando feedback</p>
+                            </a>
+                            <a class="total-item info"
+                               href="/admin/demandas/demanda/?area={{ demanda.area.pk }}&tab=tab_nao_iniciadas">
+                                <p class="total">{{ obj.2 }}</p>
+                                <p class="description">Não iniciada{{ obj.2|pluralize }}</p>
+                            </a>
+                            <a class="total-item success"
+                               href="/admin/demandas/demanda/?situacao__exact=Concluída&area={{ demanda.area.pk }}&tab=tab_any_data">
+                                <p class="total">{{ obj.3 }}</p>
+                                <p class="description">Concluída{{ obj.3|pluralize }}</p>
+                            </a>
+                        </div>
+                    {% endfor %}
+                </div>
+            </details>
+        {% endif %}
+    </aside>
+{% endblock %}
+{% block extrascripts %}
+    {{ block.super }}
+    <script>
+        document.addEventListener('click', async function (event) {
+            const button = event.target.closest('[data-demanda-markdown-copy]');
+            if (!button) {
+                return;
+            }
+
+            event.preventDefault();
+            if (button.getAttribute('aria-disabled') === 'true') {
+                return;
+            }
+
+            const originalContent = button.innerHTML;
+            button.setAttribute('aria-disabled', 'true');
+
+            try {
+                const response = await fetch(button.dataset.demandaMarkdownCopy, {credentials: 'same-origin'});
+                if (!response.ok) {
+                    throw new Error('Falha ao carregar o Markdown.');
+                }
+                const markdown = await response.text();
+                await navigator.clipboard.writeText(markdown);
+                button.innerHTML = '<span class="fas fa-check" aria-hidden="true"></span> Markdown copiado';
+            } catch (error) {
+                button.innerHTML = '<span class="fas fa-exclamation-triangle" aria-hidden="true"></span> Não foi possível copiar';
+            } finally {
+                setTimeout(function () {
+                    button.innerHTML = originalContent;
+                    button.removeAttribute('aria-disabled');
+                }, 3000);
+            }
+        });
+    </script>
+{% endblock %}
+{% block action-links %}
+    <li class="ultima_atualizacao">Última atualização em {{ demanda.data_atualizacao|format }}</li>
+{% endblock %}

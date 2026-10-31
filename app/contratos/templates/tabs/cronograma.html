@@ -1,0 +1,297 @@
+{% load tags %}
+<ul class="action-bar">
+    {% if pode_gerar_cronograma %}
+        {% if cronograma.numero and not contrato.cancelado %}
+            <li><a class="btn success popup" href="/contratos/adicionar_parcela/{{ contrato.pk }}/">{% icone "plus" %} Adicionar
+                Parcela</a></li>
+            <li><a class="btn success" href="/contratos/gerar_parcelas/{{ contrato.pk }}/">{% icone "plus" %} Gerar Várias Parcelas</a></li>
+        {% else %}
+            {% if not contrato.cancelado %}
+                <li><a class="btn success popup" href="/contratos/definir_cronograma/{{ contrato.pk }}/">{% icone "calendar" %} Criar
+                    Cronograma</a></li>
+            {% endif %}
+        {% endif %}
+        {% if request.user|in_group:"Gerente de Contrato" %}
+            <li><a class="btn" href="/contratos/configurar_medicao/{{ contrato.pk }}/">{% icone "cog" %} Configurar Documentos Comprobatórios</a></li>
+        {% endif %}
+    {% endif %}
+    {% if perms.contratos.pode_visualizar_contrato %}
+        <li><a href="/contratos/relatorio_valores_executados/{{ contrato.id }}/" class="btn">Demonstrativo de Valores Executados por {{ nomenclatura.campus }}</a></li>
+    {% endif %}
+</ul>
+
+{% if pode_gerar_cronograma and not cronograma.numero and not contrato.cancelado %}
+    <div class="alert alert-warning">
+        <strong>Atenção:</strong> Para que o cronograma seja gerado ou novas parcelas sejam adicionadas, o número do
+        cronograma deve estar definido através do botão Criar Cronograma.
+    </div>
+{% endif %}
+
+{% include "includes/filter_campus.html" with tab="cronograma" %}
+
+{% if cronograma %}
+    <dl class="definition-list flex">
+        <div class="list-item">
+            <dt>Nº</dt>
+            <dd>{{ cronograma.numero|default:"" }}</dd>
+        </div>
+        {% if cronograma.nl %}
+            <div class="list-item">
+                <dt>NL</dt>
+                <dd>{{ cronograma.nl|default:"" }}</dd>
+            </div>
+        {% endif %}
+        {% if cronograma.rc %}
+            <div class="list-item">
+                <dt>RC</dt>
+                <dd>{{ cronograma.rc|default:"" }}</dd>
+            </div>
+        {% endif %}
+    </dl>
+{% endif %}
+
+{% for parcela in parcelas %}
+    <div class="general-box">
+        <div class="primary-info">
+            <div class="status-info-container">
+                {% if parcela.sem_medicao %}
+                    <span class="status status-info">Sem medição</span>
+                {% elif not parcela.medicoes.exists %}
+                    <span class="status status-alert">Aguardando medição</span>
+                {% endif %}
+            </div>
+
+            <h4 id="parcela_{{ parcela.id }}"><small>{{ forloop.counter }}</small> <strong>{{ parcela.data_prevista_inicio|format }} à {{ parcela.data_prevista_fim|format }}</strong></h4>
+
+            {% if not contrato.cancelado and pode_gerar_cronograma or pode_efetuar_medicao and not contrato.cancelado %}
+                <ul class="action-bar">
+                    {% if pode_efetuar_medicao %}
+                        <li><a class="btn success popup"
+                                href="{% url 'informar_imr' parcela.id contrato.id %}">{% icone "plus" %} IMR</a></li>
+                        {% if not parcela.sem_medicao %}
+                            <li><a class="btn success popup"
+                                    href="{% url 'efetuar_medicao_sem_imr' parcela.id contrato.id %}">{% icone "plus" %} Efetuar
+                                Medição</a></li>
+                            {% if not parcela.medicoes.exists %}
+                                <li><a class="btn primary confirm"
+                                        href="/contratos/sem_medicao/{{ parcela.id }}/{{ contrato.id }}/">{% icone "minus" %} Sem
+                                    Medição</a></li>
+                            {% endif %}
+                        {% else %}
+                            <li><a class="btn warning"
+                                    href="/contratos/sem_medicao/{{ parcela.id }}/{{ contrato.id }}/">{% icone "undo" %} Desfazer
+                                'Sem Medição'</a></li>
+                        {% endif %}
+                    {% endif %}
+                    {% if pode_gerar_cronograma %}
+                        <li><a class="btn primary"
+                                href="/contratos/atualizar_parcela/{{ parcela.id }}/{{ contrato.id }}/" title="Editar parcela">{% icone "edit" %} <span class="visually-hidden">Editar parcela</span></a></li>
+                    {% endif %}
+                    {% if pode_gerar_cronograma and not parcela.medicoes.exists %}
+                        <li><a class="btn danger"
+                                href="/contratos/excluir_parcela/{{ parcela.id }}/{{ contrato.id }}/" title="Remover parcela">{% icone "trash" %} <span class="visually-hidden">Remover parcela</span></a></li>
+                    {% endif %}
+                </ul>
+            {% endif %}
+
+            <div class="extra-info table-responsive">
+                {% with imrs_pendentes=parcela.get_imrs_pendentes %}
+                    {% if imrs_pendentes %}
+                        <h5>IMRs sem medição</h5>
+                        <table>
+                            <caption>IMRs Pendentes de Medição</caption>
+                            <thead>
+                            <tr>
+                                <th>Porcentagem</th>
+                                <th>{{ nomenclatura.campus }}</th>
+                                <th>Opções</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for imr in imrs_pendentes %}
+                                <tr>
+                                    <td>{{ imr.percentual }}%</td>
+                                    <td>{{ imr.campus }}</td>
+                                    <td class="no-print field-get_acoes">
+                                        <ul class="action-bar">
+                                            <li><a href="{{ imr.arquivo.url }}" class="btn default">{% icone "download" %} Baixar IMR</a></li>
+                                            {% if pode_efetuar_medicao and not contrato.cancelado %}
+                                                <li><a class="btn primary popup"
+                                                    href="{% url 'editar_imr' imr.id contrato.id %}" title="Editar IMR">{% icone "edit" %} Editar IMR</a></li>
+                                                <li><a class="btn danger"
+                                                    href="{% url 'excluir_imr' imr.id contrato.id %}" title="Excluir IMR">{% icone "trash" %} Excluir IMR</a></li>
+                                                <li><a class="btn success popup"
+                                                    href="{% url 'efetuar_medicao_com_imr' parcela.id contrato.id imr.id %}" title="Efetuar Medição">{% icone "plus" %} Efetuar Medição</a></li>
+                                            {% endif %}
+                                        </ul>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    {% endif %}
+                {% endwith %}
+
+                {% if parcela|method:"get_medicoes"|call:campus_filtro %}
+                    <h5>Medições:</h5>
+                    <table>
+                        <caption>Medições da Parcela</caption>
+                        <thead>
+                        <tr>
+                            <th class="no-print">Ações</th>
+                            <th>Nº da Nota/Documento Fiscal</th>
+                            <th>Fiscal da Medição</th>
+                            <th>Data da Medição</th>
+                            <th>{{ nomenclatura.campus }}</th>
+                            <th>Período Executado</th>
+                            <th>Valor Executado</th>
+                            <th>Dados gerais</th>
+                            <th class="no-print">Opções</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for medicao in parcela|method:"get_medicoes"|call:campus_filtro %}
+                            <tr>
+                                <td class="no-print field-get_acoes">
+                                    {% if pode_efetuar_medicao and not contrato.cancelado and not parcela.sem_medicao %}
+                                        {% if fiscal.servidor == medicao.fiscal.servidor or pode_gerenciar_todas_medicoes %}
+                                            {% icon "edit" "/contratos/atualizar_medicao/{{ medicao.id }}/{{ contrato.id }}/" "Editar Medição" %}
+                                            {% icon "delete" "/contratos/excluir_medicao/{{ medicao.id }}/{{ contrato.id }}/" "Remover Medição" %}
+                                        {% endif %}
+                                    {% endif %}
+                                </td>
+                                <td>{{ medicao.numero_documento }}</td>
+                                <td>{{ medicao.fiscal }}</td>
+                                <td>{{ medicao.data_medicao|format }}</td>
+                                <td>{{ medicao.campus|format }}</td>
+                                <td>{{ medicao.data_inicio|format }} à {{ medicao.data_fim|format }}</td>
+                                <td>R$ {{ medicao.valor_executado|format }}</td>
+                                <td>
+                                    <dl>
+                                        {% if medicao.imr %}
+                                            <dt>IMR:</dt>
+                                            <dd>{{ medicao.imr.percentual }}%</dd>
+                                        {% endif %}
+                                        {% if medicao.processo %}
+                                            <dt>Processo:</dt>
+                                            <dd><a href="{{ medicao.processo.get_absolute_url }}">{{ medicao.processo.get_numero }}</a></dd>
+                                        {% endif %}
+                                        {% if medicao.despacho_documentotexto %}
+                                            {% if medicao.despacho_documentotexto.estah_assinado or medicao.despacho_documentotexto.estah_finalizado %}
+                                                <dt>Relatório de Recebimento Provisório:</dt>
+                                                <dd><a
+                                                        href="{% url 'visualizar_documento' medicao.despacho_documentotexto.id %}"
+                                                        class="btn default">Visualizar</a></dd>
+                                            {% endif %}
+                                        {% endif %}
+                                        {% if medicao.termo_definitivo_documentotexto %}
+                                            {% if medicao.termo_definitivo_documentotexto.estah_assinado or medicao.termo_definitivo_documentotexto.estah_finalizado %}
+                                                <dt>Termo de Recebimento Definitivo:</dt>
+                                                <dd><a href="{% url 'visualizar_documento' medicao.termo_definitivo_documentotexto.id %}"
+                                                        class="btn default">Visualizar</a></dd>
+                                            {% endif %}
+                                        {% endif %}
+                                        {% if medicao.ocorrencia %}
+                                            <dt>Ocorrências:</dt>
+                                            <dd>{{ medicao.ocorrencia }}</dd>
+                                        {% endif %}
+                                        {% if medicao.providencia %}
+                                            <dt>Providências:</dt>
+                                            <dd>{{ medicao.providencia }}</dd>
+                                        {% endif %}
+                                        {% with movimentacoes_conta=medicao.movimentacoes_conta.all %}
+                                            {% if movimentacoes_conta %}
+                                                <dt>Depósitos em Conta Vinculada:</dt>
+                                                {% for movimentacao in movimentacoes_conta %}
+                                                    <dd>R$ {{ movimentacao.valor|format_money }} em {{ movimentacao.data|format }}</dd>
+                                                {% endfor %}
+                                            {% endif %}
+                                        {% endwith %}
+                                        {% with documentos_empenho_medicao=medicao.documentos_empenho_medicao.all %}
+                                            {% if documentos_empenho_medicao %}
+                                                <dt>Empenhos:</dt>
+                                                <dd>{{ documentos_empenho_medicao|format }}</dd>
+                                            {% endif %}
+                                        {% endwith %}
+                                    </dl>
+                                </td>
+                                <td class="no-print">
+                                    <ul class="action-bar">
+                                        {% if pode_efetuar_medicao and not contrato.cancelado and not parcela.sem_medicao %}
+                                            {% if fiscal.servidor == medicao.fiscal.servidor or pode_gerenciar_todas_medicoes %}
+                                                {% if medicao.imr %}
+                                                    <li>
+                                                        <a href="{{ medicao.imr.arquivo.url }}" class="btn default">{% icone "download" %} Baixar IMR</a>
+                                                    </li>
+                                                    <li>
+                                                        <a class="btn primary popup"
+                                                            href="{% url 'editar_imr' medicao.imr.id contrato.id %}" title="Editar IMR">{% icone "edit" %} Editar IMR</a>
+                                                    </li>
+                                                    <li>
+                                                        <a class="btn danger"
+                                                            href="{% url 'excluir_imr' medicao.imr.id contrato.id %}" title="Excluir IMR">{% icone "trash" %} Excluir IMR</a>
+                                                    </li>
+                                                {% endif %}
+                                                <li>
+                                                    <a class="btn"
+                                                        href="/contratos/adicionar_ocorrencia_medicao/{{ medicao.id }}/{{ contrato.id }}/">{% icone "plus" %} Informar Ocorrência/Providência</a>
+                                                </li>
+                                                {% if not medicao.despacho_documentotexto or not medicao.despacho_documentotexto.estah_finalizado %}
+                                                    <li>
+                                                        <a href="/contratos/gerar_despacho_eletronico/{{ medicao.id }}/{{ contrato.id }}/"
+                                                            class="btn">{% icone "file" %} Gerar Relatório de Recebimento Provisório</a>
+                                                    </li>
+                                                {% endif %}
+                                                <li>
+                                                    <a href="/contratos/historico_medicao/{{ medicao.id }}/"
+                                                        class="btn default popup">{% icone "history" %} Histórico da Medição</a>
+                                                </li>
+                                            {% endif %}
+                                        {% endif %}
+                                        {% if pode_gerenciar_recebimento_definitivo %}
+                                            {% if medicao.pode_ser_recebida_definitivamente %}
+                                                <li>
+                                                    <a href="/contratos/receber_definitivamente_medicao/{{ medicao.id }}/"
+                                                        class="btn">{% icone "circle" %} {% if medicao.recebimento_definitivo_iniciado or medicao.foi_recebida_definitivamente %}Atualizar Recebimento Definitivo{% else %}Receber Definitivamente{% endif %}</a>
+                                                </li>
+                                            {% endif %}
+                                            {% if medicao.pode_gerar_termo_definitivo %}
+                                                <li>
+                                                    <a href="/contratos/gerar_termo_definitivo_documentotexto/{{ medicao.id }}/{{ contrato.id }}/"
+                                                        class="btn">{% icone "file" %} Gerar Termo de Recebimento Definitivo - Documento
+                                                        Eletrônico</a>
+                                                </li>
+                                            {% endif %}
+                                        {% endif %}
+                                        {% if pode_gerenciar_conta %}
+                                            <li><a href="/contratos/deposito_conta/{{ medicao.id }}/" class="btn success popup">{% icone "money-bill" %} Adicionar Depósito em Conta Vinculada</a></li>
+                                        {% endif %}
+                                        {% if medicao.arquivo %}
+                                            <li><a href="/contratos/visualizar_arquivo/{{ medicao.arquivo.id }}/" class="btn default">{% icone "download" %} Arquivo da medição</a></li>
+                                        {% endif %}
+                                        <li><a href="/contratos/conferencia_documentos/{{ medicao.id }}/{{ contrato.id }}/" class="btn default popup">{% icone "eye" %} Conferência de documentos</a></li>
+                                    </ul>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                {% endif %}
+            </div>
+        </div>
+        <dl class="secondary-info">
+            <div class="list-item">
+                <dt>{% icone "dollar-sign" %} Valor Previsto:</dt>
+                <dd>R$ {{ parcela.valor_previsto|mascara_dinheiro }}</dd>
+            </div>
+            {% if parcela.valor_executado %}
+                <div class="list-item">
+                    <dt>{% icone "dollar-sign" %} Valor Executado:</dt>
+                    <dd>R$ {{ parcela.valor_executado|mascara_dinheiro }}</dd>
+                </div>
+            {% endif %}
+        </dl>
+    </div>
+    {% empty %}
+    <p class="alert alert-warning">Nenhuma parcela para o filtro aplicado.</p>
+{% endfor %}

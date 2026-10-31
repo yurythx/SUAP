@@ -1,0 +1,773 @@
+<!-- Exemplo de sobrescrita de template no LPS -->
+
+{% extends super_template %}
+
+{% block content %}
+
+    <ul class="action-bar">
+        {% if perms.rh.change_servidor or servidor.get_user and perms.auth.change_user or verificacao_propria or perms.rh.pode_editar_email_secundario_servidor or perms.rh.pode_cadastrar_digital %}
+            <li class="has-child">
+                <a href="#" class="btn primary">Editar</a>
+                <ul>
+                    {% if perms.rh.pode_editar_email_secundario_servidor or verificacao_propria %}
+                        <li><a class="popup" href="/comum/atualizar_email_secundario/{{ servidor.get_vinculo.pk }}/">E-mail</a></li>
+                    {% endif %}
+                    {% if verificacao_propria or perms.rh.change_servidor %}
+                        {% if perms.rh.change_servidor %}
+                            <li><a href="/admin/rh/servidor/{{ servidor.pk }}/">Servidor</a></li>
+                            {% if servidor.eh_docente and perms.rh.eh_rh_sistemico %}
+                                <li><a class="popup" href="/edu/editar_disciplina_docente/{{ servidor.pessoa_fisica_id }}/">Dados como Professor</a></li>
+                            {% endif %}
+                            {% if servidor.cargo_emprego.cargoempregoarea_set.exists and perms.rh.eh_rh_sistemico %}
+                                <li><a class="popup" href="{% url 'editar_servidor_cargo_emprego_area' servidor.pk %}">Área do Cargo</a></li>
+                            {% endif %}
+                        {% else %}
+                            <li><a class="popup" href="/rh/servidor/editar_informacoes_pessoais/">Informações Pessoais</a></li>
+                        {% endif %}
+                    {% endif %}
+                    {% if perms.rh.pode_cadastrar_digital or verificacao_propria and servidor.tem_digital_fraca %}
+                        <li><a class="popup" href="/rh/editar_informacoes_digitais_fracas/{{ servidor.pessoa_fisica_id }}/">{% if perms.rh.pode_cadastrar_digital %}Informações de Digitais Fracas{% else %}Editar Senha do Ponto{% endif %}</a></li>
+                    {% endif %}
+                    {% if servidor.get_user and perms.auth.change_user %}
+                        <li><a href="/admin/comum/user/{{ servidor.get_user.pk }}/">Usuário</a></li>
+                    {% endif %}
+                </ul>
+            </li>
+        {% endif %}
+
+        {% ldap_actions servidor %}
+
+        {% if servidor.get_vinculo.professor_set.exists %}
+            <li><a href="{{ servidor.professor.get_absolute_url }}" class="btn default">Dados do Professor</a></li>
+        {% endif %}
+
+        <li class="has-child">
+            <a href="#" class="btn default">Outras opções</a>
+            <ul>
+                {% if perms.rh.pode_gerar_cracha and pode_gerar_cracha %}
+                    <li><a href="/rh/cracha_pessoa/{{ servidor.pk }}/">Crachá</a></li>
+                {% endif %}
+                {% if perms.rh.pode_gerar_carteira and pode_gerar_carteira_funcional %}
+                    <li><a href="/rh/carteira_funcional/{{ servidor.pk }}/">Carteira Funcional</a></li>
+                {% endif %}
+                {% if servidor.get.vinculo.vinculo_curriculo_lattes %}
+                    <li><a href="/cnpq/curriculo/{{ servidor.pk }}/">Currículo Lattes</a></li>
+                {% endif %}
+                <li><a href="/comum/grupos_usuario/{{ servidor.get_user.pk }}/" class="popup">Preferências e Grupos</a></li>
+            </ul>
+        </li>
+    </ul>
+
+    {% box servidor %}
+        <div class="photo-circle lg">
+            <img src="{{ servidor.get_foto_150x200_url }}" alt="Foto de {{ servidor.pessoa_fisica.nome|format }}"/>
+        </div>
+        <div>
+            <table class="info">
+                <tr>
+                    <td>Nome</td>
+                    <td>{{ servidor.pessoa_fisica.nome|format }}</td>
+                    <td>Nome Usual</td>
+                    <td>{{ servidor.pessoa_fisica.nome_usual }}</td>
+                </tr>
+                {% if pode_ver_cpf_servidor %}
+                    <tr>
+                        <td>CPF</td>
+                        <td colspan="3">{{ servidor.pessoa_fisica.cpf }}</td>
+                    </tr>
+                {% endif %}
+                <tr>
+                    <td>E-mail Institucional</td>
+                    <td colspan="3">
+                        <a href="mailto:{{ servidor.email_institucional }}">{{ servidor.email_institucional|format }}</a>
+                    </td>
+                </tr>
+                <tr>
+                    <td>E-mail SIAPE</td>
+                    <td>{{ servidor.email_siape|format }}</td>
+                    <td>Email pessoal para recuperação de senha</td>
+                    <td>{{ servidor.email_pessoal|format }}</td>
+                </tr>
+                <tr>
+                    <td>Email para notificações</td>
+                    <td>{{ servidor.email_notificacao|format }}</td>
+                    <td>Email Google Sala de Aula</td>
+                    <td>{{ servidor.email_google_classroom|format }}</td>
+                </tr>
+                {% if servidor.email_academico %}
+                    <tr>
+                        <td>Email Acadêmico</td>
+                        <td colspan="3">{{ servidor.email_academico|format }}</td>
+                    </tr>
+                {% endif %}
+                <tr>
+                    <td>Telefones Institucionais</td>
+                    <td colspan="3">{{ servidor.telefones_institucionais|format }}</td>
+                </tr>
+                {% if pode_ver_telefones_pessoais_servidor %}
+                    <tr>
+                        <td>Telefones Pessoais</td>
+                        <td colspan="3">{{ servidor.pessoa_fisica.telefones_pessoais|format }}</td>
+                    </tr>
+                {% endif %}
+                <tr>
+                    <td>Impressão digital</td>
+                    <td>{{ servidor.tem_digital|format }}</td>
+                    <td>Ativo</td>
+                    <td>{{ servidor.ativo|status }}</td>
+                </tr>
+            </table>
+        </div>
+    {% endbox %}
+
+    <div class="tab-pane" data-title="Dados gerais" data-tab="dados_gerais">
+
+        {% if servidor.identificacao_unica_siape and verificacao_propria %}
+            <p class="alert alert-info">
+                Se as informações apresentadas estão incorretas ou desatualizadas corrija-as no <a
+                    href="https://servidor.sigepe.planejamento.gov.br/">SIGEPE</a>.
+                Se alguma dessas informações não pode ser atualizada diretamente no SIGEPE, procure o setor de recursos
+                humanos do seu campus.
+            </p>
+        {% endif %}
+        {% if pode_ver_cpf_servidor or pode_ver_dados_pessoais_servidor or pode_ver_endereco_servidor %}
+            {% box 'Dados Pessoais' %}
+                <div>
+                    <table class="info">
+                        {% if pode_ver_cpf_servidor %}
+                            <tr>
+                                <td>CPF</td>
+                                <td colspan="7">{{ servidor.pessoa_fisica.cpf|format }}</td>
+                            </tr>
+                        {% endif %}
+                        {% if pode_ver_dados_pessoais_servidor %}
+                            <tr>
+                                <td>Nome do Registro</td>
+                                <td colspan="7">{{ servidor.pessoa_fisica.nome_registro|format }}</td>
+                            </tr>
+                            <tr>
+                                <td>Nascimento</td>
+                                <td>{{ servidor.pessoa_fisica.nascimento_data|format }}
+                                    ({{ servidor.pessoa_fisica.nascimento_data|timesince|format }})
+                                </td>
+                                <td>Estado Civil</td>
+                                <td>{{ servidor.pessoa_fisica.estado_civil|format }}</td>
+                                <td>Naturalidade</td>
+                                <td colspan="3">{{ servidor.pessoa_fisica.nascimento_municipio|format }}</td>
+                            </tr>
+                            <tr>
+                                <td>Sexo</td>
+                                <td>{{ servidor.get_sexo_display|format }}</td>
+                                <td>G. Sanguíneo/RH</td>
+                                <td>{{ servidor.pessoa_fisica.grupo_sanguineo|format }}{{ servidor.fator_rh|format }}</td>
+                                <td>Dependentes IR</td>
+                                <td colspan="3">{{ servidor.servidor.qtde_depend_ir|format }}</td>
+                            </tr>
+                            <tr>
+                                <td>Nome do Pai</td>
+                                <td colspan="7"> {{ servidor.pessoa_fisica.nome_pai|format }}</td>
+                            </tr>
+                            <tr>
+                                <td>Nome da Mãe</td>
+                                <td colspan="7">{{ servidor.pessoa_fisica.nome_mae|format }}</td>
+                            </tr>
+                            <tr>
+                                <td>PIS/PASEP</td>
+                                <td colspan="7">{{ servidor.pessoa_fisica.pis_pasep|format }}</td>
+                            </tr>
+                            <tr>
+                                <td>Identidade</td>
+                                <td>{{ servidor.pessoa_fisica.rg|format }}</td>
+                                <td>Órgão Expedidor</td>
+                                <td>{{ servidor.pessoa_fisica.rg_orgao|format }}</td>
+                                <td>UF</td>
+                                <td>{{ servidor.pessoa_fisica.rg_uf|format }}</td>
+                                <td>Data Expedição</td>
+                                <td>{{ servidor.pessoa_fisica.rg_data|format }}</td>
+                            </tr>
+                            <tr>
+                                <td>Título de Eleitor</td>
+                                <td>{{ servidor.pessoa_fisica.titulo_numero|format }}</td>
+                                <td>Zona</td>
+                                <td>{{ servidor.pessoa_fisica.titulo_zona|format }}</td>
+                                <td>Seção</td>
+                                <td>{{ servidor.pessoa_fisica.titulo_secao|format }}</td>
+                                <td>UF</td>
+                                <td>{{ servidor.pessoa_fisica.titulo_uf|format }}</td>
+                            </tr>
+                            {% if servidor.cnh_carteira %}
+                                <tr>
+                                    <td>CNH Carteira</td>
+                                    <td>{{ servidor.pessoa_fisica.cnh_carteira|format }}</td>
+                                    <td>Registro</td>
+                                    <td>{{ servidor.pessoa_fisica.cnh_registro|format }}</td>
+                                    <td>Categoria</td>
+                                    <td colspan="3">{{ servidor.pessoa_fisica.cnh_categoria|format }}</td>
+                                </tr>
+                                <tr>
+                                    <td>Emissão</td>
+                                    <td>{{ servidor.pessoa_fisica.cnh_emissao|format }}</td>
+                                    <td>Validade</td>
+                                    <td colspan="5">{{ servidor.pessoa_fisica.cnh_validade|format }}</td>
+                                </tr>
+                            {% endif %}
+                            <tr>
+                                <td>Titulação</td>
+                                <td>{{ servidor.get_titulacao|format }}</td>
+                                <td>Escolaridade</td>
+                                <td colspan="5">{{ servidor.nivel_escolaridade|format }}</td>
+                            </tr>
+                        {% endif %}
+                        {% if pode_ver_endereco_servidor %}
+                            <tr>
+                                <td>Endereço</td>
+                                <td colspan="7">{{ servidor.pessoa_fisica.endereco|format }}
+                                    {% if endereco_irregular %}
+                                        <a target="_blank" class="btn primary"
+                                           href="https://servidor.sigepe.planejamento.gov.br/">Atualize seu endereço no SIGEPE</a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </table>
+                </div>
+            {% endbox %}
+        {% endif %}
+
+        {% box 'Dados Funcionais' %}
+            <table class="info">
+                <tr>
+                    <td>Matrícula</td>
+                    <td colspan="5">{{ servidor.matricula }}</td>
+                </tr>
+                {% if servidor.matricula_anterior and servidor.matricula != servidor.matricula_anterior %}
+                    <tr>
+                        <td>Matrícula Anterior</td>
+                        <td colspan="5">{{ servidor.matricula_anterior|format }}</td>
+                    </tr>
+                {% endif %}
+                {% if pode_ver_identificacao_unica_siape %}
+                    <tr>
+                        <td>Id. Única SIAPE</td>
+                        <td colspan="5">{{ servidor.identificacao_unica_siape|format }}</td>
+                    </tr>
+                {% endif %}
+                <tr>
+                    <td>Setor SUAP</td>
+                    <td><a href="/rh/setor/{{ servidor.setor.pk }}/">{{ servidor.setor|format }}</a>
+                        (campus: {{ servidor.setor.uo.setor|format }})
+                    </td>
+                    <td>Lotação SIAPE</td>
+                    <td>{{ servidor.setor_lotacao|format }} (campus: {{ servidor.setor_lotacao.uo.setor|format }})</td>
+                    <td>Exercício SIAPE</td>
+                    <td>{{ servidor.setor_exercicio|format }} (campus: {{ servidor.setor_exercicio.uo.setor|format }})
+                    </td>
+                </tr>
+                {% if servidor.setores_adicionais.exists %}
+                    <tr>
+                        <td>Setores Adicionais</td>
+                        <td colspan="5">
+                            {% for setor in servidor.setores_adicionais.all %}
+                                {{ setor }}{% if not forloop.last %}, {% endif %}
+                            {% endfor %}
+                        </td>
+                    </tr>
+                {% endif %}
+                <tr>
+                    <td>Situação</td>
+                    <td>{{ servidor.situacao }}</td>
+                    <td>Regime</td>
+                    <td colspan="3">{{ servidor.regime_juridico }}</td>
+                </tr>
+                <tr>
+                    <td>Jornada Trabalho</td>
+                    <td>{{ servidor.jornada_trabalho }}</td>
+                    <td>Opera Raio X</td>
+                    <td>{{ servidor.opera_raio_x|default:"Não" }}</td>
+                    <td>Início no Serviço Público</td>
+                    <td>{{ servidor.data_inicio_servico_publico|format }}</td>
+                </tr>
+                <tr>
+                    <td>Data de Posse na Instituição</td>
+                    <td>{{ servidor.data_posse_na_instituicao|format }}</td>
+                    <td>Início de Exercício na Instituição</td>
+                    <td>{{ servidor.data_inicio_exercicio_na_instituicao|format }}</td>
+                    <td>Tempo de serviço na Instituição</td>
+                    <td>
+                        {% if servidor.tempo_servico_na_instituicao_via_pca %}
+                            {{ servidor.tempo_servico_na_instituicao_via_pca|format }}
+                            ({{ servidor.tempo_servico_na_instituicao_via_pca.days }} dias)
+                        {% else %}
+                            {{ servidor.tempo_servico_na_instituicao|format }}
+                            ({{ servidor.tempo_servico_na_instituicao.days }} dias)
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <td>Data de Posse no Cargo</td>
+                    <td>{{ servidor.data_posse_no_cargo|format }}</td>
+                    <td>Início Exercício no Cargo</td>
+                    <td>{{ servidor.data_inicio_exercicio_no_cargo|format }}</td>
+                    <td>Tempo de Serviço no Cargo</td>
+                    <td>
+                        {% if servidor.tempo_servico_no_cargo_via_pca %}
+                            {{ servidor.tempo_servico_no_cargo_via_pca|format }}
+                            ({{ servidor.tempo_servico_no_cargo_via_pca.days }} dias)
+                        {% else %}
+                            {{ servidor.tempo_servico_no_cargo|format }}
+                            ({{ servidor.tempo_servico_no_cargo.days }} dias)
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <td>Cargo</td>
+                    <td>{% if servidor.cargo_emprego_area %}{{ servidor.cargo_emprego_area }}{% else %}{{ servidor.cargo_emprego }}{% endif %}</td>
+                    <td>Classe do Cargo</td>
+                    <td>{{ servidor.cargo_classe }}</td>
+                    <td>Padrão</td>
+                    <td>{{ servidor.nivel_padrao }}</td>
+                </tr>
+                <tr>
+                    <td>Grupo do Cargo</td>
+                    <td>{{ servidor.cargo_emprego.grupo_cargo_emprego|format }}</td>
+                    <td>Código da Vaga</td>
+                    <td colspan="3">{{ servidor.codigo_vaga|format }}</td>
+                </tr>
+            </table>
+
+            {% if funcoes_ativas %}
+                <h4>Funções Atuais</h4>
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Função</th>
+                        <th>Atividade</th>
+                        <th>Setor SUAP</th>
+                        <th>Período</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for funcao in funcoes_ativas %}
+                        <tr>
+                            <td>{{ funcao.funcao|format }}</td>
+                            <td>{{ funcao.atividade|format }} </td>
+                            <td>
+                                {% if funcao.setor_suap %}
+                                    <a href="/rh/setor/{{ funcao.setor_suap.pk }}/">{{ funcao.setor_suap|format }}</a>
+                                {% else %}
+                                    <span class="status status-alert">Você está sem setor SUAP associada à esta função. Regularize esta situação no setor de RH do seu campus.</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if funcao.data_fim_funcao %}
+                                    De {{ funcao.data_inicio_funcao|format }} até {{ funcao.data_fim_funcao|format }}
+                                {% else %}
+                                    Desde {{ funcao.data_inicio_funcao|format }}
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% endif %}
+        {% endbox %}
+
+        {% if servidor.professor %}
+            {% box 'Dados do Professor' %}
+                <table class="info">
+                    <tr>
+                        <td>NCE:</td>
+                        <td>
+                            <ul>
+                                {% for nce in servidor.professor.all %}
+                                    <li>{{ nce|format }}</li>
+                                {% endfor %}
+                            </ul>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Matéria/Disciplina Ingresso:</td>
+                        <td>{{ servidor.professor.disciplina|format }}</td>
+                    </tr>
+                    <tr>
+                        <td>Matéria/Disciplina que Leciona:</td>
+                        <td>
+                            <ul>
+                                {% for disciplina in servidor.professor.disciplinas.all %}
+                                    <li>{{ disciplina|format }}</li>
+                                {% endfor %}
+                            </ul>
+                        </td>
+                    </tr>
+                </table>
+            {% endbox %}
+        {% endif %}
+
+        {% if pode_ver_dados_bancarios_servidor %}
+            {% box 'Dados Bancários' %}
+                <table class="info">
+                    <tr>
+                        <td>Banco</td>
+                        <td>{{ servidor.pagto_banco }}</td>
+                        <td>Agência</td>
+                        <td>{{ servidor.pagto_agencia }}</td>
+                        <td>Conta corrente</td>
+                        <td>{{ servidor.pagto_ccor }}</td>
+                    </tr>
+                </table>
+            {% endbox %}
+        {% endif %}
+    </div>
+
+    {% if pode_ver_historico_funcional_servidor %}
+        <div class="tab-pane ajax-rendered" data-title="Histórico Funcional" data-tab="historico_funcional">
+            {% if request.GET.tab == "historico_funcional" or not request.GET.tab %}
+                {% box 'Linha do Tempo: {{ servidor }}' %}
+                    <div class="legenda">
+                        <p>Legenda:</p>
+                        <ul>
+                            <li class="success">Entrada no PCA</li>
+                            <li class="info">Início de Exercício ou Progressão Funcional</li>
+                            <li class="extra">Início nova Jornada de Trabalho</li>
+                            <li class="warning">Início novo regime Jurídico</li>
+                            <li class="danger">Fim de um posicionamento ou PCA</li>
+                        </ul>
+                    </div>
+                    <ul class="timeline">
+                        {% for data, eventos in pcas.items %}
+                            <li>
+                                <div class="timeline-date">
+                                    {{ data|format }}
+                                </div>
+                                <div class="timeline-icon"></div>
+                                <div class="timeline-content">
+                                    {% for evento in eventos|getkey:"eventos" %}
+                                        <div class="{{ evento|getkey:"css" }}">
+                                            {{ evento|getkey:"descricao"|safe }}
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            </li>
+                        {% endfor %}
+
+                        <li class="default">
+                            {% if servidor.data_fim_servico_na_instituicao %}
+                                <div class="timeline-date">
+                                    {{ servidor.data_fim_servico_na_instituicao }}
+                                </div>
+                            {% else %}
+                                <div class="timeline-date">
+                                    Hoje
+                                </div>
+                            {% endif %}
+                            <div class="timeline-icon"></div>
+                            <div class="timeline-content">
+                                <h4>Tempo de Serviço</h4>
+                                <dl>
+                                    <dt>Tempo Real:</dt>
+                                    <dd>{{ servidor_tempo_servico_na_instituicao_via_pca|format }}</dd>
+                                    <dt>Tempo Ficto:</dt>
+                                    <dd>{{ servidor_tempo_servico_na_instituicao_via_pca_ficto|format }}</dd>
+                                </dl>
+                            </div>
+                        </li>
+                    </ul>
+                {% endbox %}
+
+                {% if outros_vinculos %}
+                    {% box "Outros vínculos de {{ servidor.pessoa_fisica.nome }}" %}
+                        <table>
+                            <thead>
+                            <tr>
+                                <th>-</th>
+                                <th>Matricula/Cargo Emprego</th>
+                                <th>Tempo de Serviço</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for vinculo in outros_vinculos %}
+                                <tr>
+                                    <td>{% icon "view" "/rh/servidor/{{ vinculo.matricula }}/?tab=historico_funcional" %}</td>
+                                    <td>Mat:.{{ vinculo.matricula }} - {{ vinculo.cargo_emprego }}</td>
+                                    <td>{{ vinculo.tempo_servico_na_instituicao_via_pca|format }}</td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    {% endbox %}
+                {% endif %}
+            {% endif %}
+        </div>
+    {% endif %}
+
+    {% if pode_ver_ocorrencias_afastamentos_servidor %}
+        <div class="tab-pane" data-title="Ocorrências/Afastamentos" data-tab="ocorrencias_afastamentos">
+            {% box 'Ocorrências' %}
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Tipo Ocorrência</th>
+                        <th>Descrição</th>
+                        <th>Início</th>
+                        <th>Término</th>
+                        <th>Total Dias</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for so in servidor_ocorrencias %}
+                        <tr>
+                            <td>{% if so.subgrupo %} <strong>{{ so.subgrupo.descricao }}:</strong> {% else %}
+                                <strong>{{ so.ocorrencia.grupo_ocorrencia.nome }}:</strong> {% endif %}</td>
+                            <td>{{ so.ocorrencia.nome }} </td>
+                            <td>{{ so.data }}</td>
+                            {% if so.data_termino %}
+                                {% if so.data != so.data_termino %}
+                                    <td>{{ so.data_termino }}</td>
+                                {% endif %}
+                            {% else %}
+                                <td>-</td>
+                            {% endif %}
+                            <td>
+                                {% if so.data_termino %}
+                                    {{ so.data|subtract:1|timesince:so.data_termino }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% endbox %}
+
+            {% box 'Afastamentos' %}
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Tipo de Afastamento</th>
+                        <th>Descrição</th>
+                        <th>Período</th>
+                        <th>Total de Dias</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for servidorafastamento in servidor_afastamentos %}
+                        <tr>
+                            <td> {{ servidorafastamento.afastamento.get_tipo_display }}</td>
+                            <td><strong>{{ servidorafastamento.afastamento.nome }} </strong></td>
+                            <td>
+                                {% if servidorafastamento.data_termino and servidorafastamento.data_termino != servidorafastamento.data_inicio %}
+                                    {{ servidorafastamento.data_inicio }} até {{ servidorafastamento.data_termino }}
+                                {% else %}
+                                    {{ servidorafastamento.data_inicio }}
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if servidorafastamento.data_termino %}
+                                    {{ servidorafastamento.data_inicio|subtract:1|timesince:servidorafastamento.data_termino|format }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5">
+                                <p class="alert alert-warning">Nenhum afastamento encontrado.</p>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% endbox %}
+
+            {% if totais_qtd_dias_por_ano %}
+                {% box 'Totais' %}
+                    <div class="boxes services flex-container sm">
+                        {% for ano, qtd_dias in totais_qtd_dias_por_ano.items %}
+                            <div class="box-item">
+                                <h4>{{ ano }}</h4>
+                                <dl>
+                                    {% if qtd_dias.0 %}
+                                        <dt>Ocorrências:</dt>
+                                        <dd>{{ qtd_dias.0 }} dia{{ qtd_dias.0|pluralize }}</dd>
+                                    {% endif %}
+                                    {% if qtd_dias.1 %}
+                                        <dt>Afastamentos:</dt>
+                                        <dd>{{ qtd_dias.1 }} dia{{ qtd_dias.1|pluralize }}</dd>
+                                    {% endif %}
+                                </dl>
+                            </div>
+                        {% endfor %}
+                        <div class="box-item">
+                            <h4>Total</h4>
+                            <dl>
+                                {% if totais_qtd_dias_ocorrencias %}
+                                    <dt>Ocorrências:</dt>
+                                    <dd>{{ totais_qtd_dias_ocorrencias }} dia{{ totais_qtd_dias_ocorrencias|pluralize }}</dd>
+                                {% endif %}
+                                {% if totais_qtd_dias_afastamentos %}
+                                    <dt>Afastamentos:</dt>
+                                    <dd>{{ totais_qtd_dias_afastamentos }} dia{{ totais_qtd_dias_afastamentos|pluralize }}</dd>
+                                {% endif %}
+                            </dl>
+                        </div>
+                    </div>
+                {% endbox %}
+            {% endif %}
+        </div>
+    {% endif %}
+
+    {% if pode_ver_historico_setores_servidor %}
+        {% if historico_setor or historico_setor_siape %}
+            <div class="tab-pane" data-title="Histórico nos Setores" data-tab="historico_setores">
+                {% box 'Histórico nos Setores SUAP' %}
+                    {% if historico_setor.exists %}
+                        <table>
+                            <thead>
+                            <tr>
+                                <th>Setor</th>
+                                <th>Início</th>
+                                <th>Fim</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for hist_set in historico_setor %}
+                                <tr>
+                                    <td>{{ hist_set.setor.nome }} - {{ hist_set.setor.sigla }}</td>
+                                    <td>{{ hist_set.data_inicio_no_setor|format }} </td>
+                                    <td>{{ hist_set.data_fim_no_setor|format }}</td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    {% else %}
+                        <p class="alert alert-warning">Não há histórico em setores SUAP.</p>
+                    {% endif %}
+                {% endbox %}
+
+                {% box 'Histórico Lotação SIAPE' %}
+                    {% if historico_setor_siape.exists %}
+                        <table>
+                            <thead>
+                            <tr>
+                                <th>Setor Lotação</th>
+                                <th>Setor Exercício</th>
+                                <th>Início</th>
+                                <th>Fim</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for hist_setor_siape in historico_setor_siape %}
+                                <tr>
+                                    <td>{{ hist_setor_siape.setor_lotacao.sigla }}</td>
+                                    <td>{{ hist_setor_siape.setor_exercicio.sigla }}</td>
+                                    <td>{{ hist_setor_siape.data_inicio_setor_lotacao|format }}</td>
+                                    <td>
+                                        {% if servidor.setor_lotacao_data_ocupacao == hist_setor_siape.data_inicio_setor_lotacao and not hist_setor_siape.data_fim_setor_lotacao %}
+                                            <span class="status status-success">Atual</span>
+                                        {% else %}
+                                            {{ hist_setor_siape.data_fim_setor_lotacao|format }}
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    {% else %}
+                        <p class="alert alert-warning">Não há histórico em setores SUAP.</p>
+                    {% endif %}
+                {% endbox %}
+            </div>
+        {% endif %}
+    {% endif %}
+
+    {% if pode_ver_historico_funcao_servidor %}
+        {% if servidor_historico_funcao %}
+            <div class="tab-pane" data-title="Histórico de Funções" data-counter="{{ servidor_historico_funcao.count }}" data-tab="historico_funcoes">
+                {% box 'Histórico de Funções' %}
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>Função</th>
+                            <th>Nível</th>
+                            <th>Atividade</th>
+                            <th>Setor/{{ nomenclatura.campus }}</th>
+                            <th>Setor SUAP/{{ nomenclatura.campus }} SUAP</th>
+                            <th>Data Início</th>
+                            <th>Data Fim</th>
+                            <th>Situação</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for shf in servidor_historico_funcao %}
+                            <tr>
+                                <td>{{ shf.funcao|format }}</td>
+                                <td>{{ shf.nivel|format }}</td>
+                                <td>{{ shf.atividade|format }} </td>
+                                <td>{{ shf.setor|format }}</td>
+                                <td>
+                                    {% if shf.setor_suap %}
+                                        <a href="/rh/setor/{{ shf.setor_suap.pk }}/">{{ shf.setor_suap|format }}</a>
+                                    {% else %}
+                                        <span class="status status-alert">Você está sem setor SUAP associada à esta função. Regularize esta situação no setor de RH do seu campus.</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ shf.data_inicio_funcao|format }}</td>
+                                <td>{{ shf.data_fim_funcao|format }}</td>
+                                <td>
+                                    {% if shf.estah_ativa %}
+                                        <span class="status status-success">Ativa</span>
+                                    {% else %}
+                                        <span class="status status-error">Inativa</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                {% endbox %}
+            </div>
+        {% endif %}
+    {% endif %}
+
+    {% if pode_ver_viagens_servidor %}
+        <div class="tab-pane" data-title="Diárias/Passagens" data-counter="{{ viagens_servidor.count }}" data-hide-tab-on-counter-zero="true" data-tab="diarias_passagens">
+            {% box 'Diárias e Passagens (SCDP)' %}
+                <p class="alert alert-warning">O SCPD não possui mais o serviço que permite ao SUAP importar os dados automaticamente.</p>
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Nº PCDP</th>
+                        <th>Siorg Solicitante</th>
+                        <th>Motivo da Viagem</th>
+                        <th>Objetivo da Viagem</th>
+                        <th>Data Início da Viagem</th>
+                        <th>Data Fim da Viagem</th>
+                        <th>Valor da Viagem</th>
+                        <th>Situação</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for viagem in viagens_servidor %}
+                        <tr>
+                            <td><a href="{{ viagem.get_absolute_url }}">{{ viagem.numero_pcdp }}</a></td>
+                            <td>{{ viagem.codigo_siorg }} - {{ viagem.nome_siorg }}</td>
+                            <td>{{ viagem.motivo_viagem }}</td>
+                            <td>{{ viagem.objetivo_viagem }}</td>
+                            <td>{{ viagem.data_inicio_viagem|format }}</td>
+                            <td>{{ viagem.data_fim_viagem|format }}</td>
+                            <td align="right">R$ {{ viagem.valor_viagem|format }}</td>
+                            <td>{{ viagem.get_situacao_display|status }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% endbox %}
+        </div>
+    {% endif %}
+
+    {% for tab in extra_tabs %}
+        {{ tab }}
+    {% endfor %}
+{% endblock %}

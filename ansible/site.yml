@@ -1,0 +1,43 @@
+---
+- name: Implantar host SUAP (IFRS) — tuning, hardening, Docker e deploy
+  hosts: suap
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Garantir pacotes base do controlado
+      ansible.builtin.apt:
+        name:
+          - python3
+          - python3-apt
+          - rsync
+          - ca-certificates
+          - curl
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Validar presença do código-fonte local ./app no controlador
+      ansible.builtin.stat:
+        path: "{{ suap_local_app_src }}/manage.py"
+      delegate_to: localhost
+      become: false
+      register: suap_manage_py
+
+    - name: Falhar se ./app não for a raiz do SUAP oficial
+      ansible.builtin.assert:
+        that:
+          - suap_manage_py.stat.exists
+        fail_msg: >-
+          Código-fonte ausente ou mal posicionado.
+          Exigido: ./app/manage.py (fonte IFRN na raiz de app/).
+
+  roles:
+    - role: system_tuning
+      tags: [system, tuning]
+    - role: hardening
+      tags: [security, hardening]
+    - role: docker
+      tags: [docker, runtime]
+    - role: suap_deploy
+      tags: [suap, deploy, app]

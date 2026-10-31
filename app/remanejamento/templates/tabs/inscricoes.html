@@ -1,0 +1,209 @@
+<div class="tab-pane" data-tab="inscricoes" data-title="Inscrições"
+     data-checked="{% if edital.is_em_periodo_de_inscricao %}True{% else %}False{% endif %}"
+     data-counter="{{ total_inscritos }}">
+
+    {% box 'Inscrições confirmadas' %}
+        {% if inscricoes_confirmadas %}
+            {% if pode_editar %}
+                <ul class="action-bar">
+                    <li><a class="btn default popup" href="/admin/remanejamento/inscricao/?{{ edital.pk }}">Ver
+                        todas</a></li>
+                </ul>
+            {% endif %}
+
+            <div class="search-and-filters">
+                {% render_form form %}
+            </div>
+
+            <div class="table-responsive">
+                <table>
+                    <caption>Inscrições confirmadas</caption>
+                    <thead>
+                    <tr>
+                        <th>Servidor</th>
+                        <th>Data de Exercício Ajustada</th>
+                        <th>Validada</th>
+                        <th>Licenças/afastamentos</th>
+                        <th>Confirmada</th>
+                        <th>Contemplada</th>
+                        <th>Anexo</th>
+                        <th class="no-print">Opções</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% autopaginate inscricoes_confirmadas 20 %}
+                    {% paginate %}
+                    {% for inscricao in inscricoes_confirmadas %}
+                        <tr>
+                            <td>{{ inscricao.servidor|format }}</td>
+                            <td>{{ inscricao.data_exercicio_ajustada|format }}</td>
+                            <td>
+                                {% if inscricao.validado_por %}
+                                    <span class="status status-success">Informações validadas em {{ inscricao.validado_em|format }} por {{ inscricao.validado_por.user|format }}</span>
+                                {% else %}
+                                    <span class="status status-error">Pendente de validação</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if inscricao.licenca_afastamento_verificado_por %}
+                                    <span class="status status-success">Verificado em {{ inscricao.licenca_afastamento_verificado_em|format }} por {{ inscricao.licenca_afastamento_verificado_por.user|format }}</span>
+                                {% else %}
+                                    <span class="status status-error">Pendente ou não se aplica</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ inscricao.confirmada|format }}</td>
+                            <td>{{ inscricao.contemplada|format }}</td>
+                            <td>
+                                {% if not inscricao.anexo %}
+                                    &ndash;
+                                {% else %}
+                                    {% if inscricao.anexo_deferido is none %}
+                                        Não avaliado
+                                    {% elif inscricao.anexo_deferido %}
+                                        Deferido
+                                    {% else %}
+                                        Indeferido
+                                    {% endif %}
+                                {% endif %}
+                            </td>
+                            <td class="no-print">
+                                <ul class="action-bar">
+                                    <li><a href="/remanejamento/inscricao/{{ inscricao.pk }}/editar/"
+                                           class="btn primary popup">{% icone "edit" %} Validar</a></li>
+                                    <li><a href="/remanejamento/inscricao/{{ inscricao.pk }}/validar_afastamentos/"
+                                           class="btn primary popup">{% icone "edit" %} Verificar
+                                        licenças/afastamentos </a></li>
+                                    {% if not inscricao.data_inapta and inscricao|method:"is_pode_editar"|call:request.user %}
+                                        <li><a href="/remanejamento/inscricao/{{ inscricao.pk }}/"
+                                               class="btn default popup">{% icone "eye" %} Visualizar</a></li>
+                                    {% endif %}
+                                    {% if inscricao.anexo %}
+                                        <li>
+                                            <a href="/remanejamento/inscricao/{{ inscricao.pk }}/avaliar_anexo_inscricao/"
+                                               class="btn secondary popup">{% icone "check" %} Avaliar Documentação
+                                                Anexa</a></li>
+                                    {% endif %}
+                                    {% if not inscricao.data_inapta and inscricao|method:"is_pode_inabilitar"|call:request.user %}
+                                        <li><a href="/remanejamento/inscricao/{{ inscricao.pk }}/inabilitar/"
+                                               class="btn warning popup">{% icone "ban" %} Inabilitar</a></li>
+                                    {% endif %}
+                                </ul>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if pode_editar %}
+                <ul class="action-bar">
+                    <li><a class="btn default popup" href="/admin/remanejamento/inscricao/?{{ edital.pk }}">Ver
+                        todas</a></li>
+                </ul>
+            {% endif %}
+        {% else %}
+            <p class="alert alert-warning">Nenhuma inscrição confirmada.</p>
+        {% endif %}
+    {% endbox %}
+
+    {% if edital.get_inscricoes_inabilitadas %}
+        {% box 'Inscrições inabilitadas' class='collapsed' %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Resultados</caption>
+                    <thead>
+                    <tr>
+                        <th>Servidor</th>
+                        <th>Confirmada</th>
+                        <th>Data Inapta</th>
+                        <th>Motivo</th>
+                        <th class="no-print">Opções</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for inscricao in edital.get_inscricoes_inabilitadas %}
+                        <tr>
+                            <td>{{ inscricao.servidor|format }}</td>
+                            <td>{{ inscricao.confirmada|format }}</td>
+                            <td>{{ inscricao.data_inapta|format }}</td>
+                            <td>{{ inscricao.motivo_inapta|format }}</td>
+                            <td class="no-print">
+                                <ul class="action-bar">
+                                    <li><a href="/remanejamento/inscricao/{{ inscricao.pk }}/"
+                                           class="btn default popup">{% icone "eye" %} Visualizar</a></li>
+                                    {% if inscricao.data_inapta and inscricao|method:"is_pode_inabilitar"|call:request.user %}
+                                        <li><a href="/remanejamento/inscricao/{{ inscricao.pk }}/reabilitar/"
+                                               class="btn warning popup">{% icone "up" %} Reabilitar</a></li>
+                                    {% endif %}
+                                </ul>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endbox %}
+    {% endif %}
+
+    {% box 'Resultados' %}
+        {% if pode_editar %}
+            <ul class="action-bar">
+                {% if edital.pode_publicar_resultado_parcial %}
+                    <li><a class="btn success"
+                           href="{% url 'publicar_resultado_parcial' edital.pk %}">{% icone "share" %} Publicar
+                        Resultado Parcial</a></li>
+                {% elif edital.pode_publicar_resultado_final %}
+                    <li><a class="btn success" href="{% url 'publicar_resultado_final' edital.pk %}">{% icone "share" %}
+                        Publicar Resultado Final</a></li>
+                {% elif edital.resultado_final_documentotexto and edital.resultado_final_documentotexto.estah_finalizado %}
+                    <li><a class="btn success"
+                           href="{% url 'publicar_homologacao_resultado_final' edital.pk %}">{% icone "share" %}
+                        Publicar Homologação do Resultado Final</a></li>
+                {% endif %}
+                {% if not edital.is_em_periodo_de_inscricao and not edital.resultado_final_foi_homologado %}
+                    <li><a class="btn primary" href="{% url 'processar_resultado' edital.pk %}">{% icone "cog" %}
+                        Processar Resultado</a></li>
+                {% endif %}
+                {% if eh_coordenador_sistemico_rh %}
+                    <li><a class="btn"
+                           href="{% url 'adicionar_inscricao_contemplada_extraordinaria' edital.pk %}">{% icone "plus" %}
+                        Adicionar Inscrição Contemplada</a></li>
+                {% endif %}
+                {% if edital.processamentoresultado_set.exists %}
+                    <li><a class="btn default" href="{{ edital.processamentoresultado_set.last.arquivo_log.url }}"
+                           title="Processamento realizado em {{ edital.processamentoresultado_set.last.atualizado_em|format }}">{% icone "download" %}
+                        Log do último processamento</a></li>
+                {% endif %}
+            </ul>
+        {% endif %}
+
+        {% if inscricoes_contempladas_resultado %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Servidor</th>
+                        <th>Cargo</th>
+                        <th>Campus Origem</th>
+                        <th>Campus Destino</th>
+                        <th>Situação</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for inscricao_contemplada in inscricoes_contempladas_resultado %}
+                        <tr>
+                            <td>{{ inscricao_contemplada.inscricao.servidor|format }}</td>
+                            <td>{{ inscricao_contemplada.inscricao.servidor.get_cargo_area|format }}</td>
+                            <td>{{ inscricao_contemplada.campus_origem_sigla_ajustado|format }}</td>
+                            <td>{{ inscricao_contemplada.campus_destino_sigla_ajustado|format }}</td>
+                            <td>{{ inscricao_contemplada.situacao_display|format }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Nenhuma inscrição contemplada.</p>
+        {% endif %}
+    {% endbox %}
+
+</div>

@@ -1,0 +1,164 @@
+{% extends super_template %}
+
+{% block content %}
+
+{% if eh_administrador or eh_gerente_campus %}
+    <ul class="action-bar">
+        <li><a href="/planejamento/relatorio/origemrecursoua/{{ metaunidade.unidade.pk }}/" class="btn success popup">Verificar Resumo das Origens de Recursos</a></li>
+    </ul>
+{% endif %}
+
+{% box 'Dados gerais' %}
+	<table class="info">
+		{% if eh_administrador %}
+			<tr>
+		        <td>Unidade</td>
+		        <td>{{ metaunidade.unidade }}</td>
+			</tr>
+		{% endif %}
+	    <tr>
+	        <td>Meta</td><td>{{ metaunidade.get_codigo_completo }} - {{ metaunidade.meta }}</td>
+		</tr>
+		<tr>
+			<td>Justificativa</td><td>{{ metaunidade.meta.justificativa }}</td>
+		</tr>
+		<tr>
+			<td>Execução</td>
+			<td>de {{ metaunidade.meta.data_inicial|date }} a {{ metaunidade.meta.data_final|date }}</td>
+		</tr>
+		<tr>
+			<td>Saldo disponível</td>
+			<td>
+				{% if saldo %}
+					{% if not saldo.0 %}
+						<span class="false">-{{ saldo.1|mascara_dinheiro }}</span>
+						<span class="disabled">(este saldo considera apenas os gastos planejados com recursos próprios)</span>
+					{% else %}
+						<span class="false">{{ saldo.1|mascara_dinheiro }}</span>
+						<span class="disabled">(este saldo considera apenas os gastos planejados com recursos próprios)</span>
+					{% endif %}
+				{% else %}
+					Valor Desconhecido
+				{% endif %}
+			</td>
+	    </tr>
+	</table>
+{% endbox %}
+
+{% if metaunidade.metaunidadeacaoproposta_set.all %}
+	{% box 'Ações Propostas' %}
+		<table>
+		    <thead>
+		        <tr>
+		        	<th>Código</th>
+					<th>Título</th>
+					<th>Valor Total</th>
+					<th>Importação</th>
+		        </tr>
+		    </thead>
+		    <tbody>
+		        {% for muap in acoespropostas %}
+			        <tr>
+						<td>{{ muap.acao_proposta.codigo|format }}</td>
+						<td>{{ muap.acao_proposta.titulo }}</td>
+						<td class="text-end">{{ muap.get_valor_total|mascara_dinheiro }}</td>
+						<td>
+			            	{% if muap.importada %}
+								<span class="status status-success">Importada</span>
+							{% else %}
+								{% if eh_periodo_campus %}
+									<a href="/admin/planejamento/acao/add/?metaunidade_acaoproposta={{ muap.id }}" class="btn default" title="Importar Ação Proposta">Importar</a>
+			            			</ul>
+			            		{% else %}
+			            			<span class="status status-error">Não importada</span>
+			            		{% endif %}
+							{% endif %}
+						</td>
+			        </tr>
+		        {% endfor %}
+		    </tbody>
+		</table>
+	{% endbox %}
+{% endif %}
+
+{% box 'Ações Cadastradas e Importadas' %}
+
+	{% if eh_periodo_campus %}
+		<ul class="action-bar">
+			<li>
+				<a href="/admin/planejamento/acao/add/?meta_unidade={{ metaunidade.id }}" class="success">Adicionar</a>
+			</li>
+		</ul>
+	{% endif %}
+
+	{% if metaunidade.acao_set.all %}
+		<table>
+		    <thead>
+		        <tr>
+		        	<th>Código</th>
+					<th>Título</th>
+		            <th>Valor Total</th>
+		            <th>Situação</th>
+		            <th>Opções</th>
+		        </tr>
+		    </thead>
+		    <tbody>
+		        {% for acao in metaunidade.acao_set.all|dictsort:"titulo"|dictsort:"codigo" %}
+		        <tr>
+					<td>{{ acao.codigo|format }}</td>
+					<td>{{ acao.titulo }}</td>
+		            <td class="text-end">{{ acao.get_valor_unitario|mascara_dinheiro }}</td>
+		            <td>
+		            	{% if acao.status == "Deferida" %}
+		            		<span class="status status-success">Deferida</span>
+						{% else %}
+							{% if acao.status == "Indeferida" %}
+								<span class="status status-error">Indeferida</span>
+							{% else %}
+								{% if acao.status == "Parcialmente Deferida" %}
+									<span class="status status-alert">Parcialmente Deferida</span>
+								{% else %}
+									<span class="status status-alert">Não Avaliada</span>
+								{% endif %}
+							{% endif %}
+						{% endif %}
+					</td>
+		            <td>
+						<ul class="action-bar">
+						    {% if eh_administrador or eh_periodo_campus %}
+                                <li><a class="btn primary" href="/admin/planejamento/acao/{{ acao.id }}/">Editar</a></li>
+                            {% elif eh_periodo_validacao %}
+                                {% if acao.is_pendente or acao.is_parcialmente_deferida %}
+                                    <li><a class="btn primary" href="/admin/planejamento/acao/{{ acao.id }}/">Editar</a></li>
+                                {% endif %}
+                            {% endif %}
+                                
+                            {% if eh_administrador or eh_periodo_campus %}
+                                <li><a class="btn danger" href="/planejamento/acao/{{ acao.id }}/remover/">Remover</a></li>
+                            {% endif %}
+
+                            {% if acao.has_comentario %}
+                                <li><a class="btn" href="/planejamento/acao/comentario/{{ acao.id }}/">Comentários</a></li>
+                            {% endif %}
+
+                            <li><a class="btn" href="/planejamento/acao/{{ acao.id }}/">Atividades</a></li>
+						</ul>
+					</td>
+		        </tr>
+		        {% endfor %}
+		    </tbody>
+			<tfoot>				
+				<tr>
+					<td colspan="2">Total</td>
+					<td class="text-end">{{ metaunidade.get_valor_total|mascara_dinheiro }}</td>
+					<td colspan="3"></td>
+				</tr>
+				
+			</tfoot>
+		</table>
+	{% else %}
+		<p class="alert alert-warning">Não existem ações cadastradas até momento.</p>
+	{% endif %}
+{% endbox %}
+
+{% endblock %}

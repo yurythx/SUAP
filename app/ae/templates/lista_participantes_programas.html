@@ -1,0 +1,138 @@
+{% extends super_template %}
+
+
+
+{% block content %}
+
+<div class="search-and-filters">
+    {% render_form form %}
+</div>
+
+{% if form.is_bound %}
+
+{% if alunos.exists %}
+
+    {% if request.user.is_superuser %}
+    <ul class="action-bar">
+        <li><a class="btn" href="{{ request.get_full_path }}&xls=1">{% icone "download" %} Exportar para XLS</a></li>
+    </ul>
+    {% endif %}
+
+
+    <dl class="lista-simples">
+        <dt>Quantidade de alunos participantes:</dt>
+        <dd>{{ alunos.count }}</dd>
+    </dl>
+
+    {% paginate %}
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Aluno</th>
+                <th>Turma</th>
+                <th>Última Participação</th>
+                <th>Dados Bancários</th>
+            </tr>
+        </thead>
+        {% autopaginate alunos 100 %}
+        <tbody>
+        {% for aluno in qs %}
+            <tr>
+                <td>{{ forloop.counter|add:pagina }}</td>
+                <td>{{ aluno.pessoa_fisica.nome }} <a href="{{ aluno.get_absolute_url }}">({{ aluno.matricula }})</a></td>
+                <td>{{ aluno.get_ultima_matricula_periodo.get_codigo_turma|format }}</td>
+                <td>
+                    <dl>
+                        <dt>Período:</dt>
+                        <dd>
+                            {{ aluno.participacao.data_inicio|format }}
+                            {% if aluno.participacao.data_termino %}
+                                a {{ aluno.participacao.data_termino|format }}
+                            {% else %}
+                                até o momento
+                            {% endif %}
+                        </dd>
+                        {% if programa.get_tipo == programa.TIPO_IDIOMA %}
+                            <dt>Idioma:</dt>
+                            {% if aluno.participacao.sub_instance.turma_selecionada %}
+                                <dd>{{ aluno.participacao.sub_instance.turma_selecionada }}</dd>
+                            {% else %}
+                                <dd class="false">Não há dados anteriores.</dd>
+                            {% endif %}
+                        {% endif %}
+                        {% if programa.get_tipo == programa.TIPO_TRABALHO %}
+                            <dt>Bolsa:</dt>
+                            {% if aluno.participacao.sub_instance.bolsa_concedida %}
+                                <dd>{{ aluno.participacao.sub_instance.bolsa_concedida }}</dd>
+                            {% else %}
+                                <dd class="false">Não há dados anteriores.</dd>
+                            {% endif %}
+                        {% endif %}
+                        {% if programa.get_tipo == programa.TIPO_TRANSPORTE %}
+
+                            {% if aluno.participacao.sub_instance.valor_concedido %}
+                                <dt>Tipo:</dt>
+                                <dd>{{ aluno.participacao.sub_instance.get_tipo_passe_concedido_display }}</dd>
+                                <dt>Valor:</dt>
+                                <dd>R$ {{ aluno.participacao.sub_instance.valor_concedido }}</dd>
+                            {% else %}
+                                <dt>Informações:</dt>
+                                <dd class="false">Não há dados anteriores.</dd>
+                            {% endif %}
+                        {% endif %}
+                        {% if programa.get_tipo == programa.TIPO_ALIMENTACAO %}
+                            {% if aluno.participacao.sub_instance.categoria or aluno.participacao.sub_instance.solicitacao_atendida_almoco.valida or aluno.participacao.sub_instance.solicitacao_atendida_janta.valida %}
+                                {% if aluno.participacao.sub_instance.categoria %}
+                                    <dt>Categoria:</dt>
+                                    <dd>{{ aluno.participacao.sub_instance.categoria }}</dd>
+                                {% endif %}
+                                {% if aluno.participacao.sub_instance.solicitacao_atendida_cafe.valida %}
+                                    <dt>Café-da-manhã:</dt>
+                                    <dd>{{ aluno.participacao.sub_instance.solicitacao_atendida_cafe }}</dd>
+                                {% endif %}
+                                {% if aluno.participacao.sub_instance.solicitacao_atendida_almoco.valida %}
+                                    <dt>Almoço:</dt>
+                                    <dd>{{ aluno.participacao.sub_instance.solicitacao_atendida_almoco }}</dd>
+                                {% endif %}
+                                {% if aluno.participacao.sub_instance.solicitacao_atendida_janta.valida %}
+                                    <dt>Jantar:</dt>
+                                    <dd>{{ aluno.participacao.sub_instance.solicitacao_atendida_janta }}</dd>
+                                {% endif %}
+                            {% else %}
+                                <dt>Informações:</dt>
+                                <dd class="false">Não há dados anteriores.</dd>
+                            {% endif %}
+                        {% endif %}
+                    </dl>
+                </td>
+                <td>
+                    {% if aluno.get_dados_bancarios_banco %}
+                        <dl>
+                            <dt>Banco:</dt>
+                            <dd>{{ aluno.get_dados_bancarios_banco|format }}</dd>
+                            <dt>Agência:</dt>
+                            <dd>{{ aluno.get_dados_bancarios_numero_agencia|format }}</dd>
+                            <dt>Operação:</dt>
+                            <dd>{{ aluno.get_dados_bancarios_folha_pagamento.operacao|format }}</dd>
+                            <dt>Conta:</dt>
+                            <dd>{{ aluno.get_dados_bancarios_numero_conta|format }}</dd>
+                        </dl>
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% paginate %}
+{% else %}
+    <p class="alert alert-warning">Não há resultados.</p>
+{% endif %}
+
+{% else %}
+    <p class="alert alert-warning">Utilize o formulário de filtros para gerar o relatório.</p>
+{% endif %}
+
+{% endblock %}

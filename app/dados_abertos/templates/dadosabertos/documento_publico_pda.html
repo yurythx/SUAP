@@ -1,0 +1,256 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Plano de Dados Abertos — {{ pda.titulo }}">
+    <meta name="keywords" content="dados abertos, IFRN, transparência, plano de dados abertos, PDA">
+    <title>{{ pda.titulo }} — Dados Abertos IFRN</title>
+    {% if documento_style %}<style>{{ documento_style }}</style>{% endif %}
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --verde:        #148f29;
+            --verde-escuro: #0d6e1e;
+            --branco:       #ffffff;
+            --desktop-bg:   #d0d0d0;   /* cinza "mesa" ao redor do papel */
+            --rodape-bg:    #111111;
+            --fonte-titulo: 'Lato', sans-serif;
+            --fonte-corpo:  'Lato', sans-serif;
+
+            --header-h:   64px;
+            --infobar-h:  34px;
+            --topo-total: calc(var(--header-h) + var(--infobar-h));
+            --footer-h:   64px;
+
+            /* A4 a 96 dpi: 210mm × 297mm = 794px × 1123px */
+            --a4-width: 794px;
+        }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: var(--fonte-corpo);
+            background: var(--desktop-bg);
+            /* espaço para header + infobar fixos e footer fixo */
+            padding-top: var(--topo-total);
+            padding-bottom: var(--footer-h);
+            min-height: 100vh;
+        }
+
+        /* ── Cabeçalho ──────────────────────────── */
+        .da-header {
+            position: fixed; top: 0; left: 0; right: 0;
+            height: var(--header-h);
+            background: var(--verde);
+            display: flex; align-items: center;
+            padding: 0 24px;
+            z-index: 1000;
+            box-shadow: 0 2px 8px rgba(0,0,0,.3);
+        }
+
+        .da-header__logo { height: 34px; width: auto; }
+        .da-header__title {
+            margin-left: 18px;
+            font-family: var(--fonte-titulo);
+            font-size: .92rem; font-weight: 600;
+            color: #fff; letter-spacing: .03em;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .da-header__spacer { flex: 1; }
+
+        .da-header__btn {
+            display: inline-flex; align-items: center; gap: 5px;
+            font-family: var(--fonte-titulo);
+            font-size: .72rem; font-weight: 600;
+            color: rgba(255,255,255,.85);
+            text-decoration: none; text-transform: uppercase; letter-spacing: .06em;
+            padding: 5px 13px; margin-left: 10px;
+            border: 1px solid rgba(255,255,255,.4);
+            border-radius: 20px;
+            transition: background .2s, color .2s;
+        }
+        .da-header__btn:hover { background: rgba(255,255,255,.15); color: #fff; }
+
+        .da-header__badge {
+            font-family: var(--fonte-titulo);
+            font-size: .72rem; font-weight: 700;
+            color: var(--verde); background: #fff;
+            padding: 4px 12px; border-radius: 20px;
+            white-space: nowrap; margin-left: 10px;
+        }
+
+        /* ── Barra de metadados ─────────────────── */
+        .da-info-bar {
+            position: fixed;
+            top: var(--header-h); left: 0; right: 0;
+            height: var(--infobar-h);
+            background: var(--verde-escuro);
+            color: rgba(255,255,255,.9);
+            font-family: var(--fonte-titulo); font-size: .75rem;
+            display: flex; align-items: center;
+            padding: 0 24px; gap: 28px;
+            z-index: 999;
+            overflow: hidden;
+        }
+        .da-info-bar__sep { opacity: .3; }
+        .da-info-bar__label { font-weight: 700; text-transform: uppercase; letter-spacing: .07em; opacity: .75; margin-right: 4px; }
+
+        /* ── Mesa + Papel A4 ────────────────────── */
+        .da-desktop {
+            min-height: calc(100vh - var(--topo-total) - var(--footer-h));
+            padding: 32px 16px 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .da-papel {
+            width: 100%;
+            max-width: var(--a4-width);
+            background: var(--branco);
+            box-shadow:
+                0  1px  3px rgba(0,0,0,.12),
+                0  4px 14px rgba(0,0,0,.18),
+                0 12px 36px rgba(0,0,0,.12);
+            border-radius: 2px;
+        }
+
+        /* ── Corpo do documento injetado ───────── */
+        .da-documento-corpo {
+            padding: 35px 51px;
+        }
+        .da-documento-corpo ul,
+        .da-documento-corpo ol {
+            padding-left: 1.5em;
+        }
+        .da-documento-corpo ul ul,
+        .da-documento-corpo ol ol,
+        .da-documento-corpo ul ol,
+        .da-documento-corpo ol ul {
+            padding-left: 1.5em;
+            margin-top: 0.25em;
+            margin-bottom: 0.25em;
+        }
+        .da-documento-corpo li {
+            margin-bottom: 0.25em;
+        }
+        @media (max-width: 860px) {
+            .da-documento-corpo { padding: 24px 20px; }
+        }
+        @media (max-width: 560px) {
+            .da-documento-corpo { padding: 16px 12px; }
+        }
+
+        /* ── Sem documento ──────────────────────── */
+        .da-sem-documento {
+            width: 100%;
+            max-width: var(--a4-width);
+            background: var(--branco);
+            box-shadow: 0 4px 18px rgba(0,0,0,.15);
+            border-radius: 2px;
+            padding: 80px 40px;
+            text-align: center;
+        }
+        .da-sem-documento__icone { font-size: 3rem; margin-bottom: 16px; }
+        .da-sem-documento__titulo {
+            font-family: var(--fonte-titulo);
+            font-size: 1.1rem; font-weight: 700; color: #555;
+            margin-bottom: 10px;
+        }
+        .da-sem-documento__texto { font-size: .9rem; color: #888; line-height: 1.65; }
+
+        /* ── Rodapé ─────────────────────────────── */
+        .da-footer {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            height: var(--footer-h);
+            background: var(--rodape-bg);
+            display: flex; align-items: center; justify-content: center;
+            gap: 14px; padding: 0 24px;
+            z-index: 1000;
+        }
+        .da-footer__logo { height: 22px; opacity: .6; }
+        .da-footer__texto { font-family: var(--fonte-titulo); font-size: .7rem; color: #999; text-align: center; }
+        .da-footer__texto a { color: var(--verde); text-decoration: none; font-weight: 700; }
+        .da-footer__texto a:hover { text-decoration: underline; }
+
+        /* ── Responsividade ─────────────────────── */
+        @media (max-width: 860px) {
+            :root { --a4-width: 100%; }
+            .da-desktop { padding: 16px 0 24px; }
+            .da-papel { border-radius: 0; }
+        }
+        @media (max-width: 560px) {
+            .da-header__title { display: none; }
+            .da-info-bar { gap: 16px; font-size: .68rem; }
+            .da-header__badge { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Cabeçalho -->
+<header class="da-header">
+    <img src="{% static 'design_system/logotipos/logo-extenso-white.svg' %}" alt="IFRN" class="da-header__logo">
+    <span class="da-header__title">Plano de Dados Abertos</span>
+    <div class="da-header__spacer"></div>
+    <a href="{% url 'dados_abertos:area_publica_pda' %}" class="da-header__btn">← Todos os PDAs</a>
+    {% if pdf_url %}
+        <a href="{{ pdf_url }}" class="da-header__btn" target="_blank" rel="noopener">⬇ PDF</a>
+    {% endif %}
+    {% if versao_str %}
+        <span class="da-header__badge">v{{ versao_str }}</span>
+    {% endif %}
+</header>
+
+<!-- Barra de metadados -->
+<div class="da-info-bar">
+    <span><span class="da-info-bar__label">PDA</span>{{ pda.titulo }}</span>
+    <span class="da-info-bar__sep">|</span>
+    <span><span class="da-info-bar__label">Vigência</span>{{ pda.vigencia_inicio.year }}–{{ pda.vigencia_fim.year }}</span>
+    {% if versao %}
+        <span class="da-info-bar__sep">|</span>
+        <span><span class="da-info-bar__label">Versão</span>{{ versao_str }}</span>
+        <span class="da-info-bar__sep">|</span>
+        <span><span class="da-info-bar__label">Gerado em</span>{{ versao.data_criacao|date:"d/m/Y" }}</span>
+    {% endif %}
+</div>
+
+<!-- Área do documento -->
+<div class="da-desktop">
+    {% if documento_html %}
+        <div class="da-papel">
+            <div class="da-documento-corpo">
+                {{ documento_html|safe }}
+            </div>
+        </div>
+    {% else %}
+        <div class="da-sem-documento">
+            <div class="da-sem-documento__icone">📄</div>
+            <p class="da-sem-documento__titulo">Documento ainda não disponível</p>
+            <p class="da-sem-documento__texto">
+                {% if versao %}
+                    O documento da versão <strong>{{ versao_str }}</strong> ainda não foi gerado.
+                    Acesse o sistema administrativo para gerar o arquivo.
+                {% else %}
+                    Nenhuma versão do PDA foi registrada ainda.
+                {% endif %}
+            </p>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Rodapé -->
+<footer class="da-footer">
+    <img src="{% static 'design_system/logotipos/logo-principal-white.svg' %}" alt="SUAP" class="da-footer__logo">
+    <p class="da-footer__texto">
+        Instituto Federal de Educação, Ciência e Tecnologia do Rio Grande do Norte —
+        <a href="mailto:dadosabertos@ifrn.edu.br">dadosabertos@ifrn.edu.br</a>
+    </p>
+</footer>
+
+</body>
+</html>

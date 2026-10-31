@@ -1,0 +1,99 @@
+{% extends super_template %}
+
+{% block content %}
+
+<h2>{{ obj }}</h2>
+
+{% if perms.compras.pode_gerenciar_processocompra %}
+    <ul class="action-bar">
+        {% if obj|method:"pode_validar"|call:request.user %}
+            <li><a class="btn success confirm" href="/compras/processo_compra/{{ obj.pk }}/validar/">Validar</a></li>
+        {% endif %}
+        {% if perms.compras.change_processocompra %}
+            <li><a class="btn primary" href="/compras/processo_compra_editar/{{ obj.pk }}/" title="Editar">Editar</a></li>
+        {% endif %}
+        
+        {% if cotacoes_anexos %}
+        	<li><a class="btn" href="/compras/detalhar_anexos/{{ obj.pk }}/">Detalhar Anexos</a></li>
+        {% endif %}
+        <li class="has-child">
+            <a class="btn" href="#">Relatórios</a>
+            <ul>
+                <li><a href="/compras/processo_compra_relatorio_geral/{{ obj.pk }}/">Relatório Geral</a></li>
+                <li><a href="/compras/processo_compra_relatorio_ug/{{ obj.pk }}/">Relatório por UG</a></li>
+                <li><a href="/compras/processo_compra_relatorio_campus/{{ obj.pk }}/">Relatório por Campus</a></li>
+                <li><a href="/compras/processo_compra_relatorio_cotacao/{{ obj.pk }}/">Relatório de cotações</a><li>
+            </ul>
+        </li>
+    </ul>
+{% endif %}
+
+{% box "Dados gerais" %}
+    <div class="table-responsive">
+        <dl class="definition-list">
+            <dt>Descrição</dt>
+            <dd>{{ obj.descricao }}</dd>
+            <dt>Situação</dt>
+            <dd>{{ obj.get_status_display|status }}</dd>
+            <dt>Observações</dt>
+            <dd>{{ obj.observacao|format }}</dd>
+            <dt>Período para inclusões e validação</dt>
+            <dd>{{ obj.data_inicio|format }} a {{ obj.data_fim|format }}</dd>
+            <dt>Tags</dt>
+            <dd>{{ obj.tags.all|join:", " }}</dd>
+
+        </dl>
+    </div>
+{% endbox %}
+
+{% box "Processos dos Campi" %}
+    <table>
+        <thead>
+            <tr>
+                <th>Campus</th>
+                <th>UG</th>
+                <th>Situação</th>
+                <th>Qtd. Itens</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for i in obj|method:"get_itens"|call:request.user %}
+                <tr>
+                    <td><b><a href="{{ i.get_absolute_url }}">{{ i.campus }}</a></b></td>
+                    <td>{{ i.campus.codigo_ug }}</td>
+                    <td>{{ i.get_status_display|status }}</td>
+                    <td style="align: right">{{ i.get_itens.count }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endbox %}
+
+{% if perms.compras.pode_gerenciar_processocompra %}
+    {% if obj.get_materiais_sem_cotacao.exists %}
+        {% box "Materiais escolhidos sem cotação" %}
+            <p class="alert alert-info">Os itens abaixo devem ser cotados pelo pessoal do catálogo antes que o ordenador
+            de despesa de cada campus valide o processo de compra.</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Material</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for i in obj.get_materiais_sem_cotacao %}
+                        <tr>
+                            <td>{{ forloop.counter }}</td>
+                            <td>{{ i.get_ext_combo_template|safe }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+        {% endbox %}
+    {% endif %}
+{% endif %}
+
+{% endblock %}

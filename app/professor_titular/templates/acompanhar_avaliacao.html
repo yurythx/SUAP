@@ -1,0 +1,199 @@
+{% extends super_template %}
+
+{% block extrahead %}
+<script>
+    function ciencia_resultado(processo_id){
+        $.ajax({
+            type: "POST",
+            url: '/professor_titular/ciencia_resultado/'+processo_id+'/',
+            data: $('#form_ciencia').serialize(),
+            success: function (retorno) {
+                if (retorno.ok) {
+                    alert(retorno.msg)
+                    window.location.href = "/admin/professor_titular/processotitular/";
+                }else {
+                    alert(retorno.msg)
+                }
+            }
+        });
+    }
+</script>
+{% endblock %}
+
+{% block content %}
+
+<ul class="action-bar">
+    <li>
+        <a class="btn" href="javascript:history.back()">Voltar</a>
+    </li>
+</ul>
+
+{% if processo.pode_mostrar_avaliacao %}
+    {% box "Resultado Final da Avaliação" %}
+        <table class="info">
+            <tr>
+                <td>Resultado:</td>
+                <td><span class="status status-{{ estado_processo_class_css }}">{{ estado_processo }}</span></td>
+            </tr>
+            <tr>
+                <td>Pontuação Média Final:</td>
+                <td>{{ pontuacao_media_final|floatformat:2 }}</td>
+            </tr>
+        </table>
+    {% endbox %}
+{% endif %}
+    
+{% box "Avaliadores" %}
+    <table>
+        <thead>
+            <tr>
+                {% if processo.pode_mostrar_avaliacao %}
+                    <th class="no-print">Ações</th>
+                {% endif %}
+                <th>Avaliadores</th>
+                {% if processo.pode_mostrar_avaliacao %}
+	                <th>Pontuação Validada</th>
+	                <th>Resultado Preliminar</th>
+                {% endif %}
+                <th>Situação</th>
+                {% if not processo.pode_mostrar_avaliacao %}
+                    <th>Data Limite</th>
+                {% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for avaliador in avaliadores_selecionados %}
+	        <tr>
+	            {% if processo.pode_mostrar_avaliacao %}
+	                <td class="no-print">{% icon "view" "/professor_titular/avaliar_processo/{{ processo.id }}/{{ avaliador.id }}/" %}</td>
+	            {% endif %}
+                <td>
+                    <dl>
+                        <dt class="hidden"></dt>
+                        <dd>{{ avaliador.nome }}</dd>
+                        {% if processo.pode_mostrar_avaliacao %}
+                            <dt>Responsável pelo Cadastro:</dt>
+                            <dd>{{ avaliador.vinculo_responsavel_cadastro }}</dd>
+                        {% endif %}
+                    </dl>
+                </td>
+	            {% if processo.pode_mostrar_avaliacao %}
+	               <td>{{ avaliador.pontuacao_validada|floatformat:2 }}</td>
+	               <td><span class="status status-alert" style="white-space: inherit">{{ avaliador.avaliacao_status|format|safe }}</span></td>
+	            {% endif %}
+	            <td>{{ avaliador.situacao|safe }}</td>
+	            {% if not processo.pode_mostrar_avaliacao %}
+	               <td>{{ avaliador.data_limite|safe }}</td>
+	            {% endif %}
+	        </tr>
+	        {% endfor %}
+        </tbody>
+    </table>
+{% endbox %}
+
+{% if not eh_dono_processo and not processo.pode_mostrar_avaliacao %}
+    {% box "Avaliadores Reserva" %}
+	    <table>
+	        <thead>
+	            <tr>
+	                <th>Avaliadores Internos</th>
+	                <th>Avaliadores Externos</th>
+	            </tr>
+	        </thead>
+	        <tbody>
+	            <tr>
+	                <td>
+	                    {% if avaliadores_internos_reserva %}
+		                    <ul>
+		                        {% for avaliador_interno_reserva in avaliadores_internos_reserva %}
+		                            <li>{{ avaliador_interno_reserva }}</li>
+		                        {% endfor %}
+		                    </ul>
+	                    {% else %}
+	                        <p class="alert alert-warning"><strong>Atenção:</strong> Não existe reserva para avaliadores internos. É recomendado cadastrar mais avaliadores.</p>
+	                    {% endif %}
+	                </td>
+	                <td>
+	                    {% if avaliadores_externos_reserva %}
+		                    <ul>
+		                        {% for avaliador_externo_reserva in avaliadores_externos_reserva %}
+		                            <li>{{ avaliador_externo_reserva }}</li>
+		                        {% endfor %}
+		                    </ul>
+	                    {% else %}
+	                        <p class="alert alert-warning"><strong>Atenção:</strong> Não existe reserva para avaliadores externos. É recomendado cadastrar mais avaliadores.</p>
+	                    {% endif %}
+	                </td>
+	            </tr>
+	        </tbody>
+	    </table>
+	{% endbox %}
+{% endif %}
+    
+{% if avaliadores_internos_excluidos or avaliadores_externos_excluidos %}
+    {% box "Avaliadores Excluídos do Processo" %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Avaliadores Internos</th>
+                    <th>Avaliadores Externos</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>
+                        <ul>
+                            {% for avaliador_interno_desistente in avaliadores_internos_excluidos %}
+                                <li>{{ avaliador_interno_desistente.nome }} [{{ avaliador_interno_desistente.status }}]</li>
+                            {% endfor %}
+                        </ul>
+                    </td>
+                    <td>
+                        <ul>
+                            {% for avaliador_externo_desistente in avaliadores_externos_excluidos %}
+                                <li>{{ avaliador_externo_desistente.nome }} [{{ avaliador_externo_desistente.status }}]</li>
+                            {% endfor %}
+                        </ul>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    {% endbox %}
+{% endif %}
+    
+{% if eh_dono_processo %}
+        
+
+
+    {% if processo.pode_mostrar_avaliacao and eh_dono_processo and processo.pode_mostrar_formulario_ciencia%}
+        {% box 'Ciência do Resultado da Avaliação' %}
+            {% if processo.concorda_deferimento and processo.concorda_data_retroatividade %}
+                <p class="alert alert-warning">{{ processo.get_ciencia_display }}</p>
+            {% else %}
+                <form id="form_ciencia">
+                    {% csrf_token %}
+		            <table>
+		                <tbody>
+		                    <tr>
+		                        <td>Você concorda com o resultado da avaliação (deferimento/indeferimento)?
+                                    <span style="margin-left: 30px">
+                                        Sim <input type="radio" name="ciencia_deferimento" value="1"/>
+                                        Não <input type="radio" name="ciencia_deferimento" value="2"/>
+                                    </span>
+                                </td>
+                            </tr>
+		                    <tr>
+		                        <td colspan="3">
+		                            <a href="javascript:void(0);" onclick="ciencia_resultado({{ processo.id }})" class="btn success">Registrar Ciência do Resultado</a>
+		                        </td>
+		                    </tr>
+		                </tbody>
+		            </table>
+	            </form>
+	        {% endif %}
+        {% endbox %}
+    {% endif %}
+    	    
+{% endif %}
+    
+{% endblock %}

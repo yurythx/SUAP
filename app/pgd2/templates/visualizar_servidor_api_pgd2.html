@@ -1,0 +1,132 @@
+{% extends super_template %}
+
+{% block action-bar %}
+    {% if modo == 'visualizar' %}
+        <ul class="action-bar">
+            <li>
+                <a class="btn default" href="/pgd2/visualizar_servidor_api_pgd2/{{ servidor.matricula }}/?m=dados_participante">{% icone 'eye' %} Visualizar dados do Servidor (participante)</a>
+            </li>
+        </ul>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+
+    {{ block.super }}
+
+    <div class="alert alert-info">
+        <p><strong>Importante</strong>:</p>
+        <ol>
+            <li>Esta tela é destinada à equipe técnica, embora também possa ser acessada pela gestão do PGD</li>
+        </ol>
+    </div>
+
+    {% if modo == 'dados_participante' %}
+        <div class="tab-pane" data-title="Dados Locais">
+            <pre>{{ dados_locais|pprint }}</pre>
+        </div>
+
+        <div class="tab-pane" data-title="Dados remotos">
+            <pre>{{ dados_remotos|pprint }}</pre>
+        </div>
+    {% endif %}
+
+    {% if modo == 'visualizar' %}
+        {% include 'includes/dados_servidor2.html' %}    
+
+        {% for adesao in adesoes_pgd %}
+            <div class="tab-pane"
+                data-title="{{ adesao.get_verbose_simples }}"
+                data-tab="adesoes_ao_pgd_{{ adesao.id }}"
+                data-checked="{% if adesao.estah_deferida and not adesao.estah_desligado %}True{% endif %}">
+                
+                {% if adesao.data_desligamento_efeitos_a_partir_de %}
+                    <div class="alert alert-warning">
+                        <p>Desligamento com efeitos a partir de {{ adesao.data_desligamento_efeitos_a_partir_de|format }}.</p>
+                        {% if adesao.get_carencia_ate %}
+                            <p>Após {{ adesao.data_desligamento_efeitos_a_partir_de|format }} terá carência até {{ adesao.get_carencia_ate|format }} (para algumas operações no {{ nomenclatura.pit_rit_pgd2 }}).</p>
+                        {% endif %}
+                        {% if adesao.data_pode_solicitar_nova_adesao %}
+                            <p>Após {{ adesao.data_pode_solicitar_nova_adesao|format }} dias você poderá solicitar nova adesão.</p>
+                        {% endif %}
+                    </div>
+                {% endif %}
+
+                <dl class="definition-list flex mb-4">
+                    <div class="list-item">
+                        <dt>Situação de adesão ao PGD</dt>
+                        <dd>{{ adesao.get_situacao_display|status }}</dd>
+                    </div>
+                </dl>
+
+                {% if adesao.get_pits_todos %}
+                    {% box nomenclatura.pits_rits_pgd2 %}
+                        <div class="legenda">
+                            <p>Situações de execução do PIT conforme definido pela API PGD 2 GOV BR:</p>
+                            <ul>
+                                <li class="info"> <strong>(1)</strong> Cancelado</li>
+                                <li class="info"> <strong>(2)</strong> Aprovado</li>
+                                <li class="info"> <strong>(3)</strong> Em execução</li>
+                                <li class="info"> <strong>(4)</strong> Concluído</li>
+                            </ul>
+                        </div>
+                        <div class="table-responsive">
+                            <table>
+                                <thead>
+                                <tr>
+                                    <th>Período</th>
+                                    <th>Situação {{ nomenclatura.plano_individual_de_trabalho_sigla_pgd2 }}</th>
+                                    <th>Situação {{ nomenclatura.relatorio_individual_de_trabalho_sigla_pgd2 }}</th>
+                                    
+                                    <th>Data/hora do da última homologação</th>
+                                    <th>Data/hora do último envio pela API PGD</th>
+                                    <th>Situação de execução no momento do último envio pela API PGD 2 GOV BR (ver legenda)</th>
+                                    <th>Situação de execução atual (ver legenda)</th>
+                                    
+                                    <th class="no-print">Opções</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                {% for pit_rit in adesao.get_pits_todos %}
+                                    <tr>
+                                    <td>{{ pit_rit.get_verbose_periodo }}</td>
+                                    <td>
+                                        {{ pit_rit|method:"get_situacao_pit_calculado"|call:request.user }}
+                                    </td>
+
+                                    <td>
+                                        {{ pit_rit|method:"get_situacao_rit_calculado"|call:request.user }}
+                                    </td>
+
+                                    <td>
+                                        {{ pit_rit.get_data_ultima_analise_de_homologacao_do_pit_positiva|format }}
+                                    </td>
+                                    <td>
+                                        {{ pit_rit.data_hora_ultimo_envio_api|format }}
+                                    </td>
+                                    <td>
+                                        {{ pit_rit.situacao_api_no_ultimo_envio|format }}
+                                    </td>
+                                    <td>
+                                        {{ pit_rit.get_situacao_api|format }}
+                                    </td>
+
+                                    <td class="no-print">
+                                        <ul class="action-bar">
+                                            <li>
+                                                <a href="/pgd2/obter_pit_api_pgd2/{{ pit_rit.id }}" class="btn default">{% icone 'eye' %} Visualizar dados</a>
+                                            </li>
+                                        </ul>
+                                    </td>
+                                    </tr>
+                                {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% endbox %}
+                {% endif %}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+{% endblock %}

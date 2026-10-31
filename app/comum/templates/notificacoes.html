@@ -1,0 +1,261 @@
+{% extends super_template %}
+{% load static %}
+
+{% block extrahead %}
+    {% if request.user.is_superuser %}
+        <script src="/push-web-notification.js"></script>
+    {% endif %}
+    <script>
+    var elemento = ".list-articles";
+    var pk = {{ notificacao.pk|default:"null" }};
+    // Cursor da rolagem (#17451): pk do último item exibido; a view devolve o seguinte a ele.
+    {% with ultima_exibida=notificacoes|last %}var ultimo_pk = {{ ultima_exibida.pk|default:"null" }};{% endwith %}
+    var fim = ultimo_pk === null;
+    var carregando = false;
+
+    function AtualizarLeituraNotificacoes(obj) {
+        var id = obj.data("notificacao-leitura");
+        var lida = obj.data("lida");
+        var notificacao = $("[data-article='" + id + "']");
+
+        if (lida === "True" || lida === true) {
+            $.ajax({
+                url: "/comum/marcar_como_nao_lida/" + id + "/",
+                type: "GET"
+            }).done(function() {
+                notificacao.find(".article-anchor-container").addClass("non-read");
+                AtualizarContadorNotificacoesNaoLidas("+");
+                obj.data("lida", "False");
+            }).fail(function() {
+                console.error("Erro ao marcar notificação como não lida.");
+            });
+        } else {
+            $.ajax({
+                url: "/comum/marcar_como_lida/" + id + "/",
+                type: "GET"
+            }).done(function() {
+                notificacao.find(".article-anchor-container").removeClass("non-read");
+                AtualizarContadorNotificacoesNaoLidas("-");
+                obj.data("lida", "True");
+            }).fail(function() {
+                console.error("Erro ao marcar notificação como lida.");
+            });
+        }
+    }
+
+    function AtualizarContadorNotificacoesNaoLidas(operacao) {
+        var $elementoContador = $("header .notifications .counter");
+        var contador = parseInt($elementoContador.text(), 10) || 0;
+
+        if (operacao === "+") {
+            if ($elementoContador.length) {
+                $elementoContador.text(contador + 1);
+            } else {
+                $("header .notifications > a").prepend("<span class='counter'>1</span>");
+            }
+        } else {
+            if (contador <= 1) {
+                $elementoContador.remove();
+            } else {
+                $elementoContador.text(contador - 1);
+            }
+        }
+    }
+
+    function adicionaAncora() {
+        if (carregando || fim) {
+            $(elemento).addClass("complete");
+            return;
+        }
+
+        carregando = true;
+        $(elemento).removeClass("complete");
+
+        $.ajax({
+            type: "GET",
+            url: "/comum/busca_notificacao/" + ultimo_pk + "/",
+            dataType: "json"
+        }).done(function(result) {
+            if (!result || !result.itens) {
+                // Fim da lista (itens vazio): não há não lida depois do cursor; para de pedir.
+                fim = true;
+                return;
+            }
+
+            $(result.itens).appendTo(elemento);
+            ultimo_pk = result.ultimo_pk;
+
+            $(elemento).find(".article-anchor").off('click').on("click", function(e) {
+                clicaAncora($(this));
+                e.preventDefault();
+            });
+
+            if (typeof init_action_bar === 'function') {
+                init_action_bar(elemento);
+            }
+            ativaNotificacao();
+            ordenaNotificacoes();
+        }).fail(function() {
+            console.error("Erro ao carregar mais notificações.");
+        }).always(function() {
+            carregando = false;
+            if (fim) {
+                $(elemento).addClass("complete");
+            }
+        });
+    }
+
+    function carregarAoRolar() {
+        var alvo = $(this);
+        var distancia = (this === window)
+            ? $(document).height() - ($(window).scrollTop() + $(window).height())
+            : alvo[0].scrollHeight - alvo.scrollTop() - alvo.innerHeight();
+
+        if (distancia <= 300) {
+            adicionaAncora();
+        }
+    }
+
+    function ativaScrollNotificacoes() {
+        $(elemento).children("ul").off("scroll.notificacoes").on("scroll.notificacoes", carregarAoRolar);
+        $(window).off("scroll.notificacoes").on("scroll.notificacoes", carregarAoRolar);
+    }
+
+    function ordenaNotificacoes(){
+        $(".list-articles > li").sort((a, b) => $(b).data("article") - $(a).data("article")).appendTo(elemento);
+    }
+
+    function ativaNotificacao() {
+        if (!pk) return;
+        var notificacao = $("[data-article='" + pk + "']");
+        var anchorContainer = notificacao.find(".article-anchor-container");
+
+        if (anchorContainer.hasClass("can-read")) {
+            anchorContainer.removeClass("non-read");
+        }
+        notificacao.addClass("active");
+        anchorContainer.addClass("active");
+    }
+
+    function getArticleNotificacaoAjax(el, targetContainer) {
+        $.ajax({
+            type: "GET",
+            url: "/comum/notificacao/" + $(el).data('notificacao') + "?ajax=true",
+            dataType: "html"
+        }).done(function(result) {
+            targetContainer.html(result).removeClass("loader").slideDown();
+        }).fail(function() {
+            targetContainer.removeClass("loader").html("<p class='alert alert-danger'>Erro ao carregar conteúdo.</p>").slideDown();
+        });
+    }
+
+    function clicaAncora(ancora, exibir_notificacao, mark) {
+        if (typeof exibir_notificacao === "undefined") exibir_notificacao = true;
+        if (typeof mark === "undefined") mark = false;
+
+        var $ancora = $(ancora);
+        var li = $ancora.closest('li');
+        var anchorContainer = li.find('.article-anchor-container');
+        var targetContainer = li.find('.article-content');
+
+        if (exibir_notificacao) {
+            if (li.hasClass("active") && targetContainer.is(":visible")) {
+                targetContainer.slideUp();
+                li.removeClass("active");
+                anchorContainer.removeClass("active");
+            } else {
+                $(".list-articles .article-content").slideUp();
+                $(".list-articles .article-container, .list-articles .article-anchor-container").removeClass("active");
+
+                li.addClass("active");
+                anchorContainer.addClass("active");
+
+                if (targetContainer.is(':empty') || targetContainer.html().trim() === "") {
+                    targetContainer.html("").addClass("loader").removeClass("d-none");
+                    getArticleNotificacaoAjax($ancora, targetContainer);
+                } else {
+                    targetContainer.slideDown();
+                }
+            }
+        }
+
+        // Salva o estado de leitura
+        if (mark) {
+            if (mark === "lida") {
+                // Pula as travadas (sem "can-read"): a view recusaria com 403 (#17388).
+                if (anchorContainer.hasClass("can-read") && anchorContainer.hasClass("non-read")) {
+                    $.ajax("/comum/marcar_como_lida/" + $ancora.data("notificacao") + "/").done(function() {
+                        anchorContainer.removeClass("non-read");
+                        AtualizarContadorNotificacoesNaoLidas("-");
+                    });
+                }
+            } else {
+                if (!anchorContainer.hasClass("non-read")) {
+                    $.ajax("/comum/marcar_como_nao_lida/" + $ancora.data("notificacao") + "/").done(function() {
+                        anchorContainer.addClass("non-read");
+                        AtualizarContadorNotificacoesNaoLidas("+");
+                    });
+                }
+            }
+        } else {
+            if (anchorContainer.hasClass("can-read") && anchorContainer.hasClass("non-read")) {
+                $.ajax("/comum/marcar_como_lida/" + $ancora.data("notificacao") + "/").done(function() {
+                    anchorContainer.removeClass("non-read");
+                    AtualizarContadorNotificacoesNaoLidas("-");
+                });
+            }
+        }
+    }
+
+    // Inicialização ao carregar a página
+    $(document).ready(function() {
+        ativaNotificacao();
+
+        $(".article-anchor").on("click", function(e) {
+            clicaAncora($(this));
+            e.preventDefault();
+        });
+
+        // Configuração inicial do scroll infinito
+        adicionaAncora();
+        ativaScrollNotificacoes();
+
+        // Marcar todas agrupadas
+        $("[data-notificacao-mark-all]").on("click", function(e) {
+            var ancoras = $(this).closest('.article-grouped-header').next(".article-grouped-items").find(".article-anchor");
+            ancoras.each(function() {
+                clicaAncora(this, false, $(this).data("notificacao-mark-all"));
+            });
+            e.preventDefault();
+        });
+    });
+    </script>
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if notificacoes %}
+            <li><a href="{% url 'marcar_todas_notificacoes_como_lidas' %}" class="btn primary confirm" data-confirm="Você tem certeza que deseja marcar todas as suas notificações como lidas?">{% icone "eye" %} Marcar todas como lidas</a></li>
+        {% endif %}
+        {% if request.user.is_superuser %}
+            <li><a href="javascript:" onclick="subscribePushWebNotification();" class="btn">{% icone "bell" %} Ativar notificações WEB</a></li>
+        {% endif %}
+        <li><a href="/admin/comum/preferencianotificacao/" class="btn default">{% icone "cog" %} Preferências de recebimento</a></li>
+        <li><a href="/admin/comum/registronotificacao/" class="btn default">{% icone "eye" %} Todas as notificações</a></li>
+        {% if qtd_notificacoes_antigas %}
+            <li><a href="/comum/excluir_notificacoes_antigas/" class="btn danger" data-confirm="Você tem certeza que deseja remover todas as suas notificações lidas ({{ qtd_notificacoes_antigas }}) há mais de um mês?">{% icone "trash" %} Remover {{ qtd_notificacoes_antigas }} notificações antigas</a></li>
+        {% endif %}
+    </ul>
+{% endblock %}
+
+{% block content %}
+    {% if notificacoes %}
+        <ul class="list-articles mt-5">
+            {% for notificacao_item in notificacoes %}
+                {% include "notificacao_ancora.html" with notificacao=notificacao_item active_notificacao=notificacao %}
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="alert alert-warning">Todas as notificações foram lidas. <a href="/admin/comum/registronotificacao/">Veja todas as suas notificações antigas</a>.</p>
+    {% endif %}
+{% endblock %}

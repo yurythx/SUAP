@@ -1,0 +1,146 @@
+<form method="get" action="/pgd2/remover_entrega_rit/{{ pit.id }}" id="form_entrega_pit">
+    {% csrf_token %}
+    
+    {% if not entregas_pit_rit %}
+        <p class="alert alert-warning">Não há entregas cadastradas.</p>
+    {% else %}       
+        {% if existe_entrega_que_pode_ser_removida_no_rit and pode_cadastrar_entrega_rit %}
+            <ul class="action-bar">
+                <li>
+                    <a id="seleciona_entregas" class="btn" onclick="selecionar_todas_entregas2()" href="javascript:">Marcar todas</a>
+                </li>
+                <li>
+                    <input value="Remover selecionadas" 
+                            name="remover_entregas_rit" 
+                            type="submit" 
+                            class="btn danger">
+                </li>
+            </ul>
+        {% endif %}
+    {% endif %}
+
+    {% for entrega_pit_rit in entregas_pit_rit %}
+        {% box entrega_pit_rit.pit_entrega.titulo|format badge="{{ entrega_pit_rit.pit_entrega.tempo_planejado|format_hours }} planejadas | {{ entrega_pit_rit.pit_entrega.tempo_executado|format_hours }} executadas" class="collapsed" %}
+            {% if entrega_pit_rit.pode_cadastrar_entrega %}
+                <ul class="action-bar">
+                    <li>
+                        <a href="/pgd2/cadastrar_entrega_rit/{{ entrega_pit_rit.pit_entrega.id }}" class="btn success">{% icone "plus" %} Adicionar entrega</a>
+                    </li>
+                </ul>
+            {% endif %}
+            {% if entrega_pit_rit.pit_entrega.estah_cancelada_entrega_pes_ou_entrega_pit %}
+                <p class="alert alert-danger">Entrega cancelada.</p>
+            {% endif %}
+            {% if entrega_pit_rit.pit_entrega.estah_cancelada_entrega_pes_ou_entrega_pit %}
+                <p class="alert alert-danger">{{ entrega_pit_rit.pit_entrega.estah_cancelada_entrega_pes_ou_entrega_pit_str }}.</p>
+            {% endif %}
+            {% if not entrega_pit_rit.pit_entrega.entrega_pes %}
+                <p class="alert alert-info">Entrega não relacionada a PES.</p>
+            {% endif %}
+            {% if entrega_pit_rit.pit_entrega.descricao %}
+                <div class="alert alert-info"><strong>Descrição da entrega:</strong> {{ entrega_pit_rit.pit_entrega.descricao|linebreaks }}</div>
+            {% endif %}
+            <dl class="definition-list flex">
+                {% if entrega_pit_rit.pit_entrega.entrega_pes %}
+                    <div class="list-item">
+                        <dt>PES relacionado</dt>
+                        <dd>
+                            <a href="/pgd2/visualizar_entrega_pes/{{ entrega_pit_rit.pit_entrega.entrega_pes.id }}">{{ entrega_pit_rit.pit_entrega.entrega_pes.pes.setor }}/{{ entrega_pit_rit.pit_entrega.entrega_pes.pes.setor.uo.setor }}</a>
+                        </dd>
+                    </div>
+                {% endif %}
+                {% if entrega_pit_rit.pit_entrega.data_prazo %}
+                    <div class="list-item">
+                        <dt>Prazo:</dt>
+                        <dd>{{ entrega_pit_rit.pit_entrega.data_prazo|format }}</dd>
+                    </div>
+                {% endif %}
+                <div class="list-item">
+                    <dt>Tempo planejado</dt>
+                    <dd>{{ entrega_pit_rit.pit_entrega.tempo_planejado|format_hours }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Tempo executado</dt>
+                    <dd {% if entrega_pit_rit.pit_entrega.tempo_executado < entrega_pit_rit.pit_entrega.tempo_planejado %}class="false"{% endif %}>
+                        {{ entrega_pit_rit.pit_entrega.tempo_executado|format_hours }}
+                    </dd>
+                </div>
+                {% if entrega_pit_rit.possui_pes_vinculado_e_metrica_de_quantidade %}
+                    <div class="list-item">
+                        <dt>Execução</dt>
+                        <dd>{{ entrega_pit_rit.pit_entrega.get_execucao_str }}</dd>
+                    </div>
+                {% endif %}
+            </dl>
+            {% if entrega_pit_rit.rit_entregas %} 
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th scope="col" class="no-print action-checkbox-column">
+                                    -
+                                </th>
+                                <th>Entrega</th>
+                                <th>Descrição</th>
+                                <th>Tempo executado</th>
+                                <th>% executado em teletrabalho?</th>
+                                {% if entrega_pit_rit.possui_pes_vinculado_e_metrica_de_quantidade %}
+                                    <th>Execução</th>
+                                {% endif %}
+                                <th>Data início</th>
+                                <th>Data fim</th>
+                                <th class="no-print">Opções</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for entrega_rit in entrega_pit_rit.rit_entregas %}
+                                <tr>
+                                    <td class="no-print">
+                                        {% if pode_cadastrar_entrega_rit %}
+                                            <input type="checkbox" name="checks[]" value="{{ entrega_rit.id }}" class="entrit">
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {{ entrega_rit.titulo|format }}
+                                        {% if entrega_rit.anexo %}
+                                            <dd><a href="{{ entrega_rit.anexo.url }}" target="_blank">Anexo</a></dd>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {{ entrega_rit.descricao|linebreaks }}
+                                    </td>
+                                    <td>
+                                        {{ entrega_rit.tempo_executado|format_hours }}
+                                    </td>
+                                    <td>
+                                        {{ entrega_rit.perc_executada_em_teletrabalho|format }}
+                                    </td>
+                                    {% if entrega_pit_rit.possui_pes_vinculado_e_metrica_de_quantidade %}
+                                        <td>
+                                            {{ entrega_rit.get_quantidade_progresso_str|format }} 
+                                        </td>
+                                    {% endif %}
+                                    <td>
+                                        {{ entrega_rit.data_inicio|format }}
+                                    </td>
+                                    <td>
+                                        {{ entrega_rit.data_fim|format }}
+                                    </td>
+                                    <td class="no-print">
+                                        <ul class="action-bar">
+                                            {% if pode_cadastrar_entrega_rit and entrega_rit|method:"pode_editar_entrega_rit_regra_especifica"|call:request.user %}
+                                                <li>
+                                                    <a class="btn primary" href="/pgd2/editar_entrega_rit/{{ entrega_rit.id }}">Editar</a>
+                                                </li>
+                                            {% endif %}
+                                        </ul>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
+        {% endbox %}
+    {% endfor %}
+</form>

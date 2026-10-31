@@ -1,0 +1,133 @@
+{% extends super_template %}
+
+{% block bodyclass %}hasAsideRight{% endblock %}
+
+{% block object-status %}{{ atualizacao.tipo|status }}{% endblock %}
+
+{% block action-bar %}
+    {% if atualizacao.demanda %}
+        <ul class="action-bar">
+            <li><a href="{{ atualizacao.demanda.get_absolute_url }}" class="btn default">{% icone "eye" %} Visualizar Demanda #{{ atualizacao.demanda.pk }}</a></li>
+        </ul>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+
+<dl class="definition-list flex">
+    <div class="list-item flex-basis-100">
+        <dt>Descrição</dt>
+        <dd>{{ atualizacao.descricao }}</dd>
+    </div>
+    {% if atualizacao.detalhamento %}
+        <div class="list-item flex-basis-100">
+            <dt>Detalhamento</dt>
+            <dd>{{ atualizacao.detalhamento|linebreaksbr }}</dd>
+        </div>
+    {% endif %}
+    <div class="list-item">
+        <dt>Data de implantação</dt>
+        <dd>{{ atualizacao.data }}</dd>
+    </div>
+    {% if atualizacao.grupos.exists %}
+        <div class="list-item">
+            <dt>Grupos de usuários envolvidos</dt>
+            {% for grupo in atualizacao.grupos.all %}
+                <dd><a href="{{ grupo.groupdetail_set.first.get_absolute_url }}">{{ grupo }}</a></dd>
+            {% endfor %}
+        </div>
+    {% endif %}
+    <div class="list-item">
+        <dt>Módulos</dt>
+        <dd>
+            <ul class="tags">
+            {% for tag in atualizacao.tags.all %}
+                <li>{{ tag }}</li>
+            {% endfor %}
+            </ul>
+        </dd>
+    </div>
+    {% if eh_analista or eh_desenvolvedor %}
+        {% if atualizacao.responsaveis.exists %}
+            <div class="list-item">
+                <dt>Responsáveis</dt>
+                <dd>
+                    <ul>
+                        {% for responsavel in atualizacao.responsaveis.all %}
+                            <li>{{ responsavel|format }}</li>
+                        {% endfor %}
+                    </ul>
+                </dd>
+            </div>
+        {% endif %}
+    {% endif %}
+    {% if atualizacao.erro %}
+        <div class="list-item">
+            <dt>Atualização gerada a partir do erro</dt>
+            <dd><a href="{{ atualizacao.erro.get_absolute_url }}">{{ atualizacao.erro }}</dd>
+        </div>
+    {% endif %}
+</dl>
+
+{% if atualizacao.demanda %}
+    {% for especificacao in atualizacao.demanda.get_dod.especificacao_set.all %}
+        <div class="general-box">
+            <div class="primary-info">
+                <h4>{{ especificacao.nome }}</h4>
+                {% if especificacao.atividades %}
+                    <div class="extra-info">
+                        <div class="richtext">{{ especificacao.atividades|safe }}</div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    {% endfor %}
+{% endif %}
+
+{% endblock %}
+
+{% block asideright %}
+
+<aside class="right">
+    <details open="open">
+        <summary>Atualizações por módulos</summary>
+        <div class="details-container">
+            {% for tag in lista %}
+                <h4>{{ tag.0 }}</h4>
+                <div class="total-container flex-container no-icon sm">
+                    <a class="total-item" href="/admin/demandas/atualizacao/?tags__id__exact={{ tag.1 }}&tipo__exact=Funcionalidade">
+                        <p class="total">{{ tag.4 }}</p>
+                        <p class="description">Funcionalidade</p>
+                    </a>
+                    <a class="total-item" href="/admin/demandas/atualizacao/?tags__id__exact={{ tag.1 }}&tipo__exact=Manutenção">
+                        <p class="total">{{ tag.3 }}</p>
+                        <p class="description">Manutenção</p>
+                    </a>
+                    <a class="total-item" href="/admin/demandas/atualizacao/?tags__id__exact={{ tag.1 }}&tipo__exact=Bug">
+                        <p class="total">{{ tag.2 }}</p>
+                        <p class="description">Bug</p>
+                    </a>
+                </div>
+            {% endfor %}
+        </div>
+    </details>
+
+    {% if relacionadas %}
+        <details open="open">
+            <summary>Últimas atualizações relacionadas</summary>
+            <div class="details-container">
+                <div class="flex-container boxes links sm">
+                {% for relacionada in relacionadas %}
+                    <a href="{{ relacionada.get_absolute_url }}" class="box-item">
+                        <span class="fas fa-{% if relacionada.tipo == 'Manutenção' %}wrench{% elif relacionada.tipo == 'Bug' %}bug{% else %}toolbox{% endif %}" aria-hidden="true"></span>
+                        <h4 class="title">{{ relacionada.descricao }}</h4>
+                        <footer>{{ relacionada.data|format }} (Há {{ relacionada.data|timesince }})</footer>
+                    </a>
+                {% endfor %}
+                </div>
+            </div>
+        </details>
+    {% endif %}
+</aside>
+
+{% endblock %}

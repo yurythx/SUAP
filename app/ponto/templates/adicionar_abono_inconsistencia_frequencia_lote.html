@@ -1,0 +1,130 @@
+{% extends super_template %}
+
+{% block content %}
+	{% box 'Servidor: {{ servidor_faltoso }}' %}
+        <div class="table-responsive">
+            <table>
+                <caption>Dias Avaliados</caption>
+                <thead>
+                    <tr>
+                        <th>Dia avaliado</th>
+                        <th>Jornada de trabalho</th>
+                        <th>Frequências do funcionário</th>
+                        <th>Observações do funcionário</th>
+                        <th>Anexos</th>
+                        <th>Informações do registro</th>
+                        <th>Informações adicionais</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% if dias %}
+                    {% for dia in dias %}
+                        <tr>
+                            <td>{{ dia.data }}</td>
+                            <td>{{ dia.jornada_trabalho }}</td>
+                            <td>
+                                {% if dia.frequencias_servidor %}
+                                    {% for frequencia in dia.frequencias_servidor %}
+                                        {% if frequencia.acao == "E" %}
+                                            <p class="text-nowrap"><strong>{{ frequencia.acao }}</strong>: <span class="true">{{ frequencia.horario|date:"H:i:s" }}</span> ({{ frequencia.maquina }})</p>
+                                        {% else %}
+                                            <p class="text-nowrap"><strong>{{ frequencia.acao }}</strong>: <span
+                                                    class="false">{{ frequencia.horario|date:"H:i:s" }}</span> ({{ frequencia.maquina }})</p>
+                                        {% endif %}
+                                    {% endfor %}
+                                {% else %}
+                                    Sem registro de frequência
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if dia.observacoes_servidor %}
+                                    {% for observacao in dia.observacoes_servidor %}
+                                        <span class="status status-info">{{ observacao }}</span>
+                                    {% endfor %}
+                                {% else %}
+                                    <span class="status status-info">Sem observações</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if dia.anexos %}
+                                    <ul>
+                                        {% for anexo in dia.anexos %}
+                                            <li>
+                                                <a href="{{ anexo.anexo.url }}">{{ anexo }}</a>
+                                            </li>
+                                        {% endfor %}
+                                    </ul>
+                                {% else %}
+                                    <span class="status status-info">Sem anexos</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% for info in dia.informacao_registro %}
+                                    <span class="status status-{{ info.status }}">{{ info.long_display }}</span>
+                                {% endfor %}
+                            </td>
+                            <td>
+                                {% for dia, inconsistencias in dia.inconsistencias_detalhes.items %}
+                                    {% for inconsistencia, detalhe in inconsistencias.items %}
+                                        {% if detalhe %}
+                                            <span class="status status-default">{{ detalhe }}</span>
+                                        {% endif %}
+                                    {% endfor %}
+                                {% empty %}
+                                    -
+                                {% endfor %}
+                            </td>                            
+                        </tr>
+                    {% endfor %}
+                {% endif %}
+                </tbody>
+            </table>
+        </div>
+    {% endbox %}
+    
+    {% box 'Avaliação da Chefia'%}
+        {% render_form form %}
+    {% endbox %}
+    
+    <script>
+        $(document).ready(function(){
+            $(".form-row.frequencias_dias").hide();
+        })
+
+        // Obter as descrições do Django
+        var descricao_abonos = {{ descricao_abonos|safe }};
+
+        // Pega o campo de ação do abono
+        var acaoAbonoField = document.getElementById("id_acao_abono");
+
+        // Função para mudar a descrição no help_text
+        acaoAbonoField.addEventListener("change", function() {
+            var selectedValue = acaoAbonoField.value;
+            var descricao = descricao_abonos[selectedValue] || 'Nenhuma descrição disponível para esta opção.';
+
+            // Seleciona o label do campo de ação do abono
+            var select = document.querySelector('label[for="id_acao_abono"]');
+
+            // Remove qualquer help_text anterior
+            var helpText = select.nextElementSibling;
+            if (helpText && helpText.classList.contains('help')) {
+                helpText.remove();
+            }
+
+            // Cria um novo help_text e adiciona logo após o select
+            var newHelpText = document.createElement('p');
+            newHelpText.className = 'help';
+            newHelpText.textContent = descricao;
+
+            select.parentNode.insertBefore(newHelpText, select.nextSibling);
+        });
+        // Disparar a mudança quando a página carregar, para exibir a descrição inicial
+        acaoAbonoField.dispatchEvent(new Event("change"));
+    </script>
+
+    <script>
+        $(document).ready(function(){
+            $(".form-row.frequencias_dias").hide();
+        })
+    </script>
+{% endblock %}

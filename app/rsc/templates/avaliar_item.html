@@ -1,0 +1,90 @@
+{% extends super_template %}
+
+{% load rsc_tags %}
+
+{% block extrahead %}
+    <style>
+        .boxsizingBorder {
+		    -webkit-box-sizing: border-box;
+		       -moz-box-sizing: border-box;
+		            box-sizing: border-box;
+		                 width: 100%
+		}
+    </style>
+    <script>
+        function auto_salvamento(avaliacao_item_id, auto){
+            $.ajax({
+                    type: "POST",
+                    url: '/rsc/salvar_avaliacao/' + avaliacao_item_id+ '/',
+                    data: $('#form_avaliacao_item').serialize(),
+                    success: function (retorno) {
+                        if (!retorno.ok) {
+                            alert(retorno.msg);
+                        }
+                        if (retorno.justificar){
+                        	$('#justificativa_avaliacao_{{ avaliacao_item.id }}').css("border", "red solid 1px");
+                        }
+                        if ((auto == undefined  || !auto) && retorno.ok){
+                            parent.close_fancybox()
+                        }
+                    }
+            });
+        }
+    </script>
+{% endblock %}
+
+{% block content %}
+
+    <h3>{{ criterio }}</h3>
+    <p>&nbsp;</p>
+
+    <table class="my-2">
+        <caption>Dados do Item em Avaliação</caption>
+        <tr>
+            <td colspan="4"><strong>Descrição:</strong> {{ avaliacao_item.arquivo.descricao|linebreaks }}</td>
+        </tr>
+        <tr>
+            <td><strong>Arquivo:</strong> <a href="/rsc/visualizar_arquivo_pdf/{{ avaliacao_item.arquivo.encrypted_pk }}">Visualizar o arquivo</a></td>
+            <td><strong>Qtds. Itens:</strong> {{ avaliacao_item.arquivo.qtd_itens }}</td>
+            <td><strong>Data de Referência Requerida:</strong> {{ avaliacao_item.arquivo.data_referencia|format }}</td>
+            <td><strong>Pontuação Requerida:</strong> {{ avaliacao_item.arquivo.nota_pretendida }}</td>
+        </tr>
+    </table>
+
+    <form id="form_avaliacao_item">
+        {% csrf_token %}
+        <div>
+            <fieldset class="module aligned">
+            <legend>Sua avaliação de acordo com as informações acima</legend>
+                <div class="form-row">
+                    <div class="field-box">
+                        <label>Data de Referência Validada:</label>
+                        <input type="text" class="br-data-widget" id="data_referencia_validada_{{ avaliacao_item.id }}" name="data_referencia_validada_{{ avaliacao_item.id }}" value="{{ avaliacao_item.data_referencia|default_if_none:avaliacao_item.arquivo.data_referencia|format }}" onchange="auto_salvamento({{ avaliacao_item.id }}, 'True');">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="field-box">
+                        <label>Qts. Itens Validados:</label>
+                        <input type="text" class="integer-widget" name="qtd_itens_validado_{{ avaliacao_item.id }}" value="{{ avaliacao_item.qtd_itens_validado|default_if_none:avaliacao_item.arquivo.qtd_itens }}"  onchange="auto_salvamento({{ avaliacao_item.id }}, 'True'); if(this.value == 0){ $('#data_referencia_validada_{{ avaliacao_item.id }}').val('') }">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="field-box">
+                        <label>Justificativa da Avaliação (se necessário):</label>
+                        <textarea id="justificativa_avaliacao_{{ avaliacao_item.id }}" name="justificativa_avaliacao_{{ avaliacao_item.id }}" class="boxsizingBorder" rows="5" cols="20" onchange="auto_salvamento({{ avaliacao_item.id }}, 'True');">{{ avaliacao_item.justificativa|default_if_none:'' }}</textarea>
+                    </div>
+                </div>
+            </fieldset>
+        </div>
+        <div class="submit-row">
+            <input type="button" class="default" value="Salvar" onclick="auto_salvamento({{ avaliacao_item.id }})" />
+        </div>
+    </form>
+
+<script>
+    $(function() {
+        sync_widgets();
+    });
+</script>
+
+{% endblock %}

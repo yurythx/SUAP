@@ -1,0 +1,103 @@
+{% extends super_template %}
+
+{% block extrahead %}
+<script src="/static/djtools/graficos/highcharts.js"></script>
+<script src="/static/djtools/graficos/exporting.js"></script>
+<script>
+var setorSelecionada = '';
+var segmentoSelecionado = '';
+function recarregar(a, setor, segmento){
+    function succes(data){
+        $(a.parentNode.parentNode).find('a').removeClass('active');
+        $(a).addClass('active');
+        var script = document.createElement('script');
+        script.innerHTML = data;
+        $("body").append(script);
+        removerZeros();
+    }
+    $.get("/avaliacao_cursos/estatistica_resposta/{{ pergunta.pk }}/?_popup=1&setor="+setor+"&segmento="+segmento, succes);
+    setorSelecionada = setor;
+    segmentoSelecionado = segmento;
+}
+function removerZeros(){
+    $( "text" ).each(function( index ) {
+      if($(this).text()=='0%'){
+         $(this).css('display', 'none');
+      }
+    });
+}
+</script>
+{% endblock %}
+
+{% block bodyclass %}{% if grafico and mostrar_filtros %}hasAsideRight{% endif %}{% endblock %}
+
+{% block content %}
+
+    {% if grafico %}
+        <div id="grafico" class="grafico-item"></div>
+        <script>{{ grafico|safe }}</script>
+    {% else %}
+        {% if perms.avaliacao_cursos.view_avaliacao %}
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Resposta</th>
+                    <th>Campus</th>
+                    <th>Setor</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for resposta in respostas %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ resposta.resposta }}</td>
+                    <td>{{ resposta.respondente.setor.uo }}</td>
+                    <td>{{ resposta.respondente.setor }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+            <p class="alert alert-warning">Essa informação ainda não está aberta ao público.</p>
+        {% endif %}
+    {% endif %}
+
+    <script>
+        $( document ).ready(function() {
+            removerZeros();
+        });
+    </script>
+
+{% endblock %}
+
+{% block asideright %}
+
+    {% if grafico and mostrar_filtros %}
+
+          <aside class="right">
+              <ul class="ancoras no-action">
+                  <li>
+                      <span>Segmento</span>
+                      <ul>
+                          <li><a href="javascript:" onclick="recarregar(this, setorSelecionada, '')">Todos</a></li>
+                          {% for segmento in segmentos %}
+                              <li><a href="javascript:" onclick="recarregar(this, setorSelecionada, '{{ segmento.pk }}')">{{ segmento }}</a></li>
+                          {% endfor %}
+                      </ul>
+                  </li>
+                  <li>
+                      <span>Setor</span>
+                      <ul>
+                          <li><a href="javascript:" onclick="recarregar(this, '', segmentoSelecionado)">TODOS</a></li>
+                          {% for setor in setores %}
+                              <li><a href="javascript:" onclick="recarregar(this, '{{ setor.pk }}', segmentoSelecionado)">{{ setor.sigla }}</a></li>
+                          {% endfor %}
+                      </ul>
+                  </li>
+              </ul>
+          </aside>
+
+    {% endif %}
+
+{% endblock %}

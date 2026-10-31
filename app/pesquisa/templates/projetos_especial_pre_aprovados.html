@@ -1,0 +1,96 @@
+{% extends super_template %}
+
+{% block content %}
+    {% if servidor_apto or is_gerente_sistemico %}
+        {% box 'Projetos' %}
+            {% if projetos.exists %}
+                <div class="legenda">
+                    <p>Legenda:</p>
+                    <ul>
+                        <li class="danger">Projetos pendentes da sua avaliação</li>
+                    </ul>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Título</th>
+                            <th>Campus</th>
+                            <th>Pré-seleção</th>
+                            <th>Pontuação do Currículo</th>
+                            <th>Avaliações</th>
+                            {% if is_gerente_sistemico %}
+                                <th>Pontuação da Avaliação</th>
+                            {% endif %}
+                            <th class="no-print">Opções</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for projeto, indicacao_rejeitada, automaticamente in lista_projetos %}
+                            <tr {% if projeto.pendente_avaliacao %}class="error"{% endif %}>
+								<td>
+									{{ projeto.titulo }}
+                                </td>
+                                <td>{{ projeto.uo }}</td>
+                                <td>
+                                    {% if projeto.data_pre_avaliacao %}
+                                        {% if projeto.pre_aprovado %}
+                                            <span class="status status-success">Pré-selecionado em {{ projeto.data_pre_avaliacao|date:"d/m/Y" }}</span>
+                                        {% else %}
+                                            <span class="status status-rejeitado">Rejeitado em {{ projeto.data_pre_avaliacao|date:"d/m/Y" }}</span>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="status status-alert">Aguardando pré-seleção</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ projeto.pontuacao_curriculo_normalizado }}</td>
+                                <td>
+                                    <ul>
+                                    {% for avaliacao in projeto.avaliacao_set.all %}
+                                        {% if avaliacao.vinculo == vinculo or is_gerente_sistemico %}
+                                            <li>
+                                                <p>{{ avaliacao.pontuacao|format }}: {{ avaliacao.parecer }}</p>
+                                                <p>({{ avaliacao.data }})</p>
+                                            </li>
+                                        {% endif %}
+                                    {% endfor %}
+                                    </ul>
+                                </td>
+                                {% if is_gerente_sistemico %}
+                                    <td>
+                                        {{ projeto.pontuacao|format }}
+                                    </td>
+                                {% endif %}
+                                <td class="no-print">
+                                    <ul class="action-bar">
+                                        {% if projeto.edital.is_periodo_selecao %}
+                                            {% if projeto.pendente_avaliacao %}
+                                                <li><a class="btn success" href="/pesquisa/projeto/{{ projeto.id }}/">Avaliar</a></li>
+                                                {% if projeto.pode_aceitar_indicacao %}
+                                                    <li><a class="btn success" href="/pesquisa/aceitar_indicacao/{{ projeto.id }}/">Aceitar Indicação para Avaliar</a></li>
+                                                {% endif %}
+                                                {% if not projeto.rejeitou_indicacao %}
+                                                    <li><a class="btn danger" href="/pesquisa/rejeitar_indicacao/{{ projeto.id }}/">Rejeitar Indicação para Avaliar</a></li>
+                                                {% endif %}
+                                            {% elif projeto.rejeitou_indicacao %}
+                                                <li><span class="status status-rejeitado">Indicação rejeitada</span></li>
+                                            {% elif not projeto.aprovado %}
+                                                <li><a href="/pesquisa/avaliar/{{ projeto.id }}/" class="btn primary">Editar Avaliação</a></li>
+                                            {% endif %}
+                                        {% endif %}
+                                        <li><a href="/pesquisa/projeto/{{ projeto.id }}/" class="btn default">Visualizar</a></li>
+                                        <li><a href="/pesquisa/imprimir_projeto/{{ projeto.id }}/" class="btn default">Imprimir</a></li>
+                                    </ul>    
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="alert alert-warning">Nenhum projeto pré-aprovado</p>
+            {% endif %}
+        {% endbox %}
+    {% else %}
+        <p class="alert alert-warning">Você não possui titulação cadastrada ou sua titulação não está entre as exigidas pelo edital.</p>
+    {% endif %}
+    
+{% endblock %}

@@ -1,0 +1,178 @@
+{% extends "relatorio_pdf.html" %}
+
+{% block style %}
+    .cidade {
+        text-align: center;
+        padding-bottom: 15px;
+        vertical-align: bottom;
+        font-size: 14px;
+    }
+    .autenticacao {
+        font-size: 8pt;
+        line-height: 1em;
+        font-family: "Lucida Grande", Verdana, Arial, sans-serif;
+    }
+    #titulo_corpo {
+        font-size: 24px;
+        text-align: center;
+        font-weight: bold;
+    }
+    #texto_corpo {
+        font-size: 20px;
+        text-align: justify;
+        padding-top: 2px;
+        line-height: 1.5em;
+    }
+    {% block page_settings %}
+        @page {
+            size: a4 {% block page_orientation %}portrait{% endblock %};
+            background-image: url(/static/comum/img/logo_if_portrait.png);
+            background-position: right bottom;
+            background-repeat: no-repeat;
+            margin-top: 1cm; /* HeaderHeight */
+            margin-bottom: 1cm; /* FooterHeight */
+            margin-left: 0.5cm;
+            margin-right: 0.5cm;
+            @bottom-right {
+                content: "Página " counter(page) " de " counter(pages);
+            }
+        }
+        header{
+            top: -2cm; /* -HeaderHeight */
+            height: 2cm; /* HeaderHeight */
+            position: fixed;
+            width:98%;
+            padding-top: 0.5cm;
+        }
+        main{
+
+        }
+        footer{
+            bottom: 0cm; /* -FooterHeight */
+            height: 1cm; /* FooterHeight */
+            position: fixed;
+            width: 100%;
+            text-align: center;
+        }
+    {% endblock %}
+{% endblock %}
+
+{% block cabecalho %}
+{% endblock %}
+
+
+{% block content %}
+    	<div id="cabecalho_declaracao">
+            <table border="0" align="center" width="500px">
+                <tr>
+                    <td align="center"><img src="/static/comum/img/brazao_colorido.jpg" alt="Brasão do Brasil"></td>
+                </tr>
+                <tr>
+                      <td class="titulo" align="center">SERVIÇO PÚBLICO FEDERAL</td>
+                </tr>
+                <tr>
+                    <td class="titulo" align="center">{{ nome_instituicao|upper }}</td>
+                </tr>
+                <tr>
+                    <td class="titulo" align="center">{{ nome_pro_reitoria|upper }}</td>
+                </tr>
+
+            </table>
+        </div>
+        <div id="texto_corpo">
+         <br/><br/><br/><br/>
+             <center>DECLARAÇÃO</center>
+            <br/><br/><br/>
+
+                Declaramos para os devidos fins que {% if eh_aluno %} o(a) aluno(a) {% else %} o(a) servidor(a){% endif %} <b>{{ nome }}</b>,
+                CPF {{ cpf }},
+                {% if rg %}RG {{ rg }} -{% endif %}
+                {% if rg_orgao %}
+                    {{ rg_orgao }}/
+                {% endif %}
+                {% if rg_uf %}{{ rg_uf }},{% endif %}
+                {% if not eh_aluno and matricula %}
+                    matrícula SIAPE {{ matricula }},
+                {% endif %}
+                {% if eh_aluno %}
+                   aluno(a) do curso {{ participante.curso_campus }}, matrícula N° {{ matricula }},
+                {% endif %}
+                participa, desde
+                {{ participacao.get_data_entrada }} até a presente data,
+
+                do projeto de ensino <b>"{{ participacao.projeto.titulo }}"</b>, aprovado no <b>{{ participacao.projeto.edital.titulo }}</b>.
+
+            <br /><br />
+            {% if historico.exists %}
+                <h3>Histórico de Participação no Projeto</h3>
+                <table>
+                    <thead>
+                        <tr>
+
+                            <th align="left" width="40%">Vínculo</th>
+                            <th align="left">Bolsista</th>
+                            <th align="left">Início</th>
+                            <th align="left">Término</th>
+                            <th align="left">Carga Horária Semanal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for evento in historico %}
+                            <tr>
+
+                                <td align="left">{{ evento.get_vinculo }}</td>
+                                <td align="left">
+                                    {% if evento.tipo_de_evento == evento.EVENTO_INATIVAR_PARTICIPANTE %}
+                                        -
+                                    {% elif evento.vinculo == tipo_vinculo.BOLSISTA %}
+                                        Sim
+                                    {% else %}
+                                      Não
+                                    {% endif %}
+                                   </td>
+                                <td align="left">
+                                    {% if evento.tipo_de_evento == evento.EVENTO_INATIVAR_PARTICIPANTE %}
+                                        -
+                                    {% elif evento.data_movimentacao > participacao.projeto.inicio_execucao %}
+                                        {{ evento.data_movimentacao }}
+                                    {% else %}
+                                        {{ participacao.projeto.inicio_execucao }}
+                                    {% endif %}
+                                </td>
+                                <td align="left">
+                                    {% if evento.tipo_de_evento == evento.EVENTO_INATIVAR_PARTICIPANTE %}
+                                        -
+                                    {% elif evento.data_movimentacao_saida and evento.data_movimentacao_saida > participacao.projeto.fim_execucao %}
+                                        {{ participacao.projeto.fim_execucao }}{{ evento.get_data_inativacao|safe }}
+                                    {% elif evento.data_movimentacao_saida %}
+                                        {{ evento.data_movimentacao_saida }}{{ evento.get_data_inativacao|safe }}
+                                    {% else %}
+                                        {{ participacao.projeto.fim_execucao }}{{ evento.get_data_inativacao|safe }}
+                                    {% endif %}
+                                </td>
+                                <td align="left">
+                                    {% if evento.tipo_de_evento == evento.EVENTO_INATIVAR_PARTICIPANTE %}
+                                        -
+                                    {% else %}
+                                        {{ evento.carga_horaria|format }} {% if participacao.eh_docente %}horas/aula{% else %}h{% endif %}
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% endif %}
+
+
+
+            <br /><br />
+            <table>
+
+                <tr>
+                    <td align="center" class="cidade">{{ participacao.projeto.uo.municipio.nome|lower|title }}, {{ hoje.day }} de {{ mes }} de {{ hoje.year }}.</td>
+                </tr>
+            </table>
+        </div>
+
+
+{% endblock %}

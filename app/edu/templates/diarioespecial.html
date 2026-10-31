@@ -1,0 +1,224 @@
+{% extends super_template %}
+
+{% block object-status %}
+    {% if obj.is_centro_aprendizagem %}
+        {{ "É centro de aprendizagem"|status }}
+    {% endif %}
+{% endblock %}
+
+{% block action-bar %}
+    {% if perms.edu.view_log %}
+        <ul class="action-bar">
+            <li><a class="btn popup" href="/edu/log_diario_especial/{{ obj.pk }}/">Visualizar Log</a></li>
+        </ul>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    <dl class="definition-list flex">
+        {% if obj.is_centro_aprendizagem %}
+            <div class="list-item flex-basis-100">
+                <dt>Descrição</dt>
+                <dd>{{ obj.descricao }}</dd>
+            </div>
+        {% endif %}
+        <div class="list-item flex-basis-100">
+            <dt>Componente</dt>
+            <dd>{{ obj.componente.sigla }} - {{ obj.componente.descricao }} [{{ obj.componente.get_ch_hora_relogio }} h/{{ obj.componente.get_ch_hora_aula }} Aulas]</dd>
+        </div>
+        <div class="list-item">
+            <dt>Código</dt>
+            <dd>{{ obj.pk }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Ano Letivo</dt>
+            <dd>{{ obj.ano_letivo.ano }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Período Letivo</dt>
+            <dd>{{ obj.periodo_letivo }}</dd>
+        </div>
+        
+        <div class="list-item">
+            <dt>Diretoria</dt>
+            <dd>{{ obj.diretoria }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Horário do Campus</dt>
+            <dd>{{ obj.horario_campus }}</dd>
+        </div>
+    </dl>
+
+    <form method="post" action="">
+        {% csrf_token %}
+        <div class="tab-pane ajax-rendered" data-title="Dados gerais" data-tab="dados_gerais">
+            {% if request.GET.tab == "dados_gerais" or not request.GET.tab %}
+
+                {% box "Aulas" %}
+                    {% if pode_realizar_procedimentos %}
+                        <ul class="action-bar">
+                            <li><a class="btn popup" href="/edu/definir_local_aula_diario_especial/{{ obj.pk }}/">Definir Local</a></li>
+                            <li><a class="btn popup" href="/edu/definir_horario_aula_diario_especial/{{ obj.pk }}/">Definir Horário</a></li>
+                        </ul>
+                    {% endif %}
+
+                    <dl class="definition-list flex">
+                        <div class="list-item">
+                            <dt>Local</dt>
+                            <dd>{{ obj.sala|format }}</dd>
+                        </div>
+                        <div class="list-item">
+                            <dt>Horário</dt>
+                            <dd>{{ obj.get_horario_aulas|format }}</dd>
+                        </div>
+                    </dl>
+                {% endbox %}
+
+                {% box "Professores" %}
+                    {% if pode_realizar_procedimentos %}
+                        <ul class="action-bar">
+                            <li><a class="btn success popup" href="/edu/adicionar_professor_diario_especial/{{ obj.pk }}/">Adicionar
+                                Professor</a></li>
+                        </ul>
+                    {% endif %}
+
+                    {% if obj.professores.exists %}
+                        <div class="table-responsive">
+                        <table>
+                            <caption>Professores do diário</caption>
+                            <thead>
+                            <tr>
+                                {% if pode_realizar_procedimentos %}
+                                    <th class="no-print">Ações</th>
+                                {% endif %}
+                                <th>Matrícula</th>
+                                <th>Nome</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for professor in obj.professores.all %}
+                                <tr>
+                                    {% if pode_realizar_procedimentos %}
+                                        <td class="no-print">
+                                            {% icon "delete" "?del_professor={{ professor.pk }}" "Remover" "" %}
+                                        </td>
+                                    {% endif %}
+                                    <td>{{ professor.get_matricula }}</td>
+                                    <td>{{ professor.get_nome }}</td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                        </div>
+                    {% else %}
+                        <p class="alert alert-warning">Nenhum professor cadastrado.</p>
+                    {% endif %}
+                {% endbox %}
+            {% endif %}
+        </div>
+
+        <div class="tab-pane ajax-rendered" data-title="Participantes <span>{{ obj.participantes.count }}</span>"
+             data-tab="participantes">
+            {% if request.GET.tab == "participantes" or not request.GET.tab %}
+                {% box "Participantes" %}
+                    {% if is_usuario_professor or pode_realizar_procedimentos %}
+                        <ul class="action-bar">
+                            <li><a class="btn success popup" href="/edu/adicionar_aluno_diario_especial/{{ obj.pk }}/">Adicionar Alunos</a></li>
+                            <li><a class="btn success" href="/edu/adicionar_alunos_diario_especial/{{ obj.pk }}/">Adicionar Alunos em Lote</a></li>
+                        </ul>
+                    {% endif %}
+                    {% if obj.participantes.exists %}
+                    <div class="table-responsive">
+                    <table>
+                        <caption>Alunos do diário</caption>
+                        <thead>
+                        <tr>
+                            {% if is_usuario_professor or pode_realizar_procedimentos %}
+                                <th class="text-center no-print "><input type="checkbox"
+                                                                          onchange="var is = this.parentNode.parentNode.parentNode.parentNode.parentNode.getElementsByTagName('input');for(var i=0; i<is.length; i++) {is[i].checked = this.checked;}"/>
+                                </th>
+                            {% endif %}
+                            <th>Matrícula</th>
+                            <th>Nome</th>
+                            <th>Curso</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for aluno in obj.participantes.all %}
+                            <tr>
+                                {% if is_usuario_professor or pode_realizar_procedimentos %}
+                                    <td class="text-center no-print ">
+                                        {% if aluno.pk not in ids_alunos_encontros %}
+                                        <input type="checkbox" name="alunos_pk" value="{{ aluno.pk }}"/></td>
+                                        {% endif %}
+                                {% endif %}
+                                <td align="center">{{ aluno.matricula }}</td>
+                                <td>{{ aluno.get_nome|format }}</td>
+                                <td>{{ aluno.curso_campus }}</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                    </div>
+                    {% else %}
+                        <p class="alert alert-warning">
+                            Nenhum participante adicionado.
+                        </p>
+                    {% endif %}
+                    {% if is_usuario_professor or pode_realizar_procedimentos %}
+                        <div class="submit-row">
+                            <input class="danger" type="submit" value="Remover Alunos Selecionados"/>
+                        </div>
+                    {% endif %}
+                {% endbox %}
+            {% endif %}
+        </div>
+
+        <div class="tab-pane ajax-rendered" data-title="Encontros <span>{{ obj.encontro_set.all.count }}</span>" data-tab="encontros">
+            {% if request.GET.tab == "encontros" or not request.GET.tab %}
+                {% if perms.edu.cadastrar_encontro_diarioespecial %}
+                    <ul class="action-bar">
+                        <li><a class="btn success popup" href="/edu/adicionar_encontro_diario_especial/{{ obj.pk }}/">Adicionar Encontro</a></li>
+                    </ul>
+                {% endif %}
+                {% if obj.encontro_set.exists %}
+                <table>
+                    <thead>
+                    <tr>
+                        {% if perms.edu.cadastrar_encontro_diarioespecial %}
+                            <th class="no-print">Ações</th>
+                        {% endif %}
+                        <th>Atividade</th>
+                        <th>Data</th>
+                        <th>Alunos Presentes</th>
+                        <th class="no-print">Ações</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for encontro in obj.encontro_set.all %}
+                        <tr>
+                            {% if perms.edu.cadastrar_encontro_diarioespecial %}
+                                <td class="no-print">
+                                    {% icon "edit" "/edu/atualizar_encontro_diario_especial/{{ encontro.pk }}/" "Editar" "popup" %}
+                                    {% icon "delete" "?del_encontro={{ encontro.pk }}" "Remover" "" %}
+                                </td>
+                            {% endif %}
+                            <td>{{ encontro.conteudo|format }}</td>
+                            <td class="text-center">{{ encontro.data|format }}</td>
+                            <td class="text-center">{{ encontro.participantes.count }}</td>
+                            <td class="no-print">
+                                {% if encontro.participantes.exists %}
+                                <a href="/edu/frequencia_diarioespecial/{{ encontro.pk }}/" class="btn btn-default">Imprimir Lista de Frequência</a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                    <p class="alert alert-warning">Nenhum encontro cadastrado.</p>
+                {% endif %}
+            {% endif %}
+        </div>
+    </form>
+{% endblock %}

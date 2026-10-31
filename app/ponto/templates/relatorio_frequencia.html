@@ -1,0 +1,164 @@
+{% extends super_template %}
+
+{% block extrahead %}
+    {% media_filter_box %}
+    <script src="/static/djtools/graficos/highcharts.js"></script>
+    <script src="/static/djtools/graficos/exporting.js"></script>
+{% endblock %}
+
+{% block bodyclass %}{% if setor or relatorios|length > 1 %}hasAsideRight{% endif %}{% endblock %}
+
+{% block content %}
+    {% box 'Filtros' class="filters {{ form.is_valid|collapse_if_true }}" %}
+        {% render_form form %}
+    {% endbox %}
+
+    {% for relatorio in relatorios %}
+        {% if relatorios|length > 1 %}
+            <div id="frequencia-{{ relatorio.funcionario.matricula|format }}">
+                {% box "{{ relatorio.funcionario.nome }} ({{ relatorio.funcionario.matricula|format }})" %}
+                    {% box 'Dados gerais' %}
+                        {% include 'includes/funcionario_dados_gerais.html' %}
+                    {% endbox %}
+
+                    {% if ponto_docente_via_app_pit_rit_is_ativado and relatorio.funcionario.eh_docente %}
+                        {% box "Frequências" %}
+                            {% include 'pit_rit/templates/frequencias_docente.html' %}
+                        {% endbox %}
+
+                        {% box "Resumo" %}
+                            {% include 'pit_rit/templates/frequencias_docente_totais.html' %}
+                        {% endbox %}
+                    {% else %}
+                        <div class="mt-2">
+                            {% box "Frequências" %}
+                                {% include "includes/frequencias.html" with avaliar_frequencia_in_popup=True avaliar_frequencia_in_popup_reload_on_close=False avaliar_frequencia_in_popup_callback="callback_after_avaliar_frequencia" avaliar_frequencia_in_popup_reload_on_success=True %}
+                            {% endbox %}
+                        </div>
+
+                        <div class="mt-2">
+                            {% box "Detalhamento das Horas" %}
+                                {% include 'includes/frequencias_detalhamento.html' %}
+                            {% endbox %}
+                        </div>
+                    {% endif %}
+
+                    <div class="print">
+                        <div class="assinatura float-start">
+                            <p>Assinatura do Servidor</p>
+                        </div>
+                        <div class="assinatura">
+                            <p>Assinatura do Chefe Imediato</p>
+                        </div>
+                    </div>
+
+                    <div class="page-break"></div>
+                {% endbox %}
+            </div>
+        {% else %}
+            {% box 'Dados gerais' %}
+                {% include 'includes/funcionario_dados_gerais.html' %}
+            {% endbox %}
+
+            {% if ponto_docente_via_app_pit_rit_is_ativado and relatorio.funcionario.eh_docente %}
+                {% box "Frequências" %}
+                    {% include 'pit_rit/templates/frequencias_docente.html' %}
+                {% endbox %}
+
+                {% box "Totais" %}
+                    {% include 'pit_rit/templates/frequencias_docente_totais.html' %}
+                {% endbox %}
+            {% else %}
+                {% box "Frequências" %}
+                    {% include "includes/frequencias.html" with avaliar_frequencia_in_popup=True avaliar_frequencia_in_popup_reload_on_close=False avaliar_frequencia_in_popup_callback="callback_after_avaliar_frequencia" avaliar_frequencia_in_popup_reload_on_success=True %}
+                {% endbox %}
+
+                {% box "Detalhamento das Horas" %}
+                    {% include 'includes/frequencias_detalhamento.html' %}
+                {% endbox %}
+            {% endif %}
+
+            <div class="print">
+                <div class="assinatura float-start">
+                    <p>Assinatura do Servidor</p>
+                </div>
+                <div class="assinatura">
+                    <p>Assinatura do Chefe Imediato</p>
+                </div>
+            </div>
+
+            <div class="page-break"></div>
+        {% endif %}
+    {% empty %}
+        <p class="alert alert-warning">Nenhum funcionário encontrado.</p>
+    {% endfor %}
+
+{% endblock %}
+
+{% block footer %}
+    <script>
+        $(document).ready(function () {
+            $("div.progress.debito").each(function () {
+                var progress = $(this).attr("data-progress");
+                $(this).attr("title", progress + " do Débito foi reposto");
+            });
+        });
+
+        function callback_after_avaliar_frequencia() {
+            // reload na página
+            // window.location.reload();
+        }
+    </script>
+{% endblock %}
+
+{% block asideright %}
+
+    {% if setor or relatorios|length > 1 %}
+
+        <aside class="right no-print">
+
+        {% if setor %}
+            <details open="open">
+                <summary>Árvore de Setores</summary>
+                <div class="details-container">
+                    <ul class="lista-inline">
+                        {% for i in caminho_setor %}
+                            <li>
+                                <a href="/ponto/{{ url_frequencias }}/?setor={{ i.id }}&faixa_0={{ faixa_0 }}&faixa_1={{ faixa_1 }}"
+                                   title="{{ i.nome }}">{{ i.sigla }}</a>{% if not forloop.last %}&nbsp;&rarr;&nbsp;{% endif %}
+                            </li>
+                        {% endfor %}
+                    </ul>
+                    {% if filhos %}
+                        <h4>Setores filhos</h4>
+                        <ul class="lista-inline">
+                            {% for i in filhos %}
+                                <li>
+                                    <a href="/ponto/{{ url_frequencias }}/?setor={{ i.id }}&faixa_0={{ faixa_0 }}&faixa_1={{ faixa_1 }}">{{ i.sigla }}</a>
+                                    {% if not forloop.last %}&nbsp;|&nbsp;{% endif %}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                </div>
+            </details>
+        {% endif %}
+
+        {% if relatorios|length > 1 %}
+            <details open="open">
+                <summary>Servidores</summary>
+                <div class="details-container">
+                    <ol class="ancoras">
+                        {% for relatorio in relatorios %}
+                            <li>
+                                <a href="#frequencia-{{ relatorio.funcionario.matricula }}">{{ relatorio.funcionario.nome }}</a>
+                            </li>
+                        {% endfor %}
+                    </ol>
+                </div>
+            </details>
+        {% endif %}
+
+        </aside>
+    {% endif %}
+
+{% endblock %}

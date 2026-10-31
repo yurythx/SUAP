@@ -1,0 +1,61 @@
+{% comment %}
+    Filtro que depende do filtro de campus (``SetorPorCampusFilter``, de ``get_uo_setor_listfilter``):
+    mostra só as opções do campus escolhido e refaz a lista sempre que o filtro de campus muda — inclusive
+    ao ser limpo, quando voltam as opções de todos os campi —, sem esperar o "Filtrar" (#16372).
+    Cada opção traz o id do seu campus em data-campus; a opção "Todos" não tem o atributo.
+    O matcher e o sorter do select2 vêm de ``admin/filter.html``, que o filtro de campus usa.
+{% endcomment %}
+<div class="filter">
+    <script>
+        window.djtListFilterPorCampus = window.djtListFilterPorCampus || function (filtro, filtroCampus) {
+            const $filtro = $(filtro);
+            const $campus = $(filtroCampus);
+            const opcoes = $filtro.find('option').clone();
+            const restringir = function () {
+                // O valor de uma opção do filtro de campus é "<parâmetro>=<id>"; o de "Todos" é vazio.
+                const campus = String($campus.val() || '').split('=')[1] || '';
+                const selecionado = $filtro.val();
+                $filtro.empty().append(opcoes.filter(function () {
+                    return !campus || this.dataset.campus === undefined || this.dataset.campus === campus;
+                }).clone());
+                $filtro.val(selecionado);
+                if ($filtro.val() === null) {
+                    $filtro.val('');
+                }
+                $filtro.trigger('change.select2');
+            };
+            $campus.on('change', restringir);
+            restringir();
+        };
+    </script>
+    {% with parametro_filtro=spec.parameter_name %}
+        <label for="{{ parametro_filtro }}_select">{{ title }}:</label>
+        <select id="{{ parametro_filtro }}_select" name="{{ parametro_filtro }}__djt_filter_ac">
+            {% for choice in choices %}
+                <option
+                    {% if choice.selected %}
+                        selected="selected"
+                        {% if choice.display != "Todos" %}
+                            class="filled"
+                        {% endif %}
+                    {% endif %}
+                    {% if 'campus' in choice %}data-campus="{{ choice.campus }}"{% endif %}
+                    value="{{ choice.query_string|iriencode|tratar_parametros_filter:parametro_filtro }}">
+                        {{ choice.display }}
+                </option>
+            {% endfor %}
+        </select>
+        <script>
+            // O filtro de campus (e o matcher/sorter do seu admin/filter.html) pode vir depois deste na página.
+            $(function () {
+                $("#{{ parametro_filtro }}_select").select2({
+                    placeholder: 'Todos',
+                    allowClear: true,
+                    matcher: window.djtListFilterMatcher,
+                    sorter: window.djtListFilterSorter
+                });
+                window.djtListFilterPorCampus("#{{ parametro_filtro }}_select", "#{{ spec.parametro_campus }}_select");
+            });
+        </script>
+    {% endwith %}
+</div>

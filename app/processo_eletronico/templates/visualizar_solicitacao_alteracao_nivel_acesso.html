@@ -1,0 +1,175 @@
+{% extends super_template %}
+
+{% load documento_eletronico_templatetags %}
+
+{% block object-status %}
+    {{ requerimento.get_situacao_as_html }}
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if requerimento.pode_editar %}
+            <li><a class="btn success" href="{% url 'finalizar_requerimento' requerimento.id %}">Gerar Processo
+                Eletrônico</a></li>
+            <li><a class="btn primary" href="{% url 'editar_requerimento' requerimento.id %}">Editar</a></li>
+            <li class="has-child">
+                <a class="btn default" href="#">Modo de Visualização</a>
+                <ul>
+                    <li><a href="{% url 'gerenciar_requerimento' requerimento.id %}" class="default">Edição</a></li>
+                    <li><a href="{% url 'gerenciar_requerimento' requerimento.id 'navegacao' %}" class="default">Navegação</a>
+                    </li>
+                </ul>
+            </li>
+            <li><a class="btn confirm danger" href="{% url 'cancelar_requerimento' requerimento.id %}">Cancelar</a></li>
+        {% endif %}
+    </ul>
+{% endblock %}
+{% block content %}
+
+    {% box "Dados gerais" %}
+        <table class="info">
+            <tr>
+                <td>Número</td>
+                <td>{{ requerimento.get_numero_requerimento }}</td>
+            </tr>
+            <tr>
+                <td>{% verbose_field_name requerimento 'tipo_processo' %}</td>
+                <td>{{ requerimento.tipo_processo }}</td>
+            </tr>
+            <tr>
+                <td>{% verbose_field_name requerimento.tipo_processo 'nivel_acesso_default' %}</td>
+                <td>{{ requerimento.tipo_processo.get_nivel_acesso_default_display }}</td>
+            </tr>
+            {% if requerimento.hipotese_legal %}
+                <tr>
+                    <td>{% verbose_field_name requerimento 'hipotese_legal' %}</td>
+                    <td>{{ requerimento.hipotese_legal }}</td>
+                </tr>
+            {% endif %}
+            <tr>
+                <td>{% verbose_field_name requerimento 'assunto' %}</td>
+                <td>{{ requerimento.assunto }}</td>
+            </tr>
+            {% if requerimento.descricao %}
+                <tr>
+                    <td>{% verbose_field_name requerimento 'descricao' %}</td>
+                    <td>{{ requerimento.descricao }}</td>
+                </tr>
+            {% endif %}
+            <tr>
+                <td>{% verbose_field_name requerimento 'data_hora_iniciado' %}</td>
+                <td>{{ requerimento.data_hora_iniciado }}</td>
+            </tr>
+            {% if requerimento.processo %}
+                <tr>
+                    <td>Processo</td>
+                    <td><a href="{% url 'processo' requerimento.processo.pk %}">{{ requerimento.processo|format }}</a>
+                    </td>
+                </tr>
+            {% endif %}
+        </table>
+    {% endbox %}
+
+    {% if requerimento.tipo_processo.orientacoes_requerimento and requerimento.pode_editar %}
+        {% box "Orientações" %}
+            {{ requerimento.tipo_processo.orientacoes_requerimento|linebreaksbr }}
+        {% endbox %}
+    {% endif %}
+
+    {% if not modo %}
+        <div class="tab-pane" data-title="Documentos" data-tab="documentos">
+            <ul class="action-bar">
+                {% if requerimento.pode_editar %}
+                    <li>
+                        <a href="{% url 'listar_documentos_adicionar_requerimento' requerimento.pk %}"
+                           class="btn success">
+                            Adicionar Documento Interno
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{% url 'adicionar_documento_upload_requerimento' requerimento.pk %}"
+                           class="btn success">
+                            Upload de Documento Externo
+                        </a>
+                    </li>
+                {% endif %}
+            </ul>
+
+            {% if documentos_requerimento %}
+                {% for documento_requerimento in documentos_requerimento %}
+                    <div class="general-box warning">
+                        {% if documento_requerimento.digitalizado %}
+                            {% include 'processo_eletronico/documento_upload_dados_requerimento_include.html' %}
+                        {% else %}
+                            {% include 'processo_eletronico/documento_dados_requerimento_include.html' %}
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p class="alert alert-warning">Nenhum documento associado ao requerimento.</p>
+            {% endif %}
+        </div>
+    {% endif %}
+
+    {% if modo == 'navegacao' %}
+        {% if documentos_requerimento %}
+            {% box "Visualização" class="document" %}
+                {% autopaginate documentos_requerimento 1 %}
+                {% paginate %}
+                {% for documento_requerimento in documentos_requerimento %}
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>
+                                {% if documento_requerimento.digitalizado %}
+                                    <a href="{% url 'visualizar_documento_requerimento_pdf' requerimento.id documento_requerimento.pk %}"><strong>{{ documento_requerimento.tipo }}:</strong> {{ documento_requerimento }}
+                                    </a>
+                                {% else %}
+                                    {% if documento_requerimento.documento|pode_ler_documento %}
+                                        <a href="{{ documento_requerimento.documento.get_absolute_url }}/">
+                                    {% endif %}
+                                <strong>{{ documento_requerimento.documento.tipo }}:</strong> {{ documento_requerimento.documento }}
+                                {% if documento_requerimento.documento|pode_ler_documento %}
+                                    </a>
+                                {% endif %}
+                                {% endif %}
+                            </th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for documento_requerimento in documentos_requerimento %}
+                            <tr>
+                                <td>
+                                    {% if documento_requerimento.digitalizado %}
+                                        <iframe src="/processo_eletronico/visualizar_documento_requerimento_pdf/{{ requerimento.id }}/{{ documento_requerimento.id }}/"></iframe>
+                                    {% else %}
+                                        <iframe src="/documento_eletronico/conteudo_documento/{{ documento_requerimento.documento.id }}/"></iframe>
+
+                                        {% if not documento_requerimento.documento.possui_anexos %}
+                                            <iframe src="/documento_eletronico/conteudo_documento/{{ documento_requerimento.documento.id }}/"></iframe>
+                                        {% else %}
+                                            <div class="alert alert-info">
+                                                <p><strong>Importante</strong>:</p>
+                                                {% comment %}
+                                                    Este documento está sendo visualizado com todos os seus
+                                                    {{ documento_requerimento.documento.documento.get_qtd_todos_anexos }}
+                                                    anexos.
+                                                {% endcomment %}
+                                                Este documento está sendo visualizado com os seus anexos.
+                                            </div>
+                                            <iframe src="/documento_eletronico/imprimir_documento_pdf/{{ documento_requerimento.documento.id }}/carta/"></iframe>
+                                        {% endif %}
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                {% endfor %}
+            {% endbox %}
+        {% else %}
+            <p class="alert alert-warning">Nenhum documento associado ao requerimento.</p>
+        {% endif %}
+    {% endif %}
+
+{% endblock %}

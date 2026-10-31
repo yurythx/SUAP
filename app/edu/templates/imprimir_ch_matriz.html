@@ -1,0 +1,321 @@
+{% extends "relatorio_pdf.html" %}
+
+{% block page_orientation %}landscape{% endblock %}
+
+{% block style %}
+	ul{
+		list-style: none;
+    	padding: 0;
+    }
+    header{
+		top: -2.2cm; /* -HeaderHeight */
+		height: 2cm; /* HeaderHeight */
+		position: fixed;
+		width:98%;
+	}
+    .linha_total{
+        background-color: #EEE;
+    }
+{% endblock %}
+
+{% block content %}
+<main>
+    <h1>MATRIZES CURRICULARES</h1>
+    <div>
+        <table class="definicoes">
+            <tbody>
+            <tr>
+                <td class="negrito">Descrição:</td>
+                <td>{{ obj|normalizar }}</td>
+            </tr>
+            <tr>
+                <td class="negrito" valign="top">Cursos:</td>
+                <td>
+                    <ul>
+                        {% for matriz_curso in obj.matrizcurso_set.all %}
+                            <li>{{ matriz_curso.curso_campus.descricao_historico|normalizar }} - {{ matriz_curso.curso_campus.diretoria }}</li>
+                        {% endfor %}
+                    </ul>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+        <div>
+        {% if nucleos_componentes_obrigatorios %}
+            <h2>DISCIPLINAS OBRIGATÓRIAS</h2>
+        {% for nucleo in nucleos_componentes_obrigatorios %}
+            <table class="bordered" border=1>
+                <thead>
+                <tr>
+                    <th rowspan="2">{{ nucleo }}</th>
+                    <th colspan="{{ qtd_semestre }}">Número de aulas semanal por Perído/Semestre</th>
+                    <th colspan="4">C.H. Total</th>
+                </tr>
+                <tr>
+                    {% for index in periodos %}
+                        <th colspan="2">{{ index }}º</th>
+                    {% endfor %}
+                    <th colspan="2">Hora/ Aula</th>
+                    <th colspan="2">Hora</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for componente_curricular in nucleo.componentes_regulares %}
+                    <tr>
+                        <td> {{ componente_curricular.componente.descricao_historico|format }} </td>
+                        {% for index in periodos %}
+                            {% if componente_curricular.periodo_letivo == index %}
+                                {% if componente_curricular.componente.ch_qtd_creditos == 0 %}
+                                    <td colspan="2">-</td>
+                                {% else %}
+                                    {% if not componente_curricular.is_semestral %}
+                                        <td colspan="2">{{ componente_curricular.componente.ch_qtd_creditos }}</td>
+                                    {% else %}
+                                        <td>
+                                            {% if componente_curricular.is_semestral and not componente_curricular.segundo_semestre %}
+                                                {{ componente_curricular.componente.ch_qtd_creditos }}{% endif %}</td>
+                                        <td>
+                                            {% if componente_curricular.is_semestral and componente_curricular.segundo_semestre %}
+                                                {{ componente_curricular.componente.ch_qtd_creditos }}{% endif %}</td>
+                                    {% endif %}
+
+                                {% endif %}
+                            {% else %}
+                                <td colspan="2"></td>
+                            {% endif %}
+                        {% endfor %}
+                        <td colspan="2" class="negrito">{{ componente_curricular.componente.get_ch_hora_aula }}</td>
+                        <td colspan="2" class="negrito">{{ componente_curricular.componente.get_ch_hora_relogio }}</td>
+                    </tr>
+                {% endfor %}
+                <tr>
+                    <td class="negrito">Subtotal</td>
+                    {% for subtotal in nucleo.subtotal %}
+                        <td colspan="2" class="negrito">
+                            {% if subtotal == 0 %}-{% else %}{{ subtotal }}{% endif %}
+                        </td>
+                    {% endfor %}
+                </tr>
+                {% if forloop.last %}
+                    <tr class="negrito">
+                        <td class="linha_total">Total</td>
+                        {% for total in nucleo.total %}
+                            <td colspan="2" class="negrito linha_total">
+                                {% if total == 0 %}-{% else %}{{ total }}{% endif %}
+                            </td>
+                        {% endfor %}
+                    </tr>
+                {% endif %}
+                </tbody>
+            </table>
+            <br />
+        {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if nucleos_componentes_optativos %}
+        <div>
+            <h2>DISCIPLINAS OPTATIVAS</h2>
+        {% for nucleo in nucleos_componentes_optativos %}
+            <table class="bordered" border=1>
+                <thead>
+                <tr>
+                    <th rowspan="2">{{ nucleo }}</th>
+                    <th rowspan="2">Número de aulas semanal</th>
+                    <th colspan="2">C.H. Total</th>
+                </tr>
+                <tr>
+                    <th>Hora/ Aula</th>
+                    <th>Hora</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for componente_curricular in nucleo.componentes_optativos %}
+                    <tr>
+                        <td> {{ componente_curricular.componente.descricao_historico|format }} </td>
+                        <td>{{ componente_curricular.componente.ch_qtd_creditos }}</td>
+                        <td class="negrito">{{ componente_curricular.componente.get_ch_hora_aula }}</td>
+                        <td class="negrito">{{ componente_curricular.componente.get_ch_hora_relogio }}</td>
+                    </tr>
+                {% endfor %}
+                <tr>
+                    <td class="negrito">Subtotal</td>
+                    {% for subtotal in nucleo.subtotal %}
+                        <td class="negrito">
+                            {% if subtotal == 0 %}-{% else %}{{ subtotal }}{% endif %}
+                        </td>
+                    {% endfor %}
+                </tr>
+
+                {% if forloop.last %}
+                    <tr class="negrito">
+                        <td class="linha_total">Total ({{ obj.ch_componentes_optativos }} horas
+                            obrigatórias)
+                        </td>
+                        {% for total in nucleo.total %}
+                            <td class="negrito linha_total">
+                                {% if total == 0 %}-{% else %}{{ total }}{% endif %}
+                            </td>
+                        {% endfor %}
+                    </tr>
+                {% endif %}
+                </tbody>
+            </table>
+            <br />
+        {% endfor %}
+        </div>
+        {% endif %}
+        
+        {% if nucleos_componentes_seminarios %}
+        <div>
+            <h2>SEMINÁRIOS CURRICULARES</h2>
+        {% for nucleo in nucleos_componentes_seminarios %}
+            <table class="bordered">
+                <thead>
+                <tr>
+                    <th rowspan="2">{{ nucleo }}</th>
+                    <th colspan="{{ obj.qtd_periodos_letivos }}">Número de aulas semanal</th>
+                    <th colspan="2">C.H. Total</th>
+                </tr>
+                <tr>
+                    {% for index in periodos %}
+                        <th>{{ index }}º</th>
+                    {% endfor %}
+                    <th>Hora/ Aula</th>
+                    <th>Hora</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for componente_curricular in nucleo.componentes_seminarios %}
+                    <tr>
+                        <td> {{ componente_curricular.componente.descricao_historico|format }} </td>
+                        {% for index in periodos %}
+                            <td>
+                                {% if componente_curricular.periodo_letivo == index %}
+                                    {{ componente_curricular.componente.ch_qtd_creditos }}
+                                {% endif %}
+                            </td>
+                        {% endfor %}
+                        <td class="negrito">{{ componente_curricular.componente.get_ch_hora_aula }}</td>
+                        <td class="negrito">{{ componente_curricular.componente.get_ch_hora_relogio }}</td>
+                    </tr>
+                {% endfor %}
+                <tr>
+                    <td class="negrito">Subtotal</td>
+                    {% for subtotal in nucleo.subtotal %}
+                        <td class="negrito">
+                            {% if subtotal == 0 %}-{% else %}{{ subtotal }}{% endif %}
+                        </td>
+                    {% endfor %}
+                </tr>
+
+                {% if forloop.last %}
+                    <tr class="negrito">
+                        <td class="linha_total">Total</td>
+                        {% for total in nucleo.total %}
+                            <td class="negrito linha_total">
+                                {% if total == 0 %}-{% else %}{{ total }}{% endif %}
+                            </td>
+                        {% endfor %}
+                    </tr>
+                {% endif %}
+                </tbody>
+            </table>
+            <br />
+        {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if nucleos_componentes_pratica_profissional %}
+		<div>
+            <h2>PRÁTICA PROFISSIONAL</h2>
+        {% for nucleo in nucleos_componentes_pratica_profissional %}
+            <table class="bordered">
+                <thead>
+                <tr>
+                    <th rowspan="2">{{ nucleo }}</th>
+                    <th colspan="{{ obj.qtd_periodos_letivos }}">Número de aulas semanal</th>
+                    <th colspan="2">C.H. Total</th>
+                </tr>
+                <tr>
+                    {% for index in periodos %}
+                        <th>{{ index }}º</th>
+                    {% endfor %}
+                    <th>Hora/ Aula</th>
+                    <th>Hora</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for componente_curricular in nucleo.componentes_seminarios %}
+                    <tr>
+                        <td> {{ componente_curricular.componente.descricao_historico|format }} </td>
+                        {% for index in periodos %}
+                            <td>
+                                {% if componente_curricular.periodo_letivo == index %}
+                                    {% if componente_curricular.componente.ch_qtd_creditos == 0 %}
+                                        -
+                                    {% else %}
+                                        {{ componente_curricular.componente.ch_qtd_creditos }}
+                                    {% endif %}
+                                {% endif %}
+                            </td>
+                        {% endfor %}
+                        <td class="negrito">{{ componente_curricular.componente.get_ch_hora_aula }}</td>
+                        <td class="negrito">{{ componente_curricular.componente.get_ch_hora_relogio }}</td>
+                    </tr>
+                {% endfor %}
+                <tr>
+                    <td class="negrito">Subtotal</td>
+                    {% for subtotal in nucleo.subtotal %}
+                        <td class="negrito">
+                            {% if subtotal == 0 %}-{% else %}{{ subtotal }}{% endif %}
+                        </td>
+                    {% endfor %}
+                </tr>
+
+                {% if forloop.last %}
+                    <tr class="negrito">
+                        <td class="linha_total">Total</td>
+                        {% for total in nucleo.total %}
+                            <td class="negrito linha_total">
+                                {% if total == 0 %}-{% else %}{{ total }}{% endif %}
+                            </td>
+                        {% endfor %}
+                    </tr>
+                {% endif %}
+                </tbody>
+            </table>
+            <br />
+        {% endfor %}
+        </div>
+        {% endif %}
+
+        <h2>QUADRO RESUMO</h2>
+        <table class="bordered">
+            <thead>
+            <tr>
+                <th colspan="{{ obj.qtd_periodos_letivos }}">Número de aulas semanal do Curso</th>
+                <th rowspan="2">Ativ. Compl.</th>
+                <th colspan="2">C.H. Total</th>
+            </tr>
+            <tr>
+                {% for index in periodos %}
+                    <th>{{ index }}º</th>
+                {% endfor %}
+                <th>Hora/ Aula</th>
+                <th>Hora</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr>
+                {% for credito in creditos_totais %}
+                    <td>
+                        {{ credito }}
+                    </td>
+                {% endfor %}
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</main>
+{% endblock %}

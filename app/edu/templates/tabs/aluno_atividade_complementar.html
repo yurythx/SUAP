@@ -1,0 +1,128 @@
+{% if obj.matriz %}
+
+    {% if is_proprio_aluno and not pode_solicitar_atividade_complementar %}
+        <p class="alert alert-warning">Somente estudantes com matrícula ativa em níveis de ensino autorizados podem solicitar atividade complementar.</p>
+    {% endif %}
+
+    <ul class="action-bar">
+            {% if pode_realizar_procedimentos %}
+            <li><a href="/edu/cadastrar_atividade_complementar/{{ obj.pk }}/" class="btn success popup">Adicionar atividade complementar</a></li>
+        {% elif pode_solicitar_atividade_complementar %}
+            <li><a class="btn popup" href="/edu/solicitar_atividade_complementar/">Informar atividade complementar</a></li>
+        {% endif %}
+    </ul>
+
+    <dl class="definition-list flex mb-4">
+        <div class="list-item">
+            <dt>Carga horária curricular prevista</dt>
+            <dd>{{ obj.get_ch_atividades_complementares_esperada }} hora(s)</dd>
+        </div>
+        <div class="list-item">
+            <dt>Carga horária curricular cumprida</dt>
+            <dd>{{ obj.get_ch_atividades_complementares_cumprida }} hora(s)</dd>
+        </div>
+    </dl>
+
+    {% if obj.matriz.configuracao_atividade_academica and tipos %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Quadro resumo</caption>
+                    <thead>
+                        <tr>
+                            <th rowspan="2">Tipo de atividade</th>
+                            <th colspan="4">Requisitos do curso (carga horária)</th>
+                            <th colspan="3">Lançamentos do aluno</th>
+                        </tr>
+                        <tr>
+                            <th>Mínima do curso</th>
+                            <th>Máxima do curso</th>
+                            <th>Máxima por período</th>
+                            <th>Percentual considerado</th>
+                            <th>Cadastrada</th>
+                            <th>Contabilizada</th>
+                            <th>Total considerado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for tipo in tipos %}
+                        <tr>
+                            <td>{{ tipo }}</td>
+                            <td>{{ tipo.ch_min_curso|format }}</td>
+                            <td>{{ tipo.ch_max_curso|format }}</td>
+                            <td>{{ tipo.ch_max_periodo|format }}</td>
+                            <td>{{ tipo.percentual_considerar|format }}%</td>
+                            <td>{{ tipo.ch_total_cumprida|format }}h</td>
+                            <td>{{ tipo.ch_contabilizada|format }}h</td>
+                            <td>{{ tipo.ch_considerada|format }}h</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+    {% endif %}
+
+    {% if atividades_complementares.exists %}
+        {% regroup atividades_complementares by ano_periodo_letivo as lista_atividades_complementares_por_ano_letivo %}
+        <div class="table-responsive">
+            <table>
+                <caption>Atividades complementares realizadas</caption>
+                <thead>
+                    <tr>
+                        <th class="no-print">Ações</th>
+                        <th>Ano/Período</th>
+                        <th>Tipo</th>
+                        <th class="text-end">Carga Horária</th>
+                        <th>Data</th>
+                        <th>Atividade</th>
+                        <th>Curricular</th>
+                        <th>Deferida</th>
+                        <th>Razão do indeferimento</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for atividades_complementares_por_ano_letivo in lista_atividades_complementares_por_ano_letivo %}
+                    {% for atividade_complementar in atividades_complementares_por_ano_letivo.list %}
+                        <tr>
+                            <td class="list-display-icons no-print">
+                                {% if pode_realizar_procedimentos %}
+                                    {% icon "view" "/edu/atividadecomplementar/{{ atividade_complementar.pk }}/" %}
+                                    {% if atividade_complementar.tipo.descricao != "Atividade de Extensão" %}
+                                        {% icon "edit" "/edu/cadastrar_atividade_complementar/{{ obj.pk }}/{{ atividade_complementar.pk }}/" %}
+                                        {% if perms.edu.delete_atividadecomplementar %}
+                                            {% icon "delete" "/edu/atividadecomplementar_delete/{{ atividade_complementar.pk }}/" "Remover" "no-confirm popup" %}
+                                        {% endif %}
+                                    {% endif %}
+                                {% elif atividade_complementar.deferida == None and is_proprio_aluno and atividade_complementar.tipo.descricao != "Atividade de Extensão" %}
+                                    {% icon "edit" "/edu/solicitar_atividade_complementar/{{ atividade_complementar.pk }}/" %}
+                                {% endif %}
+                            </td>
+                            <td>{{ atividade_complementar.ano_letivo }}.{{ atividade_complementar.periodo_letivo }}</td>
+                            <td>{{ atividade_complementar.tipo }}</td>
+                            <td class="text-end">{{ atividade_complementar.carga_horaria }}h</td>
+                            <td>{{ atividade_complementar.data_atividade }}</td>
+                            <td>{{ atividade_complementar.descricao }}</td>
+                            <td>{{ atividade_complementar.is_curricular|format }}</td>
+                            <td>{% if atividade_complementar.deferida or atividade_complementar.razao_indeferimento %}
+                                {{ atividade_complementar.deferida|format }}{% else %}-{% endif %}</td>
+                            <td>
+                                {{ atividade_complementar.razao_indeferimento|format }}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="3"></td>
+                        <td class="text-end">{{ obj.get_ch_atividades_complementares_cadastrada }}h</td>
+                        <td colspan="5"></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    {% else %}
+        <p class="alert alert-warning">Nenhuma atividade complementar cadastrada até o momento.</p>
+    {% endif %}
+{% else %}
+    <p class="alert alert-warning">Este aluno ainda não foi migrado para o SUAP.</p>
+{% endif %}

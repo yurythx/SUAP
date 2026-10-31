@@ -1,0 +1,234 @@
+{% load centralservicos_templatetags %}
+{% with qtd_comentarios=chamado.get_comentarios.count %}
+    <div class="tab-pane"
+         id="tabs"
+         data-tab="linha_tempo"
+         data-title="Linha do tempo"
+         data-counter="{{ qtd_comentarios }}">
+        {% if qtd_comentarios > 0 %}
+            <ul class="pills justify-content-end"
+                role="group"
+                aria-label="Formas de exibição da linha do tempo">
+                <li>
+                    <button type="button" class="timeline-details">Completa</button>
+                </li>
+                <li>
+                    <button type="button" class="timeline-only-comments active">Somente comentários</button>
+                </li>
+                {% if chamado.get_comentarios_arquivados.exists %}
+                    <li>
+                        <button type="button" class="timeline-arquivados" aria-pressed="false">Exibir comentários arquivados</button>
+                    </li>
+                {% endif %}
+            </ul>
+        {% endif %}
+        <ul class="timeline with-photos">
+            {% if pode_adicionar_comentario %}
+                <li class="no-print">
+                    <div class="timeline-photo">
+                        <img alt="{{ request.user.get_profile.nome_usual }}"
+                             src="{{ request.user.get_vinculo.get_foto_75x100_url }}" />
+                    </div>
+                    <div class="timeline-content">
+                        <h4>Adicionar comentário:</h4>
+                        <form method="post"
+                              action="/centralservicos/adicionar_comentario/{{ chamado.pk }}/">
+                            {% csrf_token %}
+                            {{ form.non_field_errors }}
+                            {{ form.texto.errors }}
+                            {{ form.texto }}
+                            {{ form.texto.help_text }}
+                            {% if chamado.servico.get_bases_conhecimento_faq.exists %}
+                                {% if eh_atendente or user in chamado.get_atendentes_equipe_atendimento or user in chamado.get_responsaveis_equipe_atendimento %}
+                                    <div class="mt-4">
+                                        {{ form.bases_conhecimento.errors }}
+                                        {{ form.bases_conhecimento.label_tag }}
+                                        {{ form.bases_conhecimento }}
+                                        <p class="help">{{ form.bases_conhecimento.help_text }}</p>
+                                    </div>
+                                {% endif %}
+                            {% endif %}
+                            <div class="submit-row">
+                                <input class="success"
+                                       type="submit"
+                                       value="Adicionar Comentário"
+                                       id="btn_adicionar_comentario">
+                            </div>
+                        </form>
+                    </div>
+                </li>
+            {% endif %}
+            {% for item in chamado.get_linha_do_tempo %}
+                {% if item.tipo == 'comentario' %}
+                    {% with comentario=item.objeto %}
+                        <li {% if comentario.escondida_em %}data-comentario-arquivado class="d-none"{% endif %}>
+                            {% if not comentario.mensagem_automatica %}
+                                <div class="timeline-date">{{ comentario.data_hora|format }}</div>
+                                <div class="timeline-photo"
+                                     title="{{ comentario.remetente.get_profile.nome_usual }}">
+                                    <img alt="{{ comentario.remetente.get_profile.nome_usual }}"
+                                         src="{{ comentario.remetente.get_vinculo.get_foto_75x100_url }}" />
+                                </div>
+                                <div class="timeline-content">
+                                    <h4>
+                                        {{ comentario.remetente|format }} <small>comentou:</small>
+                                    </h4>
+                                    {% if comentario.desconsiderada_em == None and comentario.escondida_em == None %}
+                                        {{ comentario.texto|linebreaks }}
+                                        {% if comentario.bases_conhecimento.exists %}
+                                            {% for base in comentario.bases_conhecimento.all %}
+                                                <a href="{% url 'centralservicos_visualizar_baseconhecimento_publica' base.id %}"
+                                                   class="detail popup">
+                                                    <h5>
+                                                        <span class="far fa-file-alt" aria-hidden="true"></span> <strong>{{ base.titulo }}</strong>
+                                                    </h5>
+                                                    {{ base.resumo|truncatewords:100|safe }}
+                                                </a>
+                                            {% endfor %}
+                                        {% endif %}
+                                    {% elif comentario.desconsiderada_em %}
+                                        <s title="Comentário desconsiderado em {{ comentario.desconsiderada_em|format }}">{{ comentario.texto|linebreaks }}</s>
+                                    {% elif comentario.escondida_em %}
+                                        <s title="Comentário arquivado em {{ comentario.escondida_em|format }}">{{ comentario.texto|linebreaks }}</s>
+                                    {% endif %}
+                                </div>
+                                {% if comentario.desconsiderada_em == None and comentario.escondida_em == None %}
+                                    {% if pode_adicionar_comentario and comentario.remetente == request.user %}
+                                        <ul class="action-bar">
+                                            <li class="has-child">
+                                                <a href="#" class="btn"><span class="fas fa-cog" aria-hidden="true"></span><span class="visually-hidden">Opções</span></a>
+                                                <ul>
+                                                    <li>
+                                                        <form method="post"
+                                                              action="{% url 'centralservicos_arquivar_comentario' comentario.id %}">
+                                                            {% csrf_token %}
+                                                            <button type="submit" class="btn">Arquivar comentário</button>
+                                                        </form>
+                                                    </li>
+                                                </ul>
+                                            </li>
+                                        </ul>
+                                    {% endif %}
+                                {% elif comentario.escondida_em and pode_adicionar_comentario and comentario.remetente == request.user %}
+                                    <ul class="action-bar">
+                                        <li>
+                                            <form method="post"
+                                                  action="{% url 'centralservicos_desarquivar_comentario' comentario.id %}">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn">Desarquivar comentário</button>
+                                            </form>
+                                        </li>
+                                    </ul>
+                                {% endif %}
+                            {% else %}
+                                <div class="timeline-date">{{ comentario.data_hora|format }}</div>
+                                <div class="timeline-icon"></div>
+                                <div class="timeline-content">
+                                    <h4>Mensagem automática:</h4>
+                                    {{ comentario.texto|safe|linebreaks }}
+                                </div>
+                            {% endif %}
+                        </li>
+                    {% endwith %}
+                {% elif item.tipo == 'historicostatus' %}
+                    {% with historicostatus=item.objeto %}
+                        <li data-chamado-obs
+                            class="obs {% if qtd_comentarios > 0 %}d-none{% endif %}">
+                            {% if not historicostatus.comunicacao.mensagem_automatica %}
+                                <div class="timeline-date">{{ historicostatus.data_hora|format }}</div>
+                                <div class="timeline-photo"
+                                     title="{{ historicostatus.usuario.get_profile.nome_usual }}">
+                                    <img alt="{{ historicostatus.usuario.get_profile.nome_usual }}"
+                                         src="{{ historicostatus.usuario.get_vinculo.get_foto_75x100_url }}" />
+                                </div>
+                                <div class="timeline-content">
+                                    {% if historicostatus.status == historicostatus.aberto %}
+                                        Chamado {{ historicostatus.get_status_display | status }} por {{ historicostatus.usuario|format }}
+                                    {% else %}
+                                        {{ historicostatus.usuario|format }} alterou a situação do chamado para {{ historicostatus.get_status_display|status }}
+                                    {% endif %}
+                                </div>
+                            {% else %}
+                                <div class="timeline-date">{{ historicostatus.data_hora|format }}</div>
+                                <div class="timeline-icon"></div>
+                                <div class="timeline-content">
+                                    Situação alterada automaticamente para {{ historicostatus.get_status_display|status }}
+                                </div>
+                            {% endif %}
+                        </li>
+                    {% endwith %}
+                {% elif item.tipo == 'atendimentoatribuicao' %}
+                    {% if perms.centralservicos.change_chamado or user in chamado.get_responsaveis_equipe_atendimento %}
+                        {% with atendimentoatribuicao=item.objeto %}
+                            <li data-chamado-obs
+                                class="obs {% if qtd_comentarios > 0 %}d-none{% endif %}">
+                                <div class="timeline-date">{{ atendimentoatribuicao.atribuido_em|format }}</div>
+                                <div class="timeline-icon"></div>
+                                <div class="timeline-content">
+                                    {% if atendimentoatribuicao.tipo_justificativa %}
+                                        <p>
+                                            <b>{{ atendimentoatribuicao.get_tipo_justificativa_display }}</b>.
+                                        </p>
+                                    {% endif %}
+                                    <p {% if atendimentoatribuicao.tipo_justificativa %}class="line-through"{% endif %}>
+                                        Chamado distribuído para {{ atendimentoatribuicao.grupo_atendimento }}.
+                                    </p>
+                                    <p {% if atendimentoatribuicao.tipo_justificativa %}class="line-through"{% endif %}>
+                                        {% if atendimentoatribuicao.atribuido_para %}
+                                            Atribuído para <strong>{{ atendimentoatribuicao.atribuido_para.get_profile.nome_usual }}</strong>
+                                            {% if atendimentoatribuicao.atribuido_para == atendimentoatribuicao.atribuido_por %}
+                                                (autoatribuído).
+                                            {% else %}
+                                                por {{ atendimentoatribuicao.atribuido_por.get_profile.nome_usual }}.
+                                            {% endif %}
+                                        {% endif %}
+                                    </p>
+                                </div>
+                            </li>
+                        {% endwith %}
+                    {% endif %}
+                {% elif item.tipo == 'avaliacao' %}
+                    {% if user.is_superuser or user|in_group:"centralservicos Administrador" or user in chamado.get_responsaveis_equipe_atendimento %}
+                        <li>
+                            <div class="timeline-date">{{ chamado.data_avaliacao|format }}</div>
+                            <div class="timeline-photo"
+                                 title="{{ chamado.interessado.get_profile.nome_usual }}">
+                                <img alt="{{ chamado.interessado.get_profile.nome_usual }}"
+                                     src="{{ chamado.interessado.get_vinculo.get_foto_75x100_url }}" />
+                            </div>
+                            <div class="timeline-content">
+                                <h4>
+                                    {{ chamado.interessado|format }} <small>avaliou este chamado como:</small>
+                                    {% exibe_estrelas_avaliacao chamado.nota_avaliacao %}
+                                </h4>
+                                <div class="clear"></div>
+                                {% if chamado.comentario_avaliacao %}
+                                    <p>
+                                        <strong>Comentário da Avaliação:</strong>
+                                    </p>
+                                    {{ chamado.comentario_avaliacao|linebreaks }}
+                                {% endif %}
+                            </div>
+                        </li>
+                    {% endif %}
+                {% elif item.tipo == 'anexo' %}
+                    {% with anexo=item.objeto %}
+                        <li class="obs">
+                            <div class="timeline-date">{{ anexo.anexado_em|format }}</div>
+                            <div class="timeline-photo"
+                                 title="{{ anexo.anexado_por.get_profile.nome_usual }}">
+                                <img alt="{{ anexo.anexado_por.get_profile.nome_usual }}"
+                                     src="{{ anexo.anexado_por.get_vinculo.get_foto_75x100_url }}">
+                            </div>
+                            <div class="timeline-content">
+                                <p>
+                                    {{ anexo.anexado_por|format }} adicionou o seguinte anexo: <a href="{{ anexo.anexo.get_url_publica }}" target="_blank">{{ anexo.descricao }}</a>
+                                </p>
+                            </div>
+                        </li>
+                    {% endwith %}
+                {% endif %}
+            {% endfor %}
+        </ul>
+    </div>
+{% endwith %}

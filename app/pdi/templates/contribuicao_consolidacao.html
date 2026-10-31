@@ -1,0 +1,161 @@
+{% extends super_template %}
+
+{% block extrahead %}
+<script>
+$(document).ready(function() {
+    $(".pills a").click(function(e) {
+        e.preventDefault();
+        var secao = $(this).attr("data-pdi");
+        $(".pills a").parent().removeClass("active");
+        $(this).parent().addClass("active");
+        $(".secao-pdi").addClass("d-none");
+        $("#" + secao).removeClass("d-none");
+    });
+    $(".action-bar a").on('click', function() {
+        var id = $(this).data("id");
+        if ($(this).hasClass('concordar')) {
+            var link = "/pdi/concordar_contribuicao_consolidacao/";
+        } else {
+            var link = "/pdi/discordar_contribuicao_consolidacao/";
+        }
+        $.get(link + id + "/", function(data) {
+            atualizar_contribuicao(id, data);
+        });
+    });
+});
+function atualizar_contribuicao(id, data){
+    $('#qtd-concordaram-'+id).html(data.qtd_concordaram);
+    $('#qtd-discordaram-'+id).html(data.qtd_discordaram);
+    $('#discordar-'+id).removeClass("checked unchecked");
+    $('#concordar-'+id).removeClass("checked unchecked");
+    if (data.concordou != null) {
+	    atualizar_contribuicao_concordou(id, data);
+    }
+    if (data.discordou != null) {
+	    atualizar_contribuicao_discordou(id, data);
+    }
+    $("#contribuicao-"+id).fadeOut().fadeIn();
+}
+function atualizar_contribuicao_concordou(id, data){
+    if(data.concordou){
+        $('#concordar-'+id).addClass("checked");
+        $('#discordar-'+id).addClass("unchecked");
+    } else {
+        $('#concordar-'+id).removeClass("checked");
+        $('#discordar-'+id).removeClass("unchecked");
+    }
+}
+function atualizar_contribuicao_discordou(id, data){
+    if(data.discordou){
+        $('#discordar-'+id).addClass("checked");
+        $('#concordar-'+id).addClass("unchecked");
+    } else {
+        $('#discordar-'+id).removeClass("checked");
+        $('#concordar-'+id).removeClass("unchecked");
+    }
+}
+</script>
+
+<style>
+.container-pdi {
+    max-width: calc(100% - 180px);
+}
+.img-pdi {
+    max-width: 170px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="alert alert-light">
+    <div class="float-start container-pdi">
+        <p>O PDI 2019-2023 é o documento norteador do fazer institucional que favorece o cumprimento da missão do {% get_valor_por_chave "comum" "instituicao_sigla" %}, a partir da definição dos objetivos estratégicos e das metas a serem atingidas, em quatro grandes eixos, a saber: políticas acadêmicas e de inovação; políticas de desenvolvimento institucional; políticas de gestão; e políticas de infraestrutura.</p>
+        <p>A premissa básica para elaboração do PDI 2019-2023 foi sua construção coletiva, com a participação de professores, técnicos, estudantes, pais e sociedade civil. </p>
+        <p><strong>Agora, você é novamente convidado a apreciar os documentos e colaborar com a construção desse plano, registrando sua opinião por eixo temático.</strong></p>
+    </div>
+    <img src="/static/comum/img/logo-pdi.png"
+                 alt="Logo do PDI" class="img-pdi float-end" />
+</div>
+
+{% box 'Conheça a Consolidação das Propostas' %}
+    <p class="alert alert-info">Saiba mais sobre o Plano de Desenvolvimento Institucional - PDI em <a href="http://portal.ifrn.edu.br/campus/reitoria/noticias/pro-reitoria-de-planejamento-divulga-metodologia-de-construcao-do-pdi/">http://portal.ifrn.edu.br/institucional/pdi/</a>.</p>
+    <ul class="pills">
+        {% for redacao_tematica in redacao_tematica %}
+            <li {% if forloop.first %}class="active"{% endif %}><a href="#" data-pdi="secao-pdi-{{ redacao_tematica.pk }}">{{ redacao_tematica }}</a></li>
+        {% endfor %}
+    </ul>
+    {% for redacao_tematica in redacao_tematica %}
+        <div class="secao-pdi {% if not forloop.first %}d-none{% endif %}" id="secao-pdi-{{ redacao_tematica.pk }}">
+            <h4>{{ redacao_tematica.secao_pdi }}</h4>
+            <p class="alert alert-info"> Conheça as ações de melhorias propostas após análise desta comissão:</p>
+                <p> <a class="btn" href="{{ redacao_tematica.anexo.url }}"> Consolidação das Propostas</a></p>
+        </div>
+    {% endfor %}
+{% endbox %}
+
+{% if sugestao or secoes_disponiveis and periodo_consolidacao_aberto %}
+	{% box 'Adicionar sua Contribuição' %}
+	    {% render_form form %}
+	{% endbox %}
+{% endif %}
+
+{% box 'Minhas Contribuições' %}
+    {% if minhas_contribuicoes %}
+        <table>
+            <thead>
+                <tr>
+                    {% if periodo_consolidacao_aberto %}
+                        <th>Opções</th>
+                    {% endif %}
+                    <th>Eixo</th>
+                    <th>Contribuição</th>
+                    <th>Anônima</th>
+                    <th>Situação</th>
+                    <th>Avaliação</th>
+                </tr>
+            </thead>
+			<tbody>
+				{% for contribuicao in minhas_contribuicoes %}
+					<tr>
+						{% if periodo_consolidacao_aberto %}
+							<td>
+                                {% if contribuicao.anonima is False %}
+                                    {% icon "edit" "/pdi/contribuicao_consolidacao/{{ contribuicao.id }}/" %}
+                                    {% icon "delete" "/pdi/remover_contribuicao_consolidacao/{{ contribuicao.id }}/" %}
+                                {% endif %}
+                            </td>
+						{% endif %}
+						<td>{{ contribuicao.secao_pdi|format }}</td>
+                        <td>{{ contribuicao.texto|urlizetrunc:30 }}</td>
+                        <td>{{ contribuicao.anonima|format }}</td>
+						<td>
+			        		{% if contribuicao.analisada %}
+								<span class="status status-success">Analisada</span>
+							{% else %}
+								<span class="status status-alert">Em análise</span>
+							{% endif %}
+						</td>
+						<td>
+                            <span class="status status-success">
+                                {% with total=contribuicao.concordam.count %}
+                                    {{ total }} pessoa{{ total|pluralize }} concord{{ total|pluralize:"ou,aram" }}
+                                {% endwith %}
+                            </span>
+                            <span class="status status-error">
+                                {% with total=contribuicao.discordam.count %}
+                                    {{ total }} pessoa{{ total|pluralize }} não concord{{ total|pluralize:"ou,aram" }}
+                                {% endwith %}
+                            </span>
+                        </td>
+					</tr>
+				{% endfor %}
+			</tbody>
+		</table>
+	{% else %}
+		<p class="alert alert-warning">Nenhuma contribuição cadastrada.</p>
+	{% endif %}
+{% endbox %}
+
+    {% include "includes/contribuicoes_consolidacao.html" %}
+
+{% endblock %}

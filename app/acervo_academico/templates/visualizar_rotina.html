@@ -1,0 +1,142 @@
+{% extends super_template %}
+{% load acervo_academico_tags %}
+{% block object-status %}{{ rotina.get_status|status }}{% endblock %}
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if rotina|method:"pode_processar"|call:request.user %}
+            <li>
+                <a class="btn success {% if rotina.em_processamento %}disabled{% endif %}"
+                   href="{% url 'acervo_processar_rotina' rotina.pk %}">
+                    {% if rotina.em_processamento %}
+                        <span class="fas fa-spinner fa-spin" aria-hidden="true"></span> Rotina em processamento
+                    {% else %}
+                        Processar rotina
+                    {% endif %}
+                </a>
+            </li>
+        {% endif %}
+        <li>
+            <a class="btn default" href="{{ rotina.url_diretorio_raiz }}">Visualizar Sharepoint</a>
+        </li>
+    </ul>
+{% endblock %}
+{% block content %}
+    {% if rotina.finalizada and rotina.houve_falhas %}
+        <p class="alert alert-warning">
+            A situação <strong>FINALIZADA COM FALHAS</strong> indica que houve problemas pontuais no processamento.
+            Ou seja, a rotina conseguiu varrer todos os itens, mas alguns deles apresentaram problemas na validação ou no processamento.
+            Para detalhes, consulte a seção abaixo.
+        </p>
+    {% endif %}
+    <dl class="definition-list flex">
+        <div class="list-item">
+            <dt>Nome do grupo no Sharepoint</dt>
+            <dd>
+                {{ rotina.nome_do_projeto|format }}
+            </dd>
+        </div>
+        <div class="list-item">
+            <dt>Diretório raiz</dt>
+            <dd>
+                {{ rotina.diretorio_raiz }}
+            </dd>
+        </div>
+        <div class="list-item">
+            <dt>Data de Criação</dt>
+            <dd>
+                {{ rotina.data_criacao|format }}
+            </dd>
+        </div>
+        <div class="list-item">
+            <dt>Última execução</dt>
+            <dd>
+                {{ rotina.ultima_execucao|format }}
+            </dd>
+        </div>
+    </dl>
+    {% box 'Log da execução' class="collapsed" badge="{{ rotina.logs.count|default:'' }}" %}
+        {% if rotina.logs.exists %}
+            <ul class="action-bar">
+                {% if perms.acervo_academico.change_rotinaimportacao %}
+                    <li>
+                        <a href="{% url 'acervo_limpar_logs_rotina' rotina.pk %}"
+                           class="btn danger">{% icone 'eraser' %} Limpar logs</a>
+                    </li>
+                {% endif %}
+            </ul>
+            {% for log in rotina.logs.all %}
+                <p>{{ log.data_hora|format }} - {{ log.get_tipo_display|upper }}: {{ log.mensagem|format }}</p>
+            {% endfor %}
+        {% else %}
+            <p class="alert alert-info">As mensagens reportadas durante o processamento da rotina aparecerão aqui.</p>
+        {% endif %}
+    {% endbox %}
+    {% box "Resumo do processamento" %}
+        {% if rotina.itens.count > 0 %}
+            <div class="alert alert-light">
+                <p>Os arquivos da rotina poderão apresentar os seguintes status:</p>
+                <ul>
+                    <li>
+                        <strong>Aguardando processamento:</strong> status inicial do item.
+                    </li>
+                    <li>
+                        <strong>Na fila:</strong>
+                        o item foi incluído na fila de processamento da execução atual da rotina.
+                    </li>
+                    <li>
+                        <strong>Processado:</strong>
+                        a execução da rotina já passou por esse arquivo, e a importação dele foi bem sucedida.
+                    </li>
+                    <li>
+                        <strong>Falhou:</strong>
+                        a execução da rotina já passou por esse arquivo, mas houve erro na validação ou na importação. Acesse o item para mais detalhes do erro.
+                    </li>
+                    {% if debug or rotina|qtd_itens_simulados %}
+                        <li>
+                            <strong>Simulado:</strong>
+                            status típico de ambientes de teste ou desenvolvimento. Significa que o arquivo original passou em todas as validações,
+                            mas um arquivo menor e mais simples foi registrado em seu lugar na pasta documental do aluno, evitando sobrecarga no armazenamento.
+                        </li>
+                    {% endif %}
+                </ul>
+            </div>
+            <ul class="flex-container boxes services">
+                {% for campus, sumario in quantitativos_por_campus.items %}
+                    <li class="box-item">
+                        <h4>{{ sumario.sigla }}</h4>
+                        <p class="note">
+                            <strong>{{ sumario.total }}</strong> ite{{ sumario.total|pluralize:"m,ns" }} encontrado{{ sumario.total|pluralize }}.
+                        </p>
+                        <div class="total-container flex-container sm">
+                            {% for status, detalhes in sumario.quantitativos.items %}
+                                <a class="total-item {{ detalhes.classe }}"
+                                   href="{{ rotina|url_itens_por_campus:campus }}&status__exact={{ status }}">
+                                    {% icone detalhes.icone %}
+                                    <p class="description">{{ detalhes.display }}</p>
+                                    <p class="total">{{ detalhes.qtd }}</p>
+                                </a>
+                            {% endfor %}
+                        </div>
+                        <ul class="action-bar">
+                            <li>
+                                <a href="{% url 'acervo_processar_rotina' rotina.pk %}?ids_campi={{ campus }}"
+                                   class="btn success {% if rotina.em_processamento %}disabled{% endif %}">
+                                    Processar campus
+                                </a>
+                            </li>
+                            <li>
+                                <a href="{{ rotina|url_itens_por_campus:campus }}&export_to_xls=1"
+                                   class="btn">Exportar resultados</a>
+                            </li>
+                            <li>
+                                <a href="{{ rotina|url_itens_por_campus:campus }}" class="btn default">Mais detalhes</a>
+                            </li>
+                        </ul>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="alert alert-warning">Processamento ainda não realizado ou nenhum item encontrado.</p>
+        {% endif %}
+    {% endbox %}
+{% endblock %}

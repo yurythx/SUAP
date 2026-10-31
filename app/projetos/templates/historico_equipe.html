@@ -1,0 +1,127 @@
+{% extends super_template %}
+
+{% block content %}
+
+    <dl class="definition-list">
+         <div class="list-item">
+            <dt>Projeto</dt>
+            <dd>{{ participacao.projeto.titulo }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Participante</dt>
+            <dd>{{ participacao.get_nome }}</dd>
+        </div>
+        {% if not participacao.is_servidor and participacao.orientador %}
+            <div class="list-item">
+                <dt>Orientador</dt>
+                <dd>{{ participacao.orientador.vinculo_pessoa.pessoa.nome }} (Início em: {{ participacao.get_inicio_orientacao_atual }})</dd>
+            </div>
+        {% endif %}
+        <div class="list-item">
+            <dt>Situação</dt>
+            <dd>
+                {% if participacao.ativo %}
+                    <span class="status status-success">Ativo</span>
+                {% else %}
+                    <span class="status status-error">Inativo</span>
+                {% endif %}
+            </dd>
+        </div>
+    </dl>
+    {% if historico.exists %}
+        {% box 'Histórico' %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Histórico</caption>
+                    <thead>
+                        <tr>
+                            {% if eh_sistemico %}
+                                <th class="no-print">Ações</th>
+                            {% endif %}
+                            <th>Situação</th>
+                            <th>Bolsista</th>
+                            <th>Início</th>
+                            <th>Término</th>
+                            <th>Carga Horária Semanal</th>
+                            <th>Observação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for evento in historico %}
+                            <tr>
+                                {% if eh_sistemico %}
+                                    <td class="no-print">
+                                        {% icon "edit" "/admin/projetos/historicoequipe/{{ evento.pk }}/" %}
+                                    </td>
+                                {% endif %}
+                                <td>{{ evento.get_movimentacao_descricao }}</td>
+                                <td>
+                                    {% if evento.tipo_de_evento == evento.EVENTO_INATIVAR_PARTICIPANTE %}
+                                        -
+                                    {% elif evento.vinculo == tipo_vinculo.BOLSISTA %}
+                                        <span class="status status-success">Sim</span>
+                                    {% else %}
+                                      <span class="status status-error">Não</span>
+                                    {% endif %}
+                                   </td>
+                                <td>
+                                    {% if evento.tipo_de_evento == evento.EVENTO_INATIVAR_PARTICIPANTE %}
+                                        -
+                                    {% elif evento.data_movimentacao > participacao.projeto.inicio_execucao %}
+                                        {{ evento.data_movimentacao }}
+                                    {% else %}
+                                        {{ participacao.projeto.inicio_execucao }}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if evento.tipo_de_evento == evento.EVENTO_INATIVAR_PARTICIPANTE %}
+                                        -
+                                    {% elif evento.data_movimentacao_saida and evento.data_movimentacao_saida > participacao.projeto.fim_execucao %}
+                                        {{ participacao.projeto.fim_execucao }}{{ evento.get_data_inativacao|safe }}
+                                    {% elif evento.data_movimentacao_saida %}
+                                        {{ evento.data_movimentacao_saida }}{{ evento.get_data_inativacao|safe }}
+                                    {% else %}
+                                        {{ participacao.projeto.fim_execucao }}{{ evento.get_data_inativacao|safe }}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if evento.tipo_de_evento == evento.EVENTO_INATIVAR_PARTICIPANTE %}
+                                        -
+                                    {% else %}
+                                        {{ evento.carga_horaria|format }} {% if participacao.eh_docente %}horas/aula{% else %}h{% endif %}
+                                    {% endif %}
+                                </td>
+                                <td>{{ evento.obs|format }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endbox %}
+    {% else %}
+        <p class="alert alert-warning">Nenhuma movimentação para esta participação.</p>
+    {% endif %}
+    {% if orientacoes.exists %}
+        {% box 'Orientações' %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Início</th>
+                        <th>Término</th>
+                        <th>Orientador</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for orientacao in orientacoes %}
+                        <tr>
+                            <td>{{ orientacao.data_inicio }}</td>
+                            <td>{{ orientacao.data_termino|format }}</td>
+                            <td>{{ orientacao.orientador }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endbox %}
+
+    {% endif %}
+{% endblock %}

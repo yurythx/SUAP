@@ -1,0 +1,116 @@
+{% extends super_template %}
+
+{% block content %}
+
+<h2>{{ obj }}</h2>
+
+<ul class="action-bar">
+    {% if perms.compras.pode_validar_do_seu_campus and not obj.estah_validado and obj|method:"pode_validar"|call:request.user %}
+        <li><a class="btn success confirm" href="/compras/processo_compra_campus/{{ obj.pk }}/validar/">Validar Processo de Compra</a></li>
+    {% endif %}
+    {% if perms.compras.pode_gerenciar_processocompra and obj.estah_validado %}
+        <li><a class="btn confirm" href="/compras/preencher_materiais_ausentes_campus/{{ obj.pk }}/">Preencher Materiais Ausentes</a></li>
+    {% endif %}
+    <li><a class="btn" href="/compras/relatorio_processo_compra_campus/{{ obj.pk }}/">Relatório em XLS</a><li>
+</ul>
+
+{% if perms.compras.pode_validar_do_seu_campus and not obj.estah_validado and not obj|method:"pode_validar"|call:request.user %}
+    <div class="alert alert-warning">
+        Para que seja possível validar este processo de compras é necessário que: 
+        I) Esteja no período de validação; II) Todos os materiais incluídos tenham 
+        cotação.
+    </div>
+{% endif %}
+
+{% box "Dados do Processo de Compra" %}
+    <div class="table-responsive">
+        <dl class="definition-list">
+            <dt>Descrição</dt>
+            <dd><a href="{{ obj.processo_compra.get_absolute_url }}">{{ obj.processo_compra }}</a></dd>
+            <dt>Situação</dt>
+            <dd>{{ obj.get_status_display|status }}</dd>
+            {% if obj.validado_por %}
+                <dt>Validado por</dt>
+                <dd>{{ obj.validado_por.get_profile.nome_usual }}</dd>
+            {% endif %}
+            <dt>Período para inclusões e validação</dt>
+            <dd>{{ obj.data_inicio|format }} a {{ obj.data_fim|format }}</dd>
+            <dt>Tags</dt>
+            <dd>{{ obj.tags.all|join:", " }}</dd>
+
+        </dl>
+    </div>
+{% endbox %}
+
+{% if obj.estah_no_periodo %}
+    {% box "Adicionar Novo Item" %}
+        {% render_form form %}
+    {% endbox %}
+{% endif %}
+
+{% if obj.get_valor_total_por_tag.items %}
+    {% box "Total por Tag" %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Tag</th>
+                    <th>Valor</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for tag, valor in obj.get_valor_total_por_tag.items %}
+                    <tr>
+                        <td>{{ tag }}</td>
+                        <td align="right">{{ valor|format }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endbox %}
+{% endif %}
+{% autopaginate itens 50 %}
+{% box "Lista de itens" %}
+    <div class="search-and-filters">
+        <div class="filter">
+            <form method="get" action="" id="filtro">
+                <label for="searchbar">Buscar:</label>
+                <input type="text" class="search-query" id="busca" value="" name="q" />
+            </form>
+        </div>
+        <input type="submit" value="Buscar" />
+    </div>
+    {% paginate %}
+    <table>
+        <thead>
+            <tr>
+                <th>Ações</th>
+                <th>Cadastrado por</th>
+                <th>Material</th>
+                <th>Valor unit.</th>
+                <th>Qtd.</th>
+                <th>Valor total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for i in itens %}
+                <tr>
+                    <td>{% if obj.estah_no_periodo %}{% delete_object_icon i %}{% else %}-{% endif %}</td>
+                    <td>{{ i.cadastrado_por.get_profile.nome_usual }}</td>
+                    <td>{{ i.material.get_ext_combo_template|safe }}</td>
+                    <td>{{ i.valor_unitario|format }}</td>
+                    <td>{{ i.qtd }}</td>
+                    <td class="text-end">{{ i.valor_total|format }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr>
+                <td colspan="5">Total:</td>
+                <td>{{ obj.valor_total|format }}</td>
+            </tr>
+        </tfoot>
+    </table>
+    {% paginate %}
+{% endbox %}
+
+{% endblock %}

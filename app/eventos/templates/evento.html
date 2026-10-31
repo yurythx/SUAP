@@ -1,0 +1,410 @@
+{% extends super_template %}
+{% load eventos_tags %}
+{% block extrahead %}
+    <script>
+        function getSelectedPks() {
+            var pks = [];
+            $("input[name='ids']:checked").each(function() {
+                pks.push($(this).val());
+            });
+            return pks;
+        }
+
+        function executarAcao(msg, url){
+            var pks = getSelectedPks();
+            if (pks.length === 0) {
+                alert(msg);
+            } else {
+                document.location.href = url + pks.join("_") + "/";
+            }
+        }
+
+        function enviarEmailParticipantesSelecionadosNasAtividades(){
+            var pks = getSelectedPks();
+            
+            if(pks.length === 0) {
+                alert("Selecione a(s) atividade(s) para a(s) qual(is) deseja enviar o email de confirmação de presença.");
+                return;
+            }
+            
+            var mensagem = "CONFIRME OS CRITÉRIOS DE ENVIO:\n\n";
+            mensagem += "Serão notificados APENAS participantes que:\n";
+            mensagem += "- Estão inscritos na(s) atividade(s)\n";
+            mensagem += "- Possuem inscrição VALIDADA\n";
+            mensagem += "- Ainda NÃO confirmaram presença\n\n";
+            mensagem += "️INFORMAÇÃO IMPORTANTE:\n";
+            mensagem += "- Link válido por apenas 1 HORA\n";
+            mensagem += "- Reenviar email renova a validade\n\n";
+            mensagem += "Deseja continuar?";
+            
+            if(confirm(mensagem)) {
+                var url = "/eventos/enviar_link_registro_presenca_atividades/{{ evento.pk }}/";
+                document.location.href = url + pks.join("_") + "/";
+            }
+        }
+    </script>
+{% endblock %}
+{% block object-status %}
+    {% if evento.ativo %}
+        <ul class="steps">
+            <li aria-label="O Evento foi submetido pelos seus organizadores."
+                class="hint hint-bottom">
+                <span class="step-info {% if evento.submetido and not evento.deferido %}active{% endif %}">Submetido</span>
+            </li>
+            <li aria-label="O Evento foi deferido pelos avaliadores da área sistêmica."
+                class="hint hint-bottom">
+                <span class="step-success {% if evento.deferido and not evento.finalizado %}active{% endif %}">Deferido</span>
+            </li>
+            <li aria-label="O Evento foi finalizado." class="hint hint-bottom">
+                <span class="step-success {% if evento.finalizado %}active{% endif %}">Finalizado</span>
+            </li>
+        </ul>
+    {% else %}
+        <span class="status status-error">Inativo</span>
+    {% endif %}
+{% endblock %}
+{% block action-bar %}
+    {% lista_certificados evento request.user as meus_certificados %}
+    {% if pode_avaliar or pode_gerenciar or meus_certificados or pode_confirmar_presenca %}
+        <ul class="action-bar">
+            {% if not evento.submetido %}
+                {% if evento.coordenador and request.user.get_vinculo == evento.coordenador.get_vinculo %}
+                    <li>
+                        <a href="/eventos/submeter/{{ evento.pk }}/" class="btn success">{% icone "share" %} Submeter</a>
+                    </li>
+                {% endif %}
+            {% endif %}
+            {% if pode_finalizar %}
+                <li>
+                    <a class="btn success" href="/eventos/finalizar/{{ evento.pk }}/">{% icone "times" %} Finalizar</a>
+                </li>
+            {% endif %}
+            {% if pode_avaliar %}
+                {% if evento.submetido and evento.deferido and not evento.ativo %}
+                    <li>
+                        <a href="/eventos/ativar/{{ evento.pk }}/" class="btn success popup">{% icone "check" %} Ativar</a>
+                    </li>
+                {% endif %}
+            {% endif %}
+            {% if pode_gerenciar %}
+                <li>
+                    <a href="/admin/eventos/evento/{{ evento.pk }}/" class="btn primary">{% icone "edit" %} Editar</a>
+                </li>
+                <li>
+                    <a href="/eventos/participantes/{{ evento.pk }}/" class="btn default">{% icone "eye" %} Participantes</a>
+                </li>
+                {% if evento.atingiu_configuracoes_minimas_para_submissao_trabalhos %}
+                    <li>
+                        <a href="/eventos/trabalhos/{{ evento.pk }}/" class="btn default">{% icone "eye" %} Trabalhos</a>
+                    </li>
+                {% endif %}
+            {% endif %}
+            {% if pode_gerenciar or pode_confirmar_presenca %}
+                <li>
+                    <a href="{% url 'buscar_participantes_evento' evento.pk %}"
+                       class="btn default">{% icone "search" %} Consultar participantes</a>
+                </li>
+            {% endif %}
+            {% if meus_certificados %}
+                <li class="has-child">
+                    <a href="#" class="btn default">{% icone "file-signature" %} Meus Certificados</a>
+                    <ul>
+                        {% for certificado in meus_certificados %}
+                            <li>
+                                <a href="{{ certificado.url }}">{{ certificado.tipo }}</a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </li>
+            {% endif %}
+            {% if pode_avaliar %}
+                {% if evento.submetido %}
+                    {% if evento.deferido == None %}
+                        <li class="has-child">
+                            <a href="#" class="btn">{% icone "check" %} Avaliar</a>
+                            <ul>
+                                <li>
+                                    <a href="/eventos/deferir/{{ evento.pk }}/">Deferir</a>
+                                </li>
+                                <li>
+                                    <a href="/eventos/indeferir/{{ evento.pk }}/" class="no-confirm popup">Indeferir</a>
+                                </li>
+                            </ul>
+                        </li>
+                        <li>
+                            <a href="/eventos/devolver/{{ evento.pk }}/"
+                               class="btn warning no-confirm popup">{% icone "undo" %} Devolver</a>
+                        </li>
+                    {% else %}
+                        <li>
+                            <a href="/eventos/cancelar_avaliacao/{{ evento.pk }}/"
+                               class="btn warning">{% icone "times" %} Cancelar Avaliação</a>
+                        </li>
+                    {% endif %}
+                    {% if evento.deferido and evento.ativo %}
+                        <li>
+                            <a href="/eventos/desativar/{{ evento.pk }}/" class="btn warning popup">{% icone "ban" %} Inativar</a>
+                        </li>
+                    {% endif %}
+                {% endif %}
+            {% endif %}
+            {% if evento.finalizado and pode_gerenciar %}
+                <li>
+                    <a class="btn warning"
+                       href="/eventos/desfazer_finalizacao/{{ evento.pk }}/">{% icone "times" %} Desfazer finalização</a>
+                </li>
+            {% endif %}
+            {% if user|in_group:"Coordenador de Comunicação Sistêmico" %}
+                {% if evento.cancelado %}
+                    <li>
+                        <a href="/eventos/desfazer_cancelamento/{{ evento.pk }}/"
+                           class="btn danger">{% icone "times" %} Desfazer Cancelamento</a>
+                    </li>
+                {% else %}
+                    <li>
+                        <a href="/eventos/cancelar/{{ evento.pk }}/" class="btn danger">{% icone "times" %} Cancelar</a>
+                    </li>
+                {% endif %}
+            {% endif %}
+        </ul>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    {% if pode_gerenciar or pode_avaliar %}
+        {% if evento.deferido == False %}
+            <p class="alert alert-warning">
+                <strong>Motivo do Indeferimento:</strong> {{ evento.motivo_indeferimento }}
+            </p>
+        {% endif %}
+        {% if not evento.inscricao_publica and not evento.get_tipo_participacoes_area_publica.exists and evento.deferido and not evento.finalizado %}
+            <p class="alert alert-warning">
+                Inscrições não disponíveis na área pública. Permita <strong>inscrições diretas</strong> para pelo menos um tipo de participação.
+            </p>
+        {% endif %}
+    {% endif %}
+    {% box "Dados gerais" %}
+        {% if evento.imagem %}
+            <a href="{{ evento.imagem.url }}" class="img-large">
+                <img src="{{ evento.imagem.url }}" alt="Foto de {{ evento.nome }}">
+            </a>
+        {% endif %}
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>Nome</dt>
+                <dd>
+                    {{ evento.nome }}
+                </dd>
+            </div>
+            <div class="list-item">
+                <dt>Dimensões</dt>
+                <dd>
+                    {{ evento.dimensoes|format }}
+                </dd>
+            </div>
+            <div class="list-item flex-basis-100">
+                <dt>Apresentação</dt>
+                <dd>
+                    {{ evento.apresentacao }}
+                </dd>
+            </div>
+            {% if evento.site %}
+                <div class="list-item">
+                    <dt>Site</dt>
+                    <dd>
+                        <a href="{{ evento.site|format }}">{{ evento.site|format }}</a>
+                    </dd>
+                </div>
+            {% endif %}
+            <div class="list-item">
+                <dt>Carga Horária</dt>
+                <dd>
+                    {{ evento.get_carga_horaria|format }}
+                </dd>
+            </div>
+            {% if evento.servidores_envolvidos %}
+                <div class="list-item">
+                    <dt>Servidores Envolvidos</dt>
+                    <dd>
+                        {{ evento.servidores_envolvidos|format }}
+                    </dd>
+                </div>
+            {% endif %}
+            {% if evento.recursos %}
+                <div class="list-item">
+                    <dt>Recursos Envolvidos</dt>
+                    <dd>
+                        R$ {{ evento.recursos|format }}
+                    </dd>
+                </div>
+            {% endif %}
+            <div class="list-item">
+                <dt>URL pública do evento</dt>
+                <dd>
+                    <a href="{{ evento.get_url_inscricao|format }}">{{ evento.get_url_inscricao_completa|format }}</a>
+                </dd>
+            </div>
+        </dl>
+        <h4 class="pb-3">Inscrições</h4>
+        <dl class="definition-list flex mt-3">
+            <div class="list-item">
+                <dt>Início das inscrições</dt>
+                <dd>
+                    {{ evento.data_inicio_inscricoes|format }} {{ evento.hora_inicio_inscricoes|time:"H:i"|default:"" }}
+                </dd>
+            </div>
+            <div class="list-item">
+                <dt>Fim das inscrições</dt>
+                <dd>
+                    {{ evento.data_fim_inscricoes|format }} {{ evento.hora_fim_inscricoes|time:"H:i"|default:"" }}
+                </dd>
+            </div>
+        </dl>
+        <h4 class="pb-3">Realização</h4>
+        <dl class="definition-list flex mt-3">
+            <div class="list-item">
+                <dt>Local</dt>
+                <dd>
+                    {{ evento.local|format }}
+                </dd>
+            </div>
+            <div class="list-item">
+                <dt>Início do Evento</dt>
+                <dd>
+                    {{ evento.data_inicio }} {{ evento.hora_inicio|time:"H:i" }}
+                </dd>
+            </div>
+            <div class="list-item">
+                <dt>Fim do Evento</dt>
+                <dd>
+                    {{ evento.data_fim|default:"-" }} {{ evento.hora_fim|time:"H:i"|default:"" }}
+                </dd>
+            </div>
+        </dl>
+        <h4 class="pb-3">Classificação</h4>
+        <dl class="definition-list flex mt-3">
+            <div class="list-item">
+                <dt>Localização</dt>
+                <dd>
+                    {{ evento.classificacao|format }}
+                </dd>
+            </div>
+            <div class="list-item">
+                <dt>Espacialidades</dt>
+                <dd>
+                    {{ evento.espacialidades.all|format }}
+                </dd>
+            </div>
+            <div class="list-item">
+                <dt>Porte</dt>
+                <dd>
+                    {{ evento.porte|format }}
+                </dd>
+            </div>
+            <div class="list-item">
+                <dt>Classificação</dt>
+                <dd>
+                    {{ evento.tipo|format }}
+                    {% if evento.subtipo %}
+                        - {{ evento.subtipo|format }}
+                    {% else %}
+                        - {{ evento.natureza|format }}
+                    {% endif %}
+                </dd>
+            </div>
+            <div class="list-item">
+                <dt>Público Alvo</dt>
+                <dd>
+                    {{ evento.publico_alvo|format }}
+                </dd>
+            </div>
+        </dl>
+        <h4 class="pb-3">Configurações</h4>
+        <dl class="definition-list flex compact mt-3">
+            <div class="list-item">
+                <dt>Inscrição via Suap</dt>
+                <dd>
+                    {{ evento.inscricao_publica|format }}
+                </dd>
+            </div>
+            {% if evento.inscricao_publica %}
+                <div class="list-item">
+                    <dt>Confirmação automática de inscrição</dt>
+                    <dd>
+                        {{ evento.confirmacao_automatica_inscricao|format }}
+                    </dd>
+                </div>
+            {% endif %}
+            <div class="list-item">
+                <dt>Gera certificado</dt>
+                <dd>
+                    {{ evento.gera_certificado|format }}
+                </dd>
+            </div>
+            {% if evento.exigir_avaliacao_para_certificado %}
+                <div class="list-item">
+                    <dt>Exigir avaliação para certificado</dt>
+                    <dd>
+                        {{ evento.exigir_avaliacao_para_certificado|format }}
+                    </dd>
+                </div>
+            {% endif %}
+            <div class="list-item">
+                <dt>Registra presença online</dt>
+                <dd>
+                    {{ evento.registrar_presenca_online|format }}
+                </dd>
+            </div>
+            <div class="list-item">
+                <dt>Utiliza QR Code para confirmação de presença</dt>
+                <dd>
+                    {{ evento.utilizar_qr_code|format }}
+                </dd>
+            </div>
+            <div class="list-item">
+                <dt>Gerencia página institucional</dt>
+                <dd>
+                    {{ evento.gerencia_pagina_institucional|format }}
+                </dd>
+            </div>
+            {% if evento.get_fluxo_atual %}
+                <div class="list-item">
+                    <dt>Etapa Atual</dt>
+                    <dd>
+                        {{ evento.get_fluxo_atual.get_etapa_display }}
+                    </dd>
+                </div>
+            {% endif %}
+        </dl>
+    {% endbox %}
+
+    {% if pode_gerenciar or pode_avaliar %}
+        {% include "tabs/evento_detalhamento.html" %}
+        {% if evento.subtipo.multiplas_atividades %}
+            {% include "tabs/evento_atividades.html" %}
+            {% include "tabs/evento_programacao_evento.html" %}
+        {% endif %}
+        {% include "tabs/evento_submissao_trabalhos.html" %}
+        {% if evento.inscricao_publica %}
+            {% include "tabs/evento_inscricoes.html" %}
+        {% endif %}
+    {% endif %}
+    {% include "tabs/evento_fotos.html" %}
+    {% include "tabs/evento_videos.html" %}
+    {% include "tabs/evento_anexos.html" %}
+    {% include "tabs/evento_participacoes_inconsistentes.html" %}
+    {% include "tabs/evento_divulgacao.html" %}
+    {% if evento.internacionalizacao_set.exists %}
+        {% include "tabs/evento_internacionalizacao.html" %}
+    {% endif %}
+    {% if pode_gerenciar or pode_avaliar %}
+        {% include "tabs/evento_avaliacao.html" %}
+    {% endif %}
+    {% if pode_gerenciar or pode_avaliar %}
+        {% include "tabs/evento_historico.html" %}
+    {% endif %}
+{% endblock %}
+
+{% block action-links %}
+    <li>Última atualização por {{ evento.ultima_atualizacao_por }} em {{ evento.ultima_atualizacao_em }}</li>
+{% endblock %}

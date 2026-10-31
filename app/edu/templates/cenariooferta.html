@@ -1,0 +1,587 @@
+{% extends super_template %}
+
+{% block extrahead %}
+    <style>
+        .responsive{
+            max-width: 100%;
+            overflow-x: auto;
+            max-height: 500px;
+            overflow-x: auto;
+        }
+        .center{
+            text-align:center;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <ul class="action-bar">
+        <li><a href="?reprocessar_variaveis=1" class="btn">Reprocessar Variáveis</a></li>
+    </ul>
+    {% box "Dados gerais" %}
+        <table class="info">
+            <tr>
+                <td>{{ obj|verbose:'uo'|normalizar }}</td>
+                <td colspan="3">{{ obj.uo|normalizar|format }}</td>
+            </tr>
+            <tr>
+                <td>{{ obj|verbose:'ano_letivo' }}</td>
+                <td>{{ obj.ano_letivo|format }}</td>
+                <td>{{ obj|verbose:'periodo_letivo' }}</td>
+                <td>{{ obj.periodo_letivo|format }}</td>
+            </tr>
+        </table>
+    {% endbox %}
+
+    {% box "Matrizes" %}
+        <div class="responsive">
+        <table>
+            <thead>
+            <tr>
+                <th rowspan="2"></th>
+                <th rowspan="2">Matriz</th>
+                <th rowspan="2">Turno</th>
+                <th rowspan="2">Qtd. Ingressantes</th>
+                <th rowspan="2">Qtd. Turmas</th>
+                <th colspan="10" class="center">Percentual de Evasão</th>
+            </tr>
+            <tr>
+                <th class="center">1º</th>
+                <th class="center">2º</th>
+                <th class="center">3º</th>
+                <th class="center">4º</th>
+                <th class="center">5º</th>
+                <th class="center">6º</th>
+                <th class="center">7º</th>
+                <th class="center">8º</th>
+                <th class="center">9º</th>
+                <th class="center">10º</th>
+            </tr>
+            </thead>
+            <tbody>
+                {% for item in obj.get_itens %}
+                    <tr>
+                        <td><a class="popup icon icon-edit" href="/edu/editar_taxa_evasao/{{ item.pk }}/"></a></td>
+                        <td>{{ item.matriz }}</td>
+                        <td>{{ item.turno }}</td>
+                        <td class="center">{{ item.qtd_ingressantes }}</td>
+                        <td class="center">{{ item.qtd_turmas }}</td>
+                        <td class="center">{{ item.taxa_evasao_1 }}%</td>
+                        <td class="center">{% if item.matriz.qtd_periodos_letivos > 1 %}{{ item.taxa_evasao_2 }}%{% endif %}</td>
+                        <td class="center">{% if item.matriz.qtd_periodos_letivos > 2 %}{{ item.taxa_evasao_3 }}%{% endif %}</td>
+                        <td class="center">{% if item.matriz.qtd_periodos_letivos > 3 %}{{ item.taxa_evasao_4 }}%{% endif %}</td>
+                        <td class="center">{% if item.matriz.qtd_periodos_letivos > 4 %}{{ item.taxa_evasao_5 }}%{% endif %}</td>
+                        <td class="center">{% if item.matriz.qtd_periodos_letivos > 5 %}{{ item.taxa_evasao_6 }}%{% endif %}</td>
+                        <td class="center">{% if item.matriz.qtd_periodos_letivos > 6 %}{{ item.taxa_evasao_7 }}%{% endif %}</td>
+                        <td class="center">{% if item.matriz.qtd_periodos_letivos > 7 %}{{ item.taxa_evasao_8 }}%{% endif %}</td>
+                        <td class="center">{% if item.matriz.qtd_periodos_letivos > 8 %}{{ item.taxa_evasao_9 }}%{% endif %}</td>
+                        <td class="center">{% if item.matriz.qtd_periodos_letivos > 9 %}{{ item.taxa_evasao_10 }}%{% endif %}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    {% endbox %}
+
+    {% box "Demanda de CH semanal" %}
+        <div class="responsive">
+        <table>
+            <thead>
+            <tr>
+                <th rowspan="2">Matriz</th>
+                <th class="center" colspan="{{ obj.get_series|length|add:1 }}">Séries</th>
+            </tr>
+                <th>Grupo de Atuação</th>
+                {% for serie in obj.get_series %}
+                    <th class="center">{{ serie }}º</th>
+                {% endfor %}
+            </thead>
+            <tbody>
+                {% for matriz in obj.get_matrizes %}
+                    {% with grupos_atuacao=matriz.get_grupos_atuacao %}
+                    {% for grupo in grupos_atuacao %}
+                    <tr>
+                        {% if forloop.first %}
+                            <td rowspan="{{ grupos_atuacao|length }}">{{ matriz }}</td>
+                        {% endif %}
+                        <td>{{ grupo }}</td>
+                        {% for serie in obj.get_series %}
+                            {% if serie > matriz.qtd_periodos_letivos %}
+                                <td></td>
+                            {% else %}
+                                {% with matriz.id|stringformat:"i" as matriz_id %}
+                                    {% with serie|stringformat:"i" as serie %}
+                                        {% with grupo.id|stringformat:"i" as grupo %}
+                                            {% with matriz_id|add:"/"|add:serie|add:"/"|add:grupo as dados %}
+                                                <td class="center">{{ obj|method:"get_ch_necessaria_grupo_atuacao_matriz"|call:dados }}</td>
+                                            {% endwith %}
+                                        {% endwith %}
+                                    {% endwith %}
+                                {% endwith %}
+                            {% endif %}
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                    {% endwith %}
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    {% endbox %}
+
+    {% box "Grupos de atuação" %}
+        {% with grupos_atuacao=obj.get_grupos_atuacao %}
+            {% if grupos_atuacao %}
+                <div class="responsive">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Grupo</th>
+                        <th>Professores</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                        {% for grupo in grupos_atuacao %}
+                            <tr>
+                                <td>{{ grupo }}</td>
+                                <td>
+                                    <ul>
+                                        {% for professor in grupo.professores %}
+                                            <li>{{ professor }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                </div>
+            {% else %}
+                <p class='alert alert-warning'>Nehum registro encontrado.</p>
+            {% endif %}
+        {% endwith %}
+    {% endbox %}
+
+    {% box "Afastamentos" %}
+
+        <h3>Cadastrados</h3>
+        {% with afastamentos=obj.get_afastamentos %}
+            {% if afastamentos.exists %}
+                <div class="responsive">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Professor</th>
+                        <th>Motivo</th>
+                        <th>Início</th>
+                        <th>Fim</th>
+                        <th>Tipo de Substituição</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                        {% for afastamento in afastamentos.all %}
+                            <tr>
+                                <td>{{ afastamento.professor }}</td>
+                                <td>{{ afastamento.motivo }}</td>
+                                <td>{{ afastamento.ano_inicio }}/{{ afastamento.periodo_inicio }}</td>
+                                <td>
+                                    {% if afastamento.ano_termino %}
+                                        {{ afastamento.ano_termino }}/{{ afastamento.periodo_termino }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {{ afastamento.get_tipo_substituicao_display }}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                </div>
+            {% else %}
+                <p class='alert alert-warning'>Nehum registro encontrado.</p>
+            {% endif %}
+        {% endwith %}
+
+        <div style="margin-top:50px">
+            <ul class="action-bar">
+               <li><a class="btn success popup" href="/edu/adicionar_simulacao_afastamento/{{ obj.pk }}">Simular Afastamento</a></li>
+            </ul>
+        </div>
+        <h3 style="padding-top:0px;">Simulados</h3>
+        {% with afastamentos=obj.simulacaoafastamento_set.all %}
+            {% if afastamentos.exists %}
+                <div class="responsive">
+                <table>
+                    <thead>
+                    <tr>
+                        <th></th>
+                        <th>Professor</th>
+                        <th>Início</th>
+                        <th>Fim</th>
+                        <th>Tipo de Substituição</th>
+                        <th>Observação</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                        {% for afastamento in afastamentos.all %}
+                            <tr>
+                                <td>
+                                    <a class="popup icon icon-edit" href="/edu/adicionar_simulacao_afastamento/{{ obj.pk }}/{{ afastamento.pk }}/"></a>
+                                    <a class="icon icon-delete" href="?del_simulacao_afastamento={{ afastamento.pk }}"></a>
+                                </td>
+                                <td>{{ afastamento.professor }}</td>
+                                <td>{{ afastamento.ano_inicio }}/{{ afastamento.periodo_inicio }}</td>
+                                <td>
+                                    {% if afastamento.ano_termino %}
+                                        {{ afastamento.ano_termino }}/{{ afastamento.periodo_termino }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {{ afastamento.get_tipo_substituicao_display }}
+                                </td>
+                                <td>
+                                    {{ afastamento.observacao }}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                </div>
+            {% else %}
+                <p class='alert alert-warning'>Nehum registro encontrado.</p>
+            {% endif %}
+        {% endwith %}
+
+    {% endbox %}
+
+    {% box "Contratações" %}
+        <div>
+            <ul class="action-bar">
+               <li><a class="btn success popup" href="/edu/adicionar_simulacao_contratacao/{{ obj.pk }}">Simular Contratação</a></li>
+            </ul>
+        </div>
+        <div style="clear: both"></div>
+        {% with contratacoes=obj.simulacaocontratacao_set.all %}
+            {% if contratacoes.exists %}
+                <div class="responsive">
+                <table>
+                    <thead>
+                    <tr>
+                        <th></th>
+                        <th>Grupo de Atuação</th>
+                        <th>Início</th>
+                        <th>Fim</th>
+                        <th>Tipo de Substituição</th>
+                        <th>Observação</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                        {% for contratacao in contratacoes.all %}
+                            <tr>
+                                <td>
+                                    <a class="popup icon icon-edit" href="/edu/adicionar_simulacao_contratacao/{{ obj.pk }}/{{ contratacao.pk }}/"></a>
+                                    <a class="icon icon-delete" href="?del_simulacao_contratacao={{ contratacao.pk }}"></a>
+                                </td>
+                                <td>{{ contratacao.grupo_atuacao }}</td>
+                                <td>{{ contratacao.ano_inicio }}/{{ contratacao.periodo_inicio }}</td>
+                                <td>
+                                    {% if contratacao.ano_termino %}
+                                        {{ contratacao.ano_termino }}/{{ contratacao.periodo_termino }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {{ contratacao.get_tipo_contratacao_display }}
+                                </td>
+                                <td>
+                                    {{ contratacao.observacao }}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                </div>
+            {% else %}
+                <p class='alert alert-warning'>Nehum registro encontrado.</p>
+            {% endif %}
+        {% endwith %}
+    {% endbox %}
+
+    {% box "Alteração de CH docente" %}
+        <div>
+            <ul class="action-bar">
+               <li><a class="btn success popup" href="/edu/simular_carga_horaria_professor/{{ obj.pk }}/0/">Simular Carga Horária</a></li>
+            </ul>
+        </div>
+        <div style="clear: both"></div>
+        {% if obj.simulacaocargahorariaprofessor_set.exists %}
+                <div class="responsive">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Ações</th>
+                        <th>Matrícula</th>
+                        <th>Nome</th>
+                        <th>Carga Horária Semanal</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                        {% for registro in obj.simulacaocargahorariaprofessor_set.all %}
+                            <tr>
+                                <td>
+                                    <a class="popup icon icon-edit" href="/edu/simular_carga_horaria_professor/{{ obj.pk }}/{{ registro.pk }}/"></a>
+                                </td>
+                                <td>{{ registro.professor.get_matricula }}</td>
+                                <td>{{ registro.professor.get_nome }}</td>
+                                <td>{{ registro.ch_sala_aula_semanal }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                </div>
+        {% else %}
+            <p class='alert alert-warning'>Nehum registro encontrado.</p>
+        {% endif %}
+
+    {% endbox %}
+
+    {% box "Docentes" %}
+        {% if professores %}
+            <div class="responsive">
+            <table>
+                <thead>
+                <tr>
+                    <th rowspan="3">Matrícula</th>
+                    <th rowspan="3">Nome</th>
+                    <th rowspan="3">CH em sala de aula</th>
+                    <th class="center" colspan="{{ obj.get_periodos|length|add:2 }}">Grupos de atuação</th>
+                </tr>
+                <tr>
+                    <th rowspan="2">Nome</th>
+                    <th rowspan="2">Percentual de participação</th>
+                    <th class="center" colspan="{{ obj.get_periodos|length }}">CH disponível</th>
+                </tr>
+                <tr>
+                    {% for periodo in obj.get_periodos %}
+                        <th class="center">{{ periodo }}</th>
+                    {% endfor %}
+                </tr>
+                </thead>
+                <tbody>
+                    {% for professor in professores %}
+                        {% with rowspan=professor.pga_cont %}
+                        {% for pga in professor.pgas %}
+                        <tr>
+                            {% if forloop.first %}
+                                <td rowspan="{{ rowspan }}">{{ professor.matricula }}</td>
+                                <td rowspan="{{ rowspan }}">{{ professor.nome }}</td>
+                                <td rowspan="{{ rowspan }}">
+                                    {{ professor.get_ch_semanal_professor|format }}
+                                </td>
+                            {% endif %}
+                            <td class="center">{{ pga.grupo_atuacao }}</td>
+                            <td class="center">{{ pga.percentual }}%</td>
+                            {% for periodo in pga.periodos %}
+                                <td class="center">{{ periodo }}</td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                        {% endwith %}
+                    {% endfor %}
+
+                </tbody>
+            </table>
+            </div>
+        {% else %}
+            <p class='alert alert-warning'>Nehum registro encontrado.</p>
+        {% endif %}
+    {% endbox %}
+
+    {% box "Total de alunos" %}
+        <div class="responsive">
+        <table>
+            <thead>
+            <tr>
+                <th rowspan="2">Ações</th>
+                <th rowspan="2">Matriz</th>
+                <th rowspan="2">Nível de Ensino</th>
+                <th rowspan="2">Turno</th>
+                {% for periodo in obj.get_periodos %}
+                    <th class="center" colspan="10">{{ periodo }}</th>
+                {% endfor %}
+            </tr>
+            <tr>
+                {% for periodo in obj.get_periodos %}
+                    {% for serie in obj.get_series %}
+                        <th>{{ serie }}º</th>
+                    {% endfor %}
+                {% endfor %}
+            </tr>
+            </thead>
+            <tbody>
+                {% for item in obj.get_itens %}
+                <tr>
+                    <td><a class="popup icon icon-edit" href="/edu/editar_quantidade_alunos/{{ item.pk }}/"></a></td>
+                    <td>{{ item.matriz.descricao }}</td>
+                    <td>{{ item.matriz.nivel_ensino }}</td>
+                    <td>{{ item.turno }}</td>
+                    {% for periodo in obj.get_periodos %}
+                        {% for serie in obj.get_series %}
+                            {% if serie > item.matriz.qtd_periodos_letivos %}
+                                <td></td>
+                            {% else %}
+                                {% with serie|stringformat:"i"|add:"/"|add:periodo as dados %}
+                                    <td class="center">{{ item|method:"get_qtd_alunos"|call:dados }}</td>
+                                {% endwith %}
+                            {% endif %}
+                        {% endfor %}
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    {% endbox %}
+
+    {% box "Quantitativo de turmas" %}
+        <div class="responsive">
+        <table>
+            <thead>
+            <tr>
+                <th rowspan="2">Matriz</th>
+                <th rowspan="2">Turno</th>
+                <th rowspan="2">Alunos/Turma</th>
+                {% for periodo in obj.get_periodos %}
+                    <th class="center" colspan="10">{{ periodo }}</th>
+                {% endfor %}
+            </tr>
+            <tr>
+                {% for periodo in obj.get_periodos %}
+                    {% for serie in obj.get_series %}
+                        <th>{{ serie }}º</th>
+                    {% endfor %}
+                {% endfor %}
+            </tr>
+            </thead>
+            <tbody>
+                {% for item in obj.get_itens %}
+                <tr>
+                    <td>{{ item.matriz }}</td>
+                    <td>{{ item.turno }}</td>
+                    <td class="center">{{ item.get_qtd_alunos_por_turma }}</td>
+                    {% for periodo in obj.get_periodos %}
+                        {% for serie in obj.get_series %}
+                            {% if serie > item.matriz.qtd_periodos_letivos %}
+                                <td></td>
+                            {% else %}
+                                {% with serie|stringformat:"i"|add:"/"|add:periodo as dados %}
+                                    <td class="center">{{ item|method:"get_qtd_turmas"|call:dados }}</td>
+                                {% endwith %}
+                            {% endif %}
+                        {% endfor %}
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    {% endbox %}
+
+    {% box "Total de carga horária" %}
+        {% if grupos_atuacao %}
+            <div class="responsive">
+            <table>
+                <thead>
+                <tr>
+                    <th rowspan="2">Grupo</th>
+                    {% for periodo in obj.get_periodos %}
+                        <th class="center" colspan="3">{{ periodo }}</th>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    {% for periodo in obj.get_periodos %}
+                        <th>Disponível</th>
+                        <th>Necessária</th>
+                        <th>Saldo</th>
+                    {% endfor %}
+                </tr>
+                </thead>
+                <tbody>
+                    {% for grupo in grupos_atuacao %}
+                        <tr>
+                            <td><div style="width:300px">{{ grupo.nome }}</div></td>
+                            {% for periodo in grupo.periodos %}
+                                <td class="center">{{ periodo.get_ch_disponivel_grupo_atuacao_periodo }}</td>
+                                <td class="center">{{ periodo.get_ch_necessaria_grupo_atuacao_periodo }}</td>
+                                <td class="center">
+                                    {% with saldo=periodo.get_ch_saldo_grupo_atuacao_periodo %}
+                                        {% if saldo > 0 %}
+                                            <span style="color:green;font-weight:bold">+{{ saldo }}</span>
+                                        {% else %}
+                                            <span style="color:red;font-weight:bold">{{ saldo }}</span>
+                                        {% endif %}
+                                    {% endwith %}
+                                </td>
+                            {% endfor %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            </div>
+        {% else %}
+            <p class='alert alert-warning'>Nenhum registro encontrado.</p>
+        {% endif %}
+    {% endbox %}
+
+    {% box "Total de docentes" %}
+        {% if grupos_atuacao %}
+            <div class="responsive">
+            <table>
+                <thead>
+                <tr>
+                    <th rowspan="2">Grupo</th>
+                    {% for periodo in obj.get_periodos %}
+                        <th class="center" colspan="3">{{ periodo }}</th>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    {% for periodo in obj.get_periodos %}
+                        <th>Disponível</th>
+                        <th>Necessária</th>
+                        <th>Saldo</th>
+                    {% endfor %}
+                </tr>
+                </thead>
+                <tbody>
+                    {% for grupo in grupos_atuacao %}
+                        <tr>
+                            <td><div style="width:300px">{{ grupo.nome }}</div></td>
+                            {% for periodo in grupo.periodos %}
+                                <td class="center">{{ periodo.get_docente_disponivel_grupo_atuacao_periodo }}</td>
+                                <td class="center">{{ periodo.get_docente_necessario_grupo_atuacao_periodo }}</td>
+                                <td class="center">
+                                    {% with saldo=periodo.get_docente_saldo_grupo_atuacao_periodo %}
+                                        {% if saldo > 0 %}
+                                            <span style="color:green;font-weight:bold">+{{ saldo }}</span>
+                                        {% else %}
+                                            <span style="color:red;font-weight:bold">{{ saldo }}</span>
+                                        {% endif %}
+                                    {% endwith %}
+                                </td>
+                            {% endfor %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            </div>
+        {% else %}
+            <p class='alert alert-warning'>Nenhum registro encontrado.</p>
+        {% endif %}
+    {% endbox %}
+
+{% endblock %}

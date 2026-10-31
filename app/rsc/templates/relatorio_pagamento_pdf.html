@@ -1,0 +1,368 @@
+{% extends "relatorio_pdf.html" %}
+
+{% load rsc_tags %}
+
+{% block cabecalho %}
+{% endblock %}
+
+{% block page_settings %}
+    @page {
+        size: a4 {% block page_orientation %}portrait{% endblock %};
+        background-image: url(/static/comum/img/logo_if_portrait.png);
+        background-position: right bottom;
+        background-repeat: no-repeat;
+        margin-top: 0.5cm; /* HeaderHeight */
+        margin-bottom: 1cm; /* FooterHeight */
+        margin-left: 0.5cm;
+        margin-right: 0.5cm;
+        @bottom-right {
+            content: "Página " counter(page) " de " counter(pages);
+        }
+    }
+    header{
+        top: -2cm; /* -HeaderHeight */
+        height: 2cm; /* HeaderHeight */
+        position: fixed;
+        width:98%;
+        padding-top: 0.5cm;
+    }
+    main{
+
+    }
+    footer{
+        bottom: 0cm; /* -FooterHeight */
+        height: 1cm; /* FooterHeight */
+        position: fixed;
+        width: 100%;
+        text-align: center;
+    }
+{% endblock %}
+
+{% block style %}
+    td {
+        font-size: 8pt !important;
+    }
+    h2 {
+        text-align: center;
+        color: white;
+        background-color: black;
+        padding-top: 6px;
+        margin-bottom: 2px;
+    }
+    .logotipo {
+        height: 50px;
+    }
+    .width-10 {
+        width: 10%;
+        text-align: center;
+    }
+    .width-15 {
+        width: 15%;
+        text-align: center;
+    }
+    .width-20 {
+        width: 20%;
+        text-align: center;
+    }
+    ul {
+        margin: 0;
+        padding-left: 10px;
+    }
+    li {
+        padding-bottom: 5px;
+    }
+{% endblock %}
+
+{% block content %}
+	<table>
+        <tr>
+            <td rowspan="3"><img src="/static/comum/img/brazao_colorido.jpg" alt="Brasão do Brasil" class="logotipo" /></td>
+            <td class="titulo">SERVIÇO PÚBLICO FEDERAL</td>
+            <td rowspan="3"><img src={% get_logo_instituicao %} alt="Logotipo do {% get_valor_por_chave "comum" "instituicao_sigla" %}"  class="logotipo" /></td>
+        </tr>
+        <tr>
+            <td>INSTITUTO FEDERAL DE EDUCAÇÃO, CIÊNCIA E TECNOLOGIA DO RIO GRANDE DO NORTE</td>
+        </tr>
+        <tr>
+            <td class="titulo">RELATÓRIO DE PAGAMENTO DOS AVALIADORES</td>
+        </tr>
+    </table>
+
+<div class="corpo">
+
+    {% if processos %}
+        <h2>PROCESSOS</h2>
+
+        <strong>Total de Processos: {{ total_processos }}</strong>
+
+        <table class="bordered" >
+            <thead>
+                <tr>
+                    <th>Processo</th>
+                    <th>Avaliadores</th>
+                    <th class="width-15">Data de Finalização</th>
+                    <th class="width-10">Situação</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for processo in processos %}
+                <tr>
+                    <td>{{ processo }}</td>
+                    <td>
+                        <ul>
+                            {% for avaliador in processo.banca_avaliadora_final %}
+                                <li>{{ avaliador|normalizar }}</li>
+                            {% endfor %}
+                        </ul>
+                    </td>
+                    <td>{{ processo.data_finalizacao_processo|date:'d/m/Y' }}</td>
+                    <td>{{ processo.status_estilizado|safe }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+
+    {% if avaliadores_internos %}
+        <h2>INFORMAÇÕES GERAIS</h2>
+        <table class="bordered">
+            <thead>
+                <tr>
+                    <th>Quantidade de Processos</th>
+                    <th>Quantidade de Avaliações</th>
+                    <th>Valor Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="text-center">{{ total_processos }}</td>
+                    <td class="text-center">{{ total_avaliacoes_internos }}</td>
+                    <td class="text-center">{{ valor_total_internos|format_money }}</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>AVALIADORES INTERNOS</h2>
+        {% for avaliador in avaliadores_internos %}
+            <table class="bordered">
+                <thead>
+                    <tr>
+                        <th class="text-start">Avaliador</th>
+                        <th class="width-20">Qtde. de Avaliação</th>
+                        <th class="width-20">Valor a Pagar</th>
+                        <th class="width-20">Qtde. de Horas</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>{{ avaliador|format }}</td>
+                        <td class="text-center">{{ avaliador.qtde_avaliacoes|format }}</td>
+                        <td class="text-center">{{ avaliador.valor_a_pagar|format_money }}</td>
+                        <td class="text-center">{{ avaliador.qtde_horas|format }}</td>
+                    </tr>
+                </tbody>
+            </table>
+            <table class="bordered">
+                <thead>
+                    <tr>
+                        <th class="text-start">Processo Avaliado por {{ avaliador|format }}</th>
+                        <th class="width-20">Data de Finalização</th>
+                        <th class="width-20">Situação da Avaliação</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for avaliacao in avaliador.avaliacoes %}
+                        <tr>
+                            <td>{{ avaliacao.processo|format }}</td>
+                            <td class="text-center">{{ avaliacao.data_finalizacao|date:'d/m/Y' }}</td>
+                            <td class="text-center">{{ avaliacao.get_status_display|format }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <br />
+        {% endfor %}
+    {% endif %}
+
+    {% if avaliadores_externos and relatorio != 'externo_instituicao_origem' %}
+        <h2>INFORMAÇÕES GERAIS</h2>
+        <table class="bordered">
+            <thead>
+                <tr>
+                    <th>Quantidade de Processos</th>
+                    <th>Quantidade de Avaliações</th>
+                    <th>Valor Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="text-center">{{ total_processos }}</td>
+                    <td class="text-center">{{ total_avaliacoes_externos }}</td>
+                    <td class="text-center">{{ valor_total_externos|format_money }}</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>AVALIADORES EXTERNOS</h2>
+        {% for avaliador in avaliadores_externos %}
+            <table class="bordered">
+                <thead>
+                    <tr>
+                        <th colspan="3">{{ avaliador.vinculo.user.get_profile.nome|upper }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Matrícula:</strong> {{ avaliador.matricula_siape|format }}</td>
+                        <td colspan="2"><strong>Data Nascimento:</strong> {{ avaliador.vinculo.user.get_profile.nascimento_data|format }}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>CPF:</strong> {{ avaliador.vinculo.user.get_profile.cpf|format }}</td>
+                        <td colspan="2"><strong>Telefone:</strong> {{ avaliador.vinculo.user.get_profile.telefones }}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>E-mail para contato:</strong> {{ avaliador.email_contato|format }}</td>
+                        <td colspan="2"><strong>Instituição de Origem:</strong> {{ avaliador.instituicao_origem|format }}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Número do Documento de Identificação:</strong> {{ avaliador.numero_documento_identificacao|format }}</td>
+                        <td colspan="2"><strong>Emissor do Documento de Identificação:</strong> {{ avaliador.emissor_documento_identificacao|format }}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>PIS/PASEP:</strong> {{ avaliador.pis_pasep|format }}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Logradouro:</strong> {{ avaliador.endereco_logradouro|format }}</td>
+                        <td><strong>Número:</strong> {{ avaliador.endereco_numero|format }}</td>
+                        <td><strong>Município:</strong> {{ avaliador.endereco_municipio|format }}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Complemento:</strong> {{ avaliador.endereco_complemento|format }}</td>
+                        <td><strong>Bairro:</strong> {{ avaliador.endereco_bairro|format }}</td>
+                        <td><strong>CEP:</strong> {{ avaliador.endereco_cep|format }}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Banco:</strong> {{ avaliador.banco|format }}</td>
+                        <td><strong>Número da Agência:</strong> {{ avaliador.numero_agencia|format }}</td>
+                        <td><strong>Tipo da Conta:</strong> {{ avaliador.tipo_conta|format }}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Número da Conta:</strong> {{ avaliador.numero_conta|format }}</td>
+                        <td><strong>Operação:</strong> {{ avaliador.operacao|format }}</td>
+                    </tr>
+                </tbody>
+            </table>
+            <table class="bordered">
+                <thead>
+                    <tr>
+                        <th>Qtde. de Avaliação</th>
+                        <th>Valor Bruto a Pagar</th>
+                        <th>Desconto INSS (11%)</th>
+                        <th>Desconto ISS (5%)</th>
+                        <th>Valor Líquido a Pagar</th>
+                        <th>Qtde. de Horas</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="text-center">{{ avaliador.qtde_avaliacoes|format }}</td>
+                        <td class="text-center">{{ avaliador.valor_a_pagar|format_money }}</td>
+                        <td class="text-center">{{ avaliador.desconto_inss_a_pagar|format_money }}</td>
+                        <td class="text-center">{{ avaliador.desconto_iss_a_pagar|format_money }}</td>
+                        <td class="text-center">{{ avaliador.valor_liquido_a_pagar|format_money }}</td>
+                        <td class="text-center">{{ avaliador.qtde_horas|format }}</td>
+                    </tr>
+                </tbody>
+            </table>
+            <table class="bordered">
+                <thead>
+                    <th class="text-start">Processo Avaliado por {{ avaliador|format }}</th>
+                    <th class="width-20">Data de Finalização</th>
+                    <th class="width-20">Situação da Avaliação</th>
+                </thead>
+                <tbody>
+                    {% for avaliacao in avaliador.avaliacoes %}
+                        <tr>
+                            <td>{{ avaliacao.processo|format }}</td>
+                            <td>{{ avaliacao.data_finalizacao|date:'d/m/Y' }}</td>
+                            <td>{{ avaliacao.get_status_display|format }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <br />
+            <br />
+        {% endfor %}
+    {% endif %}
+
+    {% if avaliadores_externos and relatorio == 'externo_instituicao_origem' %}
+        <h2>AVALIADORES EXTERNOS POR INSTITUIÇÃO DE ORIGEM</h2>
+        {% regroup avaliadores_externos by instituicao_origem as avaliadores %}
+        {% for avaliador_io in avaliadores %}
+            <strong>{{ avaliador_io.grouper }}</strong> [ <strong>UG:</strong> {{ avaliador_io.grouper.unidade_gestora }}  <strong>UASG:</strong> {{ avaliador_io.grouper.uasg }} ]
+            {% if avaliador_io.grouper %}
+                <table class="bordered">
+                    <thead>
+                        <tr>
+                            <th>Quantidade de Processos</th>
+                            <th>Quantidade de Avaliações</th>
+                            <th>Valor Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="text-center">{{ total_avaliacoes_por_instituicao|get_value_dict:avaliador_io.grouper.id|get_value_list:1 }}</td>
+                            <td class="text-center">{{ total_avaliacoes_por_instituicao|get_value_dict:avaliador_io.grouper.id|get_value_list:2 }}</td>
+                            <td class="text-center">{{ total_avaliacoes_por_instituicao|get_value_dict:avaliador_io.grouper.id|get_value_list:3|format_money }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <br />
+            {% endif %}
+
+            {% for avaliador in avaliador_io.list %}
+                <table class="bordered">
+                    <thead>
+                        <tr>
+                            <th class="text-start">Avaliador</th>
+                            <th class="width-20">Qtde. de Avaliação</th>
+                            <th class="width-20">Valor a Pagar</th>
+                            <th class="width-20">Qtde. de Horas</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>{{ avaliador.vinculo.user.get_profile.nome|format }} ({{ avaliador.matricula_siape|format }})</td>
+                            <td class="text-center">{{ avaliador.qtde_avaliacoes|format }}</td>
+                            <td class="text-center">{{ avaliador.valor_a_pagar|format_money }}</td>
+                            <td class="text-center">{{ avaliador.qtde_horas|format }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <table class="bordered">
+                    <thead>
+                        <th>Processo Avaliado por {{ avaliador.vinculo.user.get_profile.nome|format }} ({{ avaliador.matricula_siape|format }})</th>
+                        <th class="width-20">Data de Finalização</th>
+                        <th class="width-20">Situação da Avaliação</th>
+                    </thead>
+                    <tbody>
+                        {% for avaliacao in avaliador.avaliacoes %}
+                            <tr>
+                                <td>{{ avaliacao.processo|format }}</td>
+                                <td>{{ avaliacao.data_finalizacao|date:'d/m/Y' }}</td>
+                                <td>{{ avaliacao.get_status_display|format }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <br />
+            {% endfor %}
+            <br />
+        {% endfor %}
+    {% endif %}
+
+</div>
+{% endblock %}
+
+{% block footer %}
+{% endblock %}

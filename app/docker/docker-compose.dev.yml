@@ -1,0 +1,303 @@
+services:
+  web:
+    restart: always
+    stdin_open: true
+    tty: true
+    user: "0:0"
+    env_file:
+      - ../.env
+    image: "${SUAP_IMAGE}:dev"
+    build:
+      context: ..
+      dockerfile: ./docker/Dockerfile
+      target: suap-dev
+      args:
+        - BASE_IMAGE=${SUAP_IMAGE}:base
+    command: python manage.py runserver 0.0.0.0:8000
+    ports:
+      - "8000:8000"
+    ulimits:
+      memlock: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - type: bind
+        source: ../
+        target: /opt/suap
+      - type: bind
+        source: ./crontab/tasks
+        target: /etc/crontab
+    healthcheck:
+      test: curl --fail -s http://web:8000/accounts/login/
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - suap
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  celery:
+    restart: always
+    stdin_open: true
+    tty: true
+    user: "0:0"
+    env_file:
+      - ../.env
+    image: "${SUAP_IMAGE}:dev"
+    command: ./bin/celery.sh $CELERY_QUEUE --autoreload
+    ulimits:
+      memlock: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - type: bind
+        source: ../
+        target: /opt/suap
+    networks:
+      - suap
+    healthcheck:
+      test: celery -A suap inspect ping
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  celery-beat:
+    restart: always
+    stdin_open: true
+    tty: true
+    env_file:
+      - ../.env
+    image: "${SUAP_IMAGE}:dev"
+    command: ./bin/celery-beat.sh $CELERY_QUEUE
+    ulimits:
+      memlock: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - type: bind
+        source: ../
+        target: /opt/suap/
+    networks:
+      - suap
+    healthcheck:
+      test: celery -A suap inspect ping
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  cron:
+    restart: always
+    stdin_open: true
+    tty: true
+    env_file:
+      - ../.env
+    image: "${SUAP_IMAGE}:dev"
+    user: "0:0"
+    command: cron -f
+    ulimits:
+      memlock: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - type: bind
+        source: ../
+        target: /opt/suap
+      - type: bind
+        source: ../.env
+        target: /etc/environment
+        read_only: true
+      - type: bind
+        source: ./crontab/tasks
+        target: /etc/crontab
+      - type: bind
+        source: /etc/ssl/suap/
+        target: /etc/ssl/suap/
+        read_only: true
+    networks:
+      - suap
+
+  pdfprinter:
+    restart: always
+    image: "${SUAP_PDF_IMAGE}"
+    stdin_open: true
+    tty: true
+    env_file:
+      - ../.env
+    volumes:
+      - type: bind
+        source: "${SUAP_PDF_VOLUME_PATH}"
+        target: /opt/suap-pdf/volume
+      - type: bind
+        source: "${SUAP_PDF_VOLUME_PATH}/tmp"
+        target: /tmp
+    ports:
+      - "9000:8000"
+    networks:
+      - suap
+    healthcheck:
+      test: curl -s http://pdfprinter:8000
+      interval: 30s
+      timeout: 10s
+      retries: 5
+  
+  mail:
+    restart: always
+    image: mailhog/mailhog:latest
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - suap
+    healthcheck:
+      test: curl -s http://mail:8025/api/v2/messages | grep -q '"total":0'
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  base:
+    env_file:
+      - ../.env
+    image: "${SUAP_IMAGE}:base"
+    build:
+      context: ..
+      dockerfile: ./docker/Dockerfile.base
+
+  prod:
+    env_file:
+      - ../.env
+    image: "${SUAP_IMAGE}"
+    build:
+      context: ..
+      dockerfile: ./docker/Dockerfile
+      target: suap-app
+      args:
+        - BASE_IMAGE=${SUAP_IMAGE}:base
+
+  celery-flower:
+    restart: always
+    stdin_open: true
+    tty: true
+    env_file:
+      - ../.env
+    image: "${SUAP_IMAGE}:dev"
+    command: ./bin/celery-flower.sh $CELERY_BROKER_URL $FLOWER_BASIC_AUTH
+    ulimits:
+      memlock: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    ports:
+      - "5555:5555"
+    networks:
+      - suap
+    healthcheck:
+      test: celery -A suap inspect ping
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  ai:
+    restart: always
+    stdin_open: true
+    tty: true
+    env_file:
+      - ../.env
+    image: "${SUAP_AI_IMAGE}"
+    ports:
+      - "7000:8000"
+    networks:
+      - suap
+    healthcheck:
+      test: curl -s http://ai:8000
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  minio:
+    restart: always
+    user: "0:0"
+    networks:
+      - suap
+    image: quay.io/minio/minio:RELEASE.2023-08-31T15-31-16Z
+    command: server --console-address ":9001" /data
+    volumes:
+      - ../deploy:/data
+    expose:
+      - "9000"
+      - "9001"
+    environment:
+      MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID}
+      MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY}
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+  
+  minio-nginx:
+    restart: always
+    networks:
+      - suap
+    user: "0:0"
+    image: nginx:latest
+    hostname: nginx
+    volumes:
+      - type: bind
+        source: ../docker/nginx/minio.conf.template
+        target: /etc/nginx/templates/minio.conf.template
+        read_only: true
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    depends_on:
+      minio:
+        condition: service_healthy
+
+  redis:
+    restart: always
+    env_file:
+      - ../.env
+    networks:
+      - suap
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  db:
+    restart: always
+    env_file:
+      - ../.env
+    networks:
+      - suap
+    image: postgres:18
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${DATABASE_USER:-postgres}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-postgres}
+      PGDATA: /data/postgres
+    volumes:
+      - /opt/pgdata:/data/postgres
+      - /tmp:/tmp
+    shm_size: 2gb
+
+networks:
+  suap:
+    driver: bridge
+
+volumes:
+  postgres:

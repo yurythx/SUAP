@@ -1,0 +1,111 @@
+{% extends super_template %}
+
+{% block extrahead %}
+    <script>
+        function human_file_size(bytes, si) {
+            var thresh = si ? 1000 : 1024;
+            if(bytes < thresh) return bytes + ' B';
+            var units = si ? ['kB','MB','GB','TB','PB','EB','ZB','YB'] : ['KB','MB','GB','TB','PB','EB','ZB','YB'];
+            var u = -1;
+            do {
+                bytes /= thresh;
+                ++u;
+            } while(bytes >= thresh);
+            return bytes.toFixed(1)+' '+units[u];
+        };
+
+        function onCompleteUpload(uploader, id, fileName, responseJSON) {
+            var el = uploader._getItemByFileId(id);
+            if(responseJSON.success) {
+                var templateRow = '' +
+                        '<tr>' +
+                        '    <td>' +
+                        '        <a class="icon icon-view" href="/arquivo/visualizar_arquivo_pdf/' + responseJSON.chave + '" title="Visualizar o arquivo ' + fileName + '"><span class="visually-hidden">Visualizar</span></a>' +
+                        '        <a class="icon icon-delete" href="/arquivo/arquivos_pendentes_servidor/{{ servidor.id }}/' + responseJSON.chave + '/excluir/" title="Excluir o arquivo ' + fileName + '"><span class="visually-hidden">Excluir</span></a>' +
+                        '    </td>' +
+                        '    <td><a href="/arquivo/visualizar_arquivo_pdf/' + responseJSON.chave + '" title="Visualizar o arquivo ' + fileName + '">' + fileName + '</a></td>' +
+                        '    <td>' + human_file_size(responseJSON.tamanho) + '</td>' +
+                        '</tr>';
+                $(templateRow).hide().prependTo("#arquivos_pendentes tbody").fadeIn("slow");
+                $($(el).find('.qq-upload-result')[0]).html('<span class="true">Concluído</span>').fadeOut("slow");
+            } else {
+                $($(el).find('.qq-upload-result')[0]).html('<span class="false">Ocorreu um erro!</span>');
+            }
+            $(el).find('.qq-progress')[0].remove();
+        }
+    </script>
+{% endblock %}
+
+{% block content %}
+
+<ul class="action-bar">
+    <li><a href="/arquivo/arquivos_upload/" class="btn success">Selecionar Outro Servidor</a></li>
+</ul>
+{% if servidor %}
+    {% box 'Identificação do Servidor' %}
+        <div class="photo-circle lg">
+            <img src="{{ servidor.get_foto_150x200_url }}" alt="{{ servidor.pessoa_fisica.nome }}" />
+        </div>
+        <div>
+            <table class="info">
+                <tr>
+                    <td>Nome</td>
+                    <td>{{ servidor.pessoa_fisica.nome }}</td>
+                    <td>Matricula</td>
+                    <td>{{ servidor.matricula }}</td>
+                </tr>
+                <tr>
+                    <td>E-mail Institucional</td>
+                    <td colspan="3"><a href="mailto:{{ servidor.email_institucional }}">{{ servidor.email_institucional|format }}</a></td>
+                </tr>
+                <tr>
+                    <td>Telefone</td>
+                    <td colspan="3">{{ servidor.telefones_institucionais|format }}</td>
+                </tr>
+                <tr>
+                    <td>Cargo</td>
+                    <td>{{ servidor.cargo_emprego }}</td>
+                    <td>Início do Exercício</td>
+                    <td>{{ servidor.data_inicio_exercicio_na_instituicao }}</td>
+                </tr>
+            </table>
+        </div>
+    {% endbox %}
+    
+    {% box 'Formulário de Upload de Arquivos' %}
+        <p class="alert alert-warning">Somente serão carregados arquivos com extensão <strong>pdf</strong>.</p>
+        {% render_form form False %}
+    {% endbox %}
+    
+    {% if arquivos_pendentes_identificar_servidor %}
+        {% box 'Arquivos Pendentes' %}
+            <table id="arquivos_pendentes">
+                <thead>
+                    <tr>
+                        <th class="no-print">Ações</th>
+                        <th>Arquivo</th>
+                        <th>Tamanho</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for arquivo in arquivos_pendentes_identificar_servidor %}
+                        <tr>
+                            <td id="viewer" class="no-print">
+                                {% icon "view" "/arquivo/visualizar_arquivo_pdf/{{ arquivo.encrypted_pk }}" %}
+                                {% icon "delete" "/arquivo/arquivos_pendentes_servidor/{{ servidor.id }}/{{ arquivo.encrypted_pk }}/excluir/" %}
+                            </td>
+                            <td>
+                                <a href="/arquivo/visualizar_arquivo_pdf/{{ arquivo.encrypted_pk }}" title="Visualizar o arquivo {{ arquivo.nome|format }}">{{ arquivo.nome|format }}</a>
+                            </td>
+                            <td>{{ arquivo.file.size|filesizeformat }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endbox %}
+    {% endif %}
+{% else %}
+    <p class="alert alert-warning"><strong>Atenção:</strong> O servidor não foi encontrado.</p>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,935 @@
+variables:
+  GIT_STRATEGY: fetch
+  GIT_DEPTH: 0
+  GIT_SSL_NO_VERIFY: "true"
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+    - if: $CI_PIPELINE_SOURCE == 'web'
+    - if: $CI_PIPELINE_SOURCE == 'api'
+    - if: $CI_PIPELINE_SOURCE == 'external'
+    - if: $CI_COMMIT_BRANCH == 'master'
+    - if: $CI_MERGE_REQUEST_IID && $CI_MERGE_REQUEST_DRAFT == null
+
+stages:
+  - ai-review
+  - quality-assurance
+  - test
+  # `coverage` soma os dados das suítes unitária e e2e — só no pipeline agendado (noturno), que
+  # roda tudo; em MR os testes são recortados e um total combinado mediria só o que rodou.
+  - coverage
+  - development
+  - homologate
+  - build
+  - deploy
+  - post-merge
+  - containers
+  - special-tasks
+
+# ============================================================
+# Testes — docker executor (serviços isolados por job)
+# ============================================================
+
+# Entradas individuais de service (usadas via *anchor nas listas services: dos jobs)
+.postgres-service: &postgres-service
+  name: postgres:18
+  alias: postgres
+  pull_policy: if-not-present
+  command:
+    - "postgres"
+    - "-c"
+    - "max_locks_per_transaction=1024"
+    - "-c"
+    - "fsync=off"
+    - "-c"
+    - "synchronous_commit=off"
+    - "-c"
+    - "full_page_writes=off"
+
+# Template base de todo job de teste em docker executor
+.test-base:
+  image:
+    name: $CI_REGISTRY_IMAGE/test:latest
+    # [always, if-not-present]: como :latest é tag mutável, "always" faz o runner
+    # consultar o registry antes do job e detectar um rebuild publicado no master.
+    # NÃO rebaixa os ~3.6GB toda vez: só busca o manifest e compara digests; baixa
+    # apenas as layers que mudaram (ou seja, somente quando há imagem nova). O
+    # fallback "if-not-present" usa o cache local se o registry estiver inacessível.
+    # Requer allowed_pull_policies no config.toml do runner incluir AMBOS.
+    pull_policy: [always, if-not-present]
+  tags:
+    - docker-v3
+  variables:
+    GIT_DEPTH: "0"
+    GIT_SSL_NO_VERIFY: "true"
+    DATABASE_HOST: postgres
+    DATABASE_NAME: suap_dev
+    DATABASE_USER: postgres
+    # vars do job sao injetadas no container do service postgres -> cria DB no boot
+    POSTGRES_DB: suap_dev
+    POSTGRES_USER: postgres
+    POSTGRES_HOST_AUTH_METHOD: trust
+  before_script:
+    # settings de teste
+    - cp suap/settings_sample.py suap/settings.py
+    # pre-commit (--from-ref origin/master) e "git diff origin/master.." precisam do ref de master
+    - git fetch origin master:refs/remotes/origin/master
+    # integra master no que será testado (equivale aos "merged results pipelines", indisponíveis
+    # no tier Free); pega quebras que master introduz e força rebase em caso de conflito.
+    # O merge roda só dentro do job (descartado ao final), não persiste no repositório.
+    - git config user.email ci@suap.local && git config user.name "SUAP CI"
+    - git merge --no-edit origin/master || { echo "❌ branch conflita com master — faça rebase/merge de master antes de seguir"; exit 1; }
+    # sincroniza dependências do MR (cobre mudanças de deps Python não presentes na imagem)
+    - uv sync --all-groups
+    # coleta estáticos (manifest storage exige isso para renderizar templates nos testes)
+    - python manage.py collectstatic --skip-checks -v 0 --noinput
+  script:
+    - python manage.py suap_check
+
+
+checagem-codigo:
+  extends: .test-base
+  stage: quality-assurance
+  services:
+    - *postgres-service
+  variables:
+    SUAP_CHECK: code
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+      when: on_success
+  allow_failure: false
+
+# Suíte unitária em dois jobs, no mesmo desenho do e2e:
+#
+# - `unitario-transversal` roda SEMPRE: `tests/` (inclui `tests/scripts/`, os testes de `bin/scripts/`) e `bin/` (só para a cobertura dos scripts entrar no XML), que não pertencem a módulo.
+# - `unitario-modulo` roda só o que o MR pode quebrar: os módulos tocados e os que dependem
+#   DIRETAMENTE deles em `module_dependencies.json` (invertido). Quem decide é o `suap_check`
+#   (SUAP_APPS=dependentes); arquivo em djtools/, comum/, rh/ ou o conftest.py da raiz roda todos.
+#   3 shards fixos (`parallel: 3`), e não matriz por módulo: ~55 jobs multiplicariam preparo +
+#   schema. Quem reparte é o pytest-split, teste a teste, pela duração em `unitario_duracoes.json`
+#   (promovida do noturno; ver `ARQUIVO_DURACOES_UNITARIO` no `suap_check`). Medido antes da troca:
+#   MR pequeno ~3 min (quase tudo preparo), fallback e noturno ~50 min num job só.
+#
+# No pipeline agendado (noturno) os dois rodam completos. Ver
+# docs/superpowers/specs/2026-09-14-ci-testes-por-dependencia-design.md.
+unitario-transversal:
+  extends: .test-base
+  stage: test
+  services:
+    - *postgres-service
+  variables:
+    SUAP_CHECK: django
+    SUAP_APPS: tests bin
+    # Arquivo próprio: sem ele grava `artifacts/.coverage`, o mesmo do `unitario-modulo`, e no
+    # `cobertura-combinada` um artefato sobrescreveria o outro.
+    COVERAGE_FILE: artifacts/.coverage.unitario-transversal
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+      when: on_success
+    - if: $CI_PIPELINE_SOURCE == 'schedule'
+      when: on_success
+  allow_failure: false
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - artifacts
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: artifacts/coverage.xml
+
+unitario-modulo:
+  extends: .test-base
+  stage: test
+  parallel: 3
+  services:
+    - *postgres-service
+  variables:
+    SUAP_CHECK: django
+    # Um arquivo por shard: com o padrão (`artifacts/.coverage`), no `cobertura-combinada` o
+    # artefato de um shard sobrescreveria o dos outros.
+    COVERAGE_FILE: artifacts/.coverage.unitario-modulo-$CI_NODE_INDEX
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+      variables:
+        SUAP_APPS: dependentes
+      when: on_success
+    - if: $CI_PIPELINE_SOURCE == 'schedule'
+      variables:
+        SUAP_APPS: geral
+      when: on_success
+  allow_failure: false
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - artifacts
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: artifacts/coverage.xml
+
+behave-changed:
+  extends: .test-base
+  stage: test
+  services:
+    - *postgres-service
+  variables:
+    SUAP_CHECK: behave-changed
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+      when: on_success
+  allow_failure: false
+  artifacts:
+    when: on_failure
+    expire_in: 1 week
+    paths:
+      - artifacts
+
+# Valida a doc de usuário dos módulos tocados pelo MR (#17000, #17005).
+#
+# `allow_failure: true` e nenhuma checagem que reprove: o gate ALERTA, nunca bloqueia. A
+# superfície é uma nota no próprio MR, e é isso que resolve a pergunta "quem é o dono" sem
+# escolher um — o dono é o autor do MR, que está ali com o módulo na cabeça.
+#
+# Reporta o ESTADO COMPLETO do módulo tocado, não só o delta: os ~90 módulos começam sem doc
+# nenhuma, e um gate diff-local jamais emitiria sinal para eles — a dívida ficaria invisível.
+# O custo aceito é um MR pequeno em módulo sem doc receber nota que o autor não causou.
+# DESABILITADO TEMPORARIAMENTE: o `.` no início torna o job uma chave oculta (template), então
+# ele não é instanciado em nenhum pipeline. Para reativar, remova o ponto.
+.validar-doc:
+  extends: .test-base
+  stage: quality-assurance
+  needs: []
+  services:
+    - *postgres-service
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+      when: on_success
+  allow_failure: true
+  script:
+    - |
+      set -e
+      # Módulos tocados: diretório de topo de cada arquivo do diff que tenha `menu.yaml`.
+      #
+      # `for` e não `... | while read`: o runner roda com `set -eo pipefail`, e um `while`
+      # cujo último `[ -f ] && echo` falha termina em 1, envenena o pipe, derruba a atribuição
+      # e mata o job SEM IMPRIMIR NADA. Foi o que quebrou a primeira versão deste job.
+      MODULOS=""
+      for m in $(git diff --name-only origin/master...HEAD | cut -d/ -f1 | sort -u); do
+        if [ -f "$m/menu.yaml" ]; then MODULOS="$MODULOS $m"; fi
+      done
+      if [ -z "$MODULOS" ]; then echo "nenhum módulo com menu.yaml tocado"; exit 0; fi
+      echo "módulos tocados: $MODULOS"
+      python bin/scripts/validar_doc.py $MODULOS --markdown > nota-doc.md
+      if [ ! -s nota-doc.md ]; then echo "doc dos módulos tocados está em dia"; exit 0; fi
+      cat nota-doc.md
+      curl -sf --request POST \
+        --header "PRIVATE-TOKEN: $SUAP_BOT_TOKEN" \
+        --form "body=<nota-doc.md" \
+        "$CI_API_V4_URL/projects/$CI_PROJECT_ID/merge_requests/$CI_MERGE_REQUEST_IID/notes" > /dev/null
+      echo "nota publicada no MR !$CI_MERGE_REQUEST_IID"
+
+# Suíte e2e (pytest + Playwright), independente do behave, no mesmo desenho do unitário:
+# `e2e-transversal` roda sempre; `e2e-modulo` roda só as suítes `<modulo>/tests/e2e/` dos módulos
+# que o MR TOCA (SUAP_APPS=tocados). Diferente do `unitario-modulo`: sem dependentes diretos e sem
+# fallback em djtools/comum/rh — com eles quase todo MR caía nas 15 suítes (~137 min, ~45 min por
+# shard). O que isso deixa passar (dependente quebrado, mudança no harness em djtools/e2e_*.py) o
+# noturno pega.
+#
+# Ver tests/e2e/conftest.py.
+.e2e-base:
+  extends: .test-base
+  stage: test
+  services:
+    - *postgres-service
+  variables:
+    DJANGO_SETTINGS_MODULE: suap.settings_test
+    # Banco próprio: o seed do e2e e a fixture suap_data da suíte unitária montam a mesma
+    # árvore organizacional de formas incompatíveis (ver djtools/e2e_fixtures.py).
+    TEST_DATABASE_NAME: test_suap_e2e
+  # O `suap_check` decide o que roda (SUAP_CHECK=e2e ou e2e-transversal) e, só no noturno
+  # (SUAP_APPS=geral), liga a cobertura com um `COVERAGE_FILE` próprio por suíte — para o
+  # `cobertura-combinada` somar sem um artefato sobrescrever o outro. Medir no e2e vale porque o
+  # `live_server` roda o Django numa thread do próprio processo: o que o browser exercita entra na conta.
+  script:
+    # No-op na imagem de CI (bin/ci/Dockerfile já instala chromium em
+    # PLAYWRIGHT_BROWSERS_PATH); mantido para a imagem não virar dependência oculta.
+    - playwright install chromium
+    - python manage.py suap_check
+  allow_failure: false
+  artifacts:
+    # `always` e não `on_failure`: os dados de cobertura precisam sobreviver ao job verde
+    # para o `cobertura-combinada` encontrá-los.
+    when: always
+    expire_in: 1 week
+    paths:
+      - artifacts
+
+# Fluxos transversais (login, autocomplete, formulário, permissão, caixa de processos): 15
+# testes, baratos, e rodam em TODO MR de propósito. É o que mantém a propriedade que o job
+# único garantia — sem eles, um MR que não toca módulo com e2e não teria teste de browser
+# nenhum barrando o merge, e o `behave-changed` já vira no-op nesse caso.
+# Roda pelo `suap_check` (SUAP_CHECK=e2e-transversal): sem seleção nem shard, sempre `tests/e2e`,
+# com as mesmas regras do `e2e-modulo` — cobertura só no noturno.
+e2e-transversal:
+  extends: .e2e-base
+  variables:
+    SUAP_CHECK: e2e-transversal
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+      variables:
+        SUAP_APPS: tocados
+      when: on_success
+    - if: $CI_PIPELINE_SOURCE == 'schedule'
+      variables:
+        SUAP_APPS: geral
+      when: on_success
+
+# e2e por módulo: 3 jobs fixos. O `suap_check` (SUAP_CHECK=e2e) escolhe as suítes
+# `<modulo>/tests/e2e/` dos módulos tocados (SUAP_APPS=tocados), distribui entre os 3 por peso (duração
+# medida em `e2e_duracoes.json`) e cada job roda as suas — uma invocação de pytest por suíte. `edu`,
+# `saude` e `pesquisa` viram duas suítes cada (`edu-rotas`, `saude-2`, `pesquisa-2`; `DIVISOES_E2E` no
+# `suap_check`), para um MR que toca só um deles caber em 2 shards. Não há
+# lista de módulos aqui: suíte nova entra sozinha. Shard sem suíte sai verde em segundos, e o log de
+# qualquer shard mostra a atribuição de todos. No noturno (SUAP_APPS=geral) roda tudo, com cobertura.
+e2e-modulo:
+  extends: .e2e-base
+  parallel: 3
+  variables:
+    SUAP_CHECK: e2e
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+      variables:
+        SUAP_APPS: tocados
+      when: on_success
+    - if: $CI_PIPELINE_SOURCE == 'schedule'
+      variables:
+        SUAP_APPS: geral
+      when: on_success
+
+# Soma a cobertura das suítes unitária e e2e. SÓ no pipeline agendado (noturno): em MR os testes são
+# recortados por módulo, e um total combinado mediria só o que rodou. As anotações de linha no diff
+# do MR continuam vindo do `coverage_report` dos jobs unitários.
+cobertura-combinada:
+  extends: .test-base
+  stage: coverage
+  # Sem `services`: não roda teste, só soma arquivos de dados já produzidos.
+  # `needs` (e não `dependencies`): baixa os mesmos artefatos, mas dispara assim que as suítes
+  # terminam. Um `needs` em `unitario-modulo`/`e2e-modulo` cobre os 3 jobs do `parallel`.
+  needs:
+    - unitario-modulo
+    - unitario-transversal
+    - e2e-transversal
+    - e2e-modulo
+  script:
+    # Falha explícita se um dos lados não veio: combinar só um deles publicaria um número
+    # menor como se fosse o total, que é pior que não publicar.
+    # Um por shard (3 = o `parallel` do `unitario-modulo`). Checar cada índice, e não um glob, também
+    # pega `$CI_NODE_INDEX` não expandido no `COVERAGE_FILE`: os shards gravariam o mesmo nome.
+    - for i in 1 2 3; do test -f artifacts/.coverage.unitario-modulo-$i || { echo "❌ shard $i do unitario-modulo sem cobertura"; exit 1; }; done
+    - test -f artifacts/.coverage.unitario-transversal || { echo "❌ dados de cobertura do unitario-transversal ausentes"; exit 1; }
+    - ls artifacts/.coverage.e2e-* >/dev/null 2>&1 || { echo "❌ nenhum dado de cobertura de e2e presente"; exit 1; }
+    # Todos os arquivos vão para um diretório só, com nomes casando `<data_file>.*` — é esse
+    # o padrão que `coverage combine <dir>` procura, derivado do `data_file` do
+    # pyproject.toml (`artifacts/.coverage`). O resultado é escrito no próprio `data_file`.
+    # `mv` e não `cp`: `coverage xml`/`report` também combinam os `<data_file>.*` que acharem
+    # em `artifacts/` antes de relatar; cópias deixadas lá seriam somadas de novo (inócuo,
+    # a soma é união, mas confunde o log).
+    - mkdir -p artifacts/combinado
+    - mv artifacts/.coverage.unitario-modulo-* artifacts/combinado/
+    - mv artifacts/.coverage.unitario-transversal artifacts/combinado/
+    - mv artifacts/.coverage.e2e-* artifacts/combinado/
+    - coverage combine artifacts/combinado
+    - coverage xml -o artifacts/coverage.xml
+    - coverage report
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'schedule'
+      when: on_success
+  # Cobertura é informação, não portão.
+  allow_failure: true
+  coverage: '/TOTAL.*\s+(\d+\.\d+)%/'
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - artifacts
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: artifacts/coverage.xml
+
+.behave-by-area:
+  extends: .test-base
+  stage: test
+  services:
+    - *postgres-service
+  variables:
+    SUAP_CHECK: behave
+    SUAP_APPS: $CI_JOB_NAME
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'web' || $CI_PIPELINE_SOURCE == 'api' || $CI_PIPELINE_SOURCE == 'external'
+      when: manual
+  allow_failure: false
+  artifacts:
+    when: on_failure
+    expire_in: 1 week
+    paths:
+      - artifacts
+
+tecnologia-da-informacao:
+  extends: .behave-by-area
+
+comum:
+  extends: .behave-by-area
+
+gestao-de-pessoas:
+  extends: .behave-by-area
+
+administracao:
+  extends: .behave-by-area
+
+ensino:
+  extends: .behave-by-area
+
+desenvolvimento-institucional:
+  extends: .behave-by-area
+
+extensao:
+  extends: .behave-by-area
+
+atividades-estudantis:
+  extends: .behave-by-area
+
+pesquisa-e-inovacao:
+  extends: .behave-by-area
+
+comunicacao-social:
+  extends: .behave-by-area
+
+documentos-e-processos-eletronicos:
+  extends: .behave-by-area
+
+
+.opencode-skill: &opencode-skill
+  stage: ai-review
+  image:
+    # Imagem custom: nagyv/gitlab-opencode + nodejs/npm + MCPs (sentry, gitlab)
+    # Build: job `build-opencode-image` (bin/ci/Dockerfile.opencode)
+    name: $CI_REGISTRY_IMAGE/opencode:latest
+    entrypoint: [""]
+    # [always, if-not-present]: :latest é mutável; "always" detecta rebuild publicado
+    # (só busca manifest/digests, baixa apenas layers alteradas), com fallback p/ cache.
+    # Requer allowed_pull_policies no config.toml incluir AMBOS.
+    pull_policy: [always, if-not-present]
+  tags:
+    - docker-v3
+  variables:
+    GIT_STRATEGY: fetch
+    GIT_DEPTH: "0"
+    GIT_SSL_NO_VERIFY: "true"
+  script:
+    - bin/ci/opencode-skill.sh $SKILL_NAME $CI_MERGE_REQUEST_IID $CI_MERGE_REQUEST_PROJECT_ID $CI_SERVER_URL $SUAP_BOT_TOKEN $OPENCODE_PROVIDER $OPENCODE_MODEL $OPENCODE_API_KEY
+  allow_failure: true
+
+.run-only-on-first-mr-pipeline: &run-only-on-first-mr-pipeline
+  - |
+    export HEADER_TOKEN="PRIVATE-TOKEN:${SUAP_BOT_TOKEN}"
+    export MR_PIPELINES_URL="$CI_API_V4_URL/projects/$CI_MERGE_REQUEST_PROJECT_ID/merge_requests/$CI_MERGE_REQUEST_IID/pipelines?per_page=100"
+    export FIRST_PIPELINE_ID="$(curl --silent --header "$HEADER_TOKEN" "$MR_PIPELINES_URL" | jq 'sort_by(.id) | .[0].id')"
+    echo "Primeiro pipeline do MR: $FIRST_PIPELINE_ID"
+    echo "Pipeline atual: $CI_PIPELINE_ID"
+    if [[ -z "$FIRST_PIPELINE_ID" || "$FIRST_PIPELINE_ID" == "null" ]]; then
+      echo 'Nao foi possivel determinar o primeiro pipeline do MR.'
+      exit 1
+    fi
+    if [[ "$CI_PIPELINE_ID" != "$FIRST_PIPELINE_ID" ]]; then
+      echo 'Nao e o primeiro pipeline do MR. Encerrando job.'
+      exit 0
+    fi
+
+.merge-request-auto-rules: &merge-request-auto-rules
+  - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+    when: always
+
+.merge-request-manual-rules: &merge-request-manual-rules
+  - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+    when: manual
+
+mr-auto:
+  <<: *opencode-skill
+  rules: *merge-request-auto-rules
+  before_script:
+    - *run-only-on-first-mr-pipeline
+  script:
+    - bin/ci/opencode-skill.sh mr-format $CI_MERGE_REQUEST_IID $CI_MERGE_REQUEST_PROJECT_ID $CI_SERVER_URL $SUAP_BOT_TOKEN $OPENCODE_PROVIDER $OPENCODE_MODEL $OPENCODE_API_KEY
+
+mr-format:
+  <<: *opencode-skill
+  rules: *merge-request-manual-rules
+  variables:
+    SKILL_NAME: mr-format
+
+code-review:
+  <<: *opencode-skill
+  rules: *merge-request-manual-rules
+  variables:
+    SKILL_NAME: code-review
+
+# Comentário de confirmação no merge: em push na master (pós-merge), resolve o
+# MR mergeado a partir do commit e roda a skill pgd-rit-merge, que comenta no MR
+# qual RIT foi lançado no PGD (ou lembra o lançamento manual). Em push NÃO há
+# CI_MERGE_REQUEST_IID, por isso resolvemos o IID via API antes de chamar a skill.
+# REQUER VALIDAÇÃO NO CI REAL (resolução do MR a partir do commit de merge).
+pgd-rit-merge:
+  <<: *opencode-skill
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "master"'
+      when: always
+  allow_failure: true
+  script:
+    - |
+      export HEADER_TOKEN="PRIVATE-TOKEN:${SUAP_BOT_TOKEN}"
+      export MR_COMMITS_URL="$CI_API_V4_URL/projects/$CI_PROJECT_ID/repository/commits/$CI_COMMIT_SHA/merge_requests"
+      export MR_IID="$(curl --silent --header "$HEADER_TOKEN" "$MR_COMMITS_URL" | jq -r 'map(select(.state == "merged")) | .[0].iid // empty')"
+      if [[ -z "$MR_IID" ]]; then
+        echo 'Commit sem MR mergeado associado (commit direto); encerrando.'
+        exit 0
+      fi
+      echo "MR mergeado resolvido: !$MR_IID"
+      bin/ci/opencode-skill.sh pgd-rit-merge "$MR_IID" "$CI_PROJECT_ID" "$CI_SERVER_URL" "$SUAP_BOT_TOKEN" "$OPENCODE_PROVIDER" "$OPENCODE_MODEL" "$OPENCODE_API_KEY"
+
+.homologate: &homologate
+  stage: homologate
+  needs: []
+  tags:
+    - hom-v3
+  when: manual
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'web' || $CI_PIPELINE_SOURCE == 'api' || $CI_PIPELINE_SOURCE == 'external'
+      when: manual
+  allow_failure: false
+
+deploy-suapdev:
+  <<: *homologate
+  script:
+    - cd /opt/suap && bin/ci/deploy.sh --branch "$CI_COMMIT_BRANCH" --owner "$CI_COMMIT_AUTHOR" --database "$DATABASE_TEMPLATE" --password "$PASSWORD" --usernames "$USERNAMES" && sudo bin/ci/index.sh
+
+undeploy-suapdev:
+  <<: *homologate
+  script:
+    - cd /opt/suap && bin/ci/undeploy.sh --branch "$CI_COMMIT_BRANCH" --owner "$CI_COMMIT_AUTHOR" && sudo bin/ci/index.sh
+
+destroy-suapdev:
+  <<: *homologate
+  script:
+    - cd /opt/suap && bin/ci/destroy.sh --branch "$CI_COMMIT_BRANCH" --owner "$CI_COMMIT_AUTHOR" && sudo bin/ci/index.sh
+
+.prod: &prod
+  tags:
+    - prod
+  needs: []
+  when: manual
+  rules:
+    - if: ($CI_PIPELINE_SOURCE == 'web' || $CI_PIPELINE_SOURCE == 'api' || $CI_PIPELINE_SOURCE == 'external') && $CI_COMMIT_BRANCH == 'master' && ($GITLAB_USER_LOGIN == 'hugo.sena' || $GITLAB_USER_LOGIN == 'lucas.pereira' || $GITLAB_USER_LOGIN == 'augusto.medeiros')
+      when: manual
+  allow_failure: false
+
+
+.script-deploy-master: &script-deploy-master
+  - bin/ci/deploy-remote.sh master
+
+.script-deploy-slaves: &script-deploy-slaves
+  - bin/ci/deploy-remote.sh slaves
+
+# Base p/ jobs de build de imagem (docker executor / DinD, tag tests-v3).
+# Reaproveita o .docker-build (TLS-off) e adiciona regras de produção + login.
+.build-dind:
+  extends: .docker-build
+  tags:
+    - tests-v3
+  needs: []
+  allow_failure: false
+  variables:
+    GIT_STRATEGY: fetch
+  rules:
+    - if: ($CI_PIPELINE_SOURCE == 'web' || $CI_PIPELINE_SOURCE == 'api' || $CI_PIPELINE_SOURCE == 'external') && $CI_COMMIT_BRANCH == 'master' && ($GITLAB_USER_LOGIN == 'hugo.sena' || $GITLAB_USER_LOGIN == 'lucas.pereira' || $GITLAB_USER_LOGIN == 'augusto.medeiros')
+      when: manual
+  before_script:
+    - apk add --no-cache curl jq
+    - docker login -u gitlab-ci-token -p "$CI_JOB_TOKEN" "$CI_REGISTRY"
+
+# Tag atual + componentes (POSIX sh; roda no ash do docker:27-cli).
+.script-current-tag: &script-current-tag
+  - |
+    HEADER_TOKEN="PRIVATE-TOKEN:${SUAP_BOT_TOKEN}"
+    TAG_URL="$CI_API_V4_URL/projects/$CI_PROJECT_ID/repository/tags"
+    CHANGELOG_URL="$CI_API_V4_URL/projects/$CI_PROJECT_ID/repository/changelog"
+    CURRENT_TAG="$(curl -s --header "$HEADER_TOKEN" "$TAG_URL" | jq -r '.[0].name')"
+    echo "CURRENT_TAG=$CURRENT_TAG"
+    MAJOR="$(echo "$CURRENT_TAG" | cut -d. -f1)"
+    MINOR="$(echo "$CURRENT_TAG" | cut -d. -f2)"
+    PATCH="$(echo "$CURRENT_TAG" | cut -d. -f3)"
+    if ! { [ -n "$MAJOR" ] && [ -n "$MINOR" ] && [ -n "$PATCH" ]; } || \
+       { echo "$MAJOR$MINOR$PATCH" | grep -qE '[^0-9]'; }; then
+      echo "CURRENT_TAG inválida ('$CURRENT_TAG'): não foi possível derivar a versão"; exit 1
+    fi
+
+# Build + push da imagem prod (latest + NEXT_TAG). VERSION entra no ADD . . do Dockerfile.
+.script-build-push: &script-build-push
+  - |
+    set -e
+    echo "NEXT_TAG=$NEXT_TAG"
+    echo "$NEXT_TAG" > VERSION
+    docker build -f docker/Dockerfile --target suap-app \
+      --build-arg BASE_IMAGE="$CI_REGISTRY_IMAGE:base" \
+      -t "$CI_REGISTRY_IMAGE:latest" .
+    docker tag "$CI_REGISTRY_IMAGE:latest" "$CI_REGISTRY_IMAGE:$NEXT_TAG"
+    docker push "$CI_REGISTRY_IMAGE:$NEXT_TAG"
+    docker push "$CI_REGISTRY_IMAGE:latest"
+
+# Changelog + resumo via LLM + criação da git tag (porte verbatim, POSIX sh).
+.script-changelog-tag: &script-changelog-tag
+  - |
+    CURRENT_CHANGES="$(curl -s --request GET --header "$HEADER_TOKEN" --data "version=${NEXT_TAG}" "$CHANGELOG_URL" | jq '.notes')"
+    curl -s --request POST --header "$HEADER_TOKEN" --data "version=${NEXT_TAG}" "$CHANGELOG_URL"
+    MESSAGE="Converta e resuma o seguinte texto em markdown para um formato em texto simples, removendo links caso apareçam:\n ${CURRENT_CHANGES}"
+    GEMINI_URL="${LLM_URL}?key=${LLM_KEY}"
+    GEMINI_API_MESSAGE=$(jq -n --arg msg "$MESSAGE" '{contents: [{parts: [{text: $msg}]}]}')
+    FORMATTED_CHANGES="$(curl -s "$GEMINI_URL" -H 'Content-Type: application/json' -X POST -d "$GEMINI_API_MESSAGE" | jq '.candidates[0].content.parts[0].text' | sed 's/\\n/\n/g' | sed 's/^"//;s/"$//')"
+    if [ -z "$FORMATTED_CHANGES" ] || [ "$FORMATTED_CHANGES" = "null" ]; then
+      FORMATTED_CHANGES="Atualização para a versão ${NEXT_TAG}"
+    fi
+    curl -s --request POST --header "$HEADER_TOKEN" --data "tag_name=${NEXT_TAG}&ref=${CI_COMMIT_REF_NAME}&message=${FORMATTED_CHANGES}" "$TAG_URL"
+
+build-prod:
+  extends: .build-dind
+  stage: build
+  script:
+    - *script-current-tag
+    - |
+      NEXT_TAG="$MAJOR.$MINOR.$((PATCH+1))"
+      HAS_CHANGE="$(curl -s -d "version=$NEXT_TAG" -G --header "$HEADER_TOKEN" "$CHANGELOG_URL" | grep -c 'No changes' || true)"
+      if [ "$HAS_CHANGE" -eq 1 ]; then echo "Tag não foi alterada"; exit 1; fi
+    - *script-build-push
+    - *script-changelog-tag
+
+deploy-prod-master:
+  <<: *prod
+  stage: deploy
+  script:
+    - *script-deploy-master
+
+deploy-prod-slaves:
+  <<: *prod
+  stage: deploy
+  script:
+    - *script-deploy-slaves
+
+full-deploy-prod:
+  <<: *prod
+  stage: deploy
+  script:
+    - set -e
+    - echo "===== 1/2 DEPLOY MASTER ====="
+    - *script-deploy-master
+    - echo "===== 2/2 DEPLOY SLAVES ====="
+    - *script-deploy-slaves
+
+# Documentação de usuário: geração -> montagem (#16998, #16999, #17004). A publicação não é
+# job: o servidor da doc detecta a nova `$CI_REGISTRY_IMAGE/doc:latest` no registry e faz o
+# deploy sozinho — o push do `empacotar-doc` é o gatilho.
+#
+# São DOIS jobs e não um, e a divisão não é estética. As capturas não vão para o git (#16999)
+# e o markdown vai (#16998) — logo existe exatamente um momento em que os dois se encontram, e
+# ele tem de estar dentro do pipeline. Os artifacts são esse encontro; não há storage novo.
+#
+# Quem gera precisa de banco e browser; quem monta não. A montagem do site roda dentro do
+# `docker build`, num builder magro (python-slim + mkdocs) que NÃO depende da árvore de
+# dependências do SUAP.
+
+# 1. Gera a doc navegando o SUAP — só dos módulos que mudaram (ver `bin/scripts/doc_incremental.py`). Herda de `.e2e-base` porque precisa
+#    exatamente do que o e2e já tem: service postgres, chromium na imagem, banco de teste
+#    próprio.
+#
+#    UM job, e não um por módulo via `parallel:matrix`: matriz + `when: manual` dá um botão
+#    por entrada, e a meta é cobrir os ~90 módulos — seriam ~90 cliques para regerar a doc.
+#    `pytest -m doc` inteiro é UM clique.
+#
+#    O paralelismo mudou de lugar: era do GitLab (um job por módulo), passa a ser do pytest.
+#    `--dist loadgroup` + o `xdist_group` por módulo que o `conftest.py` da raiz aplica aos
+#    testes marcados `doc` mandam o módulo INTEIRO para o mesmo worker — e cada worker tem
+#    banco próprio (`test_suap_doc_e2e_gw<N>`, sufixo do pytest-django). É o que preserva o
+#    que a matriz dava de graça: isolamento por módulo. Sem o grupo, o `--dist load` padrão
+#    espalharia teste a teste e quebraria a cadeia das fatias do `edu`.
+#
+#    A run inteira é segura porque o substrato já foi desenhado para ela: `data_do_modulo`
+#    (`edu/tests/e2e/conftest.py`) descongela o relógio ao fim de CADA teste, então o 2019 do
+#    `edu` não vaza para o módulo coletado depois — conferido na captura do calendário do
+#    `eventos`, que sai no ano corrente. Dentro de um worker não há flush entre testes
+#    (`_django_db_helper` é no-op de propósito) e módulos podem dividir banco: asserção de doc
+#    filtra por chave própria e mede delta, nunca contagem global.
+#
+#    `-n 1` e não `auto`, e não 4: a escolha é por ESTABILIDADE, e ela foi medida. Doze
+#    execuções em 05-06/08/2026, mesma caixa de 12 núcleos, `--create-db`, com os 4 módulos
+#    e 69 testes que existiam ENTÃO (hoje são 8 e 92 — ver o teto abaixo):
+#
+#      | -n | runs | mediana | min-max   | runs vermelhos | falhas na 1ª tentativa |
+#      |----|------|---------|-----------|----------------|------------------------|
+#      |  1 |    3 |    686s | 686-704   |            0/3 |                      0 |
+#      |  2 |    4 |    475s | 468-552   |            2/4 |                      4 |
+#      |  3 |    1 |    605s | 605       |            0/1 |                      0 |
+#      |  4 |    4 |    510s | 505-520   |            3/4 |                      5 |
+#
+#    Menos worker = menos Chromium + `live_server` + Postgres disputando a caixa = menos
+#    página se mexendo debaixo do clique. `-n 1` é o único que nunca ficou vermelho, e custa
+#    ~3m30 sobre o `-n 2`. Num job MANUAL que gera doc, esse é o câmbio certo: rodar de novo
+#    custa mais que os 3 minutos.
+#
+#    `-n 2` é a alternativa se o tempo apertar — mediana MAIS RÁPIDA de todas, inclusive
+#    mais que o `-n 4` (setup pela metade: dois schemas em vez de quatro). Trocar é um
+#    caractere; o `--dist loadgroup` fica no lugar justamente por isso. O que não faz sentido
+#    é `-n 4`: mais lento que o `-n 2` e o mais instável dos quatro.
+#
+#    Nota de método, porque este comentário JÁ afirmou o contrário duas vezes: a variação
+#    entre execuções da MESMA configuração chega a 18% (`-n 2` deu 468s e 552s). Medida única
+#    não ranqueia nada — nem tempo, nem estabilidade.
+#
+#    Teto útil se um dia subir: 8, porque `loadgroup` não parte um grupo e hoje são 8
+#    módulos (`avaliacao_integrada`, `edu`, `erros`, `eventos`, `gerenciador_projetos`,
+#    `pafc`, `pgd2`, `ppc`) — eram 4 quando a tabela acima foi medida. E o piso não está no
+#    `-n`: o grupo do `edu` são 39 dos 92 testes e 278s dos 442s de `test call`, numa cadeia
+#    que tem de ficar num worker só. Os quatro módulos novos têm de 3 a 10 testes cada,
+#    contra 39 do `edu`, então crescer o teto NÃO mexeu no piso: o `edu` continua sendo o
+#    worker mais longo e nenhum `-n` o encurta.
+#
+#    O que a chegada dos módulos novos muda no `-n` é só o teto: a tabela mediu estabilidade,
+#    e mais módulos não tornam `-n 2` mais estável (2/4 runs vermelhos lá continuam valendo).
+#    Baixar o tempo custa uma medição de doze execuções, não um caractere.
+#
+#    `--reruns 2` continua mesmo com um worker só: rede, não muleta. A falha que sobra não é
+#    de teto de tempo (os tetos já foram elevados em `djtools/e2e_ui.py`) — é a página se
+#    mexendo depois de "pronta": clique em opção do select2 interceptado por outro elemento,
+#    `label` de custom-checkbox que fica `hidden`. `-n 1` deixou de produzi-la em 3 de 3
+#    execuções, mas 3 execuções não provam ausência, e o custo do rerun é zero quando nada
+#    falha. Rerun é o remédio certo aqui
+#    e não maquiagem: `gerar-doc` é manual e GERA documentação, não é gate de regressão — o
+#    que ele precisa é da captura, e um flake de browser não é notícia sobre o SUAP. Num job
+#    que barra merge a decisão seria outra.
+#
+#    O rerun acontece no MESMO worker (o protocolo do pytest-rerunfailures roda dentro do
+#    worker do xdist), então o teste refeito continua no banco que o seed do seu grupo
+#    montou. Sem isso o rerun cairia num banco de outro módulo.
+#
+#    Repetir sem flush é seguro pela mesma propriedade que já sustenta módulos dividirem
+#    banco (parágrafo acima): as fixtures de estado são de FUNÇÃO — refazer o teste cria
+#    evento/erro novo, com chave própria — e a asserção mede delta, nunca contagem global.
+#    O que a primeira tentativa deixou para trás vira linha a mais numa listagem, não falha.
+gerar-doc:
+  extends: .e2e-base
+  stage: test
+  variables:
+    TEST_DATABASE_NAME: test_suap_doc_e2e
+  script:
+    - playwright install chromium
+    # Só os módulos que mudaram desde o último `gerar-doc` verde; os outros reaproveitam as
+    # capturas daquele artifact. `DOC_MODULOS` no botão do job força a lista (`edu,ae`) ou tudo
+    # (`todos`). Regra e armadilhas em `bin/scripts/doc_incremental.py`.
+    - MODULOS_DOC="$(python bin/scripts/doc_incremental.py)"
+    - |
+      if [ -n "$MODULOS_DOC" ]; then
+        pytest -m doc -n 1 --dist loadgroup --reruns 2 $MODULOS_DOC
+      else
+        echo "nenhum módulo mudou: capturas reaproveitadas do artifact anterior"
+      fi
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'web' || $CI_PIPELINE_SOURCE == 'api' || $CI_PIPELINE_SOURCE == 'external'
+      when: manual
+  allow_failure: false
+  artifacts:
+    # Expiração longa de propósito: a publicação é MANUAL (#16998), então pode haver semanas
+    # entre gerar e publicar. Artifact expirado faria o `--strict` dentro do `empacotar-doc`
+    # abortar o build por captura faltando — falha honesta, mas evitável.
+    expire_in: 1 year
+    paths:
+      - '*/docs/usuario'
+      - doc_impressoes.json
+
+# 2. Monta e empacota numa tacada: a montagem vive DENTRO do `docker/Dockerfile.doc`
+#    (multi-stage), então `mkdocs build --strict` falhando aborta o `docker build` e a imagem
+#    não chega a existir com o site quebrado. `optional: true` porque nem todo pipeline gera
+#    doc — sem as capturas o `--strict` reclama de alvo não encontrado, que é o aviso certo.
+#    Continua manual (herdado do `.build-dind`): é UM botão, e empacotar é decisão à parte de
+#    gerar.
+empacotar-doc:
+  extends: .build-dind
+  stage: build
+  needs:
+    - job: gerar-doc
+      artifacts: true
+      optional: true
+  script:
+    - |
+      set -e
+      docker build -f docker/Dockerfile.doc \
+        --build-arg DOC_COMMIT="$CI_COMMIT_SHORT_SHA" \
+        -t "$CI_REGISTRY_IMAGE/doc:latest" .
+      docker tag "$CI_REGISTRY_IMAGE/doc:latest" "$CI_REGISTRY_IMAGE/doc:$CI_COMMIT_SHORT_SHA"
+      docker push "$CI_REGISTRY_IMAGE/doc:$CI_COMMIT_SHORT_SHA"
+      docker push "$CI_REGISTRY_IMAGE/doc:latest"
+
+# stop/start: `make down`/`make up` via SSH, em paralelo em master + slaves, best-effort
+# (tenta todos e falha no fim se algum falhou).
+stop-all:
+  <<: *prod
+  stage: containers
+  script:
+    - bin/ci/deploy-remote.sh stop-all
+
+start-all:
+  <<: *prod
+  stage: containers
+  script:
+    - bin/ci/deploy-remote.sh start-all
+
+# Base p/ jobs que rodam docker no executor docker (tests-v3) via Docker-in-Docker.
+# Requer runner tests-v3 com privileged=true. `extends` faz deep-merge de variables.
+# TLS desabilitado (DOCKER_TLS_CERTDIR=""): no executor docker o compartilhamento
+# do /certs/client entre o service dind e o job NÃO é automático — exigiria montar
+# o volume em cada runner. Sem TLS o dind escuta em tcp://docker:2375 (rede isolada
+# por job), e nenhum runner precisa de config extra de volume.
+.docker-build:
+  image: docker:27-cli
+  services:
+    - docker:27-dind
+  variables:
+    DOCKER_TLS_CERTDIR: ""
+    DOCKER_HOST: tcp://docker:2375
+
+build-opencode-image:
+  extends: .docker-build
+  stage: special-tasks
+  needs: []
+  tags:
+    - tests-v3
+  variables:
+    GIT_STRATEGY: fetch
+  rules:
+    # `changes` vale sempre true em pipeline agendado: sem isto o noturno rebuildaria a imagem.
+    - if: $CI_PIPELINE_SOURCE == 'schedule'
+      when: never
+    # manual tem prioridade: web/api/external sempre manual (changes: é ignorado nessas fontes)
+    - if: $CI_PIPELINE_SOURCE == 'web' || $CI_PIPELINE_SOURCE == 'api' || $CI_PIPELINE_SOURCE == 'external'
+      when: manual
+    # rebuild automático no master quando o Dockerfile do opencode muda
+    - if: $CI_COMMIT_BRANCH == 'master'
+      changes:
+        - bin/ci/Dockerfile.opencode
+      when: on_success
+  before_script:
+    - docker login -u gitlab-ci-token -p "$CI_JOB_TOKEN" "$CI_REGISTRY"
+  script:
+    - >
+      docker build
+      -f bin/ci/Dockerfile.opencode
+      -t "$CI_REGISTRY_IMAGE/opencode:latest"
+      .
+    - docker push "$CI_REGISTRY_IMAGE/opencode:latest"
+  after_script:
+    - docker logout "$CI_REGISTRY" || true
+
+build-test-image:
+  extends: .docker-build
+  stage: special-tasks
+  needs: []
+  tags:
+    - tests-v3
+  variables:
+    GIT_STRATEGY: fetch
+  rules:
+    # `changes` vale sempre true em pipeline agendado: sem isto o noturno rebuildaria a imagem.
+    - if: $CI_PIPELINE_SOURCE == 'schedule'
+      when: never
+    # manual tem prioridade: web/api/external sempre manual (changes: é ignorado nessas fontes)
+    - if: $CI_PIPELINE_SOURCE == 'web' || $CI_PIPELINE_SOURCE == 'api' || $CI_PIPELINE_SOURCE == 'external'
+      when: manual
+    # rebuild automático no master quando deps/Dockerfiles mudam
+    - if: $CI_COMMIT_BRANCH == 'master'
+      changes:
+        - uv.lock
+        - pyproject.toml
+        - bin/ci/Dockerfile
+        - docker/Dockerfile
+        - docker/Dockerfile.base
+      when: on_success
+  before_script:
+    - docker login -u gitlab-ci-token -p "$CI_JOB_TOKEN" "$CI_REGISTRY"
+  script:
+    - docker pull "$CI_REGISTRY/cosinf/suap:base"
+    - >
+      docker build
+      -f bin/ci/Dockerfile
+      --target suap-test
+      --build-arg base_image="$CI_REGISTRY/cosinf/suap:base"
+      -t "$CI_REGISTRY_IMAGE/test:latest"
+      .
+    - docker push "$CI_REGISTRY_IMAGE/test:latest"
+  after_script:
+    - docker logout "$CI_REGISTRY" || true
+
+build-base:
+  extends: .build-dind
+  stage: special-tasks
+  script:
+    - docker build -f docker/Dockerfile.base -t "$CI_REGISTRY_IMAGE:base" .
+    - docker push "$CI_REGISTRY_IMAGE:base"
+
+minor-tag:
+  extends: .build-dind
+  stage: special-tasks
+  script:
+    - *script-current-tag
+    - |
+      NEXT_TAG="$MAJOR.$((MINOR+1)).0"
+    - *script-build-push
+    - *script-changelog-tag
+
+major-tag:
+  extends: .build-dind
+  stage: special-tasks
+  script:
+    - *script-current-tag
+    - |
+      NEXT_TAG="$((MAJOR+1)).0.0"
+    - *script-build-push
+    - *script-changelog-tag
+
+# Spec viva: ao integrar um MR no master, registra no SUAP a decisão de
+# especificação (DecisaoEspecificacao) que foi aprovada na revisão do MR.
+# O script localiza o MR mergeado a partir do commit, extrai o demanda_id
+# (bloco suap-meta na descrição ou nome da branch) e o "delta proposto"
+# aprovado nos comentários, e o envia para POST /api/ti/demandas/{id}/spec-decisions/.
+# Roda pós-merge (push no master) porque só registramos a decisão depois que a
+# mudança vira realidade no master. allow_failure: não bloqueia a entrega se o
+# SUAP estiver indisponível ou o MR não tiver demanda associada.
+update-demanda-spec:
+  stage: post-merge
+  # Job sem template: precisa declarar uma imagem com Python, senão o runner cai
+  # na default alpine:latest (sem pip/python) e o before_script falha (exit 127).
+  image: python:3.14-slim
+  tags:
+    - tests-v3
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master" && $CI_PIPELINE_SOURCE == "push"'
+  before_script:
+    - pip install httpx --quiet
+  variables:
+    GITLAB_TOKEN: $CI_JOB_TOKEN
+    SUAP_TOKEN: $SUAP_CI_TOKEN
+    SUAP_BASE_URL: "https://suap.ifrn.edu.br"
+    GITLAB_BASE_URL: "https://gitlab.ifrn.edu.br"
+  script:
+    - python bin/scripts/update_demanda_spec.py
+  allow_failure: true

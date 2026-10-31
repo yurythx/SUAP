@@ -1,0 +1,156 @@
+{% extends "base_super_pgd.html" %}
+
+{% block object-status %}
+    {% if atividade.estah_ativa %}
+        <span class="status status-success">Ativo</span>
+    {% else %}
+        <span class="status status-error">Inativo</span>
+    {% endif %}
+
+    {{ atividade.get_situacao_cadastro_display|status }}
+    {% if atividade.solicitado_por %}
+        <span class="status status-info">Solicitado por: {{ atividade.solicitado_por|format }}</span>
+    {% endif %}
+
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if pode_alterar %}
+            <li>
+                <a class="btn primary" href="/pgd/selecionar_hierarquia_atividade/{{ atividade.id }}">Editar Hierarquia</a>
+            </li>
+            <li>
+                <a class="btn primary" href="/admin/pgd/atividade/{{ atividade.id }}/change/">Editar Outros Dados</a>
+            </li>
+        {% endif %}
+        {% if pode_solicitar_alteracao_desta_atividade %}
+            <li>
+                <a class="btn success" href="/pgd/cadastrar_solicitacao_alteracao_atividade/{{ atividade.id }}">Solicitar Alteração</a>
+            </li>
+        {% endif %}
+        {% if pode_submeter_alteracao_desta_atividade %}
+            <li>
+                <a class="btn success" href="/pgd/submeter_solicitacao_atividade/{{ atividade.id }}">Submeter Solicitação de Alteração</a>
+            </li>
+        {% endif %}
+        {% if pode_analisar_solicitacoes_cadastro_alteracao %}
+            <li>
+                <a class="btn success" href="/pgd/deferir_solicitacao_atividade/{{ atividade.id }}">Deferir Cadastro/Alteração</a>
+            </li>
+            <li>
+                <a class="btn danger" href="/pgd/indeferir_solicitacao_atividade/{{ atividade.id }}">Indeferir Cadastro/Alteração</a>
+            </li>
+        {% endif %}
+        <li>
+            <a class="btn default" href="/pgd/quadro_atividades/">Visualizar QTA</a>
+        </li>
+    </ul>
+{% endblock %}
+
+{% block content %} {{ block.super }}
+
+    {% comment %}
+    {% if atividade.estah_cadastrada %}
+        {% if atividade.ativo %}    
+            <p class="alert alert-info">Esta atividade está ATIVA e já pode ser utilizada pelos PTSs, PITs e RITs.</p>
+        {% else %}
+            <p class="alert alert-info">Esta atividade NÃO ESTÁ ATIVA e já NÃO pode ser utilizada pelos PTSs, PITs e RITs.</p>
+        {% endif %}
+    {% endif %}
+    {% endcomment %}
+
+    {% if atividade.estah_solicitada %}
+        <p class="alert alert-info">O cadastro/alteração desta atividade foi solicitada e está pendente de análise. </p>
+    {% endif %}
+
+    {% if atividade.estah_solicitada or atividade.esta_pendente_envio %}
+        {% if atividade.original %}
+            <p class="alert alert-info">
+                Solicitação de alteração da 
+                <a href="/pgd/visualizar_atividade/{{ atividade.original.id }}">Atividade</a> original.
+            </p>
+        {% endif %}
+    {% endif %}
+
+    {% if atividade.esta_indeferida %}
+        <p class="alert alert-info">O cadastro/alteração desta atividade foi indeferido mediante seguinte justificativa: {{ atividade.justificativa_indeferimento }}.</p>
+    {% endif %}
+
+    {% if pode_analisar_solicitacoes_cadastro_alteracao %}
+        <p class="alert alert-info">Você pode analisar a solicitação de cadastro/alteração desta atividade.</p>
+    {% endif %}
+
+    {% if pode_solicitar_cadastro_alteracao %}
+        <p class="alert alert-info">Se desejar solicitar alteração desta atividade acesse a opção "Solicitar Alteração".</p>
+    {% endif %}
+
+    {% if existe_diferenca is not None %}
+        {% if not existe_diferenca %}
+            <p class="alert alert-warning">Não existem diferenças entre a atividade desta solicitação e a atividade original.</p>
+        {% endif %}
+    {% endif %}
+
+    {% if atividade.estah_solicitada and atividade.justificativa_solicitacao %}
+        <p class="alert alert-info">Solicitação cadastrada mediante a sguinte justificativa: {{ atividade.justificativa_solicitacao }}.</p>
+    {% endif %}
+
+    <dl class="definition-list">
+        <dt>Hierarquia</dt>
+        <dd>{{ atividade.hierarquia|format }}</dd>
+        <dt>Título</dt>
+        <dd>{{ atividade.titulo|format }}</dd>
+        <dt>Descrição</dt>
+        <dd>{{ atividade.descricao|format }}</dd>
+        <dt>Ganho de Produtividade</dt>
+        <dd>{{ atividade.ganho_produtividade|format }}%</dd>
+        <dt>Pode ser executada na modalidade Teletrabalho</dt>
+        <dd>{{ atividade.pode_ser_teletrabalho|format }}</dd>
+        <dt>Ativa (agora)</dt>
+        <dd>{{ atividade.estah_ativa|format }}</dd>
+        <dt>Inativação com efeitos a partir de</dt>
+        <dd>{{ atividade.data_inativacao_efeitos_a_partir_de|format }}</dd>
+    </dl>
+
+    {% box "Entregas da Atividade" %}
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Título</th>
+                        <th>Ativo</th>
+                    </tr>
+                </thead>
+                <body>
+                    {% for comp in atividade.atividadeentrega_set.all %}
+                        <tr>
+                            <td>{{ comp.titulo|format }}</td>
+                            <td>{{ comp.ativo|format }}</td>
+                        </tr>
+                    {% endfor %}
+                </body>
+            </table>
+        </div>
+    {% endbox %}
+
+    {% comment %}
+    {% box "Complexidades da Atividade" %}
+        <div class="flex-container boxes services">
+            {% for comp in atividade.get_complexidades %}
+                <div class="box-item">
+                    {% if comp.faixa_complexidade.ativo %}
+                        <span class="status status-success">Ativo</span>
+                    {% else %}
+                        <span class="status status-error">Inativo</span>
+                    {% endif %}
+                    <h4>{{ comp.faixa_complexidade.complexidade|format }}</h4>
+                    <h5>Tempo de Execução:</h5>
+                    <p class="note"><strong>{{ comp.tempo_execucao_remoto|format_hours }}</strong> no Teletrabalho</p>
+                    <p class="note"><strong>{{ comp.tempo_execucao_presencial|format_hours }}</strong> no Presencial</p>
+                </div>
+            {% endfor %}
+        </div>
+    {% endbox %}
+    {% endcomment %}
+
+{% endblock %}

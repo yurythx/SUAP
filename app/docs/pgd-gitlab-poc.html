@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="Guia interativo do POC de lançamento automático de execuções (RIT) do PGD a partir de MRs do GitLab no SUAP." />
+<meta name="keywords" content="SUAP, PGD, RIT, GitLab, OAuth2, MCP, POC, IFRN" />
+<title>POC — PGD × GitLab: lançamento automático de execuções (RIT)</title>
+<style>
+  :root{
+    --verde:#1f7a44; --verde-esc:#16562f; --verde-cl:#e8f4ec;
+    --azul:#1366d6; --cinza:#5b6670; --bg:#f6f8f9; --card:#fff;
+    --borda:#dfe5e8; --amarelo:#fff7e0; --amarelo-b:#e7c200; --cod:#0d1117; --cod-fg:#e6edf3;
+    --vermelho:#b3261e; --radius:10px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:#1c2226;background:var(--bg)}
+  header{background:linear-gradient(135deg,var(--verde),var(--verde-esc));color:#fff;padding:28px 24px 22px}
+  header h1{margin:0 0 6px;font-size:24px}
+  header p{margin:0;opacity:.92;font-size:14px}
+  .wrap{max-width:920px;margin:0 auto;padding:0 16px 80px}
+  .bar-wrap{position:sticky;top:0;z-index:20;background:var(--bg);padding:12px 0 8px;border-bottom:1px solid var(--borda)}
+  .bar{height:10px;background:#e3e8ea;border-radius:999px;overflow:hidden}
+  .bar > i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--verde),#37b06a);transition:width .3s}
+  .bar-lbl{display:flex;justify-content:space-between;font-size:12px;color:var(--cinza);margin-top:6px}
+  .bar-lbl button{font-size:12px;border:1px solid var(--borda);background:#fff;border-radius:6px;padding:3px 8px;cursor:pointer;color:var(--cinza)}
+  section{background:var(--card);border:1px solid var(--borda);border-radius:var(--radius);margin:18px 0;overflow:hidden}
+  section > h2{margin:0;padding:14px 18px;font-size:17px;background:var(--verde-cl);color:var(--verde-esc);cursor:pointer;display:flex;align-items:center;gap:10px}
+  section > h2 .chev{margin-left:auto;transition:transform .2s;opacity:.6}
+  section.collapsed > h2 .chev{transform:rotate(-90deg)}
+  section.collapsed .body{display:none}
+  .body{padding:6px 18px 16px}
+  .lead{color:var(--cinza);margin:6px 0 14px}
+  .step{border:1px solid var(--borda);border-radius:8px;padding:12px 14px;margin:12px 0;display:flex;gap:12px;align-items:flex-start}
+  .step.done{background:var(--verde-cl);border-color:#bfe0cc}
+  .step input[type=checkbox]{width:20px;height:20px;margin-top:2px;accent-color:var(--verde);cursor:pointer;flex:0 0 auto}
+  .step .st-body{flex:1;min-width:0}
+  .step h3{margin:0 0 4px;font-size:15px}
+  .step.done h3{text-decoration:line-through;opacity:.7}
+  .tag{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;margin-left:8px;vertical-align:middle}
+  .tag.suap{background:#e7eefc;color:var(--azul)} .tag.local{background:#eaf6ee;color:var(--verde)} .tag.demo{background:#fdeede;color:#a85b00}
+  pre{position:relative;background:var(--cod);color:var(--cod-fg);padding:12px 14px;border-radius:8px;overflow:auto;font:13px/1.5 "SF Mono",Menlo,Consolas,monospace;margin:10px 0}
+  pre code{white-space:pre}
+  .copy{position:absolute;top:7px;right:7px;background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;font-size:11px;padding:3px 9px;cursor:pointer}
+  .copy:hover{background:#30363d} .copy.ok{background:var(--verde);color:#fff;border-color:var(--verde)}
+  code.inl{background:#eef1f3;border:1px solid var(--borda);border-radius:4px;padding:1px 5px;font:12.5px "SF Mono",Menlo,Consolas,monospace}
+  .note{border-left:4px solid var(--amarelo-b);background:var(--amarelo);padding:10px 12px;border-radius:0 8px 8px 0;margin:10px 0;font-size:14px}
+  .note.warn{border-color:var(--vermelho);background:#fdecea}
+  .note.say{border-color:var(--azul);background:#eef4fd}
+  .note b{display:inline-block}
+  .pill{font-size:12px;color:var(--cinza)}
+  table.matrix{width:100%;border-collapse:collapse;margin:10px 0;font-size:14px}
+  table.matrix th,table.matrix td{border:1px solid var(--borda);padding:8px 10px;text-align:left;vertical-align:top}
+  table.matrix th{background:#f0f3f5}
+  .ok-i{color:var(--verde);font-weight:700} .no-i{color:var(--vermelho);font-weight:700}
+  .flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0 4px;font-size:13px}
+  .flow .box{background:#fff;border:1px solid var(--borda);border-radius:8px;padding:8px 10px}
+  .flow .arr{color:var(--verde);font-weight:700}
+  footer{color:var(--cinza);font-size:12px;text-align:center;padding:20px}
+  kbd{background:#fff;border:1px solid var(--borda);border-bottom-width:2px;border-radius:5px;padding:1px 6px;font:12px monospace}
+  .mt14{margin-top:14px}
+</style>
+</head>
+<body>
+<header>
+  <h1>POC — PGD × GitLab: lançamento automático de execuções</h1>
+  <p>Cada MR vira uma execução (RIT) no PGD do SUAP — inferida da Entrega PES, confirmada pelo servidor. Guia passo a passo para a demonstração.</p>
+</header>
+
+<div class="wrap">
+
+  <div class="bar-wrap">
+    <div class="bar"><i id="barfill"></i></div>
+    <div class="bar-lbl"><span id="barlbl">0 de 0 passos</span><button id="reset">Reiniciar checklist</button></div>
+  </div>
+
+  <!-- ============ VISÃO GERAL ============ -->
+  <section id="s0">
+    <h2>0 · Visão geral <span class="chev">▾</span></h2>
+    <div class="body">
+      <p class="lead">O que a demo prova: ao pedir o lançamento num MR, o assistente lê a issue+diff, descobre a qual <b>categoria de trabalho</b> (Entrega PES) aquilo pertence, estima as horas, mostra um resumo, o servidor confirma, e o SUAP grava <b>1 RIT por MR</b> (idempotente). O servidor segue no controle: o RIT entra como rascunho (<code class="inl">EM_CADASTRO_RIT</code>) e é validado no envio mensal.</p>
+
+      <div class="flow">
+        <span class="box">MR no GitLab</span><span class="arr">→</span>
+        <span class="box">skill <code class="inl">/pgd-rit</code></span><span class="arr">→</span>
+        <span class="box">infere entrega (PES) + estima horas</span><span class="arr">→</span>
+        <span class="box">servidor confirma</span><span class="arr">→</span>
+        <span class="box">RIT no PGD</span>
+      </div>
+
+      <p class="mt14"><b>3 componentes (já implementados e testados):</b></p>
+      <table class="matrix">
+        <tr><th>Camada</th><th>O que faz</th><th>Onde</th></tr>
+        <tr><td><b>Backend SUAP</b></td><td>Endpoints ninja (<code class="inl">entregas-disponiveis</code>, <code class="inl">lancar-rit</code>, <code class="inl">rit-do-mr</code>) + serviço que cria o RIT; campos de proveniência no RIT</td><td>repo <code class="inl">suap</code></td></tr>
+        <tr><td><b>Tools MCP</b></td><td>Conectam o assistente ao SUAP (lista entregas, lança RIT, lê status), com auth OAuth2</td><td>repo <code class="inl">suap-mcp</code></td></tr>
+        <tr><td><b>Skill</b></td><td><code class="inl">/pgd-rit</code> (infere + confirma + grava) e <code class="inl">/pgd-rit-merge</code> (comentário no merge)</td><td>repo <code class="inl">suap</code></td></tr>
+      </table>
+
+      <div class="note say"><b>Resposta à pergunta "basta criar o AplicacaoOAuth2?":</b> No SUAP, o passo manual de <b>autenticação</b> é só esse (a app OAuth2 client-credentials). Além dele, o POC precisa de: o backend desta branch rodando com a migração aplicada, e <b>dados de demonstração</b> (um servidor com PIT do mês + entregas homologadas + o mapeamento GitLab). O resto — configurar o MCP, validar o token, rodar a skill — fazemos localmente. Os passos abaixo cobrem tudo isso.</div>
+    </div>
+  </section>
+
+  <!-- ============ 1. SUAP: AUTH ============ -->
+  <section id="s1">
+    <h2>1 · SUAP — criar a aplicação OAuth2 (autenticação) <span class="chev">▾</span></h2>
+    <div class="body">
+      <p class="lead">O MCP autentica no SUAP via <b>OAuth2 client-credentials</b> (machine-to-machine). Você cria uma <code class="inl">AplicacaoOAuth2</code> confiável; ela gera <code class="inl">client_id</code> + <code class="inl">client_secret</code>.</p>
+
+      <div class="step"><input type="checkbox"><div class="st-body">
+        <h3>1.1 Criar a app confiável <span class="tag suap">SUAP</span></h3>
+        <p>No host do SUAP, na venv do projeto: <code class="inl">python manage.py shell</code> e cole:</p>
+        <pre><code>from api.models import AplicacaoOAuth2
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+owner = User.objects.get(username='SEU_USUARIO_SERVICO')  # qualquer user ativo; vira o request.user
+
+app = AplicacaoOAuth2(
+    name='PGD GitLab Bot',
+    client_type=AplicacaoOAuth2.CLIENT_CONFIDENTIAL,
+    authorization_grant_type=AplicacaoOAuth2.GRANT_CLIENT_CREDENTIALS,
+    skip_authorization=True,   # torna a app "trusted" (só admin pode)
+    user=owner,                # OBRIGATÓRIO: TrustedAppAuth usa app.user como request.user
+)
+client_secret_plano = app.client_secret   # CAPTURE AGORA (é hasheado no save)
+app.save()
+print('client_id     =', app.client_id)
+print('client_secret =', client_secret_plano)</code></pre>
+        <div class="note warn"><b>Copie o <code class="inl">client_secret</code> imediatamente.</b> O SUAP guarda só o hash; depois do <code class="inl">save()</code> ele não pode ser recuperado (só regenerado).</div>
+      </div></div>
+
+      <div class="step"><input type="checkbox"><div class="st-body">
+        <h3>1.2 Validar o token (prova que a auth funciona) <span class="tag suap">SUAP</span></h3>
+        <p>Do seu terminal, troque a URL/credenciais e rode:</p>
+        <pre><code>curl -s -X POST "https://SEU_SUAP/o/token/" \
+  -d "grant_type=client_credentials&client_id=CLIENT_ID&client_secret=CLIENT_SECRET" | jq</code></pre>
+        <p class="pill">Esperado: <code class="inl">{"access_token":"…","expires_in":36000,"token_type":"Bearer",…}</code></p>
+        <div class="note say"><b>Fala na apresentação:</b> "Não guardamos token de longa duração nem senha — a app pega um token curto sob demanda; se vazar, revoga-se a app. É o padrão M2M que o próprio SUAP recomenda."</div>
+      </div></div>
+    </div>
+  </section>
+
+  <!-- ============ 2. SUAP: BACKEND + DADOS ============ -->
+  <section id="s2">
+    <h2>2 · SUAP — backend desta branch + dados de demonstração <span class="chev">▾</span></h2>
+    <div class="body">
+      <div class="note say"><b>Caminho rápido (recomendado p/ a demo):</b> depois de subir o backend (2.1), o <b>seed command</b> abaixo (2.2-rápido) cria de uma vez o cenário inteiro — servidor mapeado + PIT homologado + Entregas PES + (com a flag) a app OAuth2. Ele substitui os passos 1.1 e 2.2 e já imprime o trecho do <code class="inl">contexts.yaml</code>. Um teste de aceitação garante que o cenário é <b>lançável de verdade</b> (o gate completo do PGD passa).</div>
+
+      <div class="step"><input type="checkbox"><div class="st-body">
+        <h3>2.1 Subir o backend com a migração aplicada <span class="tag suap">SUAP</span></h3>
+        <p>Na branch <code class="inl">spec/pgd-execucao-gitlab</code> (que tem os endpoints + a migração <code class="inl">pgd2/0027</code> dos campos GitLab no RIT):</p>
+        <pre><code>git checkout spec/pgd-execucao-gitlab
+uv sync --all-groups
+python manage.py migrate pgd2          # aplica a 0027 (campos gitlab_* no RIT)
+python manage.py runserver             # ou o ambiente onde o MCP vai bater</code></pre>
+        <p class="pill">A API fica em <code class="inl">/api/pgd2/execucao-gitlab/…</code>.</p>
+      </div></div>
+
+      <div class="step"><input type="checkbox"><div class="st-body">
+        <h3>2.2-rápido · Seed do cenário (faz 1.1 + 2.2 de uma vez) <span class="tag suap">SUAP</span></h3>
+        <p>Cria servidor mapeado + adesão + PIT homologado (<code class="inl">EM_CADASTRO_RIT</code>) + Entregas PES (Atendimento de erros, Desenvolvimento, Revisão de código) e, com <code class="inl">--with-oauth-app</code>, a app OAuth2 — imprimindo <code class="inl">client_id</code>/<code class="inl">client_secret</code> + o trecho do <code class="inl">contexts.yaml</code>:</p>
+        <pre><code>python manage.py seed_pgd2_gitlab_demo \
+  --username-gitlab USERNAME_GITLAB \
+  --matricula MATRICULA_DO_SERVIDOR \
+  --with-oauth-app</code></pre>
+        <p class="pill">Idempotente: pode rodar de novo. Se já fez o 1.1 na mão, omita <code class="inl">--with-oauth-app</code>. Se usar este passo, pule o 2.2 manual abaixo.</p>
+      </div></div>
+
+      <div class="step"><input type="checkbox"><div class="st-body">
+        <h3>2.2 Garantir os dados de demonstração (alternativa manual) <span class="tag suap">SUAP</span></h3>
+        <p>O fluxo só tem o que mostrar se existir, para um servidor: um <b>PIT do mês homologado</b> (em <code class="inl">EM_CADASTRO_RIT</code>) com pelo menos uma <b>entrega homologada</b> ligada a uma <b>Entrega PES</b> (com descrição/critérios), e o <b>mapeamento</b> do usuário → username GitLab.</p>
+        <pre><code># manage.py shell — mapear o servidor ao username do GitLab (autor do MR):
+from demandas.models import AnalistaDesenvolvedor
+from rh.models import Servidor
+serv = Servidor.objects.get(matricula='MATRICULA_DO_SERVIDOR')
+AnalistaDesenvolvedor.objects.get_or_create(
+    usuario=serv.get_user(), defaults={'username_gitlab': 'USERNAME_GITLAB', 'ativo': True}
+)</code></pre>
+        <div class="note">Use um servidor que <b>já tenha</b> o PIT do mês com entregas homologadas (o caso real). Se precisar de um cenário limpo e reproduzível para a demo, peça que eu gere um <i>management command</i> de seed.</div>
+      </div></div>
+
+      <div class="step"><input type="checkbox"><div class="st-body">
+        <h3>2.3 Provar o backend ponta a ponta (token + dados) <span class="tag suap">SUAP</span></h3>
+        <p>Com o <code class="inl">access_token</code> do passo 1.2, liste as entregas candidatas:</p>
+        <pre><code>TOKEN="COLE_O_ACCESS_TOKEN"
+curl -s "https://SEU_SUAP/api/pgd2/execucao-gitlab/entregas-disponiveis/?gitlab_username=USERNAME_GITLAB" \
+  -H "Authorization: Bearer $TOKEN" | jq</code></pre>
+        <p class="pill">Esperado: <code class="inl">{"entregas":[{…,"pes_descricao":"…","pes_criterios_avaliacao":"…","metrica":…}]}</code>. Se vier <code class="inl">404</code>, o username não está mapeado (passo 2.2). Se vier lista vazia, falta PIT/entrega homologada do mês.</p>
+        <div class="note say"><b>Fala:</b> "Essa chamada já mostra o coração da inferência: as categorias do PIT vêm com a descrição e os critérios da Entrega PES — é contra isso que o assistente casa a issue."</div>
+      </div></div>
+    </div>
+  </section>
+
+  <!-- ============ 3. LOCAL: MCP ============ -->
+  <section id="s3">
+    <h2>3 · Local — configurar o MCP (este computador) <span class="chev">▾</span></h2>
+    <div class="body">
+      <div class="step"><input type="checkbox"><div class="st-body">
+        <h3>3.1 Apontar o contexto SUAP <span class="tag local">LOCAL</span></h3>
+        <p>Em <code class="inl">~/.config/coding-agents/contexts.yaml</code>, na seção do contexto (ex.: <code class="inl">ifrn</code>), inclua a seção <code class="inl">suap</code> com o <code class="inl">client_id</code> (não é segredo):</p>
+        <pre><code>contexts:
+  ifrn:
+    suap:
+      base_url: "https://SEU_SUAP"
+      client_id: "CLIENT_ID_DO_PASSO_1.1"
+      token_keychain: "coding-agents/suap/ifrn"
+    gitlab:
+      base_url: "https://gitlab.ifrn.edu.br"
+      token_keychain: "coding-agents/gitlab/ifrn"</code></pre>
+      </div></div>
+
+      <div class="step"><input type="checkbox"><div class="st-body">
+        <h3>3.2 Guardar o client_secret <span class="tag local">LOCAL</span></h3>
+        <p>O <code class="inl">token_keychain</code> agora guarda o <b>client_secret</b>. Via variável de ambiente (nome derivado do keychain em MAIÚSCULAS, <code class="inl">/</code>→<code class="inl">_</code>):</p>
+        <pre><code>export CODING_AGENTS_SUAP_IFRN="CLIENT_SECRET_DO_PASSO_1.1"</code></pre>
+        <p class="pill">Ou no macOS Keychain: <code class="inl">security add-generic-password -a "$USER" -s "coding-agents/suap/ifrn" -w "CLIENT_SECRET"</code></p>
+      </div></div>
+
+      <div class="step"><input type="checkbox"><div class="st-body">
+        <h3>3.3 Recarregar o MCP no Claude Code <span class="tag local">LOCAL</span></h3>
+        <p>O servidor <code class="inl">suap-mcp</code> já está no <code class="inl">.mcp.json</code>. Reinicie o Claude Code para carregar as tools novas (<code class="inl">get_entregas_disponiveis_pgd2</code>, <code class="inl">lancar_rit_execucao_gitlab</code>, <code class="inl">get_rit_do_mr_pgd2</code>). A skill <code class="inl">/pgd-rit</code> aparece na lista de skills.</p>
+        <div class="note">Garanta que o <code class="inl">suap-mcp</code> está na branch <code class="inl">feat/pgd2-lancar-rit</code> (auth client-credentials + tools pgd2).</div>
+      </div></div>
+    </div>
+  </section>
+
+  <!-- ============ 4. DEMO ============ -->
+  <section id="s4">
+    <h2>4 · A demonstração — lançar o RIT a partir de um MR <span class="chev">▾</span></h2>
+    <div class="body">
+      <p class="lead">Tenha um MR de teste no GitLab cujo autor seja o servidor mapeado no 2.2 (idealmente ligado a uma issue de bug/feature).</p>
+
+      <div class="step"><input type="checkbox"><div class="st-body">
+        <h3>4.1 Rodar a skill <span class="tag demo">DEMO</span></h3>
+        <p>No Claude Code, aponte o MR e rode:</p>
+        <pre><code>/pgd-rit  (no MR https://gitlab.ifrn.edu.br/.../-/merge_requests/NN)</code></pre>
+      </div></div>
+
+      <div class="step"><input type="checkbox"><div class="st-body">
+        <h3>4.2 Acompanhar a inferência <span class="tag demo">DEMO</span></h3>
+        <p>Mostre o assistente: lendo o diff/issue → listando as categorias (Entrega PES) → escolhendo a que casa (bug → <i>Atendimento de erros/chamados</i>; feature → <i>Desenvolvimento</i>) → estimando as horas pelo diff → montando título + link da issue.</p>
+        <div class="note say"><b>Fala:</b> "Ele não duplica o trabalho no SUAP: o RIT leva um resumo + o link do GitLab. A fonte continua sendo o GitLab."</div>
+      </div></div>
+
+      <div class="step"><input type="checkbox"><div class="st-body">
+        <h3>4.3 Dry-run e confirmação <span class="tag demo">DEMO</span></h3>
+        <p>O resumo aparece (entrega, horas, descrição). A skill faz um <b>dry-run</b> (não grava) e só grava depois que <b>você confirma</b>. Confirme.</p>
+        <div class="note say"><b>Fala:</b> "O servidor está sempre no controle — nada é gravado sem a confirmação explícita."</div>
+      </div></div>
+
+      <div class="step"><input type="checkbox"><div class="st-body">
+        <h3>4.4 Verificar o RIT no PGD <span class="tag demo">DEMO</span></h3>
+        <p>Abra o PGD do servidor: o RIT aparece na entrega, em <code class="inl">EM_CADASTRO_RIT</code>, com <code class="inl">quantidade = 1</code> e o link do MR na descrição. As horas somam no total da categoria.</p>
+      </div></div>
+
+      <div class="step"><input type="checkbox"><div class="st-body">
+        <h3>4.5 Mostrar a idempotência <span class="tag demo">DEMO</span></h3>
+        <p>Rode <code class="inl">/pgd-rit</code> de novo no mesmo MR → ele <b>atualiza o mesmo RIT</b> (não duplica). Chave: <code class="inl">(projeto, MR)</code>.</p>
+      </div></div>
+    </div>
+  </section>
+
+  <!-- ============ 5. BORDAS ============ -->
+  <section id="s5" class="collapsed">
+    <h2>5 · Bordas (opcional na demo) <span class="chev">▾</span></h2>
+    <div class="body">
+      <div class="step"><input type="checkbox"><div class="st-body">
+        <h3>5.1 Comentário no merge <span class="tag demo">DEMO</span></h3>
+        <p>Ao mergear o MR, o job de CI <code class="inl">pgd-rit-merge</code> (push na master) resolve o MR do commit e comenta no MR qual RIT foi lançado. <span class="pill">(requer validação no GitLab real)</span></p>
+      </div></div>
+      <div class="step"><input type="checkbox"><div class="st-body">
+        <h3>5.2 Limpeza de órfão <span class="tag suap">SUAP</span></h3>
+        <p>Se o MR for <b>fechado sem merge</b>, o cron <code class="inl">descartar_rits_gitlab_orfaos</code> (agendado no <code class="inl">pgd2/beat.py</code>) remove o RIT. Para demonstrar na hora:</p>
+        <pre><code>python manage.py descartar_rits_gitlab_orfaos --dry-run   # lista o que removeria
+python manage.py descartar_rits_gitlab_orfaos             # remove os órfãos</code></pre>
+      </div></div>
+    </div>
+  </section>
+
+  <!-- ============ 6. Q&A ============ -->
+  <section id="s6" class="collapsed">
+    <h2>6 · Pontos de fala / Q&amp;A <span class="chev">▾</span></h2>
+    <div class="body">
+      <table class="matrix">
+        <tr><th>Pergunta provável</th><th>Resposta curta</th></tr>
+        <tr><td>"E se a issue não casar com nenhuma categoria?"</td><td>A skill avisa e <b>não grava</b> — o servidor lança manual ou pede a entrega ao gestor.</td></tr>
+        <tr><td>"Não vai poluir o PGD?"</td><td>1 RIT por MR, só título + link (não duplica conteúdo). O total da categoria é a soma — comportamento nativo do PGD.</td></tr>
+        <tr><td>"Quem garante que é o servidor certo?"</td><td>O servidor é resolvido pelo <code class="inl">username_gitlab</code> e validado contra a entrega (IDOR coberto) + o gate nativo <code class="inl">pode_cadastrar_entrega_rit</code>.</td></tr>
+        <tr><td>"E a segurança do token?"</td><td>OAuth2 client-credentials: segredo revogável, token curto em cache, sem senha de usuário, sem token de longa duração solto.</td></tr>
+        <tr><td>"Mexeu no fluxo manual atual?"</td><td>Não. Reusa a mesma regra do cadastro manual de RIT; o lançamento automático é só mais um caminho de entrada.</td></tr>
+        <tr><td>"E se o servidor já enviou o RIT do mês?"</td><td>O gate nega (período fechado) → a skill avisa e orienta lançamento manual.</td></tr>
+      </table>
+      <div class="note"><b>Status real:</b> os 3 planos estão implementados e com testes verdes (backend, MCP+skill, cron+comentário). Pendências: provisionar a app OAuth2 (passo 1), validar o job de CI no GitLab real, e abrir os MRs das branches.</div>
+    </div>
+  </section>
+
+  <footer>POC PGD × GitLab · gerado para apresentação · o progresso é salvo neste navegador (localStorage).</footer>
+</div>
+
+<script>
+  // copiar blocos de código
+  document.querySelectorAll('pre').forEach(function(pre){
+    var btn=document.createElement('button'); btn.className='copy'; btn.textContent='copiar';
+    btn.addEventListener('click',function(){
+      var code=pre.querySelector('code'); var txt=code?code.innerText:pre.innerText;
+      navigator.clipboard.writeText(txt).then(function(){
+        btn.textContent='copiado!'; btn.classList.add('ok');
+        setTimeout(function(){btn.textContent='copiar'; btn.classList.remove('ok')},1200);
+      });
+    });
+    pre.appendChild(btn);
+  });
+
+  // colapsar seções
+  document.querySelectorAll('section > h2').forEach(function(h){
+    h.addEventListener('click',function(){ h.parentElement.classList.toggle('collapsed'); });
+  });
+
+  // checklist com persistência + barra de progresso
+  var KEY='pgd_poc_v1';
+  var boxes=Array.prototype.slice.call(document.querySelectorAll('.step input[type=checkbox]'));
+  boxes.forEach(function(b,i){ b.dataset.k='c'+i; });
+  function load(){ try{return JSON.parse(localStorage.getItem(KEY)||'{}')}catch(e){return {}} }
+  function save(s){ localStorage.setItem(KEY,JSON.stringify(s)); }
+  function refresh(){
+    var s=load(), done=0;
+    boxes.forEach(function(b){
+      b.checked=!!s[b.dataset.k];
+      b.closest('.step').classList.toggle('done',b.checked);
+      if(b.checked)done++;
+    });
+    var pct=boxes.length?Math.round(done/boxes.length*100):0;
+    document.getElementById('barfill').style.width=pct+'%';
+    document.getElementById('barlbl').textContent=done+' de '+boxes.length+' passos ('+pct+'%)';
+  }
+  boxes.forEach(function(b){
+    b.addEventListener('change',function(){ var s=load(); s[b.dataset.k]=b.checked; save(s); refresh(); });
+  });
+  document.getElementById('reset').addEventListener('click',function(){
+    if(confirm('Reiniciar o checklist?')){ localStorage.removeItem(KEY); refresh(); }
+  });
+  refresh();
+</script>
+</body>
+</html>

@@ -1,0 +1,121 @@
+{% extends 'admin/base_site.html' %}
+
+{% block extrahead %}
+    <script>
+        jQuery(document).ready(function() {
+            $('select[name=modulo]').select2();
+        });
+    </script>
+{% endblock %}
+
+{% block content %}
+    {{ block.super }}
+    {% if grupos_gerenciados.exists %}
+        <form action="" id="filtro" method="get">
+            {% csrf_token %}
+            <div class="search-and-filters">
+                <div class="filter">
+                    <label>Módulo:</label>
+                    <select name="modulo" onchange="$('#filtro').submit();">
+                        <option value="">---------</option>
+                        {% for app_name, app in apps_names.items %}
+                            <option {% if app == current_app %} selected {% endif %}
+                                                                value="{{ app }}">{{ app_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="filter">
+                    <label>Exibir somente Grupos existentes {{ nomenclatura.no_campus }}:</label>
+                    <select name="campus" onchange="$('#filtro').submit();">
+                        <option value="">---------</option>
+                        {% for campus_choice in campus_choices %}
+                            <option {% if campus_choice.sigla == campus %}
+                                selected {% endif %}>{{ campus_choice.sigla }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            {% if current_app %}
+                <ul class="nav nav-tabs">
+                    {% for grupo in grupos_gerenciados %}
+                        <li class="nav-item">
+                            <a href="{{ url_filters }}grupo={{ grupo.pk }}" class="nav-link {% if grupo_escolhido == grupo %}active{% endif %}">
+                                {{ grupo.name }}
+                                <span class="badge">{{ contador_dict|getkey:grupo }}</span>
+                            </a>
+                        </li>
+                    {% endfor %}
+                </ul>
+
+                <div class="tab-pane" data-titled-tab="true">
+
+                    <ul class="action-bar">
+                        <li><a class="btn default popup" href="{% url 'visualizar_menus_do_grupo' grupo_escolhido.pk %}">Menus do Grupo</a></li>
+                    </ul>
+
+                    {% include "includes/grupo_detalhes.html" %}
+
+                    {% box 'Usuários do Grupo' %}
+                        {% if usuarios_grupo.exists %}
+                            {% autopaginate usuarios_grupo 32 %}
+                            {% paginate %}
+                            <div class="card-container">
+                                {% for usuario_grupo in usuarios_grupo %}
+                                    <div class="card {% if not usuario_grupo.user.last_login %}error{% endif %}">
+                                        <div class="photo">
+                                            <img alt="{{ usuario_grupo.user.get_profile.nome_usual }}"
+                                                 src="{{ usuario_grupo.user.get_vinculo.get_foto_75x100_url }}"/>
+                                        </div>
+                                        {% if usuario_grupo.user.get_profile.nome_usual or usuario_grupo.user.get_profile.nome %}
+                                            <h5>{{ usuario_grupo.user.get_profile.nome_usual|default:usuario_grupo.user.get_profile.nome }}</h5>
+                                        {% endif %}
+                                        <dl>
+                                            <dt>Cargo/Setor:</dt>
+                                            <dd>{% if usuario_grupo.eh_estagiario %}Estagiário{% else %}{{ usuario_grupo.user.get_relacionamento_title }}{% endif %} <span
+                                                    title="{{ usuario_grupo.user.get_vinculo.setor.nome }}">({{ usuario_grupo.user.get_vinculo.setor|format }})</span>
+                                            </dd>
+                                            {% if usuario_grupo.user.get_vinculo.eh_prestador %}
+                                                <dt>CPF:</dt>
+                                                <dd>{{ usuario_grupo.user.username }}</dd>
+                                            {% else %}
+                                                <dt>Matrícula:</dt>
+                                                <dd>
+                                                    <a href="{{ usuario_grupo.user.get_relacionamento.get_absolute_url }}">{{ usuario_grupo.user.username }}</a>
+                                                </dd>
+                                            {% endif %}
+                                            {% if usuario_grupo.ultimo_motivo %}
+                                                <dt>Motivo da inclusão:</dt>
+                                                <dd>{{ usuario_grupo.ultimo_motivo }}</dd>
+                                            {% endif %}
+                                            {% if usuario_grupo.setores.exists %}
+                                                <dt>Setores Vinculados:</dt>
+                                                <dd>{{ usuario_grupo.setores.all|join:", " }}</dd>
+                                            {% endif %}
+                                        </dl>
+                                        {% if not usuario_grupo.user.last_login %}
+                                            <div class="content status status-error">
+                                                <p>Nunca acessou o sistema.</p>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                            {% paginate %}
+                        {% else %}
+                            <p class="alert alert-warning">Nenhum usuário encontrado nesse grupo.</p>
+                        {% endif %}
+                    {% endbox %}
+
+                    {% box 'Permissões Relacionadas ao Grupo' %}
+                        {% include "includes/grupo_permissoes.html" with grupo=grupo_escolhido %}
+                    {% endbox %}
+                </div>
+            {% elif not current_app %}
+                <p class="alert alert-warning">Você precisa filtrar por um Módulo.</p>
+            {% endif %}
+        </form>
+    {% else %}
+        <p class="alert alert-warning">Não há associação de grupos gerenciados.</p>
+    {% endif %}
+{% endblock %}

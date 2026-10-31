@@ -1,0 +1,252 @@
+{% extends super_template %}
+
+{% block extrahead %}
+<link rel="stylesheet" href="/static/rsc/css/rsc-acompanhar.css">
+<script>
+    function ciencia_resultado(processo_id){
+        $.ajax({
+            type: "POST",
+            url: '/rsc/ciencia_resultado/'+processo_id+'/',
+            data: $('#form_ciencia').serialize(),
+            success: function (retorno) {
+                if (retorno.ok) {
+                    alert(retorno.msg)
+                    parent.close_fancybox()
+                }else {
+                    alert(retorno.msg)
+                }
+            }
+        });
+    }
+</script>
+{% endblock %}
+
+{% block content %}
+
+<ul class="action-bar">
+    <li>
+        <a class="btn warning popup" href="/rsc/revisar_datas_limite/">Revisar Datas Limite</a>
+    </li>
+    <li>
+        <a class="btn" href="#" onclick="history.back(); return false;">Voltar</a>
+    </li>
+</ul>
+
+{% if processo.pode_mostrar_avaliacao %}
+    {% box "Resultado Final da Avaliação" %}
+        <div class="table-responsive">
+            <table class="info mt-0">
+                <caption class="hidden">Resultado final da avaliação</caption>
+                <tr>
+                    <td>Resultado:</td>
+                    <td><span class="status status-{{ estado_processo_class_css }}">{{ estado_processo|format }}</span></td>
+                </tr>
+                <tr>
+                    <td>Data de Retroatividade:</td>
+                    <td>{{ data_referencia_validada|format }}</td>
+                </tr>
+                <tr>
+                    <td>Data de Referência dos Documentos:</td>
+                    <td>{{ data_referencia_documentos|format }}</td>
+                </tr>
+            </table>
+        </div>
+    {% endbox %}
+{% endif %}
+
+{% box "Avaliadores" %}
+    <div class="table-responsive">
+    <table class="mt-0">
+        <caption class="hidden">Avaliadores selecionados para o processo</caption>
+        <thead>
+            <tr>
+                {% if processo.pode_mostrar_avaliacao %}
+                    <th class="no-print">Ações</th>
+                {% endif %}
+                <th>Avaliadores</th>
+                {% if processo.pode_mostrar_avaliacao %}
+                    <th>Pontuação Validada</th>
+                    <th>Data de Referência Validada</th>
+                    <th>Resultado Preliminar</th>
+                {% endif %}
+                <th>Situação</th>
+                {% if not processo.pode_mostrar_avaliacao %}
+                    <th>Data Limite</th>
+                {% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for avaliador in avaliadores_selecionados %}
+                <tr>
+                    {% if processo.pode_mostrar_avaliacao %}
+                        <td class="no-print">
+                            {% icon "view" "/rsc/avaliar_processo/{{ processo.id }}/{{ avaliador.id }}/" "Ver {{ processo }}" %}
+                        </td>
+                    {% endif %}
+                    <td>
+                        <span class="rsc-avaliador-nome">{{ avaliador.nome }}</span>
+                        {% if eh_membro_do_cppd %}
+                            <span class="rsc-avaliador-meta"><strong>Resp. pelo cadastro:</strong> {{ avaliador.responsavel_cadastro }}</span>
+                            {% if avaliador.vinculo.user.get_profile.telefones %}
+                                <span class="rsc-avaliador-meta"><strong>Telefones:</strong> {{ avaliador.vinculo.user.get_profile.telefones }}</span>
+                            {% endif %}
+                        {% endif %}
+                    </td>
+                    {% if processo.pode_mostrar_avaliacao %}
+                        <td>{{ avaliador.pontuacao_validada }}</td>
+                        <td>{{ avaliador.data_referencia_validada|format }}</td>
+                        <td><span class="status status-alert rsc-wrap-normal">{{ avaliador.avaliacao_status|format|safe }}</span></td>
+                    {% endif %}
+                    <td>{{ avaliador.situacao|safe }}</td>
+                    {% if not processo.pode_mostrar_avaliacao %}
+                        <td>{{ avaliador.data_limite|safe }}</td>
+                    {% endif %}
+                </tr>
+            {% empty %}
+                <tr><td colspan="6">
+                    <p class="alert alert-danger"><strong>Atenção:</strong> Nenhum avaliador selecionado para este processo.</p>
+                </td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+{% endbox %}
+
+{% if not eh_dono_processo and not processo.pode_mostrar_avaliacao %}
+    {% box "Avaliadores Reserva" %}
+        <div class="table-responsive">
+        <table class="mt-0">
+            <caption class="hidden">Avaliadores reserva do processo</caption>
+            <thead>
+                <tr>
+                    <th>Avaliadores Internos</th>
+                    <th>Avaliadores Externos</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>
+                        {% if avaliadores_internos_reserva %}
+                            <ul>
+                                {% for avaliador_interno_reserva in avaliadores_internos_reserva %}
+                                    <li>{{ avaliador_interno_reserva }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <p class="alert alert-warning"><strong>Atenção:</strong> Não existe reserva para avaliadores internos. É recomendado cadastrar mais avaliadores.</p>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if avaliadores_externos_reserva %}
+                            <ul>
+                                {% for avaliador_externo_reserva in avaliadores_externos_reserva %}
+                                    <li>{{ avaliador_externo_reserva }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <p class="alert alert-warning"><strong>Atenção:</strong> Não existe reserva para avaliadores externos. É recomendado cadastrar mais avaliadores.</p>
+                        {% endif %}
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        </div>
+    {% endbox %}
+{% endif %}
+
+{% if avaliadores_internos_excluidos or avaliadores_externos_excluidos %}
+    {% box "Avaliadores Excluídos do Processo" %}
+        <div class="table-responsive">
+        <table class="mt-0">
+            <caption class="hidden">Avaliadores excluídos do processo</caption>
+            <thead>
+                <tr>
+                    <th>Avaliadores Internos</th>
+                    <th>Avaliadores Externos</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>
+                        <ul>
+                            {% for avaliador_interno_desistente in avaliadores_internos_excluidos %}
+                                <li>{{ avaliador_interno_desistente.nome }} [{{ avaliador_interno_desistente.status }}]</li>
+                            {% empty %}
+                                <li>Nenhum avaliador interno excluído.</li>
+                            {% endfor %}
+                        </ul>
+                    </td>
+                    <td>
+                        <ul>
+                            {% for avaliador_externo_desistente in avaliadores_externos_excluidos %}
+                                <li>{{ avaliador_externo_desistente.nome }} [{{ avaliador_externo_desistente.status }}]</li>
+                            {% empty %}
+                                <li>Nenhum avaliador externo excluído.</li>
+                            {% endfor %}
+                        </ul>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        </div>
+    {% endbox %}
+{% endif %}
+
+{% if eh_dono_processo_ou_presidente_cppd or is_superuser %}
+
+    {% if processo.pode_mostrar_avaliacao %}
+        {% box 'Dados Geradores da Data de Retroatividade' %}
+            <div class="table-responsive">
+            <table class="mt-0">
+                <caption class="hidden">Dados geradores da data de retroatividade</caption>
+                <tr>
+                    <td>Data consolidada dos documentos apresentados para atingimento da pontuação mínima:</td>
+                    <td>{{ data_referencia_documentos|format }}</td>
+                </tr>
+                <tr>
+                    <td>Data de Exercício na carreira de EBTT:</td>
+                    <td>{{ data_exercio_carreira }}</td>
+                </tr>
+                <tr>
+                    <td>Data do Título que habilita ao RSC pretendido:</td>
+                    <td>{{ data_conclusao_titulacao_rsc_pretendido }}</td>
+                </tr>
+                <tr>
+                    <td>Data de Concessão da última RT:</td>
+                    <td>{{ data_concessao_ultima_rt }}</td>
+                </tr>
+            </table>
+            </div>
+        {% endbox %}
+
+        {% box 'Ciência do Resultado da Avaliação' %}
+            {% if not processo.concorda_deferimento and not processo.concorda_data_retroatividade and processo.status == processo.get_status_aguardando_ciencia %}
+                <form id="form_ciencia">
+                    {% csrf_token %}
+                    <div class="rsc-ciencia-pergunta">
+                        Você concorda com o resultado da avaliação (deferimento/indeferimento)?
+                        <span class="rsc-ciencia-opcoes">
+                            <label>Sim <input type="radio" name="ciencia_deferimento" value="1"/></label>
+                            <label>Não <input type="radio" name="ciencia_deferimento" value="2"/></label>
+                        </span>
+                    </div>
+                    <div class="rsc-ciencia-pergunta">
+                        Você concorda com a data de retroatividade concedida?
+                        <span class="rsc-ciencia-opcoes">
+                            <label>Sim <input type="radio" name="ciencia_data_retroatividade" value="1"/></label>
+                            <label>Não <input type="radio" name="ciencia_data_retroatividade" value="2"/></label>
+                        </span>
+                    </div>
+                    <div class="rsc-ciencia-acoes">
+                        <a href="#" onclick="ciencia_resultado({{ processo.id }}); return false;" class="btn success">Registrar Ciência do Resultado</a>
+                    </div>
+                </form>
+            {% else %}
+                <p class="alert alert-warning">{{ processo.get_ciencia_display }}</p>
+            {% endif %}
+        {% endbox %}
+    {% endif %}
+
+{% endif %}
+
+{% endblock %}

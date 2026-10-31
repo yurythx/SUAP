@@ -1,0 +1,378 @@
+{% extends super_template %}
+
+{% block extrahead %}
+<script>
+jQuery(document).ready(function () {
+    function preferencias_notificacoes(element, request_url) {
+        var class_name = "true";
+
+        $.ajax({
+            url: request_url,
+            success: function(response) {
+                msg = "Salvo com sucesso.";
+                class_name = "true";
+                $(element).addClass(class_name).html(msg).show().delay(2500).fadeOut(500, function() {
+                    $(element).removeClass(class_name);
+                });
+            },
+            error: function(response) {
+                msg = "Não é possível inativar as duas formas de Notificação.";
+                class_name = "false";
+
+                $(element).addClass(class_name).html(msg).show().delay(2500).fadeOut(500, function() {
+                    $(element).removeClass(class_name);
+                });
+                $(element).prev().find("[type='checkbox']").prop('checked', true);
+            }
+        });
+    }
+    function ativar_autenticacao_dois_fatores(element, request_url) {
+        var class_name = "true";
+
+        $.ajax({
+            url: request_url,
+            success: function(response) {
+                msg = "Salvo com sucesso.";
+                class_name = "true";
+                $(element).addClass(class_name).html(msg).show().delay(2500).fadeOut(500, function() {
+                    $(element).removeClass(class_name);
+                });
+            },
+            error: function(response) {
+                msg = "Erro ao ativar. A autenticação já está ativa.";
+                class_name = "false";
+
+                $(element).addClass(class_name).html(msg).show().delay(2500).fadeOut(500, function() {
+                    $(element).removeClass(class_name);
+                });
+                $(element).prev().find("[type='checkbox']").prop('checked', true);
+            }
+        });
+    }
+    $('[data-switch-suap]').on('change', function(){
+        preferencias_notificacoes('[data-switch-message-suap]', '/comum/atualizar_preferencia_padrao/?envio=suap&is_ajax=True');
+    });
+    $('[data-switch-email]').on('change', function(){
+        preferencias_notificacoes('[data-switch-message-email]', '/comum/atualizar_preferencia_padrao/?envio=email&is_ajax=True');
+    });
+    $('[data-switch-2fa]').on('change', function(){
+        ativar_autenticacao_dois_fatores('[data-switch-message-2fa]', '/comum/ativar_autenticacao_dois_fatores/');
+    });
+});
+</script>
+{% endblock %}
+
+{% block bodyclass %}{% if historico_grupos %}hasAsideRight{% endif %}{% endblock %}
+
+{% block object-status %}
+    <span class="status status-info">Meu vínculo:&nbsp;<strong>{{ usuario.get_tipo }}</strong></span>
+    {% if usuario.eh_prestador %}
+        {% if not usuario.get_relacionamento.tem_ocupacao_ativa %}
+            <span class="status status-alert">Sem ocupação ativa como prestador de serviço</span>
+        {% endif %}
+    {% endif %}
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if perms.auth.change_user %}
+            <li><a href="/admin/comum/user/{{ usuario.pk }}/" class="btn primary">{% icone "edit" %}<span
+                    class="visually-hidden">Editar usuário</span></a></li>
+        {% endif %}
+        {% if not request.session.autenticou_com_govbr %}
+            <li><a href="/comum/alterar_senha/" class="btn primary">{% icone "key" %} Alterar senha</a></li>
+        {% endif %}
+        {% if usuario.get_vinculo.pk %}
+            <li>
+                <a href="/comum/atualizar_email_secundario/{{ usuario.get_vinculo.pk }}/" class="btn primary">{% icone "envelope" %} Alterar emails</a>
+            </li>
+        {% endif %}
+        <li><a href="/comum/logout/" class="btn danger"
+               data-confirm="Você deseja sair do sistema?">{% icone "sign-out-alt" %} Sair do sistema</a></li>
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+    <div class="widget featured">
+        <div class="photo-circle lg mt-0 mb-0">
+            <img src="{{ usuario.get_relacionamento.get_foto_150x200_url }}"
+                                alt="Foto de {{ usuario.get_relacionamento.pessoa_fisica.nome|format }}">
+        </div>
+        <div class="widget-info">
+            <h3 class="title">Olá, <strong>{{ title_usuario|truncatewords:1|slice:":-2" }}</strong>!</h3>
+            <p class="description">Esta é a página Minha Conta, onde você pode ajustar algumas configurações e preferências referentes ao seu uso do Suap.</p>
+        </div>
+        <div class="flex-container boxes links style-circles flex-grow-2">
+            {% if usuario.eh_servidor %}
+                <a href="/rh/servidor/{{ usuario.get_relacionamento.matricula }}" class="box-item">
+                    {% icone "user" %}
+                    <h4 class="title">Meus dados</h4>
+                </a>
+            {% elif usuario.eh_aluno %}
+                <a href="/edu/aluno/{{ usuario.get_relacionamento.matricula }}" class="box-item">
+                    {% icone "user" %}
+                    <h4 class="title">Meus dados</h4>
+                </a>
+            {% else %}
+                <a href="/comum/prestador_servico/{{ usuario.get_relacionamento.pk }}" class="box-item">
+                    {% icone "user" %}
+                    <h4 class="title">Meus dados</h4>
+                </a>
+            {% endif %}
+            {% if not usuario.eh_aluno %}
+                <a href="/comum/grupos_usuario/{{ usuario.pk }}/" class="box-item">
+                    {% icone "users" %}
+                    <h4 class="title">Meus grupos</h4>
+                </a>
+                <a href="/comum/minhas_acoes_suap/" class="box-item">
+                    {% icone "bullseye" %}
+                    <h4 class="title">Minhas ações</h4>
+                </a>
+            {% endif %}
+            <a href="/comum/documentos_emitidos_suap/" class="box-item">
+                {% icone "folder" %}
+                <h4 class="title">Meus documentos</h4>
+            </a>
+            <a href="/admin/comum/sessioninfo/" class="box-item">
+                {% icone "sign-in-alt" %}
+                <h4 class="title">Minhas sessões</h4>
+            </a>
+        </div>
+    </div>
+
+    {% if usuario.groups.exists %}
+        <div class="widget">
+            <div class="widget-info">
+                <h3 class="title">Grupos</h3>
+                <p class="description">Você é responsável pelas ações realizadas através dos seus grupos de acesso. Verifique se todos os seus grupos correspondem às suas atribuições atuais na instituição.</p>
+            </div>
+            <dl class="definition-list flex flex-grow-4">
+                <div class="list-item">
+                    <dt>Você está nos seguintes grupos hoje</dt>
+                    <dd>
+                        <ul class="tags mt-2">
+                            {% for grupo in usuario.groups.all %}
+                                <li>{{ grupo }}</li>
+                            {% empty %}
+                                <li>Não definido</li>
+                            {% endfor %}
+                        </ul>
+                    </dd>
+                </div>
+            </dl>
+        </div>
+    {% endif %}
+
+    <div class="widget">
+        <div class="widget-info">
+            <h3 class="title">Notificações</h3>
+            <p class="description">Escolha como e onde você deseja receber alertas sobre suas atividades, prazos e avisos do sistema.</p>
+        </div>
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>No Suap</dt>
+                <dd>
+                    <label class="switch" data-switch-suap>
+                        <input type="checkbox" {% if usuario.eh_notificado_suap %}checked{% endif %}>
+                        <span class="slider"></span>
+                    </label>
+                    <p class="message" data-switch-message-suap></p>
+                </dd>
+            </div>
+            <div class="list-item">
+                <dt>No E-mail</dt>
+                <dd>
+                    <label class="switch" data-switch-email>
+                        <input type="checkbox" {% if usuario.eh_notificado_email %}checked{% endif %}>
+                        <span class="slider"></span>
+                    </label>
+                    <p class="message" data-switch-message-email></p>
+                </dd>
+            </div>
+        </dl>
+        <ul class="action-bar">
+            <li><a href="/admin/comum/preferencianotificacao/" class="btn primary">{% icone "edit" %} Editar
+                preferências de recebimento</a></li>
+        </ul>
+    </div>
+
+    <div class="widget">
+        <div class="widget-info">
+            <h3 class="title">Aparência do sistema</h3>
+            <p class="description">Deixe o SUAP com a sua cara. Mude o tema visual ou organize os quadros da sua página inicial para destacar o que é mais importante.</p>
+        </div>
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>Tema utilizado</dt>
+                <dd>{{ usuario.tema_preferido }}</dd>
+            </div>
+        </dl>
+        <ul class="action-bar">
+            <li><a href="/comum/temas/" class="btn primary">{% icone "edit" %} Alterar tema</a></li>
+            <li><a href="/comum/index/exibir_quadro/" class="btn">{% icone "th" %} Gerenciar quadros do Início</a></li>
+        </ul>
+    </div>
+
+    {% if permite_autenticacao_duplo_fator %}
+        <div class="widget">
+            <div class="widget-info">
+                <h3 class="title">Verificação em duas etapas</h3>
+                <p class="description">Adicione uma camada extra de proteção. Além da sua senha, será solicitado um código temporário para garantir que apenas você acesse sua conta.</p>
+            </div>
+            {% if usuario.autenticacaodoisfatores.validou_qrcode %}
+                <dl class="definition-list flex">
+                    <div class="list-item">
+                        <dt>{% icone "edit" %} Ativar Autenticação via Senha de Uso Único:</dt>
+                        <dd>
+                            <label class="switch" data-switch-2fa>
+                                <input type="checkbox" {% if usuario.autenticacaodoisfatores_habilitada %}checked{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                            <p class="message" data-switch-message-2fa></p>
+                        </dd>
+                    </div>
+                </dl>
+            {% endif %}
+            <ul class="action-bar">
+                {% if not usuario.autenticacaodoisfatores.validou_qrcode %}
+                    <li>
+                        <a class="btn success" href="{% url 'habilitar_2fa_suap' %}">
+                            {% icone "qrcode" %} Habilitar autenticação com dois fatores
+                        </a>
+                    </li>
+                {% endif %}
+                {% if usuario.autenticacaodoisfatores.validou_qrcode %}
+                    <li>
+                        <a class="btn danger" href="{% url 'remover_2fa_suap' %}">
+                            {% icone "qrcode" %} Remover autenticação com dois fatores
+                        </a>
+                    </li>
+                {% endif %}
+                {% if usuario.autenticacaodoisfatores_habilitada %}
+                    <li><a class="btn" href="{% url 'validar_qrcode_2fa_otp' %}">{% icone "qrcode" %} Visualizar QR Code</a></li>
+                {% endif %}
+            </ul>
+        </div>
+    {% endif %}
+
+    {% if autocadastros is not None %}
+        <div class="widget">
+            <div class="widget-info">
+                <h3 class="title">Biometria</h3>
+                <p class="description">Agilize seu registro de ponto. Solicite o cadastro de sua digital para utilizar os novos terminais físicos de frequência com mais praticidade.</p>
+            </div>
+            {% if autocadastros %}
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Data de expiração</th>
+                                <th>Ativo?</th>
+                                <th class="no-print">Opções</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for solicitacao in autocadastros %}
+                            <tr>
+                                <td>{{ forloop.counter }}</td>
+                                <td>{{ solicitacao.data_expiracao }}</td>
+                                <td>{{ solicitacao.ativo|format }}</td>
+                                <td class="no-print">
+                                    {% if solicitacao.ativo %} 
+                                        <a class="btn primary" href="/comum/solicitar_autocadastro/reenviar/{{ solicitacao.id }}/">{% icone "square" %} Refazer autocadastro</a></li>
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
+            <ul class="action-bar">
+                <li><a href="/comum/solicitar_autocadastro/" class="btn success popup">{% icone "fingerprint" %} Solicitar autocadastro</a></li>
+            </ul>
+        </div>
+    {% endif %}
+
+{% endblock %}
+
+{% block asideright %}
+
+    {% if historico_grupos %}
+        <aside class="right">
+            <details open="open">
+                <summary>Dados gerais</summary>
+                <div class="details-container">
+                    <dl class="definition-list flex w-100">
+                        <div class="list-item">
+                            <dt>Nome</dt>
+                            <dd>{{ title_usuario }}</dd>
+                        </div>
+                        <div class="list-item">
+                            <dt>Usuário</dt>
+                            <dd>{{ usuario.username }}</dd>
+                        </div>
+                        <div class="list-item">
+                            <dt>ID de usuário</dt>
+                            <dd>{{ usuario.pk }}</dd>
+                        </div>
+                        <div class="list-item">
+                            <dt>Último login</dt>
+                            <dd>{{ usuario.last_login|format }}</dd>
+                        </div>
+                        <div class="list-item">
+                            <dt>Data de registro</dt>
+                            <dd>{{ usuario.date_joined|format }}</dd>
+                        </div>
+                        {% if request.session.autenticou_com_govbr %}
+                            <div class="list-item">
+                                <dt>Nível de confiabilidade Gov.BR</dt>
+                                {% if request.session.confiabilidade_govbr == "1" %}
+                                    <dd>Bronze</dd>
+                                {% elif request.session.confiabilidade_govbr == "2" %}
+                                    <dd>Prata</dd>
+                                {% elif request.session.confiabilidade_govbr == "3" %}
+                                    <dd>Ouro</dd>
+                                {% else %}
+                                    <dd>Não foi possível obter</dd>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                        {% if usuario.eh_prestador and usuario.get_relacionamento.tem_ocupacao_ativa %}
+                            {% for ocupacao in usuario.get_relacionamento.ocupacoes_ativas %}
+                                <div class="list-item flex-basis-100">
+                                    <dt>Ocupação ativa{% if ocupacao.ocupacao %} como <strong>{{ ocupacao.ocupacao }}</strong>{% endif %}</dt>
+                                    <dd>Setor {{ ocupacao.setor_suap }}, de {{ ocupacao.data_inicio|format }} <span class="false">até {{ ocupacao.data_fim|format }}</span>, por {{ ocupacao.empresa }}</dd>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    </dl>
+                </div>
+            </details>
+            <details open="open">
+                <summary>Histórico em grupos</summary>
+                <div class="details-container">
+                    <ul class="timeline">
+                        {% for registro in historico_grupos %}
+                            <li class="{% if registro.eh_adicao %}success{% endif %}">
+                                <div class="timeline-date">{{ registro.data|format }}</div>
+                                <div class="timeline-icon"></div>
+                                <div class="timeline-content">
+                                    <h4>{{ registro.grupo }} <small>{{ registro.acao }}</small></h4>
+                                </div>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                    <div class="d-flex justify-content-end mt-4">
+                        <a class="btn default popup"
+                            href="/comum/usuario/{{ usuario.pk }}/historico_grupos/">{% icone "eye" %} Ver todo o histórico</a>
+                    </div>
+                </div>
+            </details>
+        </aside>
+    {% endif %}
+{% endblock %}

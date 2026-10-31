@@ -1,0 +1,347 @@
+{% extends super_template %}
+
+{% block object-status %}
+    {% if obj.situacao %}
+        {{ obj.get_situacao_display|status }}
+    {% else %}
+        {{ "Cadastro em andamento"|status }}
+    {% endif %}
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if pode_finalizar and possui_solicitacoes %}
+            <li>
+                <a href="?finalizar="
+                    class="btn success popup confirm"
+                    data-confirm="Após o envio, não será mais possível realizar alterações no requerimento. Tem certeza de que deseja continuar?">Enviar requerimento</a>
+            </li>
+        {% endif %}
+    {% if pode_desarquivar %}
+        <li>
+            <a href="?desarquivar="
+                class="btn danger"
+                data-confirm="Tem certeza de que deseja continuar?">Retornar para Em Atendimento</a>
+        </li>
+    {% endif %}
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+    {% if pode_finalizar %}
+        <p class="alert alert-warning"><strong>Atenção:</strong> após concluir o cadastro das disciplinas, envie o requerimento para que a análise da sua solicitação seja iniciada.</p>
+    {% endif %}
+    
+    {% if obj.is_arquivado %}
+        <p class="alert alert-warning">O requerimento encontra-se arquivado. A reabertura para eventuais correções pode ser realizada pelo atendente se necessário.</p>
+    {% endif %}
+
+    {% box "Dados gerais" %}
+        <dl class="definition-list flex">
+            <div class="list-item flex-basis-50">
+                <dt>Situação do requerimento</dt>
+                <dd>
+                    {{ obj.get_situacao_display|default:"Cadastro em andamento" }}
+                </dd>
+            </div>
+            <div class="list-item flex-basis-50">
+                <dt>Situação da avaliação</dt>
+                <dd>
+                    {{ obj.get_situacao_avaliacao }}
+                </dd>
+            </div>
+            {% if obj.observacao %}
+                <div class="list-item flex-basis-100">
+                    <dt>Observação</dt>
+                    <dd>
+                        {{ obj.observacao|format }}
+                    </dd>
+                </div>
+            {% endif %}
+            <div class="list-item">
+                <dt>Data da solicitação</dt>
+                <dd>
+                    {{ obj.data|format }}
+                </dd>
+            </div>
+            <div class="list-item">
+                <dt>Aluno</dt>
+                <dd>
+                    {{ obj.aluno.pessoa_fisica.nome }}
+                    (<a href="{{ obj.aluno.get_absolute_url }}">{{ obj.aluno.matricula }}</a>)
+                </dd>
+            </div>
+            <div class="list-item">
+                <dt>Curso</dt>
+                <dd>
+                    {% if is_proprio_aluno %}
+                        {{ obj.aluno.curso_campus }}
+                    {% else %}
+                        <a href="{{ obj.aluno.curso_campus.get_absolute_url }}">{{ obj.aluno.curso_campus }}</a>
+                    {% endif %}
+                </dd>
+            </div>
+            {% if obj.interno %}
+                <div class="list-item flex-basis-100">
+                    <dt>Cursada nesta instituição</dt>
+                    <dd>
+                        {{ obj.interno|format }}
+                    </dd>
+                </div>
+            {% endif %}
+            {% if not obj.interno %}
+                <div class="list-item flex-basis-100">
+                    <dt>Instituição</dt>
+                    <dd>
+                        {{ obj.instituicao|format }}
+                    </dd>
+                </div>
+                <div class="list-item flex-basis-50">
+                    <dt>Histórico Escolar</dt>
+                    <dd>
+                        <a class="popup" href="{{ obj.historico_escolar.url }}">[Visualizar]</a>
+                    </dd>
+                </div>
+                <div class="list-item flex-basis-50">
+                    <dt>Comprovante de Reconhecimento de Curso</dt>
+                    <dd>
+                        {% if obj.comprovante_reconhecimento_curso %}
+                            <a class="popup" href="{{ obj.comprovante_reconhecimento_curso.url }}">[Visualizar]</a>
+                        {% else %}
+                            Não Informado
+                        {% endif %}
+                    </dd>
+                </div>
+            {% endif %}
+        </dl>
+    {% endbox %}
+    {% if obj.atendente %}
+        {% box "Dados do atendimento" %}
+            <dl class="definition-list flex">
+                <div class="list-item flex-basis-100">
+                    <dt>Atendente</dt>
+                    <dd>
+                        {{ obj.atendente|format }}
+                    </dd>
+                </div>
+                <div class="list-item flex-basis-50">
+                    <dt>Início do Atendimento</dt>
+                    <dd>
+                        {{ obj.inicio|format }}
+                    </dd>
+                </div>
+                <div class="list-item flex-basis-50">
+                    <dt>Fim do Atendimento</dt>
+                    <dd>
+                        {{ obj.termino|format }}
+                    </dd>
+                </div>
+            </dl>
+        {% endbox %}
+    {% endif %}
+    {% box "Solicitações de aproveitamento" %}
+        {% if pode_finalizar %}
+            <ul class="action-bar">
+                <li>
+                    <a href="/edu/adicionar_solicitacao_aproveitamento_disciplina/{{ obj.pk }}/" class="btn primary popup">Adicionar disciplina</a>
+                </li>
+            </ul>
+        {% endif %}
+        {% if possui_solicitacoes %}
+            {% with registros=obj.get_solicitacoes_aproveitamento_interno %}
+                {% if registros %}
+                    <div class="table-responsive">
+                        <table>
+                            <caption>Disciplinas solicitadas</caption>
+                            <thead>
+                                <tr>
+                                    {% if not obj.is_arquivado %}
+                                    <th>Ações</th>
+                                    {% endif %}
+                                    <th>Componente a Aproveitar</th>
+                                    <th>Diário</th>
+                                    <th>Curso</th>
+                                    <th>Nota</th>
+                                    <th>Frequência</th>
+                                    <th>Situação da Solicitação</th>
+                                    <th>Avaliador</th>
+                                    {% if not obj.is_arquivado %}
+                                    <th>Opções</th>
+                                    {% endif %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for registro in registros %}
+                                    {% with mds=registro.get_matriculas_diario %}
+                                        {% for md in mds %}
+                                            <tr>
+                                                {% if forloop.first %}
+                                                    {% if not obj.is_arquivado %}
+                                                    <td rowspan="{{ mds|length }}">
+                                                        {% if is_coordenador and not registro.is_finalizada or pode_finalizar %}
+                                                            <a class="popup icon icon-edit" href="/edu/adicionar_solicitacao_aproveitamento_disciplina/{{ obj.pk }}/{{ registro.pk }}/"></a>
+                                                        {% endif %}
+                                                    </td>
+                                                    {% endif %}
+                                                    <td rowspan="{{ mds|length }}">
+                                                        {{ registro.componente_curricular.componente }}
+                                                        <a class="popup" href="{{ registro.ementa.url }}">[Ementa]</a>
+                                                    </td>
+                                                {% endif %}
+                                                <td>
+                                                    {{ md.diario }} - <em>{{ md.diario.ano_letivo }}/{{ md.diario.periodo_letivo }}</em>.
+                                                    {% if forloop.counter == 1 %}<a class="popup" href="{{ registro.ementa_1.url }}">[Ementa]</a>{% endif %}
+                                                    {% if forloop.counter == 2 %}<a class="popup" href="{{ registro.ementa_2.url }}">[Ementa]</a>{% endif %}
+                                                </td>
+                                                <td>
+                                                    {% if forloop.first %}
+                                                        {{ md.diario.turma.curso_campus }}
+                                                    {% endif %}
+                                                </td>
+                                                <td>{{ md.get_media_final_disciplina_exibicao|format }}</td>
+                                                <td>{{ md.get_percentual_carga_horaria_frequentada }}%</td>
+                                                {% if forloop.first %}
+                                                    <td rowspan="{{ mds|length }}">{{ registro.get_situacao_display|status }}</td>
+                                                    <td rowspan="{{ mds|length }}">
+                                                        {{ registro.avaliador|format }}
+                                                        {% if registro.parecer %}
+                                                            - {{ registro.parecer }}
+                                                            {% if registro.observacao %}({{ registro.observacao }}){% endif %}
+                                                        {% endif %}
+                                                    </td>
+                                                    {% if not obj.is_arquivado %}
+                                                    <td style="text-align: center;" rowspan="{{ mds|length }}">
+                                                        <ul class="action-bar">
+                                                            {% if is_coordenador and registro.is_finalizada and obj.aluno.is_matriculado %}
+                                                                <li>
+                                                                    <a class="btn danger" href="?cancelar_avaliacao={{ registro.pk }}">Cancelar avaliação</a>
+                                                                </li>
+                                                            {% endif %}
+                                                            {% if is_coordenador and not registro.is_finalizada %}
+                                                                <li>
+                                                                    <a class="btn primary popup" href="/edu/encaminhar_solicitacao_aproveitamento_disciplina/{{ registro.pk }}/">Informar Avaliador</a>
+                                                                </li>
+                                                            {% endif %}
+                                                            {% if registro.avaliador.vinculo_id == vinculo.id and not registro.is_finalizada %}
+                                                                <li>
+                                                                    <a class="btn primary popup"
+                                                                       href="/edu/avaliar_solicitacao_aproveitamento_disciplina/{{ registro.pk }}/">
+                                                                        Avaliar Solicitação
+                                                                    </a>
+                                                                </li>
+                                                            {% endif %}
+                                                        </ul>
+                                                    </td>
+                                                    {% endif %}
+                                                {% endif %}
+                                            </tr>
+                                        {% endfor %}
+                                    {% endwith %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endif %}
+            {% endwith %}
+            {% with registros=obj.get_solicitacoes_aproveitamento_externo %}
+                {% if registros %}
+                    <div class="table-responsive">
+                        <table>
+                            <caption>Disciplinas solicitadas</caption>
+                            <thead>
+                                <tr>
+                                    {% if not obj.is_arquivado %}
+                                        <th>Ações</th>
+                                    {% endif %}
+                                    <th>Componente a Aproveitar</th>
+                                    <th>Nome do Componente Cursado</th>
+                                    <th>Ano/Período Cursado</th>
+                                    <th>Nota</th>
+                                    <th>Frequência</th>
+                                    <th>Situação da Solicitação</th>
+                                    <th>Avaliador</th>
+                                    {% if not obj.is_arquivado %}
+                                        <th>Opções</th>
+                                    {% endif %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for registro in registros %}
+                                    {% with dados=registro.get_dados %}
+                                        {% for dado in dados %}
+                                            <tr>
+                                                {% if forloop.first %}
+                                                    {% if not obj.is_arquivado %}
+                                                        <td rowspan="{{ dados|length }}">
+                                                            {% if is_coordenador and not registro.is_finalizada or pode_finalizar %}
+                                                                <a class="popup icon icon-edit"
+                                                                href="/edu/adicionar_solicitacao_aproveitamento_disciplina/{{ obj.pk }}/{{ registro.pk }}/"></a>
+                                                            {% endif %}
+                                                        </td>
+                                                    {% endif %}
+                                                    <td rowspan="{{ dados|length }}">
+                                                        {{ registro.componente_curricular.componente }}
+                                                        <a class="popup" href="{{ registro.ementa.url }}">[Ementa]</a>
+                                                    </td>
+                                                {% endif %}
+                                                <td>
+                                                    {{ dado.nome }} <a class="popup" href="{{ dado.ementa.url }}">[Ementa]</a>
+                                                </td>
+                                                <td>{{ dado.ano_periodo }}</td>
+                                                <td>{{ dado.nota }}</td>
+                                                <td>{{ dado.frequencia }}</td>
+                                                {% if forloop.first %}
+                                                    <td rowspan="{{ dados|length }}">{{ registro.get_situacao_display }}</td>
+                                                    <td rowspan="{{ dados|length }}">
+                                                        {{ registro.avaliador|format }}
+                                                        {% if registro.parecer %}
+                                                            - {{ registro.parecer }}
+                                                            {% if registro.observacao %}({{ registro.observacao }}){% endif %}
+                                                        {% endif %}
+                                                    </td>
+                                                    {% if not obj.is_arquivado %}
+                                                    <td style="text-align: center;" rowspan="{{ dados|length }}">
+                                                        <ul class="action-bar">
+                                                            {% if is_coordenador and registro.is_finalizada and obj.aluno.is_matriculado %}
+                                                                <li>
+                                                                    <a class="btn danger"
+                                                                       href="?cancelar_avaliacao={{ registro.pk }}">
+                                                                        Cancelar avaliação
+                                                                    </a>
+                                                                </li>
+                                                            {% endif %}
+                                                            {% if is_coordenador and not registro.is_finalizada %}
+                                                                <li>
+                                                                    <a class="btn primary popup"
+                                                                       href="/edu/encaminhar_solicitacao_aproveitamento_disciplina/{{ registro.pk }}/">
+                                                                        Informar Avaliador
+                                                                    </a>
+                                                                </li>
+                                                            {% endif %}
+                                                            {% if registro.avaliador.vinculo_id == vinculo.id and not registro.is_finalizada %}
+                                                                <li>
+                                                                    <a class="btn primary popup"
+                                                                       href="/edu/avaliar_solicitacao_aproveitamento_disciplina/{{ registro.pk }}/">
+                                                                        Avaliar Solicitação
+                                                                    </a>
+                                                                </li>
+                                                            {% endif %}
+                                                        </ul>
+                                                    </td>
+                                                    {% endif %}
+                                                {% endif %}
+                                            </tr>
+                                        {% endfor %}
+                                    {% endwith %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endif %}
+            {% endwith %}
+        {% else %}
+            <div class="alert alert-warning">Nenhuma disciplina adicionada até o momento.</div>
+        {% endif %}
+    {% endbox %}
+{% endblock %}

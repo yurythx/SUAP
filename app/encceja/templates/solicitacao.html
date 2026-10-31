@@ -1,0 +1,186 @@
+{% extends super_template %}
+
+{% block content %}
+
+    {% if not modelo_com_timbre and not modelo_sem_timbre %}
+        <p class="alert alert-danger">Não foi informado modelo de certificação para esta configuração ENCCEJA.</p>
+    {% endif %}
+
+    {% if motivo_certificacao_negada %}
+        <p class="alert alert-warning">{{ motivo_certificacao_negada }}</p>
+    {% endif %}
+    {% if not obj.cancelada %}
+        <ul class="action-bar">
+            {% if perms.encceja.change_solicitacao %}
+                <li><a class="btn primary" href="/admin/encceja/solicitacao/{{ obj.pk }}/change/">Editar</a></li>
+                <li><a class="btn danger popup" href="/encceja/cancelar_solicitacao/{{ obj.pk }}/">Cancelar</a></li>
+            {% endif %}
+            {% if modelo_com_timbre or modelo_sem_timbre %}
+                {% if obj.pode_certificar %}
+                    {% if not obj.data_emissao %}
+                        <li class="has-child">
+                            <a class="btn success" href="#">Emitir certificado{% if parcial %} parcial{% endif %}</a>
+                            <ul>
+                                {% if modelo_sem_timbre %}
+                                    <li><a href="?imprimir=1" class="btn">Papel sem timbre</a></li>
+                                {% endif %}
+                                {% if modelo_com_timbre %}
+                                    <li><a href="?imprimir=1&timbre=1" class="btn">Papel timbrado</a></li>
+                                {% endif %}
+                            </ul>
+                        </li>
+                    {% else %}
+                        {% if perms.encceja.change_solicitacao %}
+                        <li><a class="btn default popup" href="/encceja/atualizar_configuracao_solicitacao_encceja/{{ obj.pk }}/">Atualizar configuração da solicitação</a></li>
+                        {% endif %}
+                        <li class="has-child">
+                            <a class="btn" href="#">Imprimir certificado</a>
+                            <ul>
+                                {% if modelo_sem_timbre %}
+                                    <li><a class="btn" href="?imprimir=1">Papel sem timbre</a></li>
+                                {% endif %}
+                                {% if modelo_com_timbre %}
+                                    <li><a class="btn" href="?imprimir=1&timbre=1">Papel timbrado</a></li>
+                                {% endif %}
+                            </ul>
+                        </li>
+                    {% endif %}
+                {% endif %}
+            {% endif %}
+        </ul>
+    {% else %}
+         <p class="alert alert-warning">Essa solicitação foi cancelada.</p>
+         <ul class="action-bar">
+            {% if perms.encceja.change_solicitacao %}
+                <li><a class="btn danger popup" href="/encceja/descancelar_solicitacao/{{ obj.pk }}/">Descancelar</a></li>
+            {% endif %}
+        </ul>
+    {% endif %}
+   
+
+    {% box "Dados gerais" %}
+        <table class="info">
+            <tr>
+                <td>Configuração</td>
+                <td>{{ obj.configuracao }}</td>
+                <td>Campus</td>
+                <td>{{ obj.uo }}</td>
+                <td>Tipo de Certificação</td>
+                <td>{{ obj.get_tipo_certificacao|safe }}</td>
+            </tr>
+            <tr>
+                <td>Aprovado na Redação</td>
+                <td>{{ obj.atingiu_pontuacao_minima_redacao|format }}</td>
+                <td>Aprovado em Linguagem</td>
+                <td>{{ obj.atingiu_pontuacao_minima_linguagem|format }}</td>
+                <td>Certificado Impresso</td>
+                <td>{{ obj.atendida|format }}</td>
+            </tr>
+            <tr>
+            	<td>Edital</td>
+                <td>{{ obj.avaliacao.descricao_edital }}</td>
+            </tr>
+        </table>
+    {% endbox %}
+
+    {% if obj.cancelada %}
+    {% box "Dados do Cancelamento" %}
+        <table class="info">
+            <tr>
+                <td>Cancelada</td>
+                <td>{{ obj.cancelada|format }}</td>
+                <td>Responsável pelo Cancelamento</td>
+                <td>{{ obj.responsavel_cancelamento|format }}</td>
+                <td>Data pelo Cancelamento</td>
+                <td>{{ obj.data_cancelamento|format }}</td>
+            </tr>
+            <tr>
+                <td>Motivo do Cancelamento</td>
+                <td colspan="5">{{ obj.motivo_cancelamento|format }}</td>
+            </tr>
+        </table>
+    {% endbox %}
+    {% endif %}
+
+    {% if obj.processo %}
+        {% box "Processo Eletrônico" %}
+            <table class="info">
+                <tr>
+                    <td>Processo</td>
+                    <td>{{ obj.processo }}</td>
+                </tr>
+            </table>
+        {% endbox %}
+    {% endif %}
+
+    {% box "Dados do Solicitante" %}
+        <table class="info">
+            <tr>
+                <td>Nome</td>
+                <td>{{ obj.nome }}</td>
+                <td>Inscrição</td>
+                <td>{{ obj.inscricao }}</td>
+            </tr>
+            <tr>
+                <td>CPF</td>
+                <td>{{ obj.cpf }}</td>
+                <td>Data de Nascimento</td>
+                <td>{{ obj.data_nascimento }}</td>
+            </tr>
+        </table>
+    {% endbox %}
+    {% box "Dados da Emissão" %}
+        <table class="info">
+            <tr>
+                <td>Cadastrador</td>
+                <td>{{ obj.cadastrador|format }}</td>
+            </tr>
+            <tr>
+                <td>Data da Emissão</td>
+                <td>{{ obj.data_emissao|format }}</td>
+                <td>Emissor</td>
+                <td>{{ obj.emissor|format }}</td>
+            </tr>
+        </table>
+    {% endbox %}
+    {% box "Pontuação da Redação" %}
+        <table class="info">
+            <tr>
+                <td>Avaliação</td>
+                <td>{{ obj.avaliacao_redacao }}</td>
+                <td>Pontuação</td>
+                <td>{{ obj.pontuacao_redacao }}</td>
+                <td>Edital</td>
+                <td>{{ obj.avaliacao_redacao.descricao_edital }}</td>
+            </tr>
+        </table>
+    {% endbox %}
+    {% box "Pontuação" %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Avaliação</th>
+                    <th>Área de Conhecimento</th>
+                    <th>Edital</th>
+                    <th>Pontuação Mínima</th>
+                    <th>Pontuação Alcançada</th>
+                    <th>Aprovado</th>
+                    <th>Certificado</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for pontuacao in obj.pontuacao_set.all %}
+                <tr>
+            		<td>{{ pontuacao.avaliacao }}</td>
+            		<td>{{ pontuacao.area_conhecimento }}</td>
+                    <td>{{ pontuacao.avaliacao.descricao_edital }}</td>
+                    <td>{{ pontuacao.avaliacao.pontuacao_min_area_conhecimento }}</td>
+                    <td>{{ pontuacao.valor }}</td>
+            	    <td>{{ pontuacao.is_aprovado|format }}</td>
+                    <td>{{ pontuacao.is_certificado|format }}</td>
+                <tr/>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% endbox %}
+{% endblock %}

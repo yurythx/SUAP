@@ -1,0 +1,244 @@
+{% comment %}
+    Resultado da conferência da planilha.
+
+    Vive separado porque é o único pedaço da tela que muda quando o usuário confere: a chamada
+    assíncrona renderiza só este arquivo e o substitui na página, o que mantém a planilha
+    escolhida presa ao campo de arquivo — é ela que será reenviada na confirmação. Fica dentro
+    do formulário de envio, e é por isso que o botão de importar é um submit comum. O
+    `data-conferencia` é o que a tela lê para saber em que passo está.
+{% endcomment %}
+
+{% if request|is_ajax and form.errors %}
+    <div data-conferencia="erro">
+        <div class="alert alert-danger">
+            {% for campo, mensagens in form.errors.items %}
+                {% for mensagem in mensagens %}
+                    <p><strong>Atenção:</strong> {{ mensagem }}</p>
+                {% endfor %}
+            {% endfor %}
+        </div>
+    </div>
+{% elif erro_de_leitura %}
+    <div data-conferencia="erro">
+        <p class="alert alert-danger">
+            <strong>Atenção:</strong> {{ erro_de_leitura }}
+        </p>
+    </div>
+{% elif conferencia %}
+    <div data-conferencia="{% if conferencia.valida %}valida{% else %}erro{% endif %}">
+        {% if conferencia.erros %}
+            <p class="alert alert-danger">
+                <strong>Atenção:</strong> a planilha tem {{ conferencia.erros|length }} erro{{ conferencia.erros|length|pluralize:"s" }}
+                e nada será importado enquanto eles existirem. Corrija a planilha e envie de novo — ou,
+                se o problema for um cadastro faltando no SUAP, cadastre-o e envie o arquivo novamente.
+            </p>
+
+            <h3>Erros por coluna</h3>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Coluna</th>
+                            <th>Linhas com erro</th>
+                            <th>Exemplos</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for resumo in conferencia.erros_por_coluna %}
+                            <tr>
+                                <td><code>{{ resumo.coluna }}</code></td>
+                                <td>{{ resumo.total }}</td>
+                                <td>
+                                    {% for exemplo in resumo.exemplos %}
+                                        {{ exemplo }}<br />
+                                    {% endfor %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-success">
+                Nenhum erro encontrado. Confira os números abaixo e confirme a importação no fim da página.
+            </p>
+        {% endif %}
+
+        {% if conferencia.avisos %}
+            {% box "Avisos" %}
+                <p class="alert alert-warning">
+                    <strong>Atenção:</strong> {{ conferencia.avisos|length }} aviso{{ conferencia.avisos|length|pluralize:"s" }}.
+                    Não impede{{ conferencia.avisos|length|pluralize:"m" }} a importação, mas vale conferir.
+                </p>
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Coluna</th>
+                                <th>Linhas com aviso</th>
+                                <th>Exemplos</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for resumo in conferencia.avisos_por_coluna %}
+                                <tr>
+                                    <td><code>{{ resumo.coluna }}</code></td>
+                                    <td>{{ resumo.total }}</td>
+                                    <td>
+                                        {% for exemplo in resumo.exemplos %}
+                                            {{ exemplo }}<br />
+                                        {% endfor %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endbox %}
+        {% endif %}
+
+        {% if conferencia.cadastros %}
+            <h3>Cadastros verificados</h3>
+            <p>
+                Tudo o que a planilha referencia foi conferido contra o SUAP.
+                {% if conferencia.cadastros_a_criar %}
+                    {{ conferencia.cadastros_a_criar|length }} cadastro{{ conferencia.cadastros_a_criar|length|pluralize:"s" }}
+                    ser{{ conferencia.cadastros_a_criar|length|pluralize:"á,ão" }} criado{{ conferencia.cadastros_a_criar|length|pluralize:"s" }};
+                {% endif %}
+                os demais serão reaproveitados. Os números abaixo são por tipo — a lista item a item
+                acompanharia o tamanho da planilha.
+            </p>
+
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Tipo</th>
+                            <th>Referenciados</th>
+                            <th>Já cadastrados</th>
+                            <th>Serão criados</th>
+                            <th>Atenção</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for resumo in conferencia.cadastros_por_tipo %}
+                            <tr>
+                                <td>{{ resumo.tipo }}</td>
+                                <td>{{ resumo.total }}</td>
+                                <td>
+                                    {% if resumo.existentes %}<span class="status status-success">{{ resumo.existentes }}</span>{% else %}-{% endif %}
+                                </td>
+                                <td>
+                                    {% if resumo.a_criar %}<span class="status status-info">{{ resumo.a_criar }}</span>{% else %}-{% endif %}
+                                </td>
+                                <td>
+                                    {% if resumo.com_atencao %}<span class="status status-alert">{{ resumo.com_atencao }}</span>{% else %}-{% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if conferencia.cadastros_com_atencao %}
+                <p class="alert alert-warning">
+                    <strong>Atenção:</strong> {{ conferencia.cadastros_com_atencao|length }} cadastro{{ conferencia.cadastros_com_atencao|length|pluralize:"s" }}
+                    merece{{ conferencia.cadastros_com_atencao|length|pluralize:"m" }} conferência. Não impede{{ conferencia.cadastros_com_atencao|length|pluralize:"m" }}
+                    a importação, mas confira antes de seguir.
+                </p>
+
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Tipo</th>
+                                <th>Identificação</th>
+                                <th>Cadastro no SUAP</th>
+                                <th>Observação</th>
+                                <th>Linhas</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for cadastro in conferencia.atencao_em_destaque %}
+                                <tr>
+                                    <td>{{ cadastro.tipo }}</td>
+                                    <td>
+                                        {% if cadastro.url %}
+                                            <a href="{{ cadastro.url }}" target="_blank">{{ cadastro.identificacao }}</a>
+                                        {% else %}
+                                            {{ cadastro.identificacao }}
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ cadastro.descricao }}</td>
+                                    <td>{{ cadastro.detalhe|default:"-" }}</td>
+                                    <td>{{ cadastro.linhas }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if conferencia.cadastros_com_atencao|length > conferencia.atencao_em_destaque|length %}
+                    <p>
+                        Exibindo os primeiros {{ conferencia.atencao_em_destaque|length }} de
+                        {{ conferencia.cadastros_com_atencao|length }}.
+                    </p>
+                {% endif %}
+            {% endif %}
+        {% endif %}
+
+        {% if conferencia.linhas %}
+            <h3>O que será importado</h3>
+            <dl class="definition-list">
+                <dt>Campi</dt>
+                <dd>{{ conferencia.campi|join:", " }}</dd>
+                <dt>Bens (inventários)</dt>
+                <dd>{{ conferencia.total_bens }}</dd>
+                <dt>Com empenho (entram como compra)</dt>
+                <dd>{{ conferencia.total_compras }}</dd>
+                <dt>Sem empenho (entram como doação)</dt>
+                <dd>{{ conferencia.total_doacoes }}</dd>
+                <dt>Com responsável (entram ativos, com carga)</dt>
+                <dd>{{ conferencia.total_com_responsavel }}</dd>
+                <dt>Sem responsável (entram pendentes)</dt>
+                <dd>{{ conferencia.total_pendentes }}</dd>
+                <dt>Empenhos</dt>
+                <dd>{{ conferencia.total_empenhos }}</dd>
+                <dt>Entradas</dt>
+                <dd>{{ conferencia.total_entradas }}</dd>
+                <dt>Itens de entrada</dt>
+                <dd>{{ conferencia.total_itens }}</dd>
+                <dt>Requisições de carga (já deferidas)</dt>
+                <dd>{{ conferencia.total_requisicoes }}</dd>
+                <dt>Valor total</dt>
+                <dd>{{ conferencia.valor_total|format_money }}</dd>
+            </dl>
+        {% endif %}
+
+        {% if conferencia.valida %}
+            <h3>Confirmar a importação</h3>
+            <div class="alert alert-warning">
+                <p>
+                    <strong>Atenção:</strong> ao confirmar, o SUAP vai criar os empenhos, as entradas, os tombamentos, as cargas
+                    contábeis e as movimentações. <strong>Não há desfazer pela tela.</strong>
+                    A gravação roda em uma única transação: se algo falhar no meio, nada é gravado.
+                </p>
+                <p>
+                    A importação acontece em segundo plano e você acompanha o progresso na tela seguinte.
+                    A planilha não ficou guardada no SUAP: ela continua sendo a que está selecionada acima,
+                    e é enviada junto com a confirmação. Se você trocar o arquivo, é preciso conferir de novo.
+                </p>
+            </div>
+
+            <dl class="definition-list">
+                <dt>Planilha conferida</dt>
+                <dd>{{ form.cleaned_data.arquivo.name }}</dd>
+            </dl>
+
+            <div class="submit-row">
+                <button type="submit" id="confirmar-migracao" class="btn success" name="confirmar" value="1">
+                    Confirmar e importar {{ conferencia.total_bens }} bens
+                </button>
+            </div>
+        {% endif %}
+    </div>
+{% endif %}

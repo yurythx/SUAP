@@ -1,0 +1,207 @@
+{% extends super_template %}
+
+{% block action-bar %}
+<ul class="action-bar">
+    {% if obj.planoensino_set.exists %}
+        <li><a class="btn default" href="/edu/plano_ensino_pdf/{{ obj.planoensino_set.first.pk }}/">{% icone "print" %} Imprimir Plano de Ensino</a></li>
+    {% endif %}
+    {% if obj.url_moodle %}
+        <li><a class="btn default" href="{{ obj.url_moodle }}">{% icone "link" %} Moodle</a></li>
+    {% endif %}
+    {% if obj.url_ambiente_virtual %}
+        <li><a class="btn default" href="{{ obj.url_ambiente_virtual }}">{% icone "link" %} Ambiente Virtual</a></li>
+    {% endif %}
+</ul>
+{% endblock %}
+
+{% block content %}
+
+    {% box 'Dados do diário' %}
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>Ano Letivo</dt>
+                <dd>{{ obj.ano_letivo }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Período Letivo</dt>
+                <dd>{{ obj.periodo_letivo }}</dd>
+            </div>
+            <div class="list-item flex-basis-50">
+                <dt>Componente Curricular</dt>
+                <dd>{{ obj.componente_curricular.componente }}</dd>
+            </div>
+        </dl>
+    {% endbox %}
+
+    <div class="tab-pane ajax-rendered" data-title="Dados gerais" data-tab="dados_gerais">
+        {% if request.GET.tab == "dados_gerais" or not request.GET.tab %}
+
+            {% box 'Professores' %}
+                <div class="card-container">
+                {% for professor_diario in obj.professordiario_set.all %}
+                    <div class="card">
+                        <div class="photo">
+                            <img src="{{ professor_diario.professor.get_foto_75x100_url }}" alt="Foto do professor">
+                        </div>
+                        <h4>{{ professor_diario.professor.get_nome }}</h4>
+                        <dl>
+                            <dt>Matrícula:</dt>
+                            <dd>{{ professor_diario.professor.get_matricula }}</dd>
+                            {% if professor_diario.professor.vinculo.email_notificacao %}
+                                <dt class="visually-hidden">Email:</dt>
+                                <dd>{{ professor_diario.professor.vinculo.email_notificacao|format }}</dd>
+                            {% endif %}
+                            <dt class="visually-hidden">Tipo:</dt>
+                            <dd>Professor {{ professor_diario.tipo }}</dd>
+                        </dl>
+                        <div class="content">
+                            <ul class="action-bar">
+                                <li><a class="btn default popup" href="/edu/horario_professor/{{ professor_diario.professor.pk }}/{{ obj.pk }}/">{% icone "clock" %} Horários de Aula</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                {% empty %}
+                    <p class="alert alert-warning">O professor ainda não foi definido.</p>
+                {% endfor %}
+                </div>
+            {% endbox %}
+
+            {% box 'Local de Aula' %}
+                {% if obj.get_locais_aula %}
+                    <dl class="definition-list">
+                        <dt>Local</dt>
+                        <dd>{{ obj.get_locais_aula|format }}</dd>
+                    </dl>
+                {% else %}
+                    <p class="alert alert-warning">O local de aula ainda não foi definido.</p>
+                {% endif %}
+            {% endbox %}
+
+            {% box 'Horário de Aula' %}
+                {% include "includes/tabela_horario.html" %}
+            {% endbox %}
+
+            {% box 'Calendário' %}
+                <dl class="definition-list">
+                    <dt>Período</dt>
+                    <dd>{{ obj.calendario_academico.data_inicio }} a {{ obj.calendario_academico.data_fim }}</dd>
+                </dl>
+                <div class="calendarios-container mt-2">
+                    {{ obj.calendario_academico.anual|safe }}
+                </div>
+            {% endbox %}
+        {% endif %}
+    </div>
+
+    <div class="tab-pane ajax-rendered" data-title="Participantes" data-counter="{{ obj.matriculadiario_set.all.count }}"
+         data-tab="participantes">
+        {% if request.GET.tab == "participantes" %}
+            {% box 'Alunos' %}
+                <div class="card-container">
+                    {% for matricula_diario in obj.get_matriculas_diario %}
+                        <div class="card">
+                            <div class="photo"><img
+                                    src="{% if matricula_diario.matricula_periodo.aluno.foto %} {{ matricula_diario.matricula_periodo.aluno.foto.url }} {% else %} /static/comum/img/default.jpg {% endif %}"
+                                    alt="Foto de {{ obj.get_nome }}"/></div>
+                            <h4>{{ matricula_diario.matricula_periodo.aluno.get_nome }}</h4>
+                            <dl>
+                                <dt>Matrícula:</dt>
+                                <dd>{{ matricula_diario.matricula_periodo.aluno.matricula }}</dd>
+                                {% if matricula_diario.matricula_periodo.aluno.email_pessoal %}
+                                    <dt class="hidden">Email:</dt>
+                                    <dd>{{ matricula_diario.matricula_periodo.aluno.email_pessoal|lower }}</dd>
+                                {% endif %}
+                            </dl>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endbox %}
+        {% endif %}
+    </div>
+
+    <div class="tab-pane ajax-rendered" data-title="Aulas ministradas" data-counter="{{ obj.get_aulas.count }}"
+         data-tab="aulas">
+        {% if request.GET.tab == "aulas" %}
+            {% if aulas.exists %}
+                <p class="alert alert-info">Os registros sem destaque correspodem às aulas que ainda serão ministradas.</p>
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th class="text-center">Etapa</th>
+                                <th class="text-center">Nº Aulas</th>
+                                <th class="text-center">Nº Faltas</th>
+                                <th>Conteúdo</th>
+                                <th>Professor</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for falta in matricula_diario.faltas %}
+                            {% if falta.aula.is_ministrada %}
+                                <tr>
+                            {% else %}
+                                <tr class="disabled">
+                            {% endif %}
+                            <td>{{ falta.aula.data|format }}</td>
+                            <td class="text-center">{{ falta.aula.etapa|format }}</td>
+                            <td class="text-center">{{ falta.aula.quantidade|format }}</td>
+                            <td class="text-center"><span {% if falta.quantidade > 0 %}class="status status-error"{% endif %}>{{ falta.quantidade|format }}</span></td>
+                            <td>
+                                {{ falta.aula.conteudo|format }}
+                                {% if falta.aula.url %}<br><br><a href="{{ falta.aula.url }}" target="_blank">{{ falta.aula.url }}</a> {% endif %}
+                            </td>
+                            <td>{{ falta.aula.professor_diario.professor.vinculo.pessoa.nome }}</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="alert alert-warning">Nenhuma aula registrada até o momento.</p>
+            {% endif %}
+        {% endif %}
+    </div>
+
+    <div class="tab-pane ajax-rendered" data-title="Materiais de Aula" data-counter="{{ materiais.count }}"
+         data-tab="materiais">
+        {% if request.GET.tab == "materiais" %}
+            {% box 'Materiais de Aula' %}
+                {% if materiais.exists %}
+                    <table>
+                        <thead>
+                        <tr>
+                            <th class="no-print">Ações</th>
+                            <th>Descrição</th>
+                            <th>Data de Vinculação</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for material_diario in materiais %}
+                            <tr>
+                                <td class="no-print">{% icon "view" "/edu/registrar_acesso_aluno_material_aula/{{ obj.pk }}/{{ material_diario.material_aula.pk }}/" %}</td>
+                                <td><a href="/edu/registrar_acesso_aluno_material_aula/{{ obj.pk }}/{{ material_diario.material_aula.pk }}/">{{ material_diario.material_aula.descricao }}</a></td>
+                                <td>{{ material_diario.data_vinculacao }}</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p class="alert alert-warning">Nenhum material cadastrado até o momento.</p>
+                {% endif %}
+            {% endbox %}
+        {% endif %}
+    </div>
+
+    <div class="tab-pane ajax-rendered" data-title="Fórum de Discussão" data-tab="forum" data-counter="{{ topicos.count }}">
+        {% if request.GET.tab == "forum" %}
+            {% include "diario_aba_forum.html" %}
+        {% endif %}
+    </div>
+
+    <div class="tab-pane ajax-rendered" data-title="Trabalhos" data-counter="{{ trabalhos.count }}"  data-tab="trabalhos">
+        {% if request.GET.tab == "trabalhos" %}
+            {% include "diario_aba_trabalhos.html" %}
+        {% endif %}
+    </div>
+{% endblock %}

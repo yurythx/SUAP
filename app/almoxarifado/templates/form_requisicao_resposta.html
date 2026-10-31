@@ -1,0 +1,118 @@
+{% extends super_template %}
+
+{% block extrahead %}
+<script src="/static/almoxarifado/js/jquery.form.js"></script>
+<script src="/static/almoxarifado/js/validacao.js"></script>
+<script src="/static/almoxarifado/js/mask.js"></script>
+<script src="/static/almoxarifado/js/auxiliar.js"></script>
+<script src="/static/almoxarifado/js/mascaras.js"></script>
+<script>
+    atualizarCamposQuantidade = function() {
+        {% for item in requisicao.item_set.all %}        
+            checkQuantidade({{ item.id }});
+            $('#qtd{{ item.id }}').val($('#qtdSol{{ item.id }}').html());
+        {% endfor %}
+    };
+    atualizarHighlightTodos = function() {
+        $(':checkbox[checked]').parent().parent().addClass('highlight');
+        $(':checkbox:not([checked])').parent().parent().removeClass('highlight');
+        atualizarCamposQuantidade();
+    };
+    atualizarQtdItensMarcados = function() {
+        $("span#qtdItensMarcados").html(""+$(".highlight").length);
+    };
+</script>
+{% endblock %}
+
+{% block content %}
+
+<h2>Responder Requisição</h2>
+
+{% if pode_remover %}
+    <ul class="action-bar">
+        <li><a class="btn danger" href="/almoxarifado/requisicao/{{ requisicao.tipo }}/{{ requisicao.id }}/remover/">Remover Requisição</a></li>
+    </ul>
+{% endif %}
+
+{% box "Dados gerais" %}
+    <table class="info">
+        <tr>
+            <td>Código</td>
+            <td>{{ requisicao.id }}</td>
+            <td>Data</td>
+            <td>{{ requisicao.data|format }}</td>
+        </tr>
+        <tr>
+            <td>Solicitante</td>
+            <td>{{ requisicao.vinculo_solicitante|format }}</td>
+            {% if requisicao.tipo == "user" %}
+                <td>Setor Solicitante</td>
+                <td>{{ requisicao.setor_solicitante.sigla }}</td>
+            {% else %}
+                <td>Unidade Solicitante</td>
+                <td>{{ requisicao.uo_solicitante.setor.sigla }}</td>
+            {% endif %}
+        </tr>
+        <tr>
+            <td>Unidade Fornecedora</td>
+            <td>{{ requisicao.uo_fornecedora.setor.sigla }}</td>
+            <td>Observações</td>
+            <td>{{ requisicao.observacoes|format }}</td>
+        </tr>
+    </table>
+{% endbox %}
+
+{% box "Avaliar Requisição" %}
+    <form action="/almoxarifado/requisicao_resposta/{{ requisicao.tipo }}/{{ requisicao.id }}/" method="post" id="requisicao_resposta">
+        {% csrf_token %}
+        <div class="options">
+            <p>Selecionar:
+            <a href="#" class="click" onclick="$(':checkbox:not([checked])').attr('checked', true); atualizarHighlightTodos(); atualizarQtdItensMarcados(); return false;">Todos</a> |
+            <a href="#" class="click" onclick="$(':checkbox[checked]').attr('checked', false); atualizarHighlightTodos(); atualizarQtdItensMarcados(); return false;">Nenhum</a>
+            </p>
+            <p>Qtd de Itens selecionados: <strong id="qtdItensMarcados">0</strong>
+            <strong>/ {{ inventarios|length }}</strong></p>
+        </div>
+
+        <input type="hidden" name="requisicao_id" value="{{ requisicao.id }}" />
+
+        <table>
+            <thead>
+            <tr>
+                <th>#</th>
+                <th>Cód. Mat.</th>
+                <th>Material</th>
+                <th>Qtd. Solicitada</th>
+                <th>Qtd. Estoque</th>
+                <th>Qtd. Aceita</th>
+                <th>Aceitar?</th>
+            </tr>
+            </thead>
+            <tbody>
+                {% for item in requisicao.item_set.all %}
+                    <tr id="item_{{ item.id }}" >
+                        <td>{{ forloop.counter }}</td>
+                        <td>{{ item.material.codigo }}</td>
+                        <td>{{ item.material }}</td>
+                        <td align="right" name="quantidadeSolicitada" id="qtdSol{{ item.id }}">{{ item.qtd }}</td>
+                        <td align="right">{{ item.get_estoque }}</td>
+                        <td align="center">
+                            <input type="text" size="5" maxlength="5" name="quantidadesAceitas"
+                                   id="qtd{{ item.id }}" disabled
+                                   onkeypress="mascara(this, somenteNumeros)" />
+                        </td>
+                        <td align="center">
+                            <input type="checkbox" name="idRequisicoesMaterial" value="{{ item.id }}" id="cb{{ item.id }}" onclick="checkQuantidade({{ item.id }}), setHighlight('item_{{ item.id }}', this.checked)">
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div class="submit-row">
+            <input type="button" class="default" value="Responder"
+                onclick="validate_and_submit('/almoxarifado/validar/requisicao_responder/{{ requisicao.tipo }}/', '#requisicao_resposta')" />
+        </div>
+    </form>
+{% endbox %}
+
+{% endblock %}

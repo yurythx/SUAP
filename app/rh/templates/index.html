@@ -1,0 +1,209 @@
+{% extends "admin/base.html" %}
+
+{% block extrahead %}
+{% media_filter_box %}
+<script src="/static/djtools/graficos/highcharts.js"></script>
+<script src="/static/djtools/graficos/exporting.js"></script>
+{% endblock %}
+
+{% block content %}
+
+{% if data_ultima_importacao_siape %}
+    <p class="alert alert-info"><strong>Última importação SIAPE em:</strong> {{ data_ultima_importacao_siape|date:"d/m/Y"|format }}</p>
+{% endif %}
+
+<ul class="pills">
+    <li {% if not categoria %}class="active"{% endif %}><a href="?">Geral</a></li>
+    <li {% if categoria == "docente" %}class="active"{% endif %}><a href="?categoria=docente">Docentes</a></li>
+    <li {% if categoria == "tecnico_administrativo" %}class="active"{% endif %}><a href="?categoria=tecnico_administrativo">Técnicos Administrativos</a></li>
+</ul>
+
+{% box "Gráficos" %}
+    <script>
+        {% for graf in graficos %}
+            {{ graf|safe }}
+        {% endfor %}
+    </script>
+    <div class="graficos-container">
+        <div class="grafico-item" id="grafico1"></div>
+        {% if mostra_grafico_1_1 %}
+            <div class="grafico-item" id="grafico11"></div>
+        {% endif %}
+        <div class="grafico-item" id="grafico2"></div>
+        <div class="grafico-item" id="grafico3"></div>
+        <div class="grafico-item" id="grafico4"></div>
+        <div class="grafico-item" id="grafico5"></div>
+        <div class="grafico-item" id="grafico6"></div>
+    </div>
+{% endbox %}
+
+{% if not categoria %}
+    {% if inconsistencias %}
+        {% box "Inconsistências" %}
+            {% if inconsistencias.efetivos_nao_importados.exists %}
+                <p>Efetivos ausentes na extração SIAPE ({{ inconsistencias.efetivos_nao_importados.count }}):</p>
+                <ol>
+                {% for s in inconsistencias.efetivos_nao_importados %}
+                    <li><a href="/rh/servidor/{{ s.matricula }}/">{{ s.nome }} ({{ s.matricula }})</a></li>
+                {% endfor %}
+                </ol>
+            {% endif %}
+
+            {% if inconsistencias.campus_siape %}
+                <span class="false negrito">Nenhum campus SIAPE cadastrado!</span>
+            {% else %}
+                {% if inconsistencias.efetivos_sem_campus_lotacao.count %}
+                    <p>Efetivos sem campus de lotação ({{ inconsistencias.efetivos_sem_campus_lotacao.count }}):</p>
+                    <ol>
+                    {% for s in inconsistencias.efetivos_sem_campus_lotacao %}
+                        <li><a href="/rh/servidor/{{ s.matricula }}/">{{ s.nome }} ({{ s.matricula }})</a></li>
+                    {% endfor %}
+                    </ol>
+                {% endif %}
+                {% if inconsistencias.efetivos_sem_campus_exercicio.count %}
+                    <p>Efetivos sem campus de exercício ({{ inconsistencias.efetivos_sem_campus_exercicio.count }}):</p>
+                    <ol>
+                    {% for s in inconsistencias.efetivos_sem_campus_exercicio %}
+                        <li><a href="/rh/servidor/{{ s.matricula }}/">{{ s.nome }} ({{ s.matricula }})</a></li>
+                    {% endfor %}
+                    </ol>
+                {% endif %}
+            {% endif %}
+        {% endbox %}
+    {% endif %}
+{% endif %}
+
+{% if categoria == "tecnico_administrativo" %}
+    {% box "Quadro de Referência" %}
+        <table>
+            <thead>
+                <tr>
+                    <th>{{ nomenclatura.campus }}</th>
+                    <th>Nível A</th>
+                    <th>Nível B</th>
+                    <th>Nível C</th>
+                    <th>Nível D</th>
+                    <th>Nível E</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for values in quadro_referencia_administrativos.values %}
+                    <tr>
+                        <td>{{ values.sigla }}</td>
+                        <td align="right">{{ values.A }}</td>
+                        <td align="right">{{ values.B }}</td>
+                        <td align="right">{{ values.C }}</td>
+                        <td align="right">{{ values.D }}</td>
+                        <td align="right">{{ values.E }}</td>
+                        <td align="right">{{ values.total }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td>Total:</td>
+                    <td>{{ quadro_referencia_administrativos.values|sum_values_by_key:"A" }}</td>
+                    <td>{{ quadro_referencia_administrativos.values|sum_values_by_key:"B" }}</td>
+                    <td>{{ quadro_referencia_administrativos.values|sum_values_by_key:"C" }}</td>
+                    <td>{{ quadro_referencia_administrativos.values|sum_values_by_key:"D" }}</td>
+                    <td>{{ quadro_referencia_administrativos.values|sum_values_by_key:"E" }}</td>
+                    <td>{{ quadro_referencia_administrativos.values|sum_values_by_key:"total" }}</td>
+                </tr>
+            </tfoot>
+        </table>
+    {% endbox %}
+{% endif %}
+
+{% if categoria == "docente" %}
+    {% box "Quadro de Referência" %}
+        <table>
+            <thead>
+                <tr>
+                    <th rowspan="2">{{ nomenclatura.campus }}</th>
+                    <th colspan="4">Jornada 20h</th>
+                    <th colspan="4">Jornada 40h</th>
+                    <th colspan="4">Dedicação Exclusiva</th>
+                    <th colspan="4">Sem Jornada</th>
+                    <th colspan="4">Total</th>
+                </tr>
+                <tr>
+                    <th><div class="text hint hint-bottom" aria-label="{{ texto_explicativo_situacoes_efetivos }}">Efet.</div></th>
+                    <th>Valor</th>
+                    <th><div class="text hint hint-bottom" aria-label="{{ texto_explicativo_situacoes_temporarios }}">Temp.</div></th>
+                    <th>Valor</th>
+                    <th><div class="text hint hint-bottom" aria-label="{{ texto_explicativo_situacoes_efetivos }}">Efet.</div></th>
+                    <th>Valor</th>
+                    <th><div class="text hint hint-bottom" aria-label="{{ texto_explicativo_situacoes_temporarios }}">Temp.</div></th>
+                    <th>Valor</th>
+                    <th><div class="text hint hint-bottom" aria-label="{{ texto_explicativo_situacoes_efetivos }}">Efet.</div></th>
+                    <th>Valor</th>
+                    <th><div class="text hint hint-bottom" aria-label="{{ texto_explicativo_situacoes_temporarios }}">Temp.</div></th>
+                    <th>Valor</th>
+                    <th><div class="text hint hint-bottom" aria-label="{{ texto_explicativo_situacoes_efetivos }}">Efet.</div></th>
+                    <th>Valor</th>
+                    <th><div class="text hint hint-bottom" aria-label="{{ texto_explicativo_situacoes_temporarios }}">Temp.</div></th>
+                    <th>Valor</th>
+                    <th><div class="text hint hint-bottom" aria-label="{{ texto_explicativo_situacoes_efetivos }}">Efet.</div></th>
+                    <th>Valor</th>
+                    <th><div class="text hint hint-bottom" aria-label="{{ texto_explicativo_situacoes_temporarios }}">Temp.</div></th>
+                    <th>Valor</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sigla, values in quadro_referencia_docentes.items %}
+                    <tr>
+                        <td>{{ values.sigla }}</td>
+                        <td align="right">{{ values.20.qtd_efetivos }}</td>
+                        <td align="right">{{ values.20.peso_efetivos|floatformat:"2" }}</td>
+                        <td align="right">{{ values.20.qtd_temporarios }}</td>
+                        <td align="right">{{ values.20.peso_temporarios|floatformat:"2" }}</td>
+                        <td align="right">{{ values.40.qtd_efetivos }}</td>
+                        <td align="right">{{ values.40.peso_efetivos|floatformat:"2" }}</td>
+                        <td align="right">{{ values.40.qtd_temporarios }}</td>
+                        <td align="right">{{ values.40.peso_temporarios|floatformat:"2" }}</td>
+                        <td align="right">{{ values.99.qtd_efetivos }}</td>
+                        <td align="right">{{ values.99.peso_efetivos|floatformat:"2" }}</td>
+                        <td align="right">{{ values.99.qtd_temporarios }}</td>
+                        <td align="right">{{ values.99.peso_temporarios|floatformat:"2" }}</td>
+                        <td align="right">{{ values.NA.qtd_efetivos }}</td>
+                        <td align="right">{{ values.NA.peso_efetivos|floatformat:"2" }}</td>
+                        <td align="right">{{ values.NA.qtd_temporarios }}</td>
+                        <td align="right">{{ values.NA.peso_temporarios|floatformat:"2" }}</td>
+                        <td align="right">{{ values.TT.qtd_efetivos }}</td>
+                        <td align="right">{{ values.TT.peso_efetivos|floatformat:"2" }}</td>
+                        <td align="right">{{ values.TT.qtd_temporarios }}</td>
+                        <td align="right">{{ values.TT.peso_temporarios|floatformat:"2" }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td>Total:</td>
+                    <td>{{ quadro_referencia_docentes_total.20.qtd_efetivos }}</td>
+                    <td>{{ quadro_referencia_docentes_total.20.peso_efetivos|floatformat:"2" }}</td>
+                    <td>{{ quadro_referencia_docentes_total.20.qtd_temporarios }}</td>
+                    <td>{{ quadro_referencia_docentes_total.20.peso_temporarios|floatformat:"2" }}</td>
+                    <td>{{ quadro_referencia_docentes_total.40.qtd_efetivos }}</td>
+                    <td>{{ quadro_referencia_docentes_total.40.peso_efetivos|floatformat:"2" }}</td>
+                    <td>{{ quadro_referencia_docentes_total.40.qtd_temporarios }}</td>
+                    <td>{{ quadro_referencia_docentes_total.40.peso_temporarios|floatformat:"2" }}</td>
+                    <td>{{ quadro_referencia_docentes_total.99.qtd_efetivos }}</td>
+                    <td>{{ quadro_referencia_docentes_total.99.peso_efetivos|floatformat:"2" }}</td>
+                    <td>{{ quadro_referencia_docentes_total.99.qtd_temporarios }}</td>
+                    <td>{{ quadro_referencia_docentes_total.99.peso_temporarios|floatformat:"2" }}</td>
+                    <td>{{ quadro_referencia_docentes_total.NA.qtd_efetivos }}</td>
+                    <td>{{ quadro_referencia_docentes_total.NA.peso_efetivos|floatformat:"2" }}</td>
+                    <td>{{ quadro_referencia_docentes_total.NA.qtd_temporarios }}</td>
+                    <td>{{ quadro_referencia_docentes_total.NA.peso_temporarios|floatformat:"2" }}</td>
+                    <td>{{ quadro_referencia_docentes_total.TT.qtd_efetivos }}</td>
+                    <td>{{ quadro_referencia_docentes_total.TT.peso_efetivos|floatformat:"2" }}</td>
+                    <td>{{ quadro_referencia_docentes_total.TT.qtd_temporarios }}</td>
+                    <td>{{ quadro_referencia_docentes_total.TT.peso_temporarios|floatformat:"2" }}</td>
+                </tr>
+            </tfoot>
+        </table>
+    {% endbox %}
+{% endif %}
+
+{% endblock %}

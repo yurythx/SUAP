@@ -1,0 +1,875 @@
+{% extends super_template %}
+
+{% block extrahead %}
+<script src="/static/djtools/graficos/highcharts.js"></script>
+<script src="/static/djtools/graficos/exporting.js"></script>
+<script>
+{% if atendimentos %}
+    {{ grafico_atendimentos|safe }}
+    {{ alunos_unicos|safe }}
+    {{ alunos_vulnerabilidade_assistidos|safe }}
+{% endif %}
+{% if relatorio_sistemico %}
+    {{ total_refeicoes_por_campus|safe }}
+    {{ total_refeicoes_por_campus_unicos|safe }}
+{% endif %}
+{% if auxilios %}
+    {{ grafico_auxilios|safe }}
+{% endif %}
+{% if ver_transporte_todos %}
+    {{ total_transportes_por_campus|safe }}
+    {{ total_transportes_por_campus_unicos|safe }}
+{% else %}
+    {{ transporte_campus|safe }}
+    {{ transporte_campus_unicos|safe }}
+{% endif %}
+{% if ver_bolsas_profissional_todos %}
+    {{ total_bolsas_campus|safe }}
+    {{ total_bolsas_campus_unicos|safe }}
+{% else %}
+    {{ bolsas_campus|safe }}
+    {{ bolsas_campus_unicos|safe }}
+{% endif %}
+{% if saude %}
+    {{ saude_atendimentos|safe }}
+{% endif %}
+</script>
+{% endblock %}
+
+{% block content %}
+
+<div class="search-and-filters">
+    {% render_form form %}
+</div>
+
+{% if relatorio %}
+    <p class="alert alert-info">Estes dados foram processados em <strong>{{ relatorio.data_processamento }}</strong>. Para ter dados mais atualizados, você pode reprocessá-los nos filtros acima.</p>
+{% endif %}
+
+{% if atendimentos %}
+    <div class="tab-pane" data-title="Atendimentos">
+        {% box "Total de Atendimentos" %}
+            <div class="grafico-item" id="grafico_atendimentos"></div>
+            <div class="table-responsive">
+                <table id="atendimentos">
+                    <thead>
+                        <tr>
+                            <th>Tipo de Atendimento</th>
+                            <th>Custeio</th>
+                            <th class="text-end">Jan</th>
+                            <th class="text-end">Fev</th>
+                            <th class="text-end">Mar</th>
+                            <th class="text-end">Abr</th>
+                            <th class="text-end">Mai</th>
+                            <th class="text-end">Jun</th>
+                            <th class="text-end">Jul</th>
+                            <th class="text-end">Ago</th>
+                            <th class="text-end">Set</th>
+                            <th class="text-end">Out</th>
+                            <th class="text-end">Nov</th>
+                            <th class="text-end">Dez</th>
+                            <th class="text-end">Total 1º Semestre</th>
+                            <th class="text-end">Total 2º Semestre</th>
+                            <th class="text-end">Total Anual</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for atendimento in atendimentos.items %}
+                            <tr>
+                                <td>{{ atendimento.0 }}</td>
+                                <td class="text-end">{{ atendimento.1.custeio }}</td>
+                                {% for mes in atendimento.1.meses.values %}
+                                    <td class="text-end">{{ mes.qtd|floatformat:"0" }}</td>
+                                {% endfor %}
+                                <td class="text-end">{{ atendimento.1.total_1_sem|floatformat:"0" }}</td>
+                                <td class="text-end">{{ atendimento.1.total_2_sem|floatformat:"0" }}</td>
+                                <td class="text-end">{{ atendimento.1.total|floatformat:"0" }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td>Total</td>
+                            <td class="text-end"></td>
+                            {% for value in 3|range:18 %}
+                                <td class="text-end">{% total_coluna_inteiro "atendimentos" value 2 %}</td>
+                            {% endfor %}
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        {% endbox %}
+
+        {% box "Alunos Assistidos" %}
+            <div class="grafico-item" id="alunos_unicos"></div>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Tipo de Atendimento</th>
+                            <th>Custeio</th>
+                            <th class="text-end">Jan</th>
+                            <th class="text-end">Fev</th>
+                            <th class="text-end">Mar</th>
+                            <th class="text-end">Abr</th>
+                            <th class="text-end">Mai</th>
+                            <th class="text-end">Jun</th>
+                            <th class="text-end">Jul</th>
+                            <th class="text-end">Ago</th>
+                            <th class="text-end">Set</th>
+                            <th class="text-end">Out</th>
+                            <th class="text-end">Nov</th>
+                            <th class="text-end">Dez</th>
+                            <th class="text-end">Total 1º Semestre</th>
+                            <th class="text-end">Total 2º Semestre</th>
+                            <th class="text-end">Total Anual</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for atendimento in atendimentos.items %}
+                            <tr>
+                                <td>{{ atendimento.0 }}</td>
+                                <td class="text-end">{{ atendimento.1.custeio }}</td>
+                                {% for mes in atendimento.1.meses.values %}
+                                    <td class="text-end">{{ mes.qtd_aluno|floatformat:"0" }}</td>
+                                {% endfor %}
+                                <td class="text-end">{{ atendimento.1.total_alunos_1_sem|floatformat:"0" }}</td>
+                                <td class="text-end">{{ atendimento.1.total_alunos_2_sem|floatformat:"0" }}</td>
+                                <td class="text-end">{{ atendimento.1.total_alunos|floatformat:"0" }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td>Total</td>
+                            <td></td>
+                            {% for valor in dados_resumo_atendimentos.values %}
+                                <td class="text-end">{{ valor|floatformat:"0" }}</td>
+                            {% endfor %}
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        {% endbox %}
+
+        {% box "Valores Gastos" %}
+            <p class="alert alert-warning">Os valores gastos com refeições são gerenciados pelo cadastro do Valor de Refeição e podem ser acessados dentro da seção Programas, deste relatório.</p>
+            <div class="table-responsive">
+                <table id="atendimentos-valor">
+                    <thead>
+                        <tr>
+                            <th>Tipo de Atendimento</th>
+                            <th>Custeio</th>
+                            <th class="text-end">Jan</th>
+                            <th class="text-end">Fev</th>
+                            <th class="text-end">Mar</th>
+                            <th class="text-end">Abr</th>
+                            <th class="text-end">Mai</th>
+                            <th class="text-end">Jun</th>
+                            <th class="text-end">Jul</th>
+                            <th class="text-end">Ago</th>
+                            <th class="text-end">Set</th>
+                            <th class="text-end">Out</th>
+                            <th class="text-end">Nov</th>
+                            <th class="text-end">Dez</th>
+                            <th class="text-end">Total 1º Semestre</th>
+                            <th class="text-end">Total 2º Semestre</th>
+                            <th class="text-end">Total Anual</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for atendimento in atendimentos_valor.items %}
+                            <tr>
+                                <td>{{ atendimento.0 }}</td>
+                                <td class="text-end">{{ atendimento.1.custeio }}</td>
+                                {% for mes in atendimento.1.meses.values %}
+                                    <td class="text-end">R$ {{ mes.valor|format }}</td>
+                                {% endfor %}
+                                <td class="text-end">R$ {{ atendimento.1.valor_total_1_sem|format }}</td>
+                                <td class="text-end">R$ {{ atendimento.1.valor_total_2_sem|format }}</td>
+                                <td class="text-end">R$ {{ atendimento.1.valor_total|format }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td>Total</td>
+                            <td class="text-end"></td>
+                            {% for value in 3|range:18 %}
+                                <td class="text-end">{% total_coluna_moeda "atendimentos-valor" value %}</td>
+                            {% endfor %}
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        {% endbox %}
+
+        {% if relatorio_sistemico %}
+            {% box "Gráficos" %}
+                <div class="graficos-container">
+                    <div class="grafico-item" id="total_refeicoes_por_campus"></div>
+                    <div class="grafico-item" id="total_refeicoes_por_campus_unicos"></div>
+                </div>
+            {% endbox %}
+        {% endif %}
+    </div>
+{% endif %}
+
+{% if auxilios %}
+    <div class="tab-pane" data-title="Auxílios">
+        {% box "Total de Auxílios" %}
+            <div class="grafico-item" id="grafico_auxilios"></div>
+            <div class="table-responsive">
+                <table id="auxilios">
+                    <thead>
+                        <tr>
+                            <th>Tipo de Auxílio</th>
+                            <th class="text-end">Jan</th>
+                            <th class="text-end">Fev</th>
+                            <th class="text-end">Mar</th>
+                            <th class="text-end">Abr</th>
+                            <th class="text-end">Mai</th>
+                            <th class="text-end">Jun</th>
+                            <th class="text-end">Jul</th>
+                            <th class="text-end">Ago</th>
+                            <th class="text-end">Set</th>
+                            <th class="text-end">Out</th>
+                            <th class="text-end">Nov</th>
+                            <th class="text-end">Dez</th>
+                            <th class="text-end">Total 1º Semestre</th>
+                            <th class="text-end">Total 2º Semestre</th>
+                            <th class="text-end">Total Anual</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for auxilio in auxilios.items %}
+                            <tr>
+                                <td>{{ auxilio.0 }}</td>
+                                {% for mes in auxilio.1.meses.values %}
+                                    <td class="text-end">{{ mes.qtd|floatformat:"0" }}</td>
+                                {% endfor %}
+                                <td class="text-end">{{ auxilio.1.total_1_sem|floatformat:"0" }}</td>
+                                <td class="text-end">{{ auxilio.1.total_2_sem|floatformat:"0" }}</td>
+                                <td class="text-end">{{ auxilio.1.total|floatformat:"0" }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td>Total</td>
+                            {% for value in 2|range:17 %}
+                                <td class="text-end">{% total_coluna_inteiro "auxilios" value %}</td>
+                            {% endfor %}
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        {% endbox %}
+
+        {% box "Alunos Assistidos" %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Tipo de Auxílio</th>
+                            <th class="text-end">Jan</th>
+                            <th class="text-end">Fev</th>
+                            <th class="text-end">Mar</th>
+                            <th class="text-end">Abr</th>
+                            <th class="text-end">Mai</th>
+                            <th class="text-end">Jun</th>
+                            <th class="text-end">Jul</th>
+                            <th class="text-end">Ago</th>
+                            <th class="text-end">Set</th>
+                            <th class="text-end">Out</th>
+                            <th class="text-end">Nov</th>
+                            <th class="text-end">Dez</th>
+                            <th class="text-end">Total 1º Semestre</th>
+                            <th class="text-end">Total 2º Semestre</th>
+                            <th class="text-end">Total Anual</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for auxilio in auxilios.items %}
+                            <tr>
+                                <td>{{ auxilio.0 }}</td>
+                                {% for mes in auxilio.1.meses.values %}
+                                    <td class="text-end">{{ mes.qtd_aluno|floatformat:"0" }}</td>
+                                {% endfor %}
+                                <td class="text-end">{{ auxilio.1.total_alunos_1_sem|floatformat:"0" }}</td>
+                                <td class="text-end">{{ auxilio.1.total_alunos_2_sem|floatformat:"0" }}</td>
+                                <td class="text-end">{{ auxilio.1.total_alunos|floatformat:"0" }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td>Total</td>
+                            {% for valor in dados_resumo_auxilios.values %}
+                                <td class="text-end">{{ valor|floatformat:"0" }}</td>
+                            {% endfor %}
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        {% endbox %}
+
+        {% box "Valores Gastos" %}
+            <div class="table-responsive">
+                <table id="auxilios-valor">
+                    <thead>
+                        <tr>
+                            <th>Tipo de Auxílio</th>
+                            <th class="text-end">Jan</th>
+                            <th class="text-end">Fev</th>
+                            <th class="text-end">Mar</th>
+                            <th class="text-end">Abr</th>
+                            <th class="text-end">Mai</th>
+                            <th class="text-end">Jun</th>
+                            <th class="text-end">Jul</th>
+                            <th class="text-end">Ago</th>
+                            <th class="text-end">Set</th>
+                            <th class="text-end">Out</th>
+                            <th class="text-end">Nov</th>
+                            <th class="text-end">Dez</th>
+                            <th class="text-end">Total 1º Semestre</th>
+                            <th class="text-end">Total 2º Semestre</th>
+                            <th class="text-end">Total Anual</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for auxilio in auxilios.items %}
+                            <tr>
+                                <td>{{ auxilio.0 }}</td>
+                                {% for mes in auxilio.1.meses.values %}
+                                    <td class="text-end">R$ {{ mes.valor|format }}</td>
+                                {% endfor %}
+                                <td class="text-end">R$ {{ auxilio.1.valor_total_1_sem|format }}</td>
+                                <td class="text-end">R$ {{ auxilio.1.valor_total_2_sem|format }}</td>
+                                <td class="text-end">R$ {{ auxilio.1.valor_total|format }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td>Total</td>
+                            {% for value in 2|range:17 %}
+                                <td class="text-end">{% total_coluna_moeda "auxilios-valor" value %}</td>
+                            {% endfor %}
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        {% endbox %}
+    </div>
+{% endif %}
+
+{% if bolsas %}
+    <div class="tab-pane" data-title="Bolsas">
+        {% box "Total de Bolsas" %}
+            <div class="grafico-item" id="bolsas_campus"></div>
+            <div class="table-responsive">
+                <table id="bolsas">
+                    <thead>
+                        <tr>
+                            <th>Categoria de Bolsa</th>
+                            <th class="text-end">Jan</th>
+                            <th class="text-end">Fev</th>
+                            <th class="text-end">Mar</th>
+                            <th class="text-end">Abr</th>
+                            <th class="text-end">Mai</th>
+                            <th class="text-end">Jun</th>
+                            <th class="text-end">Jul</th>
+                            <th class="text-end">Ago</th>
+                            <th class="text-end">Set</th>
+                            <th class="text-end">Out</th>
+                            <th class="text-end">Nov</th>
+                            <th class="text-end">Dez</th>
+                            <th class="text-end">Total 1º Semestre</th>
+                            <th class="text-end">Total 2º Semestre</th>
+                            <th class="text-end">Total Anual</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for bolsa in bolsas.items %}
+                            <tr>
+                                <td>{{ bolsa.0 }}</td>
+                                {% for mes in bolsa.1.meses.values %}
+                                    <td class="text-end">{{ mes.qtd|floatformat:"0" }}</td>
+                                {% endfor %}
+                                <td class="text-end">{{ bolsa.1.total_1_sem|floatformat:"0" }}</td>
+                                <td class="text-end">{{ bolsa.1.total_2_sem|floatformat:"0" }}</td>
+                                <td class="text-end">{{ bolsa.1.total|floatformat:"0" }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td>Total</td>
+                            {% for value in 2|range:17 %}
+                                <td class="text-end">{% total_coluna_inteiro "bolsas" value %}</td>
+                            {% endfor %}
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        {% endbox %}
+
+        {% box "Alunos Assistidos" %}
+            <div class="grafico-item" id="bolsas_campus_unicos"></div>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Categoria de Bolsa</th>
+                            <th class="text-end">Jan</th>
+                            <th class="text-end">Fev</th>
+                            <th class="text-end">Mar</th>
+                            <th class="text-end">Abr</th>
+                            <th class="text-end">Mai</th>
+                            <th class="text-end">Jun</th>
+                            <th class="text-end">Jul</th>
+                            <th class="text-end">Ago</th>
+                            <th class="text-end">Set</th>
+                            <th class="text-end">Out</th>
+                            <th class="text-end">Nov</th>
+                            <th class="text-end">Dez</th>
+                            <th class="text-end">Total 1º Semestre</th>
+                            <th class="text-end">Total 2º Semestre</th>
+                            <th class="text-end">Total Anual</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for bolsa in bolsas.items %}
+                            <tr>
+                                <td>{{ bolsa.0 }}</td>
+                                {% for mes in bolsa.1.meses.values %}
+                                    <td class="text-end">{{ mes.qtd_aluno|floatformat:"0" }}</td>
+                                {% endfor %}
+                            <td class="text-end">{{ bolsa.1.total_alunos_1_sem|floatformat:"0" }}</td>
+                            <td class="text-end">{{ bolsa.1.total_alunos_2_sem|floatformat:"0" }}</td>
+                            <td class="text-end">{{ bolsa.1.total_alunos|floatformat:"0" }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td>Total</td>
+                            {% for valor in dados_resumo_bolsas.values %}
+                                <td class="text-end">{{ valor|floatformat:"0" }}</td>
+                            {% endfor %}
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        {% endbox %}
+
+        {% box "Valores Gastos" %}
+            <div class="table-responsive">
+                <table id="bolsas-valor">
+                    <thead>
+                        <tr>
+                            <th>Bolsas</th>
+                            <th class="text-end">Jan</th>
+                            <th class="text-end">Fev</th>
+                            <th class="text-end">Mar</th>
+                            <th class="text-end">Abr</th>
+                            <th class="text-end">Mai</th>
+                            <th class="text-end">Jun</th>
+                            <th class="text-end">Jul</th>
+                            <th class="text-end">Ago</th>
+                            <th class="text-end">Set</th>
+                            <th class="text-end">Out</th>
+                            <th class="text-end">Nov</th>
+                            <th class="text-end">Dez</th>
+                            <th class="text-end">Total 1º Semestre</th>
+                            <th class="text-end">Total 2º Semestre</th>
+                            <th class="text-end">Total Anual</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for bolsa in bolsas.items %}
+                            <tr>
+                                <td>{{ bolsa.0 }}</td>
+                                {% for mes in bolsa.1.meses.values %}
+                                    <td class="text-end">R$ {{ mes.valor|format }}</td>
+                                {% endfor %}
+                                <td class="text-end">R$ {{ bolsa.1.valor_total_1_sem|format }}</td>
+                                <td class="text-end">R$ {{ bolsa.1.valor_total_2_sem|format }}</td>
+                                <td class="text-end">R$ {{ bolsa.1.valor_total|format }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td>Total</td>
+                            {% for value in 2|range:17 %}
+                                <td class="text-end">{% total_coluna_moeda "bolsas-valor" value %}</td>
+                            {% endfor %}
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        {% endbox %}
+
+        {% if ver_bolsas_profissional_todos %}
+            {% box "Gráficos" %}
+                <div class="graficos-container">
+                    <div class="grafico-item" id="total_bolsas_campus"></div>
+                    <div class="grafico-item" id="total_bolsas_campus_unicos"></div>
+                </div>
+            {% endbox %}
+        {% endif %}
+    </div>
+{% endif %}
+
+{% if programas %}
+    <div class="tab-pane" data-title="Programas">
+        {% box "Total de Participações em Programas" %}
+            {% if ver_transporte_todos %}
+                <div class="grafico-item" id="total_transportes_por_campus"></div>
+            {% else %}
+                <div class="grafico-item" id="transporte_campus"></div>
+            {% endif %}
+            <div class="table-responsive">
+                <table id="programas">
+                    <thead>
+                        <tr>
+                            <th>Programa</th>
+                            <th class="text-end">Jan</th>
+                            <th class="text-end">Fev</th>
+                            <th class="text-end">Mar</th>
+                            <th class="text-end">Abr</th>
+                            <th class="text-end">Mai</th>
+                            <th class="text-end">Jun</th>
+                            <th class="text-end">Jul</th>
+                            <th class="text-end">Ago</th>
+                            <th class="text-end">Set</th>
+                            <th class="text-end">Out</th>
+                            <th class="text-end">Nov</th>
+                            <th class="text-end">Dez</th>
+                            <th class="text-end">Total 1º Semestre</th>
+                            <th class="text-end">Total 2º Semestre</th>
+                            <th class="text-end">Total Anual</th>
+                            <th class="text-end">Somatório Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for programa in programas.items %}
+                            <tr>
+                                <td class="nao-somar">{{ programa.0 }}</td>
+                                {% for mes in programa.1.meses.values %}
+                                    <td class="text-end">{{ mes.qtd|floatformat:"0" }}</td>
+                                {% endfor %}
+                                <td class="text-end nao-somar">{{ programa.1.total_1_sem|floatformat:"0" }}</td>
+                                <td class="text-end nao-somar">{{ programa.1.total_2_sem|floatformat:"0" }}</td>
+                                <td class="text-end nao-somar">{{ programa.1.total|floatformat:"0" }}</td>
+                                <td class="text-end nao-somar">{% total_linha_inteiro "programas" forloop.counter %}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td>Total</td>
+                            {% for value in 2|range:18 %}
+                                <td class="text-end">{% total_coluna_inteiro "programas" value %}</td>
+                            {% endfor %}
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        {% endbox %}
+
+        {% box "Alunos Assistidos" %}
+            {% if ver_transporte_todos %}
+                <div class="grafico-item" id="total_transportes_por_campus_unicos"></div>
+            {% else %}
+                <div class="grafico-item" id="transporte_campus_unicos"></div>
+            {% endif %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Programa</th>
+                            <th class="text-end">Jan</th>
+                            <th class="text-end">Fev</th>
+                            <th class="text-end">Mar</th>
+                            <th class="text-end">Abr</th>
+                            <th class="text-end">Mai</th>
+                            <th class="text-end">Jun</th>
+                            <th class="text-end">Jul</th>
+                            <th class="text-end">Ago</th>
+                            <th class="text-end">Set</th>
+                            <th class="text-end">Out</th>
+                            <th class="text-end">Nov</th>
+                            <th class="text-end">Dez</th>
+                            <th class="text-end">Total 1º Semestre</th>
+                            <th class="text-end">Total 2º Semestre</th>
+                            <th class="text-end">Total Anual</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for programa in programas.items %}
+                            <tr>
+                                <td>{{ programa.0 }}</td>
+                                {% for mes in programa.1.meses.values %}
+                                    <td class="text-end">{{ mes.qtd_aluno|floatformat:"0" }}</td>
+                                {% endfor %}
+                                <td class="text-end">{{ programa.1.total_alunos_1_sem|floatformat:"0" }}</td>
+                                <td class="text-end">{{ programa.1.total_alunos_2_sem|floatformat:"0" }}</td>
+                                <td class="text-end">{{ programa.1.total_alunos|floatformat:"0" }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td>Total</td>
+                            {% for valor in dados_resumo_programas.values %}
+                                <td class="text-end">{{ valor|floatformat:"0" }}</td>
+                            {% endfor %}
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        {% endbox %}
+
+        {% box "Valores Gastos" %}
+            <div class="alert alert-info">
+                <p>O cálculo dos Valores Gastos é realizado desta forma:</p>
+                <ul>
+                    <li>para o Programa de Alimentação Escolar: considera o total de Atendimentos de Refeição multiplicado pelo <a href="/ae/dashboard/">Valor da Refeição</a>, conforme a data do atendimento e o valor da refeição cadastrado para esta data.</li>
+                    <li>Para o Programa de Apoio à Formação Estudantil: considera as datas de entrada e saída da participação de cada aluno multiplicando-a pelo <a href="/ae/dashboard/">Valor da Bolsa</a> cadastrado para o período.</li>
+                    <li>Para o Programa de Auxílio Transporte: considera o valor informado na Participação do aluno.</li>
+                    <li>Para o programa de Curso de Idiomas: não é considerado pois não gera benefício financeiro ao aluno.</li>
+                    <li>Para os outros tipos de Programas: considera o valor informado na Participação do aluno, somente se o mesmo tiver sido marcado como Informação Financeira, no seu cadastro.</li>
+                </ul>
+            </div>
+
+            <div class="table-responsive">
+                <table id="programas-valor">
+                    <thead>
+                        <tr>
+                            <th>Programa</th>
+                            <th class="text-end">Jan</th>
+                            <th class="text-end">Fev</th>
+                            <th class="text-end">Mar</th>
+                            <th class="text-end">Abr</th>
+                            <th class="text-end">Mai</th>
+                            <th class="text-end">Jun</th>
+                            <th class="text-end">Jul</th>
+                            <th class="text-end">Ago</th>
+                            <th class="text-end">Set</th>
+                            <th class="text-end">Out</th>
+                            <th class="text-end">Nov</th>
+                            <th class="text-end">Dez</th>
+                            <th class="text-end">Total 1º Semestre</th>
+                            <th class="text-end">Total 2º Semestre</th>
+                            <th class="text-end">Total Anual</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for programa in programas.items %}
+                            {% if 'Idioma' not in programa.0 %}
+                                <tr>
+                                    <td>{{ programa.0 }}</td>
+                                    {% for mes in programa.1.meses.values %}
+                                        <td class="text-end">R$ {{ mes.valor|format }}</td>
+                                    {% endfor %}
+                                    <td class="text-end">R$ {{ programa.1.valor_total_1_sem|format }}</td>
+                                    <td class="text-end">R$ {{ programa.1.valor_total_2_sem|format }}</td>
+                                    <td class="text-end">R$ {{ programa.1.valor_total|format }}</td>
+                                </tr>
+                            {% endif %}
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td>Total</td>
+                            {% for value in 2|range:17 %}
+                                <td class="text-end">{% total_coluna_moeda "programas-valor" value %}</td>
+                            {% endfor %}
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        {% endbox %}
+    </div>
+{% endif %}
+
+{% if saude %}
+    <div class="tab-pane" data-title="Saúde">
+        {% box "Total de Atendimentos" %}
+            <div class="grafico-item" id="saude_atendimentos"></div>
+            <div class="table-responsive">
+                <table id="saude">
+                    <thead>
+                        <tr>
+                            <th>Tipo de Atendimento</th>
+                            <th class="text-end">Jan</th>
+                            <th class="text-end">Fev</th>
+                            <th class="text-end">Mar</th>
+                            <th class="text-end">Abr</th>
+                            <th class="text-end">Mai</th>
+                            <th class="text-end">Jun</th>
+                            <th class="text-end">Jul</th>
+                            <th class="text-end">Ago</th>
+                            <th class="text-end">Set</th>
+                            <th class="text-end">Out</th>
+                            <th class="text-end">Nov</th>
+                            <th class="text-end">Dez</th>
+                            <th class="text-end">Total 1º Semestre</th>
+                            <th class="text-end">Total 2º Semestre</th>
+                            <th class="text-end">Total Anual</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for registro in saude.items %}
+                            <tr>
+                                <td>{{ registro.0 }}</td>
+                                {% for mes in registro.1.meses.values %}
+                                    <td class="text-end">{{ mes.qtd|floatformat:"0" }}</td>
+                                {% endfor %}
+                                <td class="text-end">{{ registro.1.total_1_sem|floatformat:"0" }}</td>
+                                <td class="text-end">{{ registro.1.total_2_sem|floatformat:"0" }}</td>
+                                <td class="text-end">{{ registro.1.total|floatformat:"0" }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td>Total</td>
+                            {% for value in 2|range:17 %}
+                                <td class="text-end">{% total_coluna_inteiro "saude" value %}</td>
+                            {% endfor %}
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        {% endbox %}
+
+        {% box "Alunos Assistidos" %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Tipo de Atendimento</th>
+                            <th class="text-end">Jan</th>
+                            <th class="text-end">Fev</th>
+                            <th class="text-end">Mar</th>
+                            <th class="text-end">Abr</th>
+                            <th class="text-end">Mai</th>
+                            <th class="text-end">Jun</th>
+                            <th class="text-end">Jul</th>
+                            <th class="text-end">Ago</th>
+                            <th class="text-end">Set</th>
+                            <th class="text-end">Out</th>
+                            <th class="text-end">Nov</th>
+                            <th class="text-end">Dez</th>
+                            <th class="text-end">Total 1º Semestre</th>
+                            <th class="text-end">Total 2º Semestre</th>
+                            <th class="text-end">Total Anual</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for registro in saude.items %}
+                            <tr>
+                                <td>{{ registro.0 }}</td>
+                                {% for mes in registro.1.meses.values %}
+                                    <td class="text-end">{{ mes.qtd_aluno|floatformat:"0" }}</td>
+                                {% endfor %}
+                                <td class="text-end">{{ registro.1.total_alunos_1_sem|floatformat:"0" }}</td>
+                                <td class="text-end">{{ registro.1.total_alunos_2_sem|floatformat:"0" }}</td>
+                                <td class="text-end">{{ registro.1.total_alunos|floatformat:"0" }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td>Total</td>
+                            {% for valor in dados_resumo_saude.values %}
+                                <td class="text-end">{{ valor|floatformat:"0" }}</td>
+                            {% endfor %}
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        {% endbox %}
+    </div>
+{% endif %}
+
+{% if dados_resumo_total %}
+    <div class="tab-pane" data-title="Resumo">
+        {% box "Alunos Assistidos" %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Tipo</th>
+                            <th class="text-end">Jan</th>
+                            <th class="text-end">Fev</th>
+                            <th class="text-end">Mar</th>
+                            <th class="text-end">Abr</th>
+                            <th class="text-end">Mai</th>
+                            <th class="text-end">Jun</th>
+                            <th class="text-end">Jul</th>
+                            <th class="text-end">Ago</th>
+                            <th class="text-end">Set</th>
+                            <th class="text-end">Out</th>
+                            <th class="text-end">Nov</th>
+                            <th class="text-end">Dez</th>
+                            <th class="text-end">Total 1º Semestre</th>
+                            <th class="text-end">Total 2º Semestre</th>
+                            <th class="text-end">Total Anual</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Atendimentos</td>
+                            {% for valor in dados_resumo_atendimentos.values %}
+                                <td class="text-end">{{ valor|floatformat:"0" }}</td>
+                            {% endfor %}
+                        </tr>
+                        <tr>
+                            <td>Auxílios</td>
+                            {% for valor in dados_resumo_auxilios.values %}
+                                <td class="text-end">{{ valor|floatformat:"0" }}</td>
+                            {% endfor %}
+                        </tr>
+                        <tr>
+                            <td>Bolsas</td>
+                            {% for valor in dados_resumo_bolsas.values %}
+                                <td class="text-end">{{ valor|floatformat:"0" }}</td>
+                            {% endfor %}
+                        </tr>
+                        <tr>
+                            <td>Participantes em Programas</td>
+                            {% for valor in dados_resumo_programas.values %}
+                                <td class="text-end">{{ valor|floatformat:"0" }}</td>
+                            {% endfor %}
+                        </tr>
+                        <tr>
+                            <td>Atendimentos de Saúde</td>
+                            {% for valor in dados_resumo_saude.values %}
+                                <td class="text-end">{{ valor|floatformat:"0" }}</td>
+                            {% endfor %}
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td>Total</td>
+                            {% for valor in dados_resumo_total.values %}
+                                <td class="text-end">{{ valor|floatformat:"0" }}</td>
+                            {% endfor %}
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        {% endbox %}
+
+        {% box 'Gráfico' %}
+            <div class="grafico-item" id="alunos_vulnerabilidade_assistidos"></div>
+        {% endbox %}
+    </div>
+{% endif %}
+
+{% endblock %}

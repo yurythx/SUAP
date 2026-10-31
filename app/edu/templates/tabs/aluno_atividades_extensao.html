@@ -1,0 +1,153 @@
+{% progressbar obj.get_percentual_ch_atividade_extensao_cumprida %}
+<p class="progress-description">Carga Horária Cumprida</p>
+
+{% if pode_cadastrar_atividade_curricular_extensao_extra %}
+<ul class="action-bar">
+    <li>
+        <a class="btn popup" href="{% url 'adicionar_atividadecurricularextensaoextra' obj.id %}">Adicionar atividade curricular de extensão</a>
+    </li>
+</ul>
+{% endif %}
+
+{% with atividades=obj.get_atividades_extensao atividades_diario_resumido=obj.get_atividades_extensao_matriculadiarioresumida %}
+{% if atividades.exists or atividades_diario_resumido.exists %}
+    <div class="table-responsive"> 
+    <table>
+        <caption>Atividades curriculares de extensão</caption>
+        <thead>
+        <tr>
+            {% if exibe_acoes_atividades %}
+                <th class="no-print">Ações</th>
+            {% endif %}
+            <th>Período letivo</th>
+            <th>Origem da atividade</th>
+            <th>Descrição</th>
+            <th>Situação</th>
+            <th>Carga horária</th>
+            {% if obj.matriz.requer_vinculacao_extensao_diarios %}
+                <th>Opções</th>
+            {% endif %}
+        </tr>
+        </thead>
+        <tbody>
+        {% for atividade in atividades %}
+            <tr>
+                {% if exibe_acoes_atividades %}
+                    <td class="no-print">
+                        {% if pode_cadastrar_atividade_curricular_extensao_extra and atividade.is_extra %}
+                            {% with atividade_extra=atividade.get_atividade_extra %}
+                                {% if atividade_extra.documento %}
+                                    {% icon "view" "{{ atividade_extra.documento.url }}" "Visualizar comprovante" %}
+                                {% endif %}
+                                {% icon "edit" "/edu/atividadecurricularextensaoextra/editar/{{ atividade.id_referencia }}/" "Editar" "popup" %}
+                                {% if atividade_extra|method:"can_delete"|call:request.user %}
+                                    {% icon "delete" "/comum/excluir/edu/atividadecurricularextensaoextra/{{ atividade.id_referencia }}/" "Remover" "popup no-confirm" %}
+                                {% endif %}
+                            {% endwith %}
+                        {% endif %}
+                    </td>
+                {% endif %}
+                <td>{{ atividade.matricula_periodo.ano_letivo }}.{{ atividade.matricula_periodo.periodo_letivo }}</td>
+                <th>{{ atividade.get_tipo|format }}</th>
+                <td>
+                    {{ atividade.descricao }}
+                    {% if atividade.substituida %}
+                    <dl class="definition-list">
+                        <dt>Substituida por</dt>
+                        <dd><strong>{{ atividade.substituida.get_tipo|format }}</strong>: {{ atividade.substituida.descricao }}</dd>
+                    </dl>
+                    {% endif %}
+
+                </td>
+                <td>
+                    {% if atividade.substituida %}
+                        <span class="status status-error">Substituida</span>
+                    {% elif atividade.concluida %}
+                        {% if atividade.aprovada %}
+                            <span class="status status-success">Aprovada</span>
+                        {% else %}
+                            <span class="status status-error">Não Aprovada</span>
+                        {% endif %}
+                    {% else %}
+                        <span class="status status-default">Em Andamento</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if atividade.substituida %}
+                        <dl class="definition-list">
+                            <dt>Recebida</dt>
+                            <dd>{{ atividade.get_carga_horaria }} horas</dd>
+                        </dl>
+                        
+                        <dl class="definition-list">
+                            <dt>Contabilizada</dt>
+                            <dd>0 horas</dd>
+                        </dl>
+                    {% else %}
+                        <dl class="definition-list">
+                            <dt>Contabilizada</dt>
+                            <dd><strong>{{ atividade.get_ch_contabilizada }} horas</strong></dd>
+                        </dl>
+                        <dl class="definition-list">
+                            <dt>Recebida</dt>
+                            <dd>{{ atividade.get_carga_horaria }} horas</dd>
+                        </dl>
+                        {% if atividade.requer_distribuicao_ch %}
+                            <dl class="definition-list">
+                                <dt>Distribuida</dt>
+                                <dd>{{ atividade.get_carga_horaria_vinculada }} horas
+                                    <div class="progress">
+                                        <p data-prefix="">{{ atividade.get_percentual_ch_vinculada }}%</p>
+                                    </div>
+                                </dd>
+                            </dl>
+                            
+                        {% endif %}
+                    {% endif %}
+                </td>
+                {% if obj.matriz.requer_vinculacao_extensao_diarios %}
+                    <td>
+                        {% if atividade.aprovada and atividade.requer_distribuicao_ch and not atividade.substituida %}
+                            {% if is_proprio_aluno or tem_permissao_realizar_procedimentos %}
+                                <a href="/edu/atividadecurricularextensao/{{ atividade.pk }}/distribuir/" class="btn success popup">Distribuir carga horária</a>
+                            {% endif %}
+                        {% endif %}
+                    </td>
+                {% endif %}
+            </tr>
+        {% endfor %}
+        {% for atividade in atividades_diario_resumido %}
+        <tr>
+            {% if exibe_acoes_atividades %}
+                <td class="no-print">
+                    {% if pode_editar_matricula_diario_resumida %}
+                        {% icon "edit popup" "/edu/editar_matricula_diario_resumida/{{ atividade.pk }}/" %}
+                    {% endif %}
+                </td>
+            {% endif %}
+            <td>{{ atividade.matricula_periodo.ano_letivo }}.{{ atividade.matricula_periodo.periodo_letivo }}</td>
+            <td>Registro de Histórico</td>
+            <td>{{ atividade.equivalencia_componente.componente.descricao_historico }}</td>
+            <td><span class="status status-success">Aprovada</span></td>
+            <td>
+                <dl class="definition-list">
+                    <dt>Contabilizada</dt>
+                    <dd><strong>{{ atividade.ch_extensao_cumprida }} horas</strong></dd>
+                </dl>
+                <dl class="definition-list">
+                    <dt>Recebida</dt>
+                    <dd>{{ atividade.ch_extensao_cumprida }} horas</dd>
+                </dl>
+            </td>
+            {% if obj.matriz.requer_vinculacao_extensao_diarios %}
+                <td></td>
+            {% endif %}
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+{% else %}
+    <p class="alert alert-warning">Nenhuma atividade curricular de extensão cadastrada até o momento.</p>
+{% endif %}
+{% endwith %}

@@ -1,0 +1,384 @@
+{% extends super_template %}
+
+{% block extrahead %}
+<script type="text/javascript" src="/static/arquivo/js/pdf.js"></script>
+<script>
+    function toggleDataValidada(radio, id_obj){
+        var obj = $(radio)
+        var obj_hidden = $('#'+id_obj)
+        var obj_img = obj.parent().next().next().next().next().find('span.status');
+        var obj_status = obj.parent().next().next().next().next().find('input:hidden');
+
+        if (obj.is(':radio')) {
+            obj_img = obj.parent().next().next().find('span.status');
+            obj_status = obj.parent().next().next().find('input:hidden');
+        }
+
+        if (obj.val() != 1){
+            obj_img.text('Não validada');
+            obj_img.removeClass('status-success');
+            obj_img.addClass('status-error');
+            obj_status.val(obj.val());
+
+            if (obj.val() == 2) {
+                obj_hidden.removeAttr('disabled');
+                // mudando status 
+                $('input[type="date"]').change(function(){
+                    var obj_img = $(this).parent().next().next().find('span.status')
+                    var obj_status = $(this).parent().next().next().find('input:hidden')
+                    
+                    if($(this).val() == ''){
+                        obj_img.text('Não validada');
+                        obj_img.removeClass('status-success');
+                        obj_img.addClass('status-error');
+                        obj_status.val(obj.val());
+                    }else{
+                        obj_img.text('Validada');
+                        obj_img.addClass('status-success');
+                        obj_img.removeClass('status-error');
+                        obj_status.val(obj.val());
+                    }
+                    toggleShowButton();
+                });
+            }else{
+                obj_hidden.val('');
+                obj_hidden.attr('disabled','disabled');
+                obj_img.text('Não validada');
+                obj_img.removeClass('status-success');
+                obj_img.addClass('status-error');
+                obj_status.val(obj.val());
+            }
+        }else{
+
+            obj_img.text('Validada');
+            obj_img.addClass('status-success');
+            obj_img.removeClass('status-error');
+            obj_hidden.val('');
+            obj_hidden.attr('disabled','disabled');
+            obj_status.val(obj.val());
+        }
+
+        // verificando botões de ação
+        toggleShowButton();
+    }
+    
+    function toggleShowButton(){
+        var radio_pontuacao = $('input[name=formulario_pontuacao]:checked');
+        var radio_relatorio = $('input[name=relatorio_descritivo]:checked');
+
+        var processo_titulacao = $('select[name=processo_titulacao]')
+        var data_conclusao_titulacao_rsc_pretendido_validada = $('#id_data_conclusao_titulacao_rsc_pretendido_validada')
+
+        var processo_exercicio_ebtt = $('select[name=processo_exercicio_ebtt]')
+        var data_exercio_carreira_validada = $('#id_data_exercio_carreira_validada')
+
+        var processo_ultima_rt = $('select[name=processo_ultima_rt]')
+        var data_concessao_ultima_rt_validada = $('#id_data_concessao_ultima_rt_validada')
+        
+        $('#btn_aceitar').attr('style', 'display:inline-block');
+        $('#btn_devolver').attr('style', 'display:inline-block');
+
+        // checando os documentos obrigatórios
+        if (processo_titulacao.val() != 1){
+            $('#btn_aceitar').attr('style', 'display:none');
+            if (processo_titulacao.val() == 2 && data_conclusao_titulacao_rsc_pretendido_validada.val() != ''){
+                $('#btn_aceitar').attr('style', 'display:inline-block');
+            }
+        }
+        if (processo_exercicio_ebtt.val() != 1){
+            $('#btn_aceitar').attr('style', 'display:none');
+            if (processo_exercicio_ebtt.val() == 2 && data_exercio_carreira_validada.val() != ''){
+                $('#btn_aceitar').attr('style', 'display:inline-block');
+            }
+        }
+        // quando RSC I, não valida a ultima rt
+        if ($('#id_tipo_rsc').val() != 'RSC-I - docente'){
+            if (processo_ultima_rt.val() != 1){
+                $('#btn_aceitar').attr('style', 'display:none');
+                if (processo_ultima_rt.val() == 2 && data_concessao_ultima_rt_validada.val() != ''){
+                    $('#btn_aceitar').attr('style', 'display:inline-block');
+                }
+            }
+        }
+        
+        // checando formulário de pontuação e relatório descritivo
+        if (radio_pontuacao != undefined && radio_pontuacao.val() == 0){
+            $('#btn_aceitar').attr('style', 'display:none');
+        }
+        if(radio_relatorio.val() == 0){
+            $('#btn_aceitar').attr('style', 'display:none');	
+        }
+    }
+    
+    function validaData(){
+        var retorno = true
+        $('input[type="date"]').each(function() {
+            obj = $(this)
+            if(obj.attr('disabled') != 'disabled' && obj.val() == ''){
+                $('#' + obj.attr('id')).css('border', 'red solid 1px');
+                var text = obj.parent().prev().html().replace(':','').toLowerCase();
+                alert('A '+text+' deve ser preenchida.');
+                retorno = false;
+                return retorno;
+            }else{
+                $('#' + obj.attr('id')).css('border', '');
+            }
+        });
+        return retorno;
+    }
+    
+    function validaDescricao(acao){
+        var descricao = $('#id_motivo_rejeicao')
+        var btn_aceitar = $('#btn_aceitar')
+        if(btn_aceitar.css('display') == 'none'){
+            // se entrou aqui, é necessário adicionar uma descrição para rejeitar o devolver o processo para o avaliado
+            if (descricao.val().trim() == ''){
+                alert('O "motivo de rejeição/devolução/ou alteração de data" deve ser preenchido.');
+                return false
+            }
+            return true
+        }else{
+            // é necessário verificar se a data dos documentos obrigatórios foram alteradas, se sim, é necessário preencher o motivo
+            var retorno = true
+            $('input[type="date"]').each(function(index) {
+                if ($( this ).prop('disabled') == false && descricao.val().trim() == ''){
+                    alert('Necessário preencher "motivo de rejeição/devolução/ou alteração de data" quando uma data é alterada pela CPPD.');
+                    retorno = false
+                }
+            });
+            return retorno
+        }
+    }
+    
+    function processarValidacao(acao, processo_id){
+        if(validaData() && validaDescricao(acao)){
+            if (confirm("Tem certeza que deseja "+ acao +" este processo?")) {
+                var url = '/rsc/validar_processorsc/'+processo_id+'/';
+                $.ajax({
+                    type: "POST",
+                    url: url,
+                    data: $('#form_validacao').serialize()+'&acao='+acao,
+                    success: function (retorno) {
+                        alert(retorno.msg);
+                        if (retorno.ok){
+                            location.href = retorno.url;
+                        }
+                    }
+                })
+            }
+        }
+    }
+</script>
+{% endblock %}
+
+{% block content %}
+
+{% if processo.servidor.eh_aposentado %}
+    <div class="alert alert-{% if processo.servidor.data_aposentadoria_pca < processo.DATA_LEI_RETROATIVIDADE or processo.servidor.data_aposentadoria < processo.DATA_LEI_RETROATIVIDADE %}
+                        warning
+                    {% else %}
+                        info
+                    {% endif %}
+                    ">
+        <strong>Atenção:</strong> O servidor {{ processo.servidor }} está aposentado. Segue informações abaixo.
+        <ul>
+            <li><strong>Data Aposentadoria SIAPE:</strong> {{ processo.servidor.data_aposentadoria }} </li>
+            <li><strong>Data Aposentadoria PCA:</strong> {{ processo.servidor.data_aposentadoria_pca }} </li>
+            <li><strong>Data da Lei RSC:</strong> {{ processo.DATA_LEI_RETROATIVIDADE }} </li>
+        </ul>
+    </div>
+{% endif %}
+
+<form id="form_validacao" action="" method="post">
+    {% csrf_token %}
+    {{ form.processo }}
+    {{ form.tipo_rsc }}
+
+{% box 'Título que habilita ao RSC pretendido (mestrado, especialização ou graduação)' %}
+    <table class="info">
+        <tr>
+            <td>Documento:</td>
+            <td colspan="7"><a href="/rsc/visualizar_arquivo_exigido_pdf/{{ processo.get_arquivo_titulacao.encrypted_id }}" target="blank">Baixe o arquivo</a></td>
+        </tr>
+        <tr>
+            <td>Data de conclusão:</td>
+            <td>{{ processo.data_conclusao_titulacao_rsc_pretendido }}</td>
+            <td>Validação do documento:</td>
+            <td>
+                <select name="processo_titulacao" value="1" onchange="toggleDataValidada(this, 'id_data_conclusao_titulacao_rsc_pretendido_validada')">
+                    <option value="">--selecione--</option>
+                    {% for k,v in choice_validacao_arquivo %}
+                    <option value="{{ k }}">{{ v }}</option>
+                    {% endfor %}
+                </select>
+                <!--
+                <input type="radio" name="processo_titulacao" value="1" onchange="toggleDataValidada(this, 'id_data_conclusao_titulacao_rsc_pretendido_validada')" id="processo_titulacao1"> <label for="processo_titulacao1">Sim</label> 
+                <input type="radio" name="processo_titulacao" value="0" onchange="toggleDataValidada(this, 'id_data_conclusao_titulacao_rsc_pretendido_validada')" id="processo_titulacao0"> <label for="processo_titulacao0">Não</label>
+                -->
+            </td>
+            <td>Data de conclusão validada:</td>
+            <td>{{ form.data_conclusao_titulacao_rsc_pretendido_validada }}</td>
+            <td>Situação:</td>
+            <td width="10%">
+                <span class="status status-error" id="imagem_titulacao_status">Não validada</span>
+                <input type="hidden" name="titulacao_status" value="0">
+            </td>
+        </tr>
+    </table>
+{% endbox %}
+
+{% box 'Exercício na carreira de EBTT' %}
+    <table class="info">
+        <tr>
+            <td>Documento:</td>
+            <td colspan="7"><a href="/rsc/visualizar_arquivo_exigido_pdf/{{ processo.get_arquivo_inicio_exercicio.encrypted_id }}" target="blank">Baixe o arquivo</a></td>
+        </tr>
+        <tr>
+            <td>Data do início de exercício:</td>
+            <td>{{ processo.data_exercio_carreira }}</td>
+            <td>Validação do documento:</td>
+            <td>
+                <select name="processo_exercicio_ebtt" value="1" onchange="toggleDataValidada(this, 'id_data_exercio_carreira_validada')">
+                    <option value="">--selecione--</option>
+                    {% for k,v in choice_validacao_arquivo %}
+                    <option value="{{ k }}">{{ v }}</option>
+                    {% endfor %}
+                </select>
+                <!-- <input type="radio" name="processo_exercicio_ebtt" value="1" onchange="toggleDataValidada(this, 'id_data_exercio_carreira_validada')" id="processo_exercicio_ebtt1"> <label for="processo_exercicio_ebtt1">Sim</label> 
+                <input type="radio" name="processo_exercicio_ebtt" value="0" onchange="toggleDataValidada(this, 'id_data_exercio_carreira_validada')" id="processo_exercicio_ebtt0"> <label for="processo_exercicio_ebtt0">Não</label>  -->
+            </td>
+            <td>Data do início de exercício validada:</td>
+            <td>{{ form.data_exercio_carreira_validada }}</td>
+            <td>Situação:</td>
+            <td width="10%">
+                <span class="status status-error" id="imagem_inicio_exercicio_status">Não validada</span>
+                <input type="hidden" name="inicio_exercicio_status" value="0">
+            </td>
+        </tr>
+    </table>
+{% endbox %}
+
+{% if processo.data_concessao_ultima_rt %}
+    {% box 'Concessão da última RT' %}
+        <table class="info">
+            <tr>
+                <td>Documento:</td>
+                <td colspan="7"><a href="/rsc/visualizar_arquivo_exigido_pdf/{{ processo.get_arquivo_ultima_concessao_rt.encrypted_id }}" target="blank">Baixe o arquivo</a></td>
+            </tr>
+            <tr>
+                <td>Data dos efeitos da concessão da última RT:</td>
+                <td>{{ processo.data_concessao_ultima_rt }}</td>
+                <td>Validação do documento:</td>
+                <td>
+                    <select name="processo_ultima_rt" value="1" onchange="toggleDataValidada(this, 'id_data_concessao_ultima_rt_validada')">
+                        <option value="">--selecione--</option>
+                        {% for k,v in choice_validacao_arquivo %}
+                        <option value="{{ k }}">{{ v }}</option>
+                        {% endfor %}
+                    </select>
+                    <!-- <input type="radio" name="processo_ultima_rt" value="1" onchange="toggleDataValidada(this, 'id_data_concessao_ultima_rt_validada')" id="processo_ultima_rt1"> <label for="processo_ultima_rt1">Sim</label> 
+                    <input type="radio" name="processo_ultima_rt" value="0" onchange="toggleDataValidada(this, 'id_data_concessao_ultima_rt_validada')" id="processo_ultima_rt0"> <label for="processo_ultima_rt0">Não</label> -->
+                </td>
+                <td>Data dos efeitos da concessão da última RT validada:</td>
+                <td>{{ form.data_concessao_ultima_rt_validada }}</td>
+                <td>Situação:</td>
+                <td width="10%">
+                   <span class="status status-error" id="imagem_concessao_ultima_rt_status">Não validada</span>
+                   <input type="hidden" name="ultima_concessao_rt_status" value="0">
+                </td>
+            </tr>
+        </table>
+    {% endbox %}
+{% endif %}
+
+{% box 'Formulário de Pontuação' %}
+    <table class="info">
+        <tr>
+            <td>Documento:</td>
+            <td><a href="/rsc/formulario_pontuacao_pdf/{{ processo.id }}" target="blank">Baixe o arquivo</a></td>
+            <td>O formulário de pontuação está preenchido de forma correta?</td>
+            <td>
+                <input type="radio" name="formulario_pontuacao" value="1" onchange="toggleDataValidada(this)" id="formulario_pontuacao1"> <label for="formulario_pontuacao1">Sim</label> 
+                <input type="radio" name="formulario_pontuacao" value="0" onchange="toggleDataValidada(this)" id="formulario_pontuacao0"> <label for="formulario_pontuacao0">Não</label>
+            </td>
+            <td>Situação:</td>
+            <td width="10%">
+                <span class="status status-error" id="imagem_formulario_pontuacao_status">Não validada</span>
+                <input type="hidden" name="formulario_pontuacao_status" value="0">
+            </td>
+        </tr>
+    </table>
+{% endbox %}
+
+{% box 'Relatório Descritivo' %}
+    <table class="info">
+        <tr>
+            <td>Relatório:</td>
+            <td><a href="/rsc/relatorio_descritivo_pdf/{{ processo.id }}" target="blank">Baixe o arquivo</a></td>
+            <td>O relatório descritivo condiz com a norma?</td>
+            <td>
+                <input type="radio" name="relatorio_descritivo" value="1" onchange="toggleDataValidada(this)" id="relatorio_descritivo1"> <label for="relatorio_descritivo1">Sim</label> 
+                <input type="radio" name="relatorio_descritivo" value="0" onchange="toggleDataValidada(this)" id="relatorio_descritivo0"> <label for="relatorio_descritivo0">Não</label>
+            </td>
+            <td>Situação:</td>
+            <td width="10%">
+                <span class="status status-error" id="imagem_relatorio_resumido_status">Não validada</span>
+                <input type="hidden" name="relatorio_descritivo_status" value="0">
+            </td>
+        </tr>
+    </table>
+{% endbox %}
+
+{% box 'Motivo de Rejeição/Devolução/Alteração de Data' %}
+    <table class="info">
+        <tbody>
+            <tr>
+                <td>Descreva aqui o motivo:</td>
+                <td>{{ form.motivo_rejeicao }}</td>
+            </tr>
+        </tbody>
+    </table>
+{% endbox %}
+
+    {% if validacoes_processo.exists %}
+    {% box 'Histórico de Validação' %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Validador</th>
+                    <th>Data validação</th>
+                    <th>Data titulação</th>
+                    <th>Data exercício EBTT</th>
+                    <th>Data de da concessão da última RT</th>
+                    <th>Ação</th>
+                    <th>Decrição do motivo</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for validacao in validacoes_processo %}
+                    <tr>
+                        <td>{{ validacao.validador }}</td>
+                        <td>{{ validacao.data }}</td>
+                        <td>{{ validacao.data_conclusao_titulacao_rsc_pretendido_validada|format }}</td>
+                        <td>{{ validacao.data_exercio_carreira_validada|format }}</td>
+                        <td>{{ validacao.data_concessao_ultima_rt_validada|format }}</td>
+                        <td>{{ validacao.get_acao_display }}</td>
+                        <td>{{ validacao.motivo_rejeicao }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endbox %}
+    {% endif %}
+
+    <ul class="action-bar">
+        <li>
+            <a id="btn_aceitar" href="javascript:void(0);" onclick="javascript:processarValidacao('aceitar', {{ processo.id }});" class="btn success">{{ btn_aceitar }}</a>
+            <a id="btn_devolver" href="javascript:void(0);" onclick="javascript:processarValidacao('devolver', {{ processo.id }});" class="btn warning" >{{ btn_devolver }}</a>
+            <a id="btn_rejeitar" href="javascript:void(0);" onclick="javascript:processarValidacao('rejeitar', {{ processo.id }});" class="btn danger no-confirm">{{ btn_rejeitar }}</a>
+        </li>
+    </ul>
+
+</form>
+
+{% endblock %}

@@ -1,0 +1,63 @@
+<table class="bordered">
+    <thead>
+        <tr>
+            <th rowspan="3">#</th>
+            <th rowspan="3">Matrícula</th>
+            <th rowspan="3">Aluno</th>
+            <th>Dia</th>
+            {% for data in datas.keys %}
+                <th>{{ data.day|stringformat:"02d" }}</th>
+            {% endfor %}
+            <th rowspan="3">{% if diario.is_lancamento_conceito %}Conceito{% else %}Nota{% endif %}</th>
+            <th rowspan="3">Faltas</th>
+        </tr>
+        <tr>
+            <th>Mês</th>
+            {% for data in datas.keys %}
+                <th>{{ data.month|stringformat:"02d" }}</th>
+            {% endfor %}
+        </tr>
+        <tr>
+            <th>N.A.</th>
+            {% for quantidade in datas.values %}
+                <th>{{ quantidade }}</th>
+            {% endfor %}
+        </tr>
+    </thead>
+    <tbody>
+        {% for matricula_diario in diario.matriculas_diario %}
+            <tr>
+                <td class="text-center" style='font-size:8px;'>{{ forloop.counter }}</td>
+                <td class="text-center" style='font-size:10px;'>{{ matricula_diario.matricula_periodo.aluno.matricula }}</td>
+                <td colspan="2" style="font-size:9pt">{{ matricula_diario.matricula_periodo.aluno.get_nome|normalizar }}
+                    {% if matricula_diario.situacao == 6 or matricula_diario.situacao == 7 %}
+                        ({{ matricula_diario.get_situacao_display }})
+                    {% endif %}
+                </td>
+
+                {% if faltas_source == "simples" %}
+                    {% for falta in matricula_diario.faltas %}
+                        <td class="text-center" style='font-size:9pt'>{{ falta }}</td>
+                    {% endfor %}
+                {% elif faltas_source == "paginada" %}
+                    {% with k=matricula_diario.matricula_periodo.aluno.id|stringformat:"s" %}
+                        {% with chave=k|add:'pag0' %}
+                            {% with page_str=pagina_index|stringformat:"s" %}
+                                {% with chave_pagina=chave|add:page_str %}
+                                    {% for falta in diario.pagina_faltas|method:"get"|call:chave_pagina %}
+                                        <td class="text-center" style='font-size:9pt'>{{ falta }}</td>
+                                    {% endfor %}
+                                {% endwith %}
+                            {% endwith %}
+                        {% endwith %}
+                    {% endwith %}
+                {% endif %}
+
+                <td class="text-center" style='font-size:9pt'>{{ matricula_diario.nota|formatar_nota }}</td>
+                <td class="text-center" style='font-size:9pt'>
+                    {{ matricula_diario|method:"get_numero_faltas"|call:diario.etapa }}
+                </td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>

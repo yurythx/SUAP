@@ -1,0 +1,83 @@
+{% extends super_template %}
+
+{% block extrahead %}
+    <script>
+        var interval = null;
+        var pararAtualizacao = false;
+        function atualizar(){
+            $.get("/djtools/process_progress/0/{{ i.uuid }}/", function( data ) {
+                var tokens = data.split('::');
+                if (tokens.length < 5) return;
+                var percentual = tokens[0];
+                var message = tokens[1];
+                var file = tokens[2];
+                var url = tokens[3];
+                var error = tokens[4];
+                var alert = $("#alert");
+                var button = $("#button");
+                if (error.length > 0){
+                    pararAtualizacao = true;
+                    alert.removeClass('alert').addClass('error');
+                    alert.html(message);
+                    $(".process").addClass('hidden');
+                    $('#sendmail').hide();
+                    if(file){
+                        $("#msg_erro").removeClass('hidden');
+                        $("#arquivo_erro").html("Para mais detalhes acesse o <a href='/djtools/process_progress/1/{{ i.uuid }}/'>arquivo gerado pelo sistema</a>.");
+                    }
+                    if(url && url!=='..') {
+                        button.prop('href', url);
+                        button.removeClass('hidden');
+                        button.text('Tente novamente');
+                        button.prop('style', 'margin-top: 10px;');
+                    }
+                    return;
+                }
+                if (message.length > 0) {
+                    pararAtualizacao = true;
+                    alert.removeClass('alert-warning').addClass('alert-info');
+                    alert.html(message);
+                    if (interval!=null) {
+                        clearTimeout(interval);
+                    }
+                    $(".process").html('100 %');
+                    $('#sendmail').hide();
+                    if(url && url!=='..') button.prop('href', url);
+                    button.removeClass('hidden');
+                    $("#sendmail").hide();
+                    if(file){
+                        {% if not is_testing %}
+                            document.location.href = "/djtools/process_progress/1/{{ i.uuid }}/";
+                        {% else %}
+                            button.prop('href', "/djtools/process_progress/1/{{ i.uuid }}/");
+                        {% endif %}
+                    }
+
+                } else {
+                    $(".process").html(percentual + '%');
+                }
+            });
+        }
+        interval = setInterval(() => {if (!pararAtualizacao) atualizar()}, {{ interval }});
+    </script>
+{% endblock %}
+
+{% block content %}
+    <p class="alert alert-{% if i.percent >= 100 %}info{% elif i.error %}danger{% else %}warning{% endif %}" id="alert">{% if i.percent >= 100 %}{{ i.message|safe }}{% else %}Sua solicitação está sendo processada.{% endif %}</p>
+    <div id="percentual" class="process">{% if i.percent >= 100 %}100%{% elif i.error %}Erro{% else %}Aguarde{% endif %}</div>
+    <div id="msg_erro" class="hidden">
+        <br>
+        <div class="alert alert-danger">
+            <p><strong>Atenção:</strong></p>
+            <ul>
+                <li id="arquivo_erro"></li>
+            </ul>
+        </div>
+    </div>
+    <div class="mt-4 text-center">
+        {% if not i.send_email and i.percent < 100 and not i.notify and i.user and not i.error %}
+            <a href="?send_email=1" class="btn" id="sendmail">{% icone "share" %} Me avise quando finalizar</a>
+        {% endif %}
+        <a href="#" onclick="if (this.getAttribute('href') === '#') { window.history.back(); return false; }" class="btn success hidden" id="button">Continuar</a>
+    </div>
+{% endblock %}

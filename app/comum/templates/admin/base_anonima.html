@@ -1,0 +1,183 @@
+{% load pipeline %}
+{% load static %}
+<!DOCTYPE HTML>
+<html lang="{{ LANGUAGE_CODE }}" {% if LANGUAGE_BIDI %}dir="rtl"{% endif %}>
+<head>
+<title>{% block title %}{{ title }} - {% endblock %}Suap: Sistema Unificado de Administração Pública</title>
+<meta charset="utf-8">
+<meta name="keywords" content="suap, administração, pública, mec, ifrn">
+<meta content="SUAP: Sistema Unificado de Administração Pública" name="description">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+{# Favicon #}
+{% block favicon %}
+	{% if debug %}
+		<link rel="shortcut icon" href="{% static 'comum/img/favicon-debug.png' %}">
+	{% else %}
+		<link rel="shortcut icon" href="{% static 'comum/img/favicon.png' %}">
+	{% endif %}
+{% endblock %}
+
+{# CSS SUAP #}
+{% stylesheet 'padrao' %}
+{% stylesheet anonymous_theme %}
+{% stylesheet 'select2' %}
+{% block extracss %}{% endblock %}
+
+{% javascript 'jquery' %}
+{% javascript 'login' %}
+
+{# jQuery #}
+<script src="/static/comum/js/jquery.min.js"></script>
+
+{# jQuery UI [Ui Core: All, Interactions: All, Widgets: DatePicker, Effects: All] #}
+<script src="/static/comum/js/jquery.ui.custom.min.js"></script>
+{% javascript 'main' %}
+
+{% javascript 'tabs' %}
+{% javascript 'widgets' %}
+{% javascript 'select2' %}
+{% javascript 'nouislider' %}
+
+{# Usado na documentação automática #}
+{% if eh_para_documentar %}
+    {% javascript 'highlight' %}
+{% endif %}
+
+<script>
+jQuery(document).ready(function() {
+    initAll();
+
+    $('#buttonServices').on('click', function () {
+        $(this).parent().parent().parent().toggleClass('not-collapsed');
+    });
+
+    $(window).scroll(function() {
+        var windowHeight = $(window).height();
+        var documentHeight = $(document).height();
+        var scroll = $(window).scrollTop();
+
+        if ((scroll + windowHeight) == documentHeight) {
+            $('footer').addClass('opened');
+        } else {
+            $('footer').removeClass('opened');
+        }
+    });
+});
+</script>
+{% if id_ %}
+    <script>
+        $(window).on("unload", function(){
+            $.ajax({
+                type: "POST",
+                url: "/apagar_chave_sessao/{{ id_ }}/",
+            });
+        });
+    </script>
+{% endif %}
+
+{# Adição das medias dos forms do contexto #}
+{% if forms_media %}
+    {{ forms_media|safe }}
+{% endif %}
+
+{% block extrahead %}{% endblock %}
+{% block head %}{% endblock %}
+</head>
+
+<body class="anonima{% if debug %} debug{% endif %} {% block bodyclass %}{% endblock %}">
+{% if not hide_messages %}
+    {# mensagens de sucesso #}
+    {% render_mensagens messages 'alert' 'feedback_message' %}
+
+    {# erros de validação #}
+    {% render_mensagens error_message 'errornote' %}
+{% endif %}
+
+<div class="holder">
+
+    <header class="wrapper">
+        <a href="{{ public_index_url }}"><img src="{% get_logo_instituicao_fundo_transparente %}" class="logo-instituicao" alt="Logo de {% get_valor_por_chave 'comum' 'instituicao' %}"></a>
+        <div class="d-flex gap-3 flex-wrap">
+            {% if request.user.is_authenticated %}
+                <a href="/" class="btn">{% icone "user" %} Área Interna</a>
+            {% else %}
+                <a href="/accounts/login/" class="btn">{% icone "lock" %} Entrar</a>
+                <a href="/accounts/login/?code=" class="btn login-govbr">Entrar com <span>Gov.BR</span></a>
+            {% endif %}
+        </div>
+    </header>
+
+    <main class="wrapper">
+
+        {% block content_title %}
+            <div class="title-container">
+                {% if category %}<span class="category">{{ category }}</span>{% endif %}
+                {% if title %}<h2>{% if icon %}<span class="fas fa-{{ icon }}" aria-hidden="true"></span>{% endif %} {{ title|escape }}</h2>{% endif %}
+                <div class="action-bar-container">{% block action-bar %}{% endblock %}</div>
+            </div>
+        {% endblock %}
+
+        {% block content %}
+            {% block object-tools %}{% endblock %}
+            {{ content }}
+        {% endblock %}
+
+    </main>
+
+    {% block extracontent %}{% endblock %}
+
+    {% block asideright %}{% endblock %}
+
+    {% now "Y" as current_year %}
+    <footer class="login-footer">
+        <div class="wrapper">
+            <div class="button-services d-none d-md-flex">
+                <button class="title" id="buttonServices" type="button">Serviços de Acesso Público</button>
+            </div>
+            <div class="button-services d-md-none">
+                <h2 class="title">Serviços de Acesso Público</h2>
+            </div>
+
+            <ul class="_main_menu">
+                <li class="_menu_item">
+                    <div class="section_description">
+                        <h3><span class="fas fa-info-circle" aria-hidden="true"></span> O que é esta seção?</h3>
+                        <p>Esta seção reúne links para serviços de acesso público voltados ao acompanhamento de ações administrativas e acadêmicas, promovendo transparência e acesso facilitado a conteúdos oficiais e de interesse coletivo.</p>
+                    </div>
+                </li>
+                {% for servico in servicos_anonimos %}
+                    {% ifchanged servico.categoria %}
+                        {% if not forloop.first %}
+                            </ul>
+                            </li>
+                        {% endif %}
+                        <li class="_menu_group">
+                            <span class="_menu_subtitle">{{ servico.categoria }}</span>
+                            <ul class="_menu_subgroup">
+                    {% endifchanged %}
+                    <li class="_menu_item"><a href="{{ servico.url }}" title="{{ servico.titulo }}" class="_menu_link"><span class="fas fa-{{ servico.icone }}" aria-hidden="true"></span> {{ servico.titulo }}</a></li>
+                {% endfor %}
+                    </li>
+                </ul>
+            </ul>
+
+            <hr>
+            <div class="flex-container justify-content-end my-5 py-5">
+                <div class="flex-item">{% icone "copyright" %} {{ current_year }} SUAP - Desenvolvimento por IFRN</div>
+                <div class="flex-item">{% icone "server" %} {{ host_name|format }}</div>
+                <div class="flex-item">{% icone "id-badge" %} Licenciado para {% get_valor_por_chave 'comum' 'instituicao_sigla' %}</div>
+            </div>
+        </div>
+    </footer>
+
+</div>
+
+{% if debug %}
+    <div id="debug"><strong>DEBUG</strong> | {% debug_info %}</div>
+{% endif %}
+
+{% javascript 'fancybox' %}
+{% include 'components/bootstrap_js.html' %}
+</body>
+</html>

@@ -1,0 +1,22 @@
+$(document).ready(function(){
+	if($('input:radio[name=orgao_interno_recebimento]:checked').val()=="arvore"){
+		$("#tree-orgao_interno_recebimento_arvore").parent().parent().show();
+	}
+	else {
+		$("#tree-orgao_interno_recebimento_arvore").parent().parent().hide();
+	}
+	if($('input:radio[name=orgao_interno_recebimento]:checked').val()=="autocompletar"){
+		$("input[name=orgao_interno_recebimento_autocompletar]").parent().parent().show();
+	}
+	else{
+		$("input[name=orgao_interno_recebimento_autocompletar]").parent().parent().hide();
+	}
+	$("#id_orgao_interno_recebimento_1").click(function(){
+		$("input[name=orgao_interno_recebimento_autocompletar]").parent().parent().hide();
+		$("#tree-orgao_interno_recebimento_arvore").parent().parent().show();
+	});
+	$("#id_orgao_interno_recebimento_0").click(function(){
+		$("input[name=orgao_interno_recebimento_autocompletar]").parent().parent().show();
+		$("#tree-orgao_interno_recebimento_arvore").parent().parent().hide();
+	});
+});

@@ -1,0 +1,166 @@
+{% extends super_template %}
+
+{% block extrahead %}
+    <script src="/static/djtools/graficos/highcharts.js"></script>
+    <script src="/static/djtools/graficos/exporting.js"></script>
+{% endblock %}
+
+{% block content %}
+
+    <p class="alert alert-warning"><strong>Atenção!</strong> As informações aqui descritas servem apenas para verificação pelos
+        servidores dessa instituição. Assim, não podem ser utilizadas como documento ou comprovante oficial.</p>
+
+    {% if form %}
+        {% box "Formulário" %}
+            {% render_form form %}
+        {% endbox %}
+    {% else %}
+        {% box "Contracheque" %}
+            <table class="info">
+                <tr>
+                    <td colspan="6">Mês/Ano: {{ cc.mes }}/{{ cc.ano }}</td>
+                </tr>
+                {% if cc.pensionista %}
+                    <tr>
+                        <td>Matrícula do Pensionista</td>
+                        <td>{{ cc.pensionista.matricula }}</td>
+                        <td>Nome</td>
+                        <td colspan="3">{{ cc.pensionista.nome }}</td>
+                    </tr>
+                    <tr>
+                        <td>Matrícula do Instituidor</td>
+                        <td>{{ cc.servidor.matricula }}</td>
+                        <td>Nome</td>
+                        <td colspan="3">{{ cc.servidor.pessoa_fisica.nome }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td>Matrícula</td>
+                        <td>{{ cc.servidor.matricula }}</td>
+                        <td>Nome</td>
+                        <td colspan="3">{{ cc.servidor.pessoa_fisica.nome }}</td>
+                    </tr>
+                {% endif %}
+                <tr>
+                    <td>Cargo</td>
+                    <td colspan="3">{{ cc.servidor_cargo_emprego.nome|format }}</td>
+                    <td>Classe</td>
+                    <td>{{ cc.servidor_cargo_classe.codigo|format }}</td>
+                </tr>
+                <tr>
+                    <td>Nível</td>
+                    <td>{{ cc.servidor_nivel_padrao|format }}</td>
+                    <td>Jornada</td>
+                    <td>{{ cc.servidor_jornada.nome|format }}</td>
+                    <td>Situação</td>
+                    <td>{{ cc.servidor_situacao.nome|format }}</td>
+                </tr>
+                <tr>
+                    <td>Titulação</td>
+                    <td>{{ cc.servidor_titulacao.nome|format }}</td>
+                    <td>Lotação</td>
+                    <td>{{ cc.servidor_setor_lotacao.sigla|format }}</td>
+                    <td>Exercício</td>
+                    <td>{{ cc.servidor_setor_localizacao.sigla|format }}</td>
+                </tr>
+            </table>
+        {% endbox %}
+    {% endif %}
+
+    {% if cc and rendimentos %}
+        {% box "Contracheque de {{ cc.mes }}/{{ cc.ano }}" %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Descrição</th>
+                        <th class="text-end">Sequência</th>
+                        <th class="text-end">Prazo</th>
+                        {% if possui_beneficiarios %}
+                            <th>Beneficiário</th>
+                        {% endif %}
+                        <th class="text-end">Valor</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ccr in rendimentos %}
+                        <tr>
+                            <td>{{ ccr.rubrica.nome }}</td>
+                            <td class="text-end">{{ ccr.sequencia }}</td>
+                            <td class="text-end">{{ ccr.prazo }}</td>
+                            {% if possui_beneficiarios %}
+                                <td>{{ ccr.beneficiario|default:"" }}</td>
+                            {% endif %}
+                            <td class="true text-end">{{ ccr.valor|default:"0.00"|mascara_dinheiro }}</td>
+                        </tr>
+                    {% endfor %}
+                    <tr style="background-color:#eee;" class="negrito">
+                        <td colspan="{% if possui_beneficiarios %}}4{% else %}3{% endif %}">Bruto</td>
+                        <td class="true text-end">{{ cc.bruto|default:"0.00"|mascara_dinheiro }}</td>
+                    </tr>
+                    {% if descontos %}
+                        {% for ccr in descontos %}
+                            <tr>
+                                <td>{{ ccr.rubrica.nome }}</td>
+                                <td class="text-end">{{ ccr.sequencia }}</td>
+                                <td class="text-end">{{ ccr.prazo }}</td>
+                                {% if possui_beneficiarios %}
+                                    <td>{{ ccr.beneficiario|default:"" }}</td>
+                                {% endif %}
+                                <td class="false text-end">-{{ ccr.valor }}</td>
+                            </tr>
+                        {% endfor %}
+                    {% endif %}
+                    <tr style="background-color:#eee;" class="negrito">
+                        <td colspan="{% if possui_beneficiarios %}}4{% else %}3{% endif %}">Desconto</td>
+                        <td class="false text-end">-{{ cc.desconto|default:"0.00"|mascara_dinheiro }}</td>
+                    </tr>
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="{% if possui_beneficiarios %}}4{% else %}3{% endif %}">Líquido</td>
+                        <td>{{ cc.liquido|default:"0.00"|mascara_dinheiro }}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        {% endbox %}
+    {% endif %}
+
+    <script>
+        {{ grafico|safe }}
+    </script>
+    <div class="grafico-item" id="grafico"></div>
+    {% if contracheques %}
+        {% box "Detalhamento dos Contracheques" %}
+            {% for mes_ano, contrachequerubrica in contracheques.items %}
+                <h4>Contracheque {{ mes_ano }}</h4>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Rubrica</th>
+                            <th>Sequência</th>
+                            <th>Prazo</th>
+                            <th>Valor</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ccr in contrachequerubrica.queryset %}
+                            <tr>
+                                <td>{{ ccr.rubrica }}</td>
+                                <td>{{ ccr.sequencia }}</td>
+                                <td>{{ ccr.prazo }}</td>
+                                <td align="right" class="{% if ccr.tipo.nome == "Rendimento" %}True{% else %}False{% endif %}">{{ ccr.valor }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td>Total</td>
+                            <td colspan="3" align="right">{{ contrachequerubrica.total }}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            {% endfor %}
+        {% endbox %}
+    {% endif %}
+
+{% endblock %}

@@ -1,0 +1,207 @@
+{% extends super_template %}
+
+{% block content %}
+
+
+<ul class="action-bar">
+     <!-- LEONARDO 03/12/2017 -->
+    {% if calculo.can_change %}
+        <li><a class="btn primary" title="Editar {{ calculo|getattr:"_meta"|getattr:"verbose_name" }}"
+               href="/admin/calculos_pagamentos/calculosubstituicao/{{ calculo.id }}/change/">
+            Editar {{ calculo|getattr:"_meta"|getattr:"verbose_name" }}
+        </a></li>
+    {% endif %}
+     <!-- LEONARDO FIM -->
+    {# IFMA - Luiz e Tássio #}
+    <li class="has-child">
+        <a href="#" class="btn primary">Gerar/Visualizar Documentos</a>
+        <ul>
+            {# Tipos com geração de documento de Ficha de Cálculo #}
+            <li><a href="/calculos_pagamentos/gerar_documento/{{ calculo.id }}/5/">Ficha de Cálculo de Pagamento</a></li>
+            {% if consolidacao %}
+                <li><a href="/calculos_pagamentos/gerar_documento/{{ calculo.id }}/1/">Declaração de Não Ajuizamento</a></li>
+                <li><a href="/calculos_pagamentos/gerar_documento/{{ calculo.id }}/2/">Amparo Legal</a></li>
+                <li><a href="/calculos_pagamentos/gerar_documento/{{ calculo.id }}/3/?consolidacao={{ consolidacao }}">Nota Técnica</a></li>
+            {% endif %}
+        </ul>
+    </li>
+    {# Fim IFMA - Luiz #}
+    {% if perms.calculos_pagamentos.add_pagamento %}
+        {% if not calculo.pagamentos.exists %}
+            <li><a class="btn primary" title="Enviar Pagamento" href="/calculos_pagamentos/criar_pagamento/{{ calculo.id }}/">Enviar para módulo de Pagamento</a></li>
+            <li><a class="btn" title="Enviar para módulo Pagamento como Lançado Manualmente No SIAPE"
+                   href="/calculos_pagamentos/pagamento_lancado_manualmente/?calculo_id={{ calculo.id }}">
+                Pagamento lançado manualmente no SIAPE
+            </a></li>
+        {% else %}
+            <li><a class="btn" title="Ver Pagamento" href="/admin/calculos_pagamentos/pagamento/?calculo__id={{ calculo.id }}">Ver Pagamentos</a></li>
+        {% endif %}
+    {% endif %}
+</ul>
+
+{% if simultaneidade %}
+    <p class="alert alert-warning" style="background: rgba(205, 10, 10, 0.3);">
+        <b>Atenção! O servidor {{ calculo.servidor.pessoa_fisica.nome|format }} tem cadastrada outra substituição simultânea a esta.</b>
+        <b>IDs das substituições simultâneas: {{ simul_ids|format }}</b>
+    </p>
+{% endif %}
+
+{% box "Dados do Cálculo de Pagamento" %}
+	<table class="info">
+        <tr>
+            <td>Processo</td>
+            <td>
+                {% if calculo.portaria.processo %}
+                    <a href="{{ calculo.portaria.processo.get_absolute_url }}">{{ calculo.portaria.processo|format }}</a>
+                {% endif %}
+                {% if calculo.portaria.processo_eletronico %}
+                    <a href="{{ calculo.portaria.processo_eletronico.get_absolute_url }}">{{ calculo.portaria.processo_eletronico|format }}</a>
+                {% endif %}
+            </td>
+			<td>Campus</td>
+            <td>{{ calculo.campus|format }}</td>
+        </tr>
+		<tr>
+            <td>Portaria</td>
+            <td>{{ calculo.portaria.numero|format }}</td>
+			<td>Data da Portaria</td>
+            <td>{{ calculo.portaria.data_portaria|format }}</td>
+        </tr>
+        <tr>
+            <td>Motivo do Afastamento</td>
+            <td>{{ calculo.get_motivo_substituicao_display|format }}</td>
+            <td>Campus da Portaria</td>
+            <td>{{ calculo.portaria.campus|format }}</td>
+        </tr>
+        <tr>
+            <td>Servidor Substituto</td>
+            <td><a href="{{ calculo.servidor.get_absolute_url }}">{{ calculo.servidor.pessoa_fisica.nome|format }} ({{ calculo.servidor.matricula|format }})</a></td>
+            <td>Função do Substituto</td>
+            <td>{{ calculo.funcao_servidor_substituto|format }}</td>
+        </tr>
+        {% if calculo.data_inicio_funcao_servidor_substituto %}
+            <tr>
+                <td>Data Inicial da Função do Substituto</td>
+                <td>{{ calculo.data_inicio_funcao_servidor_substituto|format }}</td>
+                <td>Data Final da Função do Substituto</td>
+                <td>{{ calculo.data_fim_funcao_servidor_substituto|format }}</td>
+            </tr>
+        {% endif %}
+        <tr>
+            <td>Servidor Titular</td>
+            <td>
+                {% if calculo.titular %}
+                    <a href="{{ calculo.titular.get_absolute_url }}">{{ calculo.titular.nome|format }} ({{ calculo.titular.matricula|format }})</a></td>
+                {% else %}
+                    -
+                {% endif %}
+			<td>Função do Titular</td>
+            <td>{{ calculo.funcao_servidor_titular|format }}</td>
+        </tr>
+		<tr>
+            <td>Usuário atestador</td>
+            <td>{{ calculo.atestador|format }}</td>
+            <td>Data de Cadastro</td>
+            <td>{{ calculo.data_criacao|format }}</td>
+        </tr>
+        <tr>
+            <td>Enviado para o módulo de Pagamento</td>
+            <td>{{ calculo.pagamentos.exists|format }}</td>
+        </tr>
+    </table>
+{% endbox %}
+
+{% box "Períodos de Substituição" %}
+
+	{% if calculo.periodosubstituicao_set.exists %}
+		<table>
+		    <thead>
+		        <tr>
+					<th>Nº</th>
+					<th>Data Inicial</th>
+					<th>Data Final</th>
+		        </tr>
+		    </thead>
+		    <tbody>
+		        {% for periodo in calculo.periodosubstituicao_set.all %}
+                    <tr>
+                        <td>{{ forloop.counter }}°</td>
+                        <td>{{ periodo.data_inicio|format }}</td>
+                        <td>{{ periodo.data_fim|format }}</td>
+                    </tr>
+		        {% endfor %}
+		    </tbody>
+		</table>
+	{% else %}
+		<p class="alert alert-warning">OPS! Houve um erro ao buscar os períodos.</p>
+	{% endif %}
+{% endbox %}
+
+{% box "Detalhamento Mensal" %}
+
+	{% if detalhamentos %}
+		<table>
+		    <thead>
+		        <tr>
+					<th>Mês/Ano</th>
+					<th>Período</th>
+					<th>Quantidade de Dias</th>
+					<th>Valor de pagamento</th>
+		        </tr>
+		    </thead>
+		    <tbody>
+		        {% for detalhamento in detalhamentos %}
+                    <tr>
+                        <td>{{ detalhamento.data_inicio.month|format }}/{{ detalhamento.data_inicio.year|format }}</td>
+                        <td>{{ detalhamento.data_inicio|format }} a {{ detalhamento.data_fim|format }}</td>
+                        <td>{{ detalhamento.quant_dias|format }}</td>
+                        <td>R${{ detalhamento.valor_grat|format }}</td>
+                    </tr>
+		        {% endfor %}
+                {% for gratificacao in gratificacoes %}
+                    <tr>
+                        <td>Gratificação Natalina</td>
+                        <td>{{ gratificacao.data_inicio|format }} a {{ gratificacao.data_fim|format }}</td>
+                        <td>{{ gratificacao.quant_dias|format }}</td>
+                        <td>R${{ gratificacao.valor_grat|format }}</td>
+                    </tr>
+                {% endfor %}
+                <tr>
+                    <td colspan="3"><b>TOTAL A RECEBER</b></td>
+                    <td><b>R${{ calculo.total|format }}</b></td>
+                </tr>
+		    </tbody>
+		</table>
+	{% else %}
+		<p class="alert alert-warning">OPS! Houve um erro ao buscar o detalhamento.</p>
+	{% endif %}
+{% endbox %}
+
+{% if consolidacao %}
+    {% box "Consolidação de Exercícios Anteriores" %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Ano</th>
+                    <th>Total Anual</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ano_detalhamentos in anos_detalhamentos %}
+                    {% if ano_detalhamentos.ano < calculo.data_criacao.year %}
+                        <tr>
+                            <td>{{ ano_detalhamentos.ano|format }}</td>
+                            <td>R${{ ano_detalhamentos.total_grat|format }}</td>
+                        </tr>
+                    {% endif %}
+                {% endfor %}
+                <tr>
+                    <td><b>TOTAL A RECEBER</b></td>
+                    <td><b>R${{ consolidacao|format }}</b></td>
+                </tr>
+            </tbody>
+        </table>
+    {% endbox %}
+{% endif %}
+
+{% endblock %}

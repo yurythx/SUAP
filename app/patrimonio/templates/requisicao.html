@@ -1,0 +1,308 @@
+{% extends super_template %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if requisicao.pode_avaliar %}
+            {% if requisicao.pode_deferir %}
+                <li><a class="btn success" href="/patrimonio/deferir_requisicao/{{ requisicao.id }}/">
+                    Deferir
+                </a></li>
+            {% endif %}
+            <li><a class="btn danger popup no-confirm" href="/patrimonio/indeferir_requisicao/{{ requisicao.id }}/">
+                Indeferir
+            </a></li>
+        {% endif %}
+        {% if requisicao.status == requisicao.STATUS_DEFERIDA_AGUARDANDO_INFORMACAO_PA_ORIGEM and requisicao.pode_informar_pa_origem %}
+            <li><a class="btn success popup" href="/patrimonio/informar_pa_origem_requisicao/{{ requisicao.id }}/">
+                Informar Número PA Origem
+            </a></li>
+        {% endif %}
+        {% if requisicao.status == requisicao.STATUS_DEFERIDA_AGUARDANDO_INFORMACAO_PA_DESTINO and requisicao.pode_informar_pa_destino %}
+            <li><a class="btn success popup" href="/patrimonio/informar_pa_destino_requisicao/{{ requisicao.id }}/">
+                Informar Número PA Destino
+            </a></li>
+        {% endif %}
+        {% if requisicao.pode_editar_pa_origem %}
+            <li><a class="btn primary popup" href="/patrimonio/editar_pa_origem_requisicao/{{ requisicao.id }}/">
+                Editar Número PA Origem
+            </a></li>
+        {% endif %}
+        {% if requisicao.status == requisicao.STATUS_DEFERIDA and requisicao.pode_editar_pa_destino %}
+            <li><a class="btn primary popup" href="/patrimonio/editar_pa_destino_requisicao/{{ requisicao.id }}/">
+                Editar Número PA Destino
+            </a></li>
+        {% endif %}
+        {% if requisicao.pode_gerar_termo and historicorequisicao and requisicao.status == requisicao.STATUS_DEFERIDA or requisicao.status == requisicao.STATUS_DEFERIDA_AGUARDANDO_INFORMACAO_PA_ORIGEM %}
+            <li><a class="btn default" href="/patrimonio/relatorio/transferencia/{{ requisicao.id }}/">
+                {% icone "file-pdf" %} Termo de Transferência
+            </a></li>
+        {% endif %}
+        {% if requisicao.pode_cancelar %}
+            <li><a class="btn danger" href="/patrimonio/cancelar_requisicao/{{ requisicao.id }}/">
+                Cancelar
+            </a></li>
+        {% endif %}
+    </ul>
+{% endblock %}
+
+{% block object-status %}
+    {{ requisicao.get_status|safe }}
+{% endblock %}
+
+{% block content %}
+
+    {% if requisicao.pode_avaliar_inventario %}
+        {% if not requisicao.ver_periodo_deferimento %}
+            <div class="alert alert-warning">
+                <p>Do dia {{ dia_inicio_bloqueio }} até o final do mês, o deferimento de requisições está bloqueado, para que os contadores façam as conciliações.</p>
+            </div>
+        {% endif %}
+    {% endif %}
+
+    {% box 'Dados gerais' %}
+        <dl class="definition-list flex">
+            <div class="list-item flex-basis-50">
+                <dt>Origem</dt>
+                <dd>{{ requisicao.vinculo_origem.relacionamento|format }} ({{ requisicao.campus_origem|format }})</dd>
+            </div>
+            <div class="list-item flex-basis-50">
+                <dt>Destino</dt>
+                <dd>{{ requisicao.vinculo_destino.relacionamento|format }} ({{ requisicao.campus_destino|format }})</dd>
+            </div>
+            {% if requisicao.requisitante %}
+                <div class="list-item">
+                    <dt>Requisitante</dt>
+                    <dd>{{ requisicao.requisitante.relacionamento|format }}</dd>
+                </div>
+            {% endif %}
+            <div class="list-item">
+                <dt>Tipo de Requisição</dt>
+                <dd>{{ requisicao.get_tipo_display|format }}</dd>
+            </div>
+            {% if requisicao.descricao %}
+                <div class="list-item">
+                    <dt>Descrição</dt>
+                    <dd>{{ requisicao.descricao }}</dd>
+                </div>
+            {% endif %}
+            {% if requisicao.numero_pa_origem %}
+                <div class="list-item">
+                    <dt>Número PA Origem</dt>
+                    <dd>{{ requisicao.numero_pa_origem|safe }}</dd>
+                </div>
+            {% endif %}
+            {% if requisicao.numero_pa_destino %}
+                <div class="list-item">
+                    <dt>Número PA Destino</dt>
+                    <dd>{{ requisicao.numero_pa_destino|safe }}</dd>
+                </div>
+            {% endif %}
+            {% if requisicao.inv_inconsistentes %}
+                <div class="list-item">
+                    <dt>Requisição de Inventários Inconsistentes</dt>
+                    <dd>{{ requisicao.inv_inconsistentes|format }}</dd>
+                </div>
+            {% endif %}
+            {% if requisicao.vinculo_coordenador %}
+                <div class="list-item">
+                    <dt>Operador</dt>
+                    <dd>{{ requisicao.vinculo_coordenador.relacionamento|format }}</dd>
+                </div>
+            {% endif %}
+            {% if requisicao.observacao %}
+                <div class="list-item">
+                    <dt>Observações</dt>
+                    <dd>{{ requisicao.observacao|format }}</dd>
+                </div>
+            {% endif %}
+        </dl>
+    {% endbox %}
+
+    <div class="tab-pane" data-title="Inventários" data-counter="{{ itens.count }}">
+        {% box 'Inventários' %}
+            {% if requisicao.pode_avaliar_inventario %}
+                <div class="alert alert-info">
+                    <p>Para aprovar algum item, você deve marcar o checkbox relacionado e clicar no botão "Aprovar apenas selecionados", localizado abaixo da tabela. Os itens não marcados terão sua situação alterada para Rejeitado.</p>
+                    <p>Para finalizar, você ainda deve Deferir/Indeferir esta requisição.</p>
+                </div>
+                {% render_form form %}
+            {% else %}
+                {% autopaginate itens 100 %}
+                {% paginate %}
+                <div class="table-responsive">
+                    <table>
+                        <caption>Lista de Inventários</caption>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Descrição</th>
+                                <th>Elemento de Despesa</th>
+                                <th>Código do Elemento de Despesa</th>
+                                <th>Sala</th>
+                                <th>Situação</th>
+                                <th>Valor Contábil</th>
+                                {% if not requisicao.status == requisicao.STATUS_AGUARDANDO_APROVACAO_SERVIDOR_DESTINO and total_itens_requisicao_deferida %}
+                                    <th>Valor na Data do Recebimento</th>
+                                {% endif %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for ri in itens %}
+                            <tr>
+                                <td>{{ forloop.counter }}</td>
+                                <td><a href="{{ ri.inventario.get_absolute_url }}">{{ ri.inventario.numero }}</a> - {{ ri.inventario.get_descricao }}</td>
+                                <td>{{ ri.inventario.entrada_permanente.categoria.nome }}</td>
+                                <td>{{ ri.inventario.entrada_permanente.categoria.codigo }}</td>
+                                <td>{{ ri.inventario.sala|format }}</td>
+                                <td title="Em {{ ri.data_avaliacao|format }}">{{ ri.get_situacao_display|status }}</td>
+                                <td class="text-end">{{ ri.inventario.valor|format_money_almox }}</td>
+                                {% if not requisicao.status == requisicao.STATUS_AGUARDANDO_APROVACAO_SERVIDOR_DESTINO and total_itens_requisicao_deferida %}
+                                    <td class="text-end">{{ ri.valor|format_money_almox }}</td>
+                                {% endif %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                        {% if not requisicao.status == requisicao.STATUS_AGUARDANDO_APROVACAO_SERVIDOR_DESTINO and total_itens_requisicao_deferida %}
+                            <tr>
+                                <td colspan="6" class="text-end">Total: </td>
+                                <td>{{ soma_itens|format }}</td>
+                                <td>{{ total_itens_requisicao_deferida|format_money_almox }}</td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="6" class="text-end">Total: </td>
+                                <td>{{ soma_itens|format }}</td>
+                            </tr>
+                        {% endif %}
+                        </tfoot>
+                    </table>
+                </div>
+            {% endif %}
+        {% endbox %}
+    </div>
+
+    <div class="tab-pane" data-title="Resumo por Elemento de Despesa" data-counter="{{ despesas.count }}">
+        {% box 'Resumo por Elemento de Despesa da Requisição' %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Resumo por Elemento de Despesa da Requisição</caption>
+                    <thead>
+                        <tr>
+                            <th>Código</th>
+                            <th>Conta Contábil</th>
+                            <th>Elemento de Despesa</th>
+                            <th>Valor Inicial</th>
+                            <th>Valor Contábil</th>
+                            <th>Depreciação Acumulada</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ed in elemento_despesa %}
+                        <tr>
+                            <td>{{ ed.codigo }}</td>
+                            <td>{{ ed.plano_contas }}</td>
+                            <td>{{ ed.nome }}</td>
+                            <td class="text-end">{{ ed.total_inicial|format_money_almox }}</td>
+                            {% if ed.total_requisicao > 0 %}
+                                <td class="text-end">{{ ed.total_requisicao|mascara_dinheiro }}</td>
+                                <td class="text-end">{{ ed.total_requisicao_acumulada|mascara_dinheiro }}</td>
+                            {% else %}
+                                <td class="text-end">{{ ed.total_contabil|mascara_dinheiro }}</td>
+                                <td class="text-end">{{ ed.total_depreciacao_acumulada|mascara_dinheiro }}</td>
+                            {% endif %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="3" class="text-end">Total:</td>
+                            <td>{{ total_despesas.total_elementos_despesas|format_money_almox }}</td>
+                            {% if total_despesas.total_despesas_requisicao > 0 %}
+                                <td>{{ total_despesas.total_despesas_requisicao|mascara_dinheiro }}</td>
+                                <td>{{ total_requisicao_acumulada|mascara_dinheiro }}</td>
+                            {% else %}
+                                <td>{{ total_despesas.total_despesas_depreciada|mascara_dinheiro }}</td>
+                                <td>{{ total_depreciacao_acumulada|mascara_dinheiro }}</td>
+                            {% endif %}
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        {% endbox %}
+        {% if not requisicao.status == requisicao.STATUS_AGUARDANDO_APROVACAO_SERVIDOR_DESTINO %}
+            {% box 'Resumo por Elemento de Despesa dos Itens Aprovados' %}
+                <div class="table-responsive">
+                    <table>
+                    <caption>Resumo por Elemento de Despesa dos Itens Aprovados</caption>
+                        <thead>
+                            <tr>
+                                <th>Código</th>
+                                <th>Conta Contábil</th>
+                                <th>Elemento de Despesa</th>
+                                <th>Valor Inicial</th>
+                                <th>Valor Contábil</th>
+                                <th>Depreciação Acumulada</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for ed in elemento_despesa_aprovada %}
+                            <tr>
+                                <td>{{ ed.codigo }}</td>
+                                <td>{{ ed.plano_contas }}</td>
+                                <td>{{ ed.nome }}</td>
+                                <td class="text-end">{{ ed.total_inicial|format_money_almox }}</td>
+                                 {% if ed.total_requisicao > 0 %}
+                                    <td class="text-end">{{ ed.total_requisicao|mascara_dinheiro }}</td>
+                                    <td class="text-end">{{ ed.total_requisicao_acumulada|mascara_dinheiro }}</td>
+                                {% else %}
+                                    <td class="text-end">{{ ed.total_contabil|mascara_dinheiro }}</td>
+                                    <td class="text-end">{{ ed.total_depreciacao_acumulada|mascara_dinheiro }}</td>
+                                {% endif %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="3" class="text-end">Total:</td>
+                                <td>{{ total_despesas_aprovada.total_elementos_despesas|mascara_dinheiro }}</td>
+                                {% if total_despesas_aprovada.total_despesas_requisicao > 0 %}
+                                    <td>{{ total_despesas_aprovada.total_despesas_requisicao|mascara_dinheiro }}</td>
+                                    <td>{{ total_requisicao_acumulada_aprovada|mascara_dinheiro }}</td>
+                                {% else %}
+                                    <td>{{ total_despesas_aprovada.total_despesas_depreciada|mascara_dinheiro }}</td>
+                                    <td>{{ total_depreciacao_acumulada_aprovada|mascara_dinheiro }}</td>
+                                {% endif %}
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            {% endbox %}
+        {% endif %}
+    </div>
+
+    <div class="tab-pane" data-title="Histórico de Situações" data-counter="{{ requisicao.requisicaohistorico_set.count }}">
+        {% box 'Histórico de Situações' %}
+            {% if requisicao.requisicaohistorico_set.exists %}
+                <ul class="timeline compact">
+                    {% for historico in historicorequisicao %}
+                        <li class="{{ historico.get_status_class }}">
+                            <div class="timeline-date">{{ historico.alterado_em }}</div>
+                            <div class="timeline-icon"></div>
+                            <div class="timeline-content">
+                                <h4>{{ historico.get_status_display }}</h4>
+                                <dl>
+                                    <dt>Responsável:</dt>
+                                    <dd>{{ historico.alterado_por }}</dd>
+                                </dl>
+                            </div>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="alert alert-warning"> Não há informações sobre o histórico.</p>
+            {% endif %}
+        {% endbox %}
+    </div>
+
+{% endblock %}

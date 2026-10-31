@@ -1,0 +1,106 @@
+{% extends super_template %}
+
+{% block extrahead %}
+    <style>
+        #sortable .box-item {
+            cursor: move;
+        }
+        #sortable .box-item.ui-sortable-helper {
+            box-shadow: 0 15px 50px 15px rgba(0, 0, 0, 0.25);
+        }
+    </style>
+    <script>
+        $( function() {
+            $("#sortable").sortable({
+                cursor: "move",
+                items: "> .farol",
+                placeholder: "ui-state-highlight",
+                helper: 'clone',
+                preventOnFilter: true,
+                stop: function(e, ui) {
+                    let area = $("#sortable").data('area');
+                    let demandas = [];
+                    let sortable_container = $(this);
+                    let atualizar_prioridade = true;
+                    $(".farol").each(function (i) {
+                        let demanda = $(this).data("demanda");
+                        let prioridade = i+1;
+                        demandas.push(demanda);
+                        $(this).find(".farol-number").html(prioridade);
+                    });
+                    if (atualizar_prioridade) {
+                        $.ajax({
+                            url: '/demandas/atualizar_prioridade/' + area + '/?demandas=' + demandas,
+                            type: "GET",
+                            success: function (data) {
+                                if (data.ok){
+                                    $(".farol").slice(0,{{ qtd_demandas_prioritarias_por_area }}).each(function (i) {
+                                        $(this).addClass( "success", 5000, "easeOutBounce");
+                                    });
+                                    $(".farol").slice({{ qtd_demandas_prioritarias_por_area }}).each(function (i) {
+                                        $(this).removeClass( "success", 5000, "easeOutBounce");
+                                    });
+                                    clearFeedbackMessage();
+                                } else {
+                                    sortable_container.sortable( "cancel" );
+                                    $(".farol").each(function (i) {
+                                        let demanda = $(this).data("demanda");
+                                        let prioridade = i + 1;
+                                        demandas.push(demanda);
+                                        $(this).find(".farol-number").html(prioridade);
+                                    });
+                                    let mensagem = data.mensagem;
+                                    showFeedbackMessage(mensagem, 'error');
+                                    goToPageTop();
+                                    alert(mensagem);
+                                }
+                            }
+                        });
+                    } else {
+                        $(".farol").each(function (i) {
+                            let demanda = $(this).data("demanda");
+                            let prioridade = i + 1;
+                            demandas.push(demanda);
+                            $(this).find(".farol-number").html(prioridade);
+                        });
+                    }
+                },
+            }).disableSelection();
+        });
+    </script>
+{% endblock %}
+
+{% block content %}
+
+    {% if demandas %}
+        <div class="alert alert-info">
+            <p>As <strong>{{ demandas.count }}</strong> demandas estão ordenadas por <strong>ordem de prioridade</strong>.</p>
+            <p>Você pode arrastar uma demanda para alterar imediatamente a ordem de prioridade da mesma.</p>
+            <p>Somente as demandas de <strong>prioridade até {{ qtd_demandas_prioritarias_por_area }}</strong> serão iniciadas pela equipe de desenvolvimento.</p>
+            <p>Demandas de <strong>prioridade até {{ qtd_demandas_prioritarias_por_area }} e em andamento</strong> não poderão ter sua prioridade alterada para <strong>acima da posição {{ qtd_demandas_prioritarias_por_area }}</strong>.</p>
+        </div>
+        <div id="sortable" data-area="{{ area.pk }}">
+            {% for demanda in demandas %}
+                <div class="farol {% if demanda.prioridade <= qtd_demandas_prioritarias_por_area %}success{% endif %}" data-demanda="{{ demanda.pk }}" data-em_homologacao="{{ demanda.em_homologacao }}">
+                    <span class="farol-status farol-number">{{ demanda.prioridade }}</span>
+                    <h4 class="title">
+                        <a href="{% url 'demanda_visualizar' demanda.pk %}">
+                            <strong>#{{ demanda.pk }}</strong>: {{ demanda.titulo }}
+                        </a>
+                    </h4>
+                    {{ demanda.situacao|status }}
+                    {% if demanda.sugestaomelhoria_set.exists %}
+                        {% with sugestaomelhoria=demanda.sugestaomelhoria_set.first %}
+                            <p class="obs">Demanda criada a partir da <a href="{{ sugestaomelhoria.get_absolute_url }}">Sugestão de Melhoria {{ sugestaomelhoria.pk }}</a>.</p>
+                        {% endwith %}
+                    {% endif %}
+                    <a href="{% url 'atualizar_prioridade_manualmente' demanda.pk %}"
+                       class="btn primary popup ms-auto">Definir prioridade</a>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="alert alert-warning">Não há demandas cadastradas para esta área.</p>
+    {% endif %}
+
+{% endblock %}

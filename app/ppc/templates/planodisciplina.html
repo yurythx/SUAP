@@ -1,0 +1,377 @@
+{% extends super_template %}
+
+{% block object-status %}
+    {% if plano.ativo %}
+        {% if situacoes %}
+            <ul class="steps">
+                {% for situacao in situacoes %}
+                    <li><span class="step-{% if situacao.1 == 'Aprovado' %}success{% else %}alert{% endif %} {% if situacao.0 == plano.situacao %}active{% endif %}">{{ situacao.1 }}</span></li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            {{ plano.get_situacao_display|status }}
+        {% endif %}
+    {% else %}
+    {{ plano.get_situacao_display|status }} {{ "Inativo"|status }}
+    {% endif %}
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if ppc and pode_enviar_analise %}
+            <li><a class="btn" href="{{ ppc.get_absolute_url }}?tab=matriz">Visualizar PPC</a></li>
+        {% endif %}
+        {% if pode_enviar_analise %}
+            <li><a class="btn success" href="/ppc/planodisciplina/{{ plano.id }}/enviar/">{% icone "share" %} Enviar para análise</a></li>
+        {% endif %}
+        {% if pode_analisar %}
+            <li><a class="btn success" href="/ppc/planodisciplina/{{ plano.id }}/analisar/">{% icone "square" %} Analisar</a></li>
+        {% endif %}
+        {% if pode_aprovar %}
+            <li><a class="btn success" href="/ppc/planodisciplina/{{ plano.id }}/aprovar/">{% icone "toggle-on" %} Aprovar</a></li>
+        {% endif %}
+        {% if pode_desaprovar %}
+            <li><a class="btn warning" href="/ppc/planodisciplina/{{ plano.id }}/desaprovar/">{% icone "undo" %} Desfazer aprovação</a></li>
+        {% endif %}
+        {% if pode_editar %}
+            <li><a class="btn primary popup" href="/admin/ppc/planodisciplina/{{ plano.id }}/change/">{% icone "edit" %} Editar</a></li>
+        {% endif %}
+        {% if pode_devolver %}
+            <li><a class="btn warning" href="/ppc/planodisciplina/{{ plano.id }}/devolver/">{% icone "undo" %} Devolver para elaboração</a></li>
+        {% endif %}
+        {% if pode_cadastrar_revisao %}
+            <li><a class="btn danger popup no-confirm" href="/ppc/planodisciplina/{{ plano.id }}/reprovar/">{% icone "toggle-off" %} Reprovar</a></li>
+        {% endif %}
+        {% if pode_inativar %}
+            <li><a class="btn danger" href="/ppc/planodisciplina/{{ plano.id }}/inativar/">{% icone "toggle-off" %} Inativar</a></li>
+        {% endif %}
+        {% if pode_reativar %}
+            <li><a class="btn success" href="/ppc/planodisciplina/{{ plano.id }}/reativar/">{% icone "toggle-on" %} Reativar</a></li>
+        {% endif %}
+        {% if pode_replicar %}
+            <li><a class="btn primary" href="/ppc/planodisciplina/{{ plano.id }}/replicar/">{% icone "copy" %} Replicar</a></li>
+        {% endif %}
+        {% if pode_criar_versao_ead %}
+            <li><a class="btn primary" href="{% url 'criar_versao_ead_planodisciplina' plano.id %}">{% icone "copy" %} Criar versão EAD</a></li>
+        {% endif %}
+        {% if pode_excluir_versao_ead %}
+            <li><a class="btn danger" href="{% url 'excluir_versao_ead_planodisciplina' plano.id %}">{% icone "copy" %} Excluir versão EAD</a></li>
+        {% endif %}
+        {% if pode_excluir %}
+            <li><a class="btn danger popup" href="/comum/excluir/ppc/planodisciplina/{{ plano.pk }}/">{% icone "trash" %} Remover</a></li>
+        {% endif %}
+        {% if pode_duplicar %}
+            <li><a class="btn popup primary" href="/ppc/duplicar_plano_disciplina/{{ plano.pk }}/">{% icone "copy" %} Duplicar para novo tipo de oferta</a></li>
+        {% endif %}
+        {% if perms.ppc.view_planodisciplina %}
+            <li class="has-child">
+                <a href="#" class="btn default">{% icone "file-pdf" %} Baixar PDF</a>
+                <ul>
+                    <li><a href="{% url 'imprimir_planodisciplina' plano.id %}">Regular</a></li>
+                    {% if tem_secao_ead %}
+                        <li><a href="{% url 'imprimir_planodisciplina' plano.id %}?ead=1">Versão EAD</a></li>
+                    {% endif %}
+                </ul>
+            </li>
+            
+        {% endif %}
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+    {% if situacao_inconsistente %}
+        <p class="alert alert-danger"><strong>Atenção:</strong> Este plano de disciplina está vinculado a pelo menos uma matriz de PPC homologada; contudo, a situação do próprio plano encontra-se diferente de “Aprovado”. É necessário aprovar novamente este plano de disciplina.</p>
+    {% endif %}
+
+    {% if plano.plano_origem_id %}
+        <p class="alert alert-info"><strong>Importante:</strong> Este plano foi duplicado a partir do plano <a href="/ppc/planodisciplina/{{ plano.plano_origem_id }}/">{{ plano.plano_origem }} ({{ plano.plano_origem.tipo_oferta }})</a>.</p>
+    {% endif %}
+
+    {% if plano.planodisciplina_set.all %}
+        <p class="alert alert-info"><strong>Importante:</strong> Este plano deu origem ao(s) seguinte(s) plano(s) de disciplina: 
+            {% for obj in plano.planodisciplina_set.all %}
+                <a href="/ppc/planodisciplina/{{ obj.id }}/">{{ obj }} ({{ obj.tipo_oferta }})</a>
+                {% if not forloop.last %}
+                    | 
+                {% endif %}
+            {% endfor %}
+        .</p>
+    {% endif %}
+
+    {% if planos_mesmo_nome.exists %}
+        <div class="alert alert-warning">
+            <p><strong>Atenção:</strong> Há outros planos de disciplina com o nome de disciplina {{ plano.nome_disciplina }}.</p>
+            <ul>
+                {% for p in planos_mesmo_nome %}
+                    <li><a href="{{ p.get_absolute_url }}">{{ p }}</a> ({{ p.get_situacao_display }})</li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+
+    {% if possui_revisao_pendente %}
+        <p class="alert alert-warning"><strong>Atenção:</strong> Há revisões aguardando resolução.</p>
+    {% endif %}
+
+    {% if plano.estah_em_analise and not possui_revisao_pendente %}
+        <p class="alert alert-info">Você precisa adicionar uma revisão para devolver este plano para elaboração.</p>
+    {% endif %}
+
+    {% if plano.componente %}
+        <p class="alert alert-info">Este plano de disciplina possui componente gerado.</p>
+    {% endif %}
+
+    <dl class="definition-list flex">
+        <div class="list-item flex-basis-50">
+            <dt>Disciplina</dt>
+            <dd>{{ plano.nome_disciplina }}</dd>
+        </div>
+        <div class="list-item flex-basis-50">
+            <dt>Carga horária</dt>
+            <dd>{{ plano.ch_disciplina }}h</dd>
+        </div>
+        <div class="list-item flex-basis-50">
+            <dt>Periodicidade</dt>
+            <dd>{{ plano.get_periodicidade_display|format }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Diretriz</dt>
+            <dd>{{ plano.diretriz }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Tipo de oferta</dt>
+            <dd>{{ plano.tipo_oferta }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Núcleo</dt>
+            <dd>{{ plano.nucleo }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Desconsidera cálculo de créditos</dt>
+            <dd>{{ plano.desconsiderar_qtd_credito|format }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>É um tópico específico</dt>
+            <dd>{{ plano.topico_especifico|format }}</dd>
+        </div>
+        {% if plano.comissao_ptdem %}
+            <div class="list-item">
+                <dt>Comissão</dt>
+                <dd><a class="popup" href="/ppc/comissaoptdem/{{ plano.comissao_ptdem.id }}/">{{ plano.comissao_ptdem|format }}</a></dd>
+            </div>
+        {% endif %}
+        {% if ppc %}
+            <div class="list-item">
+                <dt>PPC de criação</dt>
+                <dd><a href="{{ ppc.get_absolute_url }}?tab=matrizes">{{ ppc }}</a></dd>
+            </div>
+        {% endif %}
+        {% if plano.componente %}
+            <div class="list-item">
+                <dt>Componente</dt>
+                <dd><a href="{{ plano.componente.get_absolute_url }}">{{ plano.componente }}</a></dd>
+            </div>
+        {% endif %}
+    </dl>
+
+    <div class="tab-pane" data-title="Ementa e programa" data-tab="programa" data-checked="{% if tem_secao_pendente %}False{% else %}True{% endif %}">
+        {% include "includes/planodisciplina_ementa_programa.html" with plano=plano secoes=plano.get_secoes tem_secao_pendente=tem_secao_pendente ead=False %}
+    </div>
+
+    {% if tem_secao_ead %}
+        <div class="tab-pane" data-title="Ementa e programa EAD" data-tab="programa_ead" data-checked="{% if tem_secao_ead_pendente %}False{% else %}True{% endif %}">
+            {% include "includes/planodisciplina_ementa_programa.html" with plano=plano secoes=plano.get_secoes_ead tem_secao_ead_pendente=tem_secao_ead_pendente ead=True %}
+        </div>
+    {% endif %}
+
+    <div class="tab-pane ajax-rendered" data-title="Revisões" data-tab="revisoes" data-checked="{% if possui_revisao_pendente %}False{% else %}True{% endif %}">
+        {% if request.GET.tab == "revisoes" %}
+            {% if pode_cadastrar_revisao %}
+                <ul class="action-bar">
+                    <li><a class="btn success popup" href="/admin/ppc/revisaoplanodisciplina/add/?plano_id={{ plano.pk }}">{% icone "plus" %} Adicionar revisão</a></li>
+                </ul>
+            {% endif %}
+
+            {% if possui_revisao_pendente and pode_editar %}
+                <p class="alert alert-info">Resolva todas as revisões para reenviar este plano de disciplina para análise.</p>
+            {% endif %}
+
+            {% if revisoes %}
+                {% autopaginate revisoes 5 %}
+                {% paginate %}
+                {% for revisao in revisoes %}
+                    <div class="general-box">
+                        <div class="primary-info">
+                            <div class="status-info-container">
+                                <span class="status status-info">{{ revisao.data_criacao }}</span>
+                                {% if revisao.resolvido %}
+                                    <span class="status status-success">Resolvida</span>
+                                {% else %}
+                                    <span class="status status-error">Não resolvida</span>
+                                {% endif %}
+                            </div>
+                            <h4>Revisão #{{ revisao.numero_revisao }} adicionada por {{ revisao.vinculo.relacionamento.pessoa_fisica.nome_usual }}</h4>
+                            <ul class="action-bar">
+                                {% if revisao|method:"pode_marcar_resolvido"|call:request.user %}
+                                    {% if not revisao.resolvido %}
+                                        <li><a class="btn popup"href="/ppc/revisaoplanodisciplina/{{ revisao.pk }}/comentarios/adicionar/">{% icone "plus" %} Adicionar comentário</a></li>
+                                        {% if plano.is_elaboracao or is_avaliador_and_analise %}
+                                            <li><a href="/ppc/revisaoplanodisciplina/{{ revisao.pk }}/atualizar_resolvida/" class="btn success">{% icone "check" %} Marcar como resolvida</a></li>
+                                        {% endif %}
+                                    {% elif revisao.resolvido and is_avaliador_and_analise %}
+                                        <li><a href="/ppc/revisaoplanodisciplina/{{ revisao.pk }}/retornar_para_analise/" class="btn warning">{% icone "undo" %} Reabrir revisão</a></li>
+                                    {% endif %}
+                                {% endif %}
+                                {% if pode_cadastrar_revisao and not revisao.resolvido %}
+                                    <li><a class="btn primary popup" href="/admin/ppc/revisaoplanodisciplina/{{ revisao.pk }}/change/">{% icone "edit" %} Editar revisão</a></li>
+                                {% endif %}
+                            </ul>
+                            <div class="extra-info">
+                                <div class="alert alert-info">{{ revisao.texto|linebreaks }}</div>
+                                {% if revisao.get_comentarios %}
+                                    {% box "Comentários ({{ revisao.get_comentarios.count }})" class="{{ revisao.collapsed_comments }}" %}
+                                        <ul class="timeline">
+                                            {% autopaginate revisao.get_comentarios 10 %}
+                                            {% paginate %}
+                                            {% for comentario in revisao.get_comentarios %}
+                                                {% if not comentario.automatico %}
+                                                    <li>
+                                                        <div class="timeline-date">{{ comentario.data_criacao }}</div>
+                                                        <div class="timeline-photo"
+                                                            title="{{ comentario.vinculo.pessoa.pessoafisica.nome_usual }}">
+                                                            <img alt="{{ comentario.vinculo.pessoa.pessoafisica.nome_usual }}"
+                                                                src="{{ comentario.vinculo.get_foto_75x100_url }}"/>
+                                                        </div>
+                                                        <div class="timeline-content">
+                                                            <h4>{{ comentario.vinculo.user|format }}
+                                                                <small>comentou:</small></h4>
+                                                            {% if not comentario.ativo %}
+                                                                <s>{{ comentario.texto|linebreaks }}</s>
+                                                            {% else %}
+                                                                {{ comentario.texto|linebreaks }}
+                                                            {% endif %}
+                                                        </div>
+                                                        {% if comentario|method:"pode_desconsiderar_comentario"|call:request.user.get_vinculo %}
+                                                            <ul class="action-bar">
+                                                                <li class="has-child">
+                                                                    <a href="#" class="btn icon-cog"><span
+                                                                            class="fas fa-cog"
+                                                                            aria-hidden="true"></span><span class="visually-hidden">Opções</span></a>
+                                                                    <ul>
+                                                                        <li>
+                                                                            <a href="/ppc/revisaoplanodisciplina/{{ revisao.pk }}/comentarios/{{ comentario.pk }}/desconsiderar/">Desconsiderar comentário</a></li>
+                                                                    </ul>
+                                                                </li>
+                                                            {% if user_apto_remover_comentario and comentario|method:"pode_remover_comentario"|call:request.user %}
+                                                            <li><a href="/ppc/revisaoplanodisciplina/{{ revisao.pk }}/comentarios/{{ comentario.pk }}/remover/" class="btn danger" title="Remover">{% icone "trash" %}<span class="visually-hidden">Remover</span></a></li>
+                                                            {% endif %}
+                                                            </ul>
+                                                        {% endif %}
+                                                    </li>
+                                                {% else %}
+                                                    <li class="obs">
+                                                        <div class="timeline-date">{{ comentario.data_criacao }}</div>
+                                                        {% if comentario.vinculo %}
+                                                            <div class="timeline-photo"
+                                                                title="{{ comentario.vinculo.pessoa.pessoafisica.nome_usual }}">
+                                                                <img alt="{{ comentario.vinculo.pessoa.pessoafisica.nome_usual }}"
+                                                                    src="{{ comentario.vinculo.get_foto_75x100_url }}"/>
+                                                            </div>
+                                                        {% else %}
+                                                            <div class="timeline-icon"></div>
+                                                        {% endif %}
+                                                        <div class="timeline-content">
+                                                            {% if comentario.vinculo %}
+                                                                {{ comentario.vinculo.user|format }}{% endif %} {{ comentario.texto|safe }}
+                                                        </div>
+                                                    </li>
+                                                {% endif %}
+                                            {% endfor %}
+                                            {% paginate %}
+                                        </ul>
+                                    {% endbox %}
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+                {% paginate %}
+            {% else %}
+                <p class="alert alert-warning">Nenhuma revisão cadastrada.</p>
+            {% endif %}
+        {% endif %}
+    </div>
+
+    <div class="tab-pane ajax-rendered" data-title="PPCs vinculados" data-tab="ppc" >
+        {% if request.GET.tab == "ppc" %}
+            {% if ppcs.exists %}
+                <div class="table-responsive">
+                    <table>
+                        <caption>PPCs vinculados a este plano de disciplina</caption>
+                        <thead>
+                        <tr>
+                            <th>PPC</th>
+                            <th>Situação do PPC</th>
+                            <th>Matriz</th>
+                            <th>Situação da matriz</th>
+                            {% if pode_remover_ppc_vinculado %}
+                                <th class="no-print">Opções</th>
+                            {% endif %}
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for planodisciplina_ppc in ppcs %}
+                            <tr>
+                                <td>
+                                    <a href="{{ planodisciplina_ppc.matriz_ppc.ppc.get_absolute_url }}">{{ planodisciplina_ppc.matriz_ppc.ppc }}</a>
+                                </td>
+                                <td>{{ planodisciplina_ppc.matriz_ppc.ppc.get_situacao_display|status }}</td>
+                                <td>
+                                    <a href="{{ planodisciplina_ppc.matriz_ppc.get_absolute_url }}">{{ planodisciplina_ppc.matriz_ppc }}</a>
+                                </td>
+                                <td>{{ planodisciplina_ppc.matriz_ppc.get_situacao_matriz_display|status }}</td>
+                                {% if pode_remover_ppc_vinculado and planodisciplina_ppc.matriz_ppc.ppc.is_em_elaboracao %}
+                                <td class="no-print">
+                                    <ul class="action-list">
+                                        <li><a href="/comum/excluir/ppc/planodisciplinappc/{{ planodisciplina_ppc.pk }}/" class="btn danger no-confirm popup">{% icone "trash" %} Desvincular</a></li>
+                                    </ul>
+                                </td>
+                            {% endif %}
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+            {% else %}
+                <p class="alert alert-warning">Não há PPC vinculado a este plano de disciplina.</p>
+            {% endif %}
+        {% endif %}
+    </div>
+
+    <div class="tab-pane ajax-rendered" data-title="Histórico de movimentações" data-tab="movimentacoes">
+        {% if request.GET.tab == "movimentacoes" %}
+            {% if movimentacoes %}
+                <ul class="timeline compact">
+                    {% for movimentacao in movimentacoes %}
+                        <li class="{% if movimentacao.get_situacao_display == 'Aprovado' %}success{% elif movimentacao.get_situacao_display == 'Reprovado' %}danger{% else %}warning{% endif %}">
+                            <div class="timeline-date">{{ movimentacao.data }}</div>
+                            <div class="timeline-icon"></div>
+                            <div class="timeline-content">
+                                {% if movimentacao.acao %}
+                                    <h4>{{ movimentacao.acao }}<br><small>({% if movimentacao.usuario %}ação realizada por {{ movimentacao.usuario|format }}{% else %}ação realizada pelo sistema{% endif %})</small></h4>
+                                {% else %}
+                                    <h4>{{ movimentacao.get_situacao_display }}<br><small>({% if movimentacao.usuario %}situação alterada por {{ movimentacao.usuario|format }}{% else %}situação alterada pelo sistema{% endif %})</small></h4>
+                                {% endif %}
+                            </div>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="alert alert-warning">Ainda não houve movimentação.</p>
+            {% endif %}
+        {% endif %}
+    </div>
+
+{% endblock %}

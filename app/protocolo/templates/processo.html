@@ -1,0 +1,204 @@
+{% extends super_template %}
+
+{% block action-bar %}
+<ul class="action-bar">
+	{% if na_caixa_entrada %}
+        {% if not ultimo_tramite.data_recebimento %}
+			<li><a class="btn success" href="/protocolo/processo_receber/{{ ultimo_tramite.id }}/">Receber</a></li>
+		{% else %}
+            <li><a class="btn success" href="/protocolo/processo_encaminhar/{{ ultimo_tramite.id }}/interno/">Encaminhar para Setor</a></li>
+            <li><a class="btn success" href="/protocolo/processo_encaminhar/{{ ultimo_tramite.id }}/externo/">Encaminhar para Pessoa Jurídica</a></li>
+			{% if ultimo_tramite.processo.tramitavel %}
+                <li><a class="btn success" href="/protocolo/processo_finalizar/{{ ultimo_tramite.processo.id }}/">Finalizar</a></li>
+            {% endif %}
+		{% endif %}
+	{% endif %}
+    {% if not tramites_processo %}
+		<li><a class="btn success" href="/protocolo/processo_encaminhar_primeiro_tramite/{{ processo.id }}/interno/">Encaminhar para Setor</a></li>
+		<li><a class="btn success" href="/protocolo/processo_encaminhar_primeiro_tramite/{{ processo.id }}/externo/">Encaminhar para Pessoa jurídica</a></li>
+	{% else %}
+		{% if link_capa_processo %}
+            <li class="has-child"><a class="btn" href="#">Gerar Capas</a>
+                <ul>
+                    <li><a href="{{ link_capa_processo }}">Capa A4</a></li>
+                    <li><a href="{{ link_capa_processo_a3 }}">Capa A3</a></li>
+                </ul>
+            </li>
+		{% endif %}
+	{% endif %}
+	{% if link_processo_editar %}
+		<li><a class="btn primary" href="{{ link_processo_editar }}">Editar</a></li>
+	{% endif %}
+    {% if na_caixa_saida %}
+		{% if ultimo_tramite.is_interno %}
+        	<li><a class="btn primary" href="/protocolo/processo_editar_encaminhamento/{{ ultimo_tramite.id }}/">Editar Último Trâmite</a></li>
+			<li><a class="btn warning" href="/protocolo/processo_remover_encaminhamento/{{ ultimo_tramite.id }}/">Remover Último Trâmite</a></li>
+		{% endif %}
+		{% if ultimo_tramite.is_externo %}
+			{% if not ultimo_tramite.data_recebimento %}
+				<li><a class="btn primary" href="/protocolo/processo_editar_encaminhamento/{{ ultimo_tramite.id }}/">Editar Último Trâmite</a></li>
+				<li><a class="btn warning" href="/protocolo/processo_remover_encaminhamento/{{ ultimo_tramite.id }}/">Remover Último Trâmite</a></li>
+				<li><a href="/protocolo/processo_informar_recebimento_externo/{{ ultimo_tramite.id }}/">Informar Recebimento Externo</a></li>
+			{% else %}
+				<li><a class="primary" href="/protocolo/processo_retornar_para_ambito_interno/{{ ultimo_tramite.id }}/">Retornar para Setor</a></li>
+			{% endif %}
+		{% endif %}
+	{% endif %}
+	{% if perms.protocolo.pode_imprimir_comprovante %}
+    	<li><a class="btn primary" href="/protocolo/processo_imprimir_etiqueta/{{ processo.pk }}/">Etiqueta</a></li>
+    {% endif %}
+	{% if link_processo_remover_finalizacao %}
+ 		<li><a class="btn danger" href="{{ link_processo_remover_finalizacao }}">Remover Finalização</a></li>
+	{% endif %}
+	{% if processo.tem_vinculo_com_processo_eletronico %}
+	<li>
+		<a class="btn" href="/processmining/processmining/eletronico/{{ processo.pk }}/">
+			{% icone "chart-line" %} Process Mining
+		</a>
+	</li>
+	{% endif %}
+</ul>
+{% endblock %}
+
+{% block content %}
+
+{% box "Dados gerais" %}
+	<table class="info">
+        <tr>
+            <td>Nº do Processo</td>
+            <td>{{ processo.numero_processo }}</td>
+			<td>Campus</td>
+            <td>{{ processo.uo }}</td>
+        </tr>
+		<tr>
+            <td>Cadastro</td>
+            <td>{{ processo.data_cadastro|format }}</td>
+			<td>Operador</td>
+            <td>{{ processo.vinculo_cadastro.user|format }}</td>
+        </tr>
+        <tr>
+            <td>Situação</td>
+            <td>{{ processo.get_status_display }}</td>
+			<td>Órgão Responsável</td>
+            <td>{{ processo.get_orgao_responsavel_atual|format }}</td>
+        </tr>
+		<tr>
+            <td>Tipo do Processo</td>
+            <td colspan="3">{{ processo.get_tipo_display }}</td>
+        </tr>
+        <tr>
+            <td>Assunto</td>
+            <td colspan="3">{{ processo.assunto }}</td>
+        </tr>
+        <tr>
+            <td>Pessoa Interessada</td>
+            <td colspan="3">{{ processo.interessado_nome|format }}</td>
+        </tr>
+        <tr>
+            <td>Nº do Documento</td>
+            <td colspan="3">{{ processo.numero_documento }}</td>
+        </tr>
+        <tr>
+            <td>Palavras-chave</td>
+            <td colspan="3">{{ processo.palavras_chave }}</td>
+        </tr>
+    </table>
+{% endbox %}
+
+{% box "Trâmites" %}
+	{% if tramites_processo %}
+		<table>
+			<thead>
+				<tr>
+					<th>#</th>
+					{# Informações do encaminhamento #}
+			    	<th>Origem</th>
+			    	<th>Enviado em</th>
+			    	<th>Enviado por</th>
+			    	<th>Despacho de envio</th>
+					{# Seta #}
+					<th>-</th>
+					{# Informações do recebimento #}
+					<th>Destino</th>
+			    	<th>Recebido em</th>
+			    	<th>Recebido por</th>
+			    	<th>Despacho de recebimento</th>
+					<th>Situação</th>
+		    	</tr>
+			</thead>
+		    <tbody>
+		        {% for t in tramites_processo %}
+		            <tr>
+						{# Situação do Trâmite e Ordem #}
+		    			<td>{{ t.ordem }}</td>
+						{# Informações do encaminhamento #}
+		                <td><strong>{{ t.orgao_encaminhamento }}</strong></td>
+		                <td>{{ t.data_encaminhamento|date:"d/m/Y H:i" }}</td>
+		                <td>{{ t.vinculo_encaminhamento.pessoa.pessoafisica|format }}</td>
+		                <td>{{ t.observacao_encaminhamento|format }}</td>
+						<td>&rarr;</td>
+						{# Informações do recebimento #}
+		            	<td><strong>{{ t.orgao_recebimento }}</strong></td>
+		                <td>{{ t.data_recebimento|format }}</td>
+	               		<td>{{ t.vinculo_recebimento.pessoa.pessoafisica|format }}</td>
+		                <td>{{ t.observacao_recebimento|format }}</td>
+		            	<td>
+							{% if t.recebido %}
+								<span class="status status-info">Recebido</span>
+							{% else %}
+								<span class="status status-alert">Aguardando recebimento</span>
+							{% endif %}
+						</td>
+		            </tr>
+		        {% endfor %}
+				{% if processo_dados_finalizacao %}
+			        <tr>
+			        	<td>{{ processo_dados_finalizacao.ordem }}</td>
+			        	<td><strong>{{ processo_dados_finalizacao.setor }}</strong></td>
+			        	<td>{{ processo_dados_finalizacao.data_finalizacao|format }}</td>
+			        	<td>{{ processo_dados_finalizacao.vinculo_finalizacao.user|format }}</td>
+			        	<td>{{ processo_dados_finalizacao.observacao_finalizacao|format }}</td>
+			        	<td>-</td>
+			        	<td>-</td>
+			        	<td>-</td>
+			            <td>-</td>
+						<td>-</td>
+						<td><span class="status status-success">Finalizado</span></td>
+			        </tr>
+		        {% endif %}
+		    </tbody>
+		</table>
+	{% else %}
+	    <p class="alert alert-warning">Nenhum trâmite encontrado.</p>
+	{% endif %}
+{% endbox %}
+
+{% if arquivos_processo.exists %}
+    {% box "Arquivos" %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Ações</th>
+                    <th>Arquivo</th>
+                    <th>Tipo de Arquivo</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for arquivo in arquivos_processo %}
+                    <tr>
+                        <td>
+							{% icon "view" "/arquivo/visualizar_arquivo_pdf/{{ arquivo.encrypted_pk }}" %}
+							{% if perms.arquivo.pode_validar_arquivo %}
+								{% icon "edit" "/arquivo/protocolar_arquivo/{{ arquivo.encrypted_pk }}" %}
+							{% endif %}
+                        </td>
+                        <td>{{ arquivo.nome|format }}</td>
+                        <td>{{ arquivo.tipo_arquivo|format }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endbox %}
+{% endif %}
+
+{% endblock %}

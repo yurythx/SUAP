@@ -1,0 +1,289 @@
+{% extends "base_super_pgd2.html" %}
+
+{% block object-status %}
+    {{ pit|method:"get_situacao_rit_calculado"|call:request.user }}
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if modo == 'registro' %}
+            {% if pode_solicitar_aprovacao_homologacao_rit %}
+                <li>
+                    <a href="/pgd2/solicitar_aprovacao_homologacao_rit/{{ pit.id }}" class="btn success">{% icone "share" %} Solicitar aprovação/homologação</a>
+                </li>
+            {% endif %}
+            {% if pode_aprovar_aprovar_rit %}
+                <li>
+                    <a href="/pgd2/aprovar_rit/{{ pit.id }}" class="btn success">{% icone "thumbs-up" %} Aprovar {{ nomenclatura.relatorio_individual_de_trabalho_sigla_pgd2 }}</a>
+                </li>
+                <li>
+                    <a href="/pgd2/reprovar_rit/{{ pit.id }}" class="btn danger">{% icone "thumbs-down" %} Reprovar {{ nomenclatura.relatorio_individual_de_trabalho_sigla_pgd2 }}</a>
+                </li>
+            {% endif %}
+            {% if pode_homologar_rit %}
+                <li>
+                    <a href="/pgd2/homologar_rit/{{ pit.id }}" class="btn success">{% icone "thumbs-up" %} Homologar {{ nomenclatura.relatorio_individual_de_trabalho_sigla_pgd2 }}</a>
+                </li>
+                <li>
+                    <a href="/pgd2/nao_homologar_rit/{{ pit.id }}" class="btn danger">{% icone "thumbs-down" %} Não homologar {{ nomenclatura.relatorio_individual_de_trabalho_sigla_pgd2 }}</a>
+                </li>
+            {% endif %}
+            {% if pode_reabrir_rit %}
+                <li>
+                    <a href="/pgd2/reabrir_rit/{{ pit.id }}" class="btn success">{% icone "square" %} Reabrir/Devolver {{ nomenclatura.relatorio_individual_de_trabalho_sigla_pgd2 }}</a>
+                </li>
+            {% endif %}
+            {% if pit|method:"pode_visualizar"|call:request.user %}
+                <li><a href="/pgd2/visualizar_pit/{{ pit.id }}" class="btn default">{% icone "eye" %} Planejamento ({{ nomenclatura.plano_individual_de_trabalho_sigla_pgd2 }})</a></li>
+            {% endif %}
+            {% if pit|method:"pode_visualizar"|call:request.user and pode_visualizar_dados %}                
+                <li class="has-child">
+                    <a class="btn default" href="#">{% icone "eye" %} Consultas</a>
+                    <ul>
+                        <li><a href="/pgd2/visualizar_rit/{{ pit.id }}?m=solicitacoes_aprova_homologa">Solicitações de aprovação e homologação</a></li>
+                        {% if pit.rit_estah_homologado %}
+                            <li><a href="/pgd2/visualizar_rit/{{ pit.id }}?m=avaliacao">Avaliação</a></li>
+                        {% endif %}
+                        <li><a href="/pgd2/visualizar_rit/{{ pit.id }}?m=historico">Histórico de alterações</a></li>
+                        {% if analista %}
+                            <li><a href="/pgd2/visualizar_acoes_periodo_rit/{{ pit.id }}">Contribuições relacionadas</a></li>
+                        {% endif %}
+                    </ul>
+                </li>
+            {% endif %} 
+        {% endif %}  
+        {% if modo == 'historico' or modo == 'solicitacoes_aprova_homologa' %}
+            {% if pit|method:"pode_visualizar"|call:request.user %}
+                <li><a href="/pgd2/visualizar_rit/{{ pit.id }}" class="btn default">{% icone "eye" %} Execução ({{ nomenclatura.relatorio_individual_de_trabalho_sigla_pgd2 }})</a></li>
+            {% endif %}
+        {% endif %}
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+    {{ block.super }}
+
+    {% if existem_pendencias_no_pit_para_solicitar_aprovacao_homologaca_rit %} 
+        <div class="alert alert-danger">
+            <p><strong>Atenção</strong>: para cadastrar e/ou visualizar as entregas do {{ nomenclatura.relatorio_individual_de_trabalho_sigla_pgd2 }} é preciso verificar os dados do seu {{ nomenclatura.plano_individual_de_trabalho_sigla_pgd2 }} e dos PESs relacionados. Verifique eventuais pendências e/ou se o {{ nomenclatura.plano_individual_de_trabalho_sigla_pgd2 }} está cancelado.</p>
+            <ol>
+                {% for erro in erros_existem_pendencias_no_pit %}
+                    <li>{{ erro }}</li>
+                {% endfor %}
+            </ol>
+        </div>
+
+    {% endif %}
+
+    {% if pode_visualizar_dados %} 
+        {% if modo == 'registro' %}
+            {% if pode_cadastrar_entrega_rit and erros_pode_solicitar_aprovacao_homologacao_rit %}
+                <div class="alert alert-danger">
+                    <p><strong>Atenção</strong>: para solicitar Aprovação/Homologação você deve observar os seguintes pontos</p>
+                    <ol>
+                        {% for erro in erros_pode_solicitar_aprovacao_homologacao_rit %}
+                            <li>{{ erro }}</li>
+                        {% endfor %}
+                    </ol>
+                </div>
+            {% endif %}
+
+            {% if not pit.pit_estah_homologado %}
+                <p class="alert alert-danger"><strong>Atenção</strong>: para cadastrar entregas no {{ nomenclatura.relatorio_individual_de_trabalho_sigla_pgd2 }} é necessário que o {{ nomenclatura.plano_individual_de_trabalho_sigla_pgd2 }} esteja homologado. Verifique seu {{ nomenclatura.plano_individual_de_trabalho_sigla_pgd2 }}</p>
+            {% endif %}
+
+            {% if justificativa_observacao_solicitacao %}
+                <div class="alert alert-info">
+                    <p><strong>Solicitou Aprovação/Homologação conforme</strong>:</p>
+                    <ol>
+                        <li>{{ justificativa_observacao_solicitacao }}</li>
+                    </ol>
+                </div>
+            {% endif %}
+
+            {% if erro_habilitacao_setor %}
+                <div class="alert alert-danger">
+                    {{ erro_habilitacao_setor }}
+                </div>
+            {% endif %}
+
+        {% endif %}
+    {% endif %}
+
+    {% if pode_visualizar_dados %} 
+        {% if modo == 'registro' %}
+
+            {% include "includes/visualizar_rit_horas.html" %}                       
+            
+            <h3>Entregas</h3>
+            {% include "includes/visualizar_rit_entregas.html" %}                       
+            
+        {% endif %}
+
+        {% if modo == 'solicitacoes_aprova_homologa' %}
+            {% if solicitacoes_aprovacao_homologacao_rit %}
+                {% for sol_ah in solicitacoes_aprovacao_homologacao_rit %}
+                    <div class="general-box">
+                        <div class="primary-info">
+                            <div class="status-info-container">
+                                {% if sol_ah.finalizado %}
+                                    <span class="status status-success">Finalizado</span>
+                                {% else %}
+                                    <span class="status status-error">Em andamento</span>
+                                    {% if sol_ah.tem_pendencia_aprovacao %}
+                                        <span class="status status-error">Aprovação(ões) pendente(es)</span>
+                                    {% else %}
+                                        {% if sol_ah.tem_pendencia_homologacao %}
+                                            <span class="status status-error">Homologação pendente</span>
+                                        {% endif %}
+                                    {% endif %}
+                                {% endif %}
+                            </div>
+                            <h4>
+                                Solicitado em {{ sol_ah.data_envio }}
+                            </h4>
+                            <div class="extra-info">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Setor</th>
+                                            <th>Tipo Parecer</th>
+                                            <th>Parecer</th>
+                                            <th>Data Parecer</th>
+                                            <th>Servidor Parecer</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for ssetor in sol_ah.pitsolicitacaoanalisesetor_set.all %}
+                                            <tr>
+                                                <td>
+                                                    {{ ssetor.setor|format }} (ou superior quando for caso)
+                                                </td>
+                                                <td>
+                                                    {{ ssetor.get_tipo_parecer_str }}
+                                                </td>
+                                                <td>
+                                                    {{ ssetor.parecer|format }}
+                                                </td>
+                                                <td>
+                                                    {{ ssetor.data_parecer|format }}
+                                                </td>
+                                                <td>
+                                                    {{ ssetor.servidor_parecer|format }}
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>        
+                {% endfor %}
+            {% endif %}
+        {% endif %}
+
+        {% if modo == 'historico' %}
+            <div class="legenda">
+                <p>Legenda:</p>
+                <ul>
+                    <li class="info">Antes da aprovação/homologação do {{ nomenclatura.plano_individual_de_trabalho_sigla_pgd2 }}</li>
+                    <li class="warning">Após aprovação/homologação do {{ nomenclatura.plano_individual_de_trabalho_sigla_pgd2 }}</li>
+                </ul>
+            </div>    
+            
+            {% autopaginate registros_acoes 15 %}
+            {% paginate %}
+
+            <ul class="timeline">
+                {% for registro_acao in registros_acoes %}
+                    {% if registro_acao.realizada_apos_aprovacao_pit %}
+                        <li class="warning">
+                    {% else %}
+                        <li class="info">
+                    {% endif %}
+                        <div class="timeline-date">
+                            {{ registro_acao.data|format }}
+                        </div>
+                        <div class="timeline-icon"></div>
+                        <div class="timeline-content">
+                            <h4>
+                                {{ registro_acao.get_tipo_display }} por {{ registro_acao.user|format }} 
+                            </h4>
+                            <p>
+                                {{ registro_acao.observacao }}
+                            </p>
+                            <p>
+                                <ul>
+                                {% for depa in registro_acao.get_de_para %}
+                                    <li>
+                                        <strong>Editou</strong> "{{ depa.dado }}" 
+                                        <ul>
+                                            <li><strong>DE: </strong> "{{ depa.de }}" </li>
+                                            <li><strong>PARA: </strong> "{{ depa.para }}" </li>
+                                        </ul>
+                                    </li>
+                                        
+                                {% endfor %}
+                                </ul>
+                            </p>
+                        </div>
+                    </li>
+                {% endfor %}
+            </ul>
+
+            {% paginate %}
+        {% endif %}
+        
+        {% if modo == 'avaliacao' and pit.rit_estah_homologado %}
+            <dl class="definition-list flex">
+                <div class="list-item">
+                    <dt>Situação</dt>
+                    <dd>{{ pit.get_situacao_rit_display|status }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Avaliação</dt>
+                    <dd>{{ pit.get_avaliacao_rit_display|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Horas homologadas</dt>
+                    <dd>{{ pit.tempo_executado_homologado_total|format_hours }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Observação</dt>
+                    <dd>{{ pit.avaliacao_observacao_rit|format }}</dd>
+                </div>
+            </dl>
+        {% endif %}
+
+    {% endif %}    
+
+    <script>
+        (function ($) {
+            $(document).on('click', '#action-toggle', function() {
+                var c = $(this).attr("name");
+                $("."+c).not(this).prop('checked', this.checked);
+            });
+        })(django.jQuery);
+
+        function selecionar_todas_entregas2(){
+			var inputs = document.getElementsByClassName('entrit');
+            var seleciona = document.getElementById('seleciona_entregas');
+            if (seleciona.innerHTML == 'Marcar todas'){
+                for(var i=0; i<inputs.length; i++){
+                    inputs[i].checked = true;
+                }
+                seleciona.innerHTML = 'Desmarcar todas';
+            }else{
+                if (seleciona.innerHTML == 'Desmarcar todas'){
+                    for(var i=0; i<inputs.length; i++){
+                        inputs[i].checked = false;
+                    }
+                    seleciona.innerHTML = 'Marcar todas';
+                }
+            }
+		}           
+
+    </script>
+
+{% endblock %}

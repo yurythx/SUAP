@@ -1,0 +1,130 @@
+{% extends super_template %}
+
+{% block content %}
+
+    {% box 'Dados gerais' %}
+        <dl class="definition-list">
+            <dt>Avaliado</dt>
+            <dd>
+                {{ servidor_a_progredir.avaliado.pessoa_fisica.nome }} (<a href="/rh/servidor/{{ servidor_a_progredir.avaliado.matricula }}/">{{ servidor_a_progredir.avaliado.matricula }}</a>)
+                <br />
+                <span class="obs">Situação: {{ servidor_a_progredir.avaliado.situacao }}</span>
+            </dd>
+            <dt>Período normal (18 meses)</dt>
+            <dd>{{ servidor_a_progredir.data_inicio_contagem }} a {{ servidor_a_progredir.data_fim_contagem_normal }}</dd>
+            <dt>Dias restantes</dt>
+            <dd>{{ servidor_a_progredir.get_dias_restantes }}</dd>
+
+            {% if servidor_a_progredir.data_inicio_contagem_manual %}
+                <dt>Data de Início da Contagem Manual</dt>
+                <dd>
+                    {{ servidor_a_progredir.data_inicio_contagem_manual }}
+                    <span class="status status-alert text-nowrap-normal">Data de início da contagem ajustada de forma manual.</span>
+                </dd>
+                <dt>Cálculo anterior a Adição da Contagem Manual</dt>
+                <dd>{{ servidor_a_progredir.get_calculo_display }}</dd>
+            {% else %}
+                <dt>Cálculo</dt>
+                <dd>{{ servidor_a_progredir.get_calculo_display }}</dd>
+            {% endif %}
+            <dt>Padrão</dt>
+            <dd>De {{ pp.padrao_anterior }} para {{ pp.padrao_novo }}</dd>
+        </dl>
+    {% endbox %}
+
+    {% if servidor_a_progredir.calculo == 1 %}
+        {% box "PCA" %}
+            <dl class="definition-list">
+                <dt>Último PCA Encontrado</dt>
+                <dd>{{ ultimo_pca.forma_entrada }}</dd>
+                <dt>Período de vigência</dt>
+                <dd>{{ ultimo_pca.data_inicio_posicionamento_pca }}</dd>
+            </dl>
+        {% endbox %}
+    {% endif %}
+
+    {% if servidor_a_progredir.calculo == 2 %}
+        {% box "Progressão" %}
+            {% if ultima_progressao %}
+                <dl class="definition-list">
+                    <dt>Última Progressão Encontrada</dt>
+                    <dd><a href="/progressoes/editar_processo/{{ ultima_progressao.id }}/">{{ ultima_progressao }}</a></dd>
+                    <dt>Período de vigência:</dt>
+                    <dd>{{ ultima_progressao.data_inicio_contagem_progressao }} a {{ ultima_progressao.data_fim_contagem_progressao }}</dd>
+                </dl>
+            {% else %}
+                <p class="alert alert-warning">Nenhuma progressão encontrada.</p>
+            {% endif %}
+        {% endbox %}
+    {% endif %}
+
+    {% box 'Afastamentos e/ou Interrupções' %}
+        <h4>Interrupções de Tempo de Serviço</h4>
+        <dl class="definition-list">
+            <dt>Quantidade de Dias que interrompem Tempo de Serviço</dt>
+            <dd>{{ dias_afast }} dia(s)</dd>
+
+            {% if pp.obtem_afastamentos %}
+                <dt>Interrupções</dt>
+                {% for a in pp.obtem_afastamentos %}
+                    <dd>{{ a.afastamento }} (<strong>{{ a.data_inicio }}</strong> à <strong>{{ a.data_termino }}</strong>) - {{ a.dias_incluindo_ultimo_dia }} dia(s)</dd>
+                {% endfor %}
+            {% endif %}
+        </dl>
+        {% if dias_afast > 0 %}
+            <p class="obs">Foram encontrados {{ dias_afast }} dia(s) no período de <strong>{{ servidor_a_progredir.data_inicio_contagem }}</strong> a <strong>{{ servidor_a_progredir.data_fim_contagem_normal }}</strong>.</p>
+        {% endif %}
+
+        <h4>Descontos de Efetivo Exercício</h4>
+        <dl class="definition-list">
+            <dt>Quantidade de dias de Desconto de Efetivo Exercício</dt>
+            <dd>{{ dias_afast_efet }} dia(s)</dd>
+            {% if pp.observacoes_list %}
+                <dt>Descontos</dt>
+                {% for i in pp.observacoes_list %}
+                    <dd>
+                        {{ i.data_afetada }}, {{ i.qtd_dias }}º dia de afastamento<br />
+                        {% for a in i.lista_afastamentos %}
+                            - {{ a.afastamento }} (<strong>{{ a.data_inicio }}</strong> à <strong>{{ a.data_termino }}</strong>) <br />
+                        {% endfor %}
+                    </dd>
+                {% endfor %}
+            {% endif %}
+        </dl>
+        {% if dias_afast_efet > 0 %}
+            <p class="obs">Foram encontrados {{ dias_afast_efet }} dia(s) no período de <strong>{{ servidor_a_progredir.data_inicio_contagem }}</strong> a <strong>{{ servidor_a_progredir.data_fim_contagem_normal }}</strong>.</p>
+        {% endif %}
+
+        <h4>Interrupções de Progressão por Mérito</h4>
+        <dl class="definition-list">
+            <dt>Quantidade de dias que interrompem Progressão por Mérito</dt>
+            <dd>{{ dias_afast_merito }} dia(s)</dd>
+            {% if pp.obtem_afastamentos_interrompem_progressao_merito %}
+                <dt>Afastamentos</dt>
+                {% for i in pp.obtem_afastamentos_interrompem_progressao_merito %}
+                    <dd>{{ i.afastamento }} (<strong>{{ i.data_inicio }}</strong> à <strong>{{ i.data_termino }}</strong>)</dd>
+                {% endfor %}
+            {% endif %}
+        </dl>
+        {% if dias_afast_merito > 0 %}
+            <p class="obs">Foram encontrados {{ dias_afast_merito }} dia(s) no período de <strong>{{ servidor_a_progredir.data_inicio_contagem }}</strong> a <strong>{{ servidor_a_progredir.data_fim_contagem_normal }}</strong>.</p>
+        {% endif %}
+
+        <h4>Regra do 24 Meses</h4>
+        <dl class="definition-list">
+            <dt>Quantidade de dias de afastamentos de licença saúde que extrapolaram os 24 meses</dt>
+            <dd>{{ dias_regra_24_meses.total_dias }} dia(s)</dd>
+        </dl>
+        {% if dias_regra_24_meses.total_dias > 0 %}
+            <p class="obs">Foram encontrados {{ dias_regra_24_meses.total_dias }} dia(s) no período de <strong>{{ servidor_a_progredir.data_inicio_contagem }}</strong> a <strong>{{ servidor_a_progredir.data_fim_contagem_normal }}</strong>.</p>
+        {% endif %}
+
+    {% endbox %}
+
+    {% if mostrar_calculo %}
+        {% box "Cálculo da Nova Data Fim da Contagem" %}
+            {{ extenso_calculo|safe }}
+        {% endbox %}
+    {% endif %}
+
+{% endblock %}

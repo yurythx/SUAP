@@ -1,0 +1,189 @@
+{% extends super_template %}
+
+{% block content %}
+
+<ul class="pills">
+   	<li {% if not setor_escolhido %}class="active" {% endif %}>
+   		<a href="?setor=todos">Qualquer setor</a>
+   	</li>
+   	{% for setor in setores_visiveis %}
+        <li {% if setor_escolhido == setor %}class="active" {% endif %}>
+   			<a href="?setor={{ setor.id }}">{{ setor }}</a>
+   		</li>
+   	{% endfor %}
+</ul>
+
+<div class="tab-pane" data-title="Entrada: Processos aguardando o seu recebimento <span>{{ cx_entrada_nao_recebidos.count }}</span>">
+	{% if cx_entrada_nao_recebidos %}
+		<table>
+			<thead>
+		   		<tr>
+		   			<th>#</th>
+		        	<th>Processo</th>
+		        	<th>Encaminhamento</th>
+		        	<th>Despacho</th>
+		        	<th>Origem</th>
+					<th>Destino</th>
+					<th>Tempo de inatividade</th>
+					<th class="no-print">Opções</th>
+		    	</tr>
+			</thead>
+		    <tbody>
+		        {% for t in cx_entrada_nao_recebidos %}
+		            <tr>
+		                <td>{{ forloop.counter }}</td>
+		                <td><a href="{{ t.processo.get_absolute_url }}">{{ t.processo.numero_processo }}</a> - {{ t.processo.assunto }}</td>
+						<td>{{ t.data_encaminhamento|date:"d/m/Y H:i" }}</td>
+		                <td>{{ t.observacao_encaminhamento }}</td>
+						<td><strong>{{ t.orgao_interno_encaminhamento }}</strong> - {{ t.vinculo_encaminhamento.pessoa.nome_usual }}</td>
+						<td><strong>{{ t.orgao_interno_recebimento }}</strong></td>
+						<td>
+							{% if t.atrasado %}
+								<span class="status status-error" title="Processo Atrasado">
+									{{ t.data_encaminhamento|timesince }}
+							    </span>
+							{% else %}
+								{{ t.data_encaminhamento|timesince }}
+							{% endif %}
+						</td>
+						<td class="no-print">
+		                	<ul class="action-bar">
+			                    {% if not t.data_recebimento %}
+			                        <li><a class="btn success popup" href="/protocolo/processo_receber/{{ t.id }}/">Receber</a></li>
+			                    {% else %}
+			                        {% if t.processo.tramitavel %}
+			                            <li><a class="btn success popup" href="/protocolo/processo_finalizar/{{ t.processo.id }}">Finalizar</a></li>
+			                        {% endif %}
+			                        <li><a class="btn primary popup" href="/protocolo/processo_encaminhar/{{ t.id }}/interno/">Encaminhar</a></li>
+			                        <!--<li>
+			                        	<a href="/protocolo/processo_encaminhar/{{ t.id  }}/externo/">Encaminhar(E)</a>
+									</li>-->
+			                    {% endif %}
+							</ul>
+		                </td>
+		            </tr>
+		        {% endfor %}
+		    </tbody>    
+		</table>
+	{% else %}
+	    <p class="alert alert-warning">Nenhum processo encontrado.</p>
+	{% endif %}
+</div>
+
+<div class="tab-pane" data-title="Entrada: Processos aguardando o seu encaminhamento <span>{{ cx_entrada_recebidos.count }}</span>">
+	{% if cx_entrada_recebidos %}
+		<table>
+			<thead>
+		   		<tr>
+		   			<th>#</th>
+		        	<th>Processo</th>
+		        	<th>Encaminhamento</th>
+		        	<th>Despacho</th>
+		        	<th>Origem</th>
+					<th>Destino</th>
+					<th>Tempo de inatividade</th>
+					<th class="no-print">Opções</th>
+		    	</tr>
+			</thead>
+		    <tbody>
+		        {% for t in cx_entrada_recebidos %}
+		            <tr>
+		                <td>{{ forloop.counter }}</td>
+		                <td><a href="{{ t.processo.get_absolute_url }}">{{ t.processo.numero_processo }}</a> - {{ t.processo.assunto }}</td>
+						<td>{{ t.data_encaminhamento|date:"d/m/Y H:i" }}</td>
+		                <td>{{ t.observacao_encaminhamento }}</td>
+		                <td><strong>{{ t.orgao_interno_encaminhamento }}</strong> - {{ t.vinculo_encaminhamento.pessoa.nome_usual }}</td>
+						<td>{{ t.orgao_interno_recebimento }}</td>
+						<td>
+							{% if t.atrasado %}
+								<span class="status status-error" title="Processo Atrasado">
+									{{ t.data_encaminhamento|timesince }}
+							    </span>
+							{% else %}
+								{{ t.data_encaminhamento|timesince }}
+							{% endif %}
+						</td>
+						<td class="no-print">
+		                	<ul class="action-bar">
+			                    {% if not t.data_recebimento %}
+			                        <li><a class="btn success popup" href="/protocolo/processo_receber/{{ t.id }}">Receber</a></li>
+			                    {% else %}
+			                    	{% if t.processo.tramitavel %}
+			                            <li><a class="btn success popup" href="/protocolo/processo_finalizar/{{ t.processo.id }}/">Finalizar</a></li>
+			                        {% endif %}
+			                        <li><a class="btn primary popup" href="/protocolo/processo_encaminhar/{{ t.id }}/interno/" title="Encaminhar para setor da Instituição">Encaminhar</a></li>
+			                        <!--<li>
+			                        	<a href="/protocolo/processo_encaminhar/{{ t.id  }}/externo/"
+										   title="Encaminhar para pessoa jurídica externa">
+											Encaminhar (E)</a>
+									</li>-->
+			                    {% endif %}
+							</ul>
+		                </td>
+		            </tr>
+		        {% endfor %}
+		    </tbody>    
+		</table>
+	{% else %}
+	    <p class="alert alert-warning">Nenhum processo encontrado.</p>
+	{% endif %}
+</div>
+
+<div class="tab-pane" data-title="Saída: Processos aguardando o recebimento pelo setor de destino <span>{{ cx_saida.count }}</span>">
+	{% if cx_saida %}
+		<table>
+			<thead>
+		    	<tr>
+		    		<th>#</th>
+		        	<th>Processo</th>
+		        	<th>Encaminhamento</th>
+		        	<th>Despacho</th>
+					<th>Origem</th>
+		        	<th>Destino</th>
+					<th>Tempo de inatividade</th>
+					<th class="no-print">Opções</th>
+		    	</tr>
+		    </thead>
+		    <tbody>
+		        {% for t in cx_saida %}
+		            <tr>
+		                <td>{{ forloop.counter }}</td>
+		                <td><a href="{{ t.processo.get_absolute_url }}">{{ t.processo.numero_processo }}</a> - {{ t.processo.assunto }}</td>
+						<td>{{ t.data_encaminhamento|date:"d/m/Y H:i" }}</td>
+		                <td>{{ t.observacao_encaminhamento }}</td>
+						<td><strong>{{ t.orgao_interno_encaminhamento }}</strong> - {{ t.vinculo_encaminhamento.pessoa.nome_usual }}</td>
+		                <td><strong>{{ t.orgao_interno_recebimento.sigla }}</strong></td>                
+						<td>
+							{% if t.atrasado %}
+								<span class="status status-error" title="Processo Atrasado">
+									{{ t.data_encaminhamento|timesince }}
+							    </span>
+							{% else %}
+								{{ t.data_encaminhamento|timesince }}
+							{% endif %}
+						</td>
+						<td class="no-print">
+		                	<ul class="action-bar">
+		                    	<li><a class="btn primary popup" href="/protocolo/processo_editar_encaminhamento/{{ t.id }}/">Editar Encaminhamento</a></li>
+								<li><a class="btn danger" id="{{ t.id }}" onclick="desfazer_tramite($(this))">Desfazer Trâmite</a></li>
+							</ul>
+		                </td>
+		            </tr>
+		        {% endfor %}
+		    </tbody>    
+		</table>
+	{% else %}
+	    <p class="alert alert-warning">Nenhum processo encontrado.</p>
+	{% endif %}
+</div>
+
+<script>
+function desfazer_tramite(tramite) {
+    if( confirm("Tem certeza que deseja desfazer este trâmite?")){
+		id_tramite = $(tramite).attr("id");
+		location.href = "/protocolo/processo_remover_encaminhamento/"+id_tramite+"/";
+	}
+}
+</script>
+
+{% endblock %}

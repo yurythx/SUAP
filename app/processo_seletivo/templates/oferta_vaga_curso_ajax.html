@@ -1,0 +1,152 @@
+{% if pode_convocar %}
+    <ul class="action-bar mt-5" id="oferta_vaga_curso-{{ oferta_vaga_curso.pk }}">
+        {% if request.GET.polo_selecionado and oferta_vaga_curso.is_processamento_encerrado %}
+            <li><a class="btn popup primary" href="/processo_seletivo/migrar_vaga_polo/{{ oferta_vaga_curso.pk }}/?origem={{ request.GET.polo_selecionado }}">Migrar Vaga para Polo</a></li>
+        {% endif %}
+        {% if oferta_vaga_curso.pode_cancelar_ultima_chamada %}
+            <li><a class="btn danger" href="?cancelar_chamada={{ oferta_vaga_curso.pk }}&{{ request.META.QUERY_STRING }}">Cancelar Convocação</a></li>
+        {% endif %}
+        {% if oferta_vaga_curso.pode_realizar_nova_chamada and total_matriculados < total_vagas and not oferta_vaga_curso.is_processamento_encerrado %}
+            <li><a class="btn success" href="?nova_chamada={{ oferta_vaga_curso.pk }}&{{ request.META.QUERY_STRING }}">Realizar Nova Convocação</a></li>
+        {% endif %}
+        <li class="has-child">
+            <a class="btn default" href="#">Lista de Convocados</a>
+            <ul>
+                {% for numero_chamada in oferta_vaga_curso.get_numeros_chamadas %}
+                    <li><a href="?lista_convocados={{ oferta_vaga_curso.pk }}&chamada={{ numero_chamada }}&divulgacao=0">{{ numero_chamada }}ª Chamada (Interna)</a></li>
+                    <li><a href="?lista_convocados={{ oferta_vaga_curso.pk }}&chamada={{ numero_chamada }}&divulgacao=1">{{ numero_chamada }}ª Chamada (Publicação)</a></li>
+                {% endfor %}
+            </ul>
+        </li>
+    </ul>
+{% endif %}
+<div class="table-responsive">
+<table class="mt-1">
+    <thead>
+    <tr>
+        <th colspan="14">
+            {% if pode_editar_ofertavagacurso %}
+                <a href="/processo_seletivo/editar_oferta_vaga_curso/{{ oferta_vaga_curso.pk }}/" class="icon icon-edit popup"><span class="visually-hidden">Editar</span></a>
+            {% endif %}
+        {{ oferta_vaga_curso.curso_campus.codigo }} - {{ oferta_vaga_curso.curso_campus.descricao_historico }}
+        {% if oferta_vaga_curso.turno_id %} - {{ oferta_vaga_curso.turno }} {% endif %}
+        {% if oferta_vaga_curso.linha_pesquisa_id %}({{ oferta_vaga_curso.linha_pesquisa|format }}){% endif %}
+        {% if oferta_vaga_curso.campus_polo %} / {{ oferta_vaga_curso.campus_polo }}{% endif %}
+    </th>
+    </tr>
+    <tr>
+        <th colspan="14" class="text-center">
+            <div class="progress">
+                <p data-prefix="vagas utilizadas">{{ total_matriculados }}/{{ total_vagas }}</p>
+            </div>
+        </th>
+    </tr>
+    <tr>
+        <th>Lista</th>
+        <th class="text-center">Vagas</br>Ofertadas</th>
+        <th class="text-center">Vagas</br>Ocupadas</th>
+        <th class="text-center">Classificados</th>
+        <th class="text-center">Convocados</th>
+        <th class="text-center">Matriculados</th>
+        <th class="text-center">Inaptos /</br>Ausentes</th>
+        <th class="text-center">Vagas</br>Cedidas</br>Migração</th>
+        <th class="text-center">Vagas</br>Recebidas</br>Migração</th>
+        <th class="text-center">Lista de</br>Espera</th>
+        <th class="text-center">Convocados</br>Aguardando</br>Matrícula</th>
+        <th class="text-center">Ocupação</br>das Vagas</th>
+        <th class="text-center">Progresso</br>Convocação</th>
+        <th class="text-center no-print">Ações</th>
+    </tr>
+    </thead>
+    <tbody>
+    {% for ofertavaga in oferta_vaga_curso.get_ofertas_vaga %}
+        <tr id="candidato-vaga-{{ ofertavaga.pk }}"
+            {% if ofertavaga.is_lista_fechada %}class="disabled"{% endif %}>
+            <td><strong>{{ ofertavaga.lista }}</strong></td>
+            <td class="text-center v1{{ oferta_vaga_curso.pk }}">
+                <a href="/processo_seletivo/visualizar_vagas/{{ ofertavaga.pk }}/0/" class="popup">
+                    {{ ofertavaga.get_descricao_qtd_vagas }}
+                    {% if ofertavaga.get_qtd_vagas_extras %}
+                        <span title="Vagas extras">+ {{ ofertavaga.get_qtd_vagas_extras }}</span>
+                    {% endif %}
+                    {% if request.GET.polo_selecionado %}
+                        {% with vagas_enviadas_polos=ofertavaga.get_vagas_enviadas_polo.count %}
+                            {% if vagas_enviadas_polos %}
+                                <span title="Vagas enviadas para outros polos">- {{ vagas_enviadas_polos }}</span>
+                            {% endif %}
+                        {% endwith %}
+                        {% with vagas_recebidas_polos=ofertavaga.vagas_recebidas_polos.count %}
+                            {% if vagas_recebidas_polos %}
+                                <span title="Vagas recebidas de outros polos">+ {{ vagas_recebidas_polos }}</span>
+                            {% endif %}
+                        {% endwith %}
+                    {% endif %}
+                </a>
+            </td>
+            <td class="text-center v2{{ oferta_vaga_curso.pk }}">
+                <a href="/processo_seletivo/visualizar_vagas/{{ ofertavaga.pk }}/1/" class="popup">{{ ofertavaga.get_vagas_ocupadas.count }}</a>
+            </td>
+            <td class="text-center v3{{ oferta_vaga_curso.pk }}">{{ ofertavaga.get_candidatos_classificados.count }}</td>
+            <td class="text-center v4{{ oferta_vaga_curso.pk }}">{{ ofertavaga.get_candidatos_convocados.count }}</td>
+            <td class="text-center v5{{ oferta_vaga_curso.pk }}">{{ ofertavaga.get_candidatos_matriculados.count }}</td>
+            <td class="text-center v10{{ oferta_vaga_curso.pk }}">{{ ofertavaga.get_candidatos_inaptos_ausentes.count }}</td>
+            <td class="text-center v6{{ oferta_vaga_curso.pk }}">
+                <a
+                    href="/processo_seletivo/visualizar_vagas/{{ ofertavaga.pk }}/3/"
+                    class="popup hint hint-bottom"
+                    aria-label="{{ ofertavaga.get_info_vagas_usadas_em_migracao }}">{{ ofertavaga.get_vagas_usadas_em_migracao.count }}</a>
+            </td>
+            <td class="text-center v7{{ oferta_vaga_curso.pk }}">
+                <a
+                    href="/processo_seletivo/visualizar_vagas/{{ ofertavaga.pk }}/2/"
+                    class="popup hint hint-bottom"
+                    aria-label="{{ ofertavaga.get_info_vagas_usadas_de_migracao }}">{{ ofertavaga.get_vagas_usadas_de_migracao.count }}</a>
+            </td>
+            <td class="text-center v8{{ oferta_vaga_curso.pk }}">{{ ofertavaga.get_candidatos_aguardando_convocacao.count }}</td>
+            <td class="text-center v9{{ oferta_vaga_curso.pk }}">{{ ofertavaga.get_candidatos_convocados_aguardando_matricula.count }}</td>
+            <td class="text-center">
+                <div class="progress">
+                    <p>{{ ofertavaga.get_total_vagas_ocupadas }}/{{ ofertavaga.qtd }}</p>
+                </div>
+            </td>
+            <td class="text-center">
+                <div class="progress">
+                    <p>{{ ofertavaga.get_candidatos_processados.count }}/{{ ofertavaga.get_candidatos_convocados.count }}</p>
+                </div>
+            </td>
+            <td class="text-center no-print">
+                <a class="btn" href="/processo_seletivo/classificados/{{ ofertavaga.pk }}/">Visualizar candidatos</a>
+            </td>
+        </tr>
+        {% empty %}
+        <p class="alert alert-warning">Nenhuma oferta de vaga neste curso encontrada.</p>
+    {% endfor %}
+    <tr>
+        <th>TOTAL</th>
+        <td class="text-center"><span id="s1{{ oferta_vaga_curso.pk }}"></span></td>
+        <td class="text-center"><span id="s2{{ oferta_vaga_curso.pk }}"></span></td>
+        <td class="text-center"><span id="s3{{ oferta_vaga_curso.pk }}"></span></td>
+        <td class="text-center"><span id="s4{{ oferta_vaga_curso.pk }}"></span></td>
+        <td class="text-center"><span id="s5{{ oferta_vaga_curso.pk }}"></span></td>
+        <td class="text-center"><span id="s10{{ oferta_vaga_curso.pk }}"></span></td>
+        <td class="text-center"><span id="s6{{ oferta_vaga_curso.pk }}"></span></td>
+        <td class="text-center"><span id="s7{{ oferta_vaga_curso.pk }}"></span></td>
+        <td class="text-center"><span id="s8{{ oferta_vaga_curso.pk }}" class="with-title" title="{{ oferta_vaga_curso.get_candidatos_aguardando_convocacao.count }} candidatos único"></span></td>
+        <td class="text-center"><span id="s9{{ oferta_vaga_curso.pk }}"></span></td>
+        <td colspan="2"></td>
+        <td class="text-center"></td>
+    </tr>
+    <script>
+        for (var i = 1; i <= 10; i++) {
+            var sum = 0;
+            var values = $('.v' + i + '{{ oferta_vaga_curso.pk }}');
+            for (var j = 0; j < values.length; j++) {
+                var node = values[j];
+                sum += (node.innerText || node.textContent).split('-').reduce((accumulator, currentValue) => accumulator + parseInt(currentValue), 0);
+            }
+            $('#s' + i + '{{ oferta_vaga_curso.pk }}').html(sum);
+        }
+    </script>
+    </tbody>
+</table>
+</div>

@@ -1,0 +1,152 @@
+{% extends super_template %}
+
+{% block extrahead %}
+    {% media_filter_box %}
+    <script src="/static/djtools/graficos/highcharts.js"></script>
+    <script src="/static/djtools/graficos/exporting.js"></script>
+    <script>
+        var filtroFuncionarioMatricula = '';
+        var filtroDataInicio = '';
+        var filtroDataFim = '';
+
+        function getValor(matricula, data_inicio, data_fim) {
+            if (matricula != filtroFuncionarioMatricula) {
+                clearFeedbackMessage();  // em djtools/fancybox/custom.js
+            }
+
+            filtroFuncionarioMatricula = '';
+            filtroDataInicio = '';
+            filtroDataFim = '';
+
+            $.ajax({
+                contentType: 'application/json',
+                type: "GET",
+                url: "/ponto/ajax/get_frequencia_funcionario/",
+                data: {
+                    "matricula": matricula,
+                    "data_inicio": data_inicio,
+                    "data_fim": data_fim
+                },
+                dataType: "html",
+                beforeSend: function () {
+                    setValor('<span class="fa fa-spinner fa-pulse fa-fw" aria-hidden="true"></span>')
+                },
+                success: function (response) {
+                    setValor(response);
+                },
+                error: function (response) {
+                    setValor('<span class="alert alert-warning">Você não tem permissão de visualizar frequências desse servidor neste período.</span>');
+                }
+            });
+
+            function setValor(response_html) {
+                div_main = document.getElementById('frequencia_main');
+                if (response_html) {
+                    $(div_main).empty().append(response_html);
+
+                    /* reload barra de progresso */
+                    init_data_progress(div_main);
+
+                    /* reload links popup */
+                    replaceAddAnotherLinks(); // em djtools/fancybox/custom.js
+
+                    filtroFuncionarioMatricula = matricula;
+                    filtroDataInicio = data_inicio;
+                    filtroDataFim = data_fim;
+                }
+            }
+        }
+
+        function callback_after_avaliar_frequencia() {
+            // vai para o topo da página
+            window.scrollTo(0, 0);
+
+            // recarrega o servidor atualmente selecionado
+            getValor(filtroFuncionarioMatricula, filtroDataInicio, filtroDataFim);
+        }
+    </script>
+{% endblock %}
+
+{% block bodyclass %}{% if form.is_valid %}hasAsideRight{% endif %}{% endblock %}
+
+{% block action-bar %}
+    {% if form.is_valid %}
+        <ul class="action-bar">
+            <li><a href="{{ request.get_full_path }}&xls=1" class="confirm btn">Exportar para XLS (todos os servidores)</a></li>
+        </ul>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+
+    {% if form.is_valid %}
+        <p class="alert alert-info">Para acessar as frequências de um servidor, use a seção de Navegação desta página.</p>
+    {% else %}
+        {% render_form form %}
+    {% endif %}
+
+    <div id="frequencia_main"></div>
+
+{% endblock %}
+
+{% block asideright %}
+
+{% if form.is_valid %}
+
+    <aside class="right no-print">
+
+        <details>
+            <summary>Filtros</summary>
+            <div class="details-container search-and-filters">
+                {% render_form form %}
+            </div>
+        </details>
+
+        {% if setor %}
+
+            <details>
+                <summary>Árvore de Setores</summary>
+                <div class="details-container">
+                    <ul class="lista-inline">
+                        {% for i in caminho_setor %}
+                            <li>
+                                <a href="/ponto/{{ url_frequencias }}/?setor={{ i.id }}&faixa_0={{ faixa_0 }}&faixa_1={{ faixa_1 }}"
+                                   title="{{ i.nome }}">{{ i.sigla }}</a>{% if not forloop.last %}&nbsp;&rarr;&nbsp;{% endif %}
+                            </li>
+                        {% endfor %}
+                    </ul>
+                    {% if filhos %}
+                        <h4>Setores filhos</h4>
+                        <ul class="lista-inline">
+                            {% for i in filhos %}
+                                <li>
+                                    <a href="/ponto/{{ url_frequencias }}/?setor={{ i.id }}&faixa_0={{ faixa_0 }}&faixa_1={{ faixa_1 }}">{{ i.sigla }}</a>
+                                    {% if not forloop.last %}&nbsp;|&nbsp;{% endif %}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                </div>
+            </details>
+
+            <details open="open">
+                <summary>Navegação</summary>
+                {% if servidores %}
+                    <ol class="pills">
+                        {% for servidor in servidores %}
+                            <li>
+                                <a href="#" onclick="getValor('{{ servidor.matricula }}', '{{ faixa_0|format_datetime }}', '{{ faixa_1|format_datetime }}')">{{ servidor.pessoa_fisica.nome_usual }}</a>
+                            </li>
+                        {% endfor %}
+                    </ol>
+                {% else %}
+                    <p class="alert alert-warning">Não há servidores neste setor.</p>
+                {% endif %}
+            </details>
+
+        {% endif %}
+
+    </aside>
+
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,131 @@
+{% extends super_template %}
+
+{% block content %}
+    <dl class="definition-list flex">
+        <div class="list-item">
+            <dt>Servidor</dt>
+            <dd>{{ abono.vinculo_pessoa.relacionamento }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Dia avaliado</dt>
+            <dd>{{ data_inconsistencia }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Jornada de trabalho</dt>
+            <dd>{{ jornada_trabalho }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Frequências do funcionário</dt>
+            <dd>
+                {% if frequencias_servidor %}
+                    {% for frequencia in frequencias_servidor %}
+                        {% if frequencia.acao == "E" %}
+                            <p class="text-nowrap"><strong>{{ frequencia.acao }}</strong>: <span class="true">{{ frequencia.horario|date:"H:i:s" }}</span> ({{ frequencia.maquina }})</p>
+                        {% else %}
+                            <p class="text-nowrap"><strong>{{ frequencia.acao }}</strong>: <span
+                                    class="false">{{ frequencia.horario|date:"H:i:s" }}</span> ({{ frequencia.maquina }})</p>
+                        {% endif %}
+                    {% endfor %}
+                {% else %}
+                    Sem registro de frequência
+                {% endif %}
+            </dd>
+        </div>
+        <div class="list-item">
+            <dt>Observações do funcionário</dt>
+            <dd>
+                {% if observacoes %}
+                    {% for observacao in observacoes %}
+                        <span class="status status-info">{{ observacao }} </span></br>
+                    {% endfor %}
+                {% else %}
+                    <span class="status status-info">Sem observações</span>
+                {% endif %}
+            </dd>
+        </div>
+        <div class="list-item">
+            <dt>Anexos</dt>
+            <dd>
+                {% if anexos %}
+                    <ul>
+                        {% for anexo in anexos %}
+                            <li>
+                                <a href="{{ anexo.anexo.url }}">{{ anexo }}</a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <span class="status status-info">Sem anexos</span>
+                {% endif %}
+            </dd>
+        </div>
+        <div class="list-item">
+            <dt>Informações do registro</dt>
+            <dd>
+                {% for info in informacao_registro %}
+                    <span class="status status-{{ info.status }}">{{ info.long_display }}</span>
+                {% endfor %}
+            </dd>
+        </div>
+        <div class="list-item">
+            <dt>Informações adicionais</dt>
+            <dd>
+                {% for dia, inconsistencias in inconsistencias_detalhes.items %}
+                    {% for inconsistencia, detalhe in inconsistencias.items %}
+                        {% if detalhe %}
+                            <span class="status status-default">{{ detalhe }}</span>
+                        {% endif %}
+                    {% endfor %}
+                {% empty %}
+                    -
+                {% endfor %}
+            </dd>
+        </div>
+    </dl>
+
+    {% if abono.solicitacao_abono_parcial %}
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>Solicitação de Abono Parcial</dt>
+                <dd>{{ abono.solicitacao_abono_parcial }}</dd>
+            </div>            
+        </dl>
+    {% endif %}
+
+    {% box 'Avaliação da Chefia' %}
+        {% render_form form %}
+    {% endbox %}
+
+    <script>
+        // Obter as descrições do Django
+        var descricao_abonos = {{ descricao_abonos|safe }};
+    
+        // Pega o campo de ação do abono
+        var acaoAbonoField = document.getElementById("id_acao_abono");
+    
+        // Função para mudar a descrição no help_text
+        acaoAbonoField.addEventListener("change", function() {
+            var selectedValue = acaoAbonoField.value;
+            var descricao = descricao_abonos[selectedValue] || 'Nenhuma descrição disponível para esta opção.';
+    
+            // Seleciona o label do campo de ação do abono
+            var select = document.querySelector('label[for="id_acao_abono"]');
+    
+            // Remove qualquer help_text anterior
+            var helpText = select.nextElementSibling;
+            if (helpText && helpText.classList.contains('help')) {
+                helpText.remove();
+            }
+    
+            // Cria um novo help_text e adiciona logo após o select
+            var newHelpText = document.createElement('p');
+            newHelpText.className = 'help';
+            newHelpText.textContent = descricao;
+    
+            select.parentNode.insertBefore(newHelpText, select.nextSibling);
+        });
+    
+        // Disparar a mudança quando a página carregar, para exibir a descrição inicial
+        acaoAbonoField.dispatchEvent(new Event("change"));
+    </script>
+{% endblock %}

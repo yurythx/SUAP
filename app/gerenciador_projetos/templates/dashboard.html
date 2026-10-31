@@ -1,0 +1,148 @@
+{% extends super_template %}
+{% load gerenciador_projetos_templatetags %}
+
+{% block extrahead %}
+    <script>
+        if (sessionStorage.getItem("dashboard_gerenciador_projetos")){
+            sessionStorage.removeItem('dashboard_gerenciador_projetos');
+            window.location.reload();
+        } else {
+            sessionStorage.setItem("dashboard_gerenciador_projetos", "1");
+        }
+        $(function () {
+            $(".board-container").sortable({
+                connectWith: ".board-container",
+                cursor: "move",
+                items: "> .beautiful-board-item",
+                placeholder: "ui-state-highlight",
+                helper: 'clone',
+                preventOnFilter: true,
+                stop: function (e, ui) {
+                    var tarefa_id = $(ui.item).attr('data-tarefa-id');
+                    var lista_id = $(ui.item).parent('div').attr('data-lista-id'); // Obtem a nova Lista -OK
+                    var posicao = ui.item.index(); // Obtem a nova posição na Lista -OK
+
+                    $.ajax({
+                        url: '/gerenciador_projetos/tarefa/' + tarefa_id + '/mudarlista/' + lista_id + '/' + posicao + '/',
+                        type: "POST",
+                        headers: {"X-CSRFToken": "{{ csrf_token }}"},
+                        success: function (data) {
+                        }
+                    });
+                },
+            }).disableSelection();
+
+            // Adicionando campo no board-container em questão.
+            $(".btn-adicionar-tarefa").click(function () {
+                // Obtendo dados sobres os botões "Adicionar Tarefa".
+                var object_board_container = $(this).closest("[data-lista-id]");
+                var lista_id = object_board_container.data("lista-id");
+
+                if (typeof ($("#id_titulo")) !== "undefined" && $("#id_titulo").is(":visible")) {
+                    $("#id_titulo").focusin();
+                } else {
+                    $(".board-container[data-lista-id=" + lista_id + "]")
+                        .append("<input type=\"text\" name=\"titulo\" maxlength=\"255\" id=\"id_titulo\" placeholder=\"Insira um título para essa tarefa\" class=\"input-titulo-tarefa\" autofocus>");
+                }
+
+                // Cria nova tarefa a partir do conteúdo do input em questão.
+                $(document.body).promise().done(function () {
+                    $("#id_titulo").focusout(function () {
+                        // Pegando título da tarefa em questão.
+                        var titulo_tarefa = $(this).val();
+
+                        // Verificando se o campo está vázio.
+                        if (titulo_tarefa.length === 0) {
+                            console.log("Título da tarefa está vázio!");
+                            $("#id_titulo").remove();
+                        } else {
+                            console.log("Título está preenchido, pode ser efetuado o POST.");
+                            // Efetuando POST para criar nova tarefa..
+                            $.ajax({
+                                type: 'POST',
+                                url: "{% url 'adicionar_tarefa_api' projeto.id %}",
+                                headers: {"X-CSRFToken": "{{ csrf_token }}"},
+                                data: {
+                                    'titulo': titulo_tarefa,
+                                    'lista': lista_id
+                                },
+                                success: function (response) {
+                                    console.log(response);
+                                },
+                                fail: function (error) {
+                                    console.log(error);
+                                }
+                            });
+                        }
+                    });
+                });
+            });
+        });
+    </script>
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if pode_adicionar_listas %}
+            <li><a class="btn success popup"
+                   href="{% url 'adicionar_ou_vincular_lista_projeto' projeto.id %}">{% icone "plus" %} <span
+                    class="visually-hidden">Adicionar</span> Lista</a></li>
+        {% endif %}
+        {% include "includes/acoes_visualizacao.html" %}
+    </ul>
+{% endblock %}
+
+{% block object-status %}
+    {% include "includes/situacoes_projeto.html" %}
+{% endblock %}
+
+{% block content %}
+
+    <div class="search-and-filters">
+        {% render_form form_filtros %}
+    </div>
+
+    <div class="flex-container boards flex-nowrap">
+        {% get_tarefas_sem_lista_por_projeto projeto filtros as tarefas_sem_lista %}
+        {% if tarefas_sem_lista %}
+            <div class="board-container" data-lista-id="0">
+                <div class="title-container">
+                    <h3 class="title">Tarefas sem lista</h3>
+                    {% if pode_adicionar_tarefas %}
+                        <ul class="action-bar">
+                            <li><a href="{% url 'adicionar_tarefa' projeto.id %}" class="btn success popup" title="Adicionar tarefa">{% icone "plus" %}
+                                <span class="visually-hidden">Adicionar tarefa</span></a></li>
+                        </ul>
+                    {% endif %}
+                </div>
+                {% tarefas_para_dashboard tarefas_sem_lista user projeto sortable=True %}
+            </div>
+        {% endif %}
+
+        {% if listaprojeto %}
+            {% for obj in listaprojeto %}
+                {% with lista=obj.lista %}
+                    <div class="board-container" data-lista-id="{{ lista.id }}">
+                        <div class="title-container">
+                            <h3 class="title">{{ lista }}</h3>
+                            {% if pode_adicionar_tarefas %}
+                                <ul class="action-bar">
+                                    <li><a href="{% url 'adicionar_tarefa' projeto.id %}?lista={{ lista.id }}" title="Adicionar tarefa"
+                                    class="btn success popup">{% icone "plus" %} <span class="visually-hidden">Adicionar tarefa</span></a></li>
+                                </ul>
+                            {% endif %}
+                        </div>
+                        {% if not lista.ativa %}
+                            <p class="alert alert-warning">Essa lista está marcada como inativa e deixará de ser exibida assim não
+                                existir nenhuma tarefa associada.</p>
+                        {% endif %}
+                        {% get_tarefas_da_lista_por_projeto lista projeto filtros as tarefas_da_lista %}
+                        {% tarefas_para_dashboard tarefas_da_lista user projeto sortable=True %}
+                    </div>
+                {% endwith %}
+            {% endfor %}
+        {% else %}
+            <p class="alert alert-warning">É necessário cadastrar listas para este projeto para poder usar o Dashboard.</p>
+        {% endif %}
+    </div>
+{% endblock %}

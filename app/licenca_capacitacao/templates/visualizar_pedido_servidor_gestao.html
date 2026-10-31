@@ -1,0 +1,237 @@
+{% extends super_template %}
+
+{% block object-status %}
+    {{ pedido.situacao_atual_str|status }}
+{% endblock %}
+
+{% block action-bar %}
+<ul class="action-bar">
+    {% include "include_operacao_pedido_servidor.html" %}
+
+    {% if pode_editar %}
+        <li><a class="btn primary" href="{% url 'admin:licenca_capacitacao_pedidoliccapacitacaoservidor_change' pedido.id %}">Editar</a></li>
+    {% endif %}
+
+    {% if pode_gestao_cancelar %}
+        <li><a href="/licenca_capacitacao/cancelar_pedido_gestao/{{ pedido.id }}/" class="btn warning confirm">Gestão - Cancelar Pedido</a></li>
+    {% endif %}
+    
+    {% if pode_imprimir_pedido %}
+        <li><a class="btn" href="/licenca_capacitacao/imprimir_pedido_servidor/{{ pedido.id }}/">{% icone "file-pdf" %} Baixar pedido</a></li>
+    {% endif %}
+    {% if pode_solicitar_alteracao_dt_ini_exercicio or pode_solicitar_alteracao_dados %}
+        <li class="has-child">
+            <a class="btn primary" href="#">Solicitar Alteração de Dados</a>
+            <ul>
+                {% if pode_solicitar_alteracao_dt_ini_exercicio %}
+                    <li>
+                        <a href="{% url 'admin:licenca_capacitacao_solicitacaoalteracaodatainicioexercicioadicionar_add' %}?edital={{ pedido.edital.id }}">
+                            Data de Início de Exercício
+                        </a>
+                    </li>
+                {% endif %}
+                {% if pode_solicitar_alteracao_dados %}
+                    <li>
+                        <a href="{% url 'admin:licenca_capacitacao_solicitacaoalteracaodadosadicionar_add' %}?edital={{ pedido.edital.id }}">
+                            Dados gerais
+                        </a>
+                    </li>
+                {% endif %}
+            </ul>
+        </li>
+    {% endif %}
+
+    {% if visualizar_como_servidor %}
+        <li><a class="btn" href="/licenca_capacitacao/visualizar_edital_servidor/{{ pedido.edital.id }}/">Voltar para o edital</a></li>
+    {% endif %}
+
+    {% if visualizar_como_gestao %}
+        <li><a class="btn" href="/licenca_capacitacao/visualizar_edital_gestao/{{ pedido.edital.id }}/">Voltar para o edital</a></li>
+    {% endif %}
+</ul>
+{% endblock %}
+
+{% block content %}
+
+    {% if pode_editar %}
+        <div class="alert alert-info">
+            <p><strong>Orientações</strong>:</p>
+            <ol>
+                <li>
+                    Se algum dado constante nos "Parâmetros utilizados pelo checklist de submissão"
+                    estiver incorreto, você pode:
+                    <ul>
+                        <li>
+                            Abrir um chamado (conforme a orientação 2) <strong>OU</strong>
+                        </li>
+                        <li>
+                            Acessar a aba "Solicitações de alteração de dados" na realizar uma solicitação de alteração de dados
+                            por este módulo.
+                        </li>
+                    </ul>
+                </li>
+            </ol>
+        </div>
+    {% endif %}
+
+    {% if lista_msgs_geral_pedido_servidor %}
+        <div class="alert alert-warning">
+            <p><strong>Importante</strong>:</p>
+            <ol>
+                {% for m in lista_msgs_geral_pedido_servidor %}
+                    <li>{{ m }}</li>
+                {% endfor %}
+            </ol>
+        </div>
+    {% endif %}
+
+    <div class="tab-pane" data-title="Dados do pedido">
+        {% include "include_dados_pedido.html" with edital=pedido.edital %}
+    </div>
+
+    {% if lista_verificacao %}
+        <div class="tab-pane" data-title="Checklist de submissão">
+            {% for lv in lista_verificacao %}
+                <p class="checklist {% if lv.erro %}error{% else %}success{% endif %}">
+                    {{ forloop.counter }} - {{ lv.msg }} <strong>{% if lv.erro %}Não concluído{% else %}Concluído{% endif %}</strong>
+                </p>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="tab-pane" data-title="Parâmetros utilizados pelo Checklist de Submissão deste Pedido">
+        {% if lista_msgs_parametros_checklist %}
+            <div class="alert alert-warning">
+                <p><strong>Importante</strong>:</p>
+                <ol>
+                    {% for m in lista_msgs_parametros_checklist %}
+                        <li>{{ m }}</li>
+                    {% endfor %}
+                </ol>
+            </div>
+        {% endif %}
+
+        {% if calculos_exercicio or calculos_quinquenios or licencas_capacitacao_servidor or afastamentos_nao_conta_como_efet_exerc %}
+            {% include "include_dados_calculos_servidor.html" %}
+        {% else %}
+            <p class="alert alert-warning">Nenhum pedido foi cadastrado.</p>
+        {% endif %}
+
+        <h4>Parcelas solicitadas (neste edital) e seu período de usufruto</h4>
+        {% if periodos_solicitados %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Início</th>
+                            <th>Final</th>
+                            <th>Total de dias</th>
+                            <th>Período aquisitivo/usufruto</th>
+                        </tr>
+                    </thead>
+                    <body>
+                        {% for cal in periodos_solicitados %}
+                            <tr>
+                                <td>{{ cal.data_inicio|format }}</td>
+                                <td>{{ cal.data_termino|format }}</td>
+                                <td>{{ cal.qtd_dias_total|format }}</td>
+                                <td>{{ cal.aquisitivo_uso_fruto.periodo }} - ({{ cal.aquisitivo_uso_fruto.inicio_uso_fruto|format }} a {{ cal.aquisitivo_uso_fruto.final_uso_fruto|format }})</td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td>-</td>
+                                <td>-</td>
+                                <td>-</td>
+                                <td>-</td>
+                            </tr>
+                        {% endfor %}
+                    </body>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Nenhuma parcela foi cadastrada no cadastrado.</p>
+        {% endif %}
+    </div>
+
+    {% if pode_visualizar_desistencia %}
+        <div class="tab-pane" data-title="Desistência">
+            <table class="info">
+                <tr>
+                    <td>Houve distência? </td>
+                    <td>{{ pedido.desistencia|format }}</td>
+                </tr>
+                {% comment %}
+                <tr>
+                    <td>Data da solicitação? </td>
+                    <td>{{ pedido.data_solicitacao_desistencia|format }}</td>
+                </tr>
+                <tr>
+                    <td>Solicitação? </td>
+                    <td>{{ pedido.solicitacao_desistencia|format }}</td>
+                </tr>
+                {% endcomment %}
+                <tr>
+                    <td>Parecer: </td>
+                    <td>{{ pedido.parecer_desistencia|format }}</td>
+                </tr>
+                <tr>
+                    <td>Data/Usuário do parecer: </td>
+                    <td> {{ pedido.data_parecer_desistencia|format }} / {{ pedido.usuario_cadastro_desistencia|format }}</td>
+                </tr>
+            </table>
+        </div>
+    {% endif %}
+
+    {% if pedido.aprovado_resultado_parcial or pedido.aprovado_resultado_final %}
+        <div class="tab-pane" data-title="Resultado">
+            {% if not pedido.edital.processamento_externo %}
+                <h4>Parcial</h4>
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Aprovado</th>
+                                <th>Justificativa de não aprovação</th>
+                                <th>Ordem de classificação</th>
+                            </tr>
+                        </thead>
+                        <body>
+                            <tr>
+                                <td>{{ pedido.aprovado_resultado_parcial|format }}</td>
+                                <td>{{ pedido.justificativa_nao_aprovacao_resultado_parcial|format }}</td>
+                                <td>{{ pedido.ordem_classificacao_resultado_parcial|format }}</td>
+                            </tr>
+                        </body>
+                    </table>
+                </div>
+            {% endif %}
+
+            <h4>Final</h4>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Aprovado</th>
+                            {% if not pedido.edital.processamento_externo %}
+                                <th>Justificativa de não aprovação</th>
+                            {% endif %}
+                            <th>Ordem de classificação</th>
+                            <th>Aprovado de forma definitiva</th>
+                        </tr>
+                    </thead>
+                    <body>
+                        <tr>
+                            <td>{{ pedido.aprovado_resultado_final|format }}</td>
+                            {% if not pedido.edital.processamento_externo %}
+                                <td>{{ pedido.justificativa_nao_aprovacao_resultado_final|format }}</td>
+                            {% endif %}
+                            <td>{{ pedido.ordem_classificacao_resultado_final|format }}</td>
+                            <td>{{ pedido.aprovado_em_definitivo|format }}</td>
+                        </tr>
+                    </body>
+                </table>
+            </div>
+        </div>
+    {% endif %}
+
+{% endblock %}

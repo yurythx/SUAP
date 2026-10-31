@@ -1,0 +1,129 @@
+{% if obj.curso_campus.modalidade.grupoarquivoobrigatorio_set.exists %}
+    {% if not obj.possui_todos_documentos_obrigatorios %}
+        <p class="alert alert-warning">
+            <strong>Atenção:</strong> Existem documentos obrigatórios não adicionados à pasta documental.
+        </p>
+    {% endif %}
+{% box 'Documentos Obrigatórios' %}
+    <div class="table-responsive">
+        <table>
+            <thead>
+            <tr>
+                <th>Grupo de Documento</th>
+                <th>Documentos Aceitos</th>
+            </tr>
+            </thead>
+            <tbody>
+                {% for grupo_documento in obj.curso_campus.modalidade.grupoarquivoobrigatorio_set.all %}
+                    <tr>
+                        <td>{{ grupo_documento }}</td>
+                        <td>
+                            <ul>
+                                {% for tipo_documento in grupo_documento.tipos.all %}
+                                    <li>{{ tipo_documento }}</li>
+                                {% endfor %}
+                            </ul>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endbox %}
+{% endif %}
+
+{% box 'Pasta Documental' %}
+
+        {% if perms.edu.add_alunoarquivo %}
+            <ul class="action-bar">
+                <li><a class="btn success popup" href="/edu/upload_arquivo_unico/{{ obj.pk }}/">Adicionar Arquivo</a></li>
+                {% if perms.edu.change_alunoarquivo %}
+                    <li><a class="btn" href="/edu/download_pasta_documental/{{ obj.pk }}/">Baixar Pasta Documental</a></li>
+                {% endif %}
+                <li><a class="btn default popup" href="/edu/log_pasta_documental/{{ obj.pk }}/">Registro de Alterações</a></li>
+            </ul>
+        {% endif %}
+
+        {% if aluno_arquivos.exists %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                    <tr>
+                        <th class="no-print">Ações</th>
+                        <th>Tipo</th>
+                        <th>Descrição</th>
+                        <th>Origem</th>
+                        <th>Situação</th>
+                        <th>No diploma</th>
+                        <th>Observação</th>
+                        {% if perms.edu.change_alunoarquivo %}
+                            <th class="no-print">Opções</th>
+                        {% endif %}
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for aluno_arquivo in aluno_arquivos %}
+                        {% if aluno_arquivo.descricao != 'Cópia de Laudo Médico nos Últimos 12 Meses' %}
+                        <tr>
+                            <td class="no-print">
+                                <ul class="action-bar">
+                                    <li>{% icon "view" "/rh/arquivo_unico/{{ aluno_arquivo.arquivo_unico.hash_sha512_link_id }}/?filename={{ aluno_arquivo.nome_exibicao }}" %}</li>
+
+                                    {% if perms.edu.add_alunoarquivo %}
+                                        <li>{% icon "edit" "/edu/editar_tipo_alunoarquivo/{{ aluno_arquivo.pk }}/" %}</li>
+                                    {% endif %}
+
+                                    {% if aluno_arquivo.pode_ser_deletado %}
+                                        <li>{% icon "delete" "?tab=pasta_documental&aluno_arquivo={{ aluno_arquivo.pk }}" %}</li>
+                                    {% endif %}
+                                </ul>
+                            </td>
+                            <td>{{ aluno_arquivo.tipo|format }}</td>
+                            <td>{{ aluno_arquivo.descricao }}</td>
+                            <td>
+                                <span class="negrito">{{ aluno_arquivo.get_tipo_origem_cadastro_display }}</span> cadastrado em {{ aluno_arquivo.data_hora_upload|format }}
+                            </td>
+                            <td>{{ aluno_arquivo.get_status_html }}</td>
+                            <td>{{ aluno_arquivo.em_diploma|format }}</td>
+                            <td>
+                                <dl class="definition-list compact">
+                                    <div class="list-item flex-basis-100">
+                                        {% if aluno_arquivo.responsavel_validacao %}
+                                            <dt>Avaliado por</dt>
+                                            <dd>{{ aluno_arquivo.responsavel_validacao|format }} em {{ aluno_arquivo.data_validacao|format }}.</dd>
+                                        {% endif %}
+                                        {% if aluno_arquivo.data_expiracao and aluno_arquivo.validado %}
+                                            <dt>Válido até</dt>
+                                            <dd>{{ aluno_arquivo.data_expiracao|format }}</dd>
+                                        {% endif %}
+                                        {% if aluno_arquivo.observacao %}
+                                            <dd>{{ aluno_arquivo.observacao|format }}</dd>
+                                        {% endif %}
+                                    </div>
+                                </dl>
+                            </td>
+                            {% if perms.edu.change_alunoarquivo %}
+                                <td class="no-print">
+                                    <ul class="action-bar">
+                                        {% if aluno_arquivo|method:"can_validate"|call:request.user %}
+                                            <li><a class="btn success popup" href="/edu/avaliar_arquivo_unico/{{ aluno_arquivo.pk }}/">Avaliar</a></li>
+                                        {% endif %}
+                                        {% if aluno_arquivo|method:"pode_renovar"|call:request.user %}
+                                            <li><a class="btn success popup" href="/edu/renovar_validade_arquivo_unico/{{ aluno_arquivo.pk }}/">Renovar</a></li>
+                                        {% endif %}
+                                    </ul>
+                                </td>
+                            {% endif %}
+                        </tr>
+                        {% endif %}
+                    {% endfor %}
+                    </tbody>
+                    <tfoot>
+                    </tfoot>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Nenhum documento encontrado.</p>
+        {% endif %}
+
+{% endbox %}

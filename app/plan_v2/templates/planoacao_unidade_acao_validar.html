@@ -1,0 +1,181 @@
+{% extends super_template %}
+
+{% load plan_v2_filters %}
+
+{% block extrahead %}
+    {% if pode_validar %}
+        <script language="JavaScript">
+            $(document).ready(function(){
+                $('input[type=radio]').on('change', function() {
+                    $(this).closest("form").submit();
+                });
+
+                $(".form_validacao").on('submit', function (event) {
+                    var form = $( this );
+                    var url = "{% url 'pas_atividade_validar' %}";
+                    var id = this.elements[0].value;
+
+
+                    $.ajax({
+                        type: "POST",
+                        url: url,
+                        data: form.serialize(),
+                    }).done(function(returnedHtml) {
+                        dados = returnedHtml.split('&');
+
+                        $(dados[0]).html(dados[2]);
+
+                        $(dados[0]).removeClass("status");
+                        $(dados[0]).removeClass("status-alert");
+                        $(dados[0]).removeClass("status-success");
+                        $(dados[0]).removeClass("status-error");
+                        $(dados[0]).removeClass("status-info");
+
+                        $(dados[0]).addClass(dados[1]);
+                    }).fail(function() {
+                        alert(this.elements[0].value);
+                    });
+
+                    event.preventDefault();
+                });
+            });
+        </script>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    {{ block.super }}
+
+	{% box 'Ação' %}
+        <table class="info">
+            <tr>
+                <td width="20%">Unidade Adm.:</td>
+                <td>{{ unidade_adm }}</td>
+            </tr>
+            <tr>
+                <td width="20%">Dimensão:</td>
+                <td>{{ acao_pa.acao.acao.macroprocesso.dimensao }}</td>
+            </tr>
+            <tr>
+                <td width="20%">Objetivo Estratégico:</td>
+                <td>{{ acao_pa.meta_pa.meta.objetivo_estrategico }}</td>
+            </tr>
+            <tr>
+                <td width="20%">Meta:</td>
+                <td>{{ acao_pa.meta_pa.meta }}</td>
+            </tr>
+            <tr>
+                <td width="20%">Ação:</td>
+                <td>{{ acao_pa.acao }}</td>
+            </tr>
+            <tr>
+                <td width="20%">Responsável:</td>
+                <td>{{ acao_pa.setor_responsavel|default:"A definir" }}</td>
+            </tr>
+        </table>
+	{% endbox %}
+
+    {% box "Comentários" %}
+        {% comentarios acao_pa %}
+    {% endbox %}
+
+    {% box 'Atividades' %}
+        {% for atividade in atividades %}
+            <div class="general-box">
+                <div class="primary-info">
+                    <ul class="action-bar">
+                        <li><a class="btn" href="{% url 'pas_unidade_validacao' plano_acao.id acao_pa.unidade_administrativa.id %}?{{ tab }}#acao_{{ acao_pa.id }}">Voltar para Validação do Plano</a></li>
+                    </ul>
+                    <div class="extra-info">
+                        <table class="info">
+                            <tr>
+                                <td>Atividade:</td>
+                                <td>{{ atividade.detalhamento }}</td>
+                            </tr>
+                            {% if atividade.acao_pa_vinculadora %}
+                                <tr>
+                                    <td>Ação:</td>
+                                    <td>{{ atividade.acao_pa.acao }}</td>
+                                </tr>
+                            {% endif %}
+                            <tr>
+                                <td>Ação Vinculadora:</td>
+                                <td>{{ atividade.acao_pa_vinculadora.acao|format }}</td>
+                            </tr>
+                            <tr>
+                                <td>Observação:</td>
+                                <td>{{ atividade.observacao|format }}</td>
+                            </tr>
+                            <tr>
+                                <td>Valor:</td>
+                                <td>{{ atividade.valor|format }}</td>
+                            </tr>
+                            <tr>
+                                <td>Natureza de Despesa:</td>
+                                <td>{{ atividade.natureza_despesa|format }}</td>
+                            </tr>
+                            <tr>
+                                <td>Origem de Recurso:</td>
+                                <td>{{ atividade.origem_recurso|format }}</td>
+                            </tr>
+                            <tr>
+                                <td>Validação:</td>
+                                {% if outras_acoes %}
+                                    {% if atividade.origem_recurso and atividade.origem_recurso.dimensao in dimensoes_usuario %}
+                                        <td>
+                                            <span id="status_{{ atividade.id }}" class="{{ atividade.validacao_vinculadora|status_validacao }}">{{ atividade.validacao_vinculadora|format }}</span>
+                                        </td>
+                                    {% endif %}
+                                {% else %}
+                                     <td>
+                                    <span id="status_{{ atividade.id }}" class="{{ atividade.validacao|status_validacao }}">{{ atividade.validacao|format }}</span>
+                                </td>
+                                {% endif %}
+                            </tr>
+                            {% if pode_validar %}
+                                <tr>
+                                    <td>Parecer:</td>
+                                    <td>
+                                        {% if outras_acoes %}
+                                            {% if atividade.origem_recurso and atividade.origem_recurso.dimensao in dimensoes_usuario %}
+                                                <form class="form_validacao">
+                                                    <input type="hidden" name="acao" value="{{ acao_pa.id }}">
+                                                    <input type="hidden" name="id" value="{{ atividade.pk }}">
+                                                    <input type="radio" name="status" value="analise"{% if atividade.validacao_vinculadora == SITUACAO_ANALISADA %} checked{% endif %}> Em análise
+                                                    <input type="radio" name="status" value="deferida"{% if atividade.validacao_vinculadora == SITUACAO_DEFERIDA %} checked{% endif %}> Deferida
+                                                    <input type="radio" name="status" value="indeferida"{% if atividade.validacao_vinculadora == SITUACAO_INDEFERIDA %} checked{% endif %}> Indeferida
+                                                </form>
+                                            {% endif %}
+                                        {% else %}
+                                            {% if origem_vinculadora %}
+                                                {% if atividade.acao_pa_vinculadora and atividade.acao_pa_vinculadora.dimensao in dimensoes_usuario %}
+                                                    <form class="form_validacao">
+                                                        <input type="hidden" name="acao" value="{{ acao_pa.id }}">
+                                                        <input type="hidden" name="id" value="{{ atividade.pk }}">
+                                                        <input type="radio" name="status" value="analise"{% if atividade.validacao_vinculadora == SITUACAO_ANALISADA %} checked{% endif %}> Em análise
+                                                        <input type="radio" name="status" value="deferida"{% if atividade.validacao_vinculadora == SITUACAO_DEFERIDA %} checked{% endif %}> Deferida
+                                                        <input type="radio" name="status" value="indeferida"{% if atividade.validacao_vinculadora == SITUACAO_INDEFERIDA %} checked{% endif %}> Indeferida
+                                                    </form>
+                                                {% endif %}
+                                            {% else %}
+                                                <form class="form_validacao">
+                                                    <input type="hidden" name="acao" value="{{ acao_pa.id }}">
+                                                    <input type="hidden" name="id" value="{{ atividade.pk }}">
+                                                    <input type="radio" name="status" value="analise"{% if atividade.validacao == SITUACAO_ANALISADA %} checked{% endif %}> Em análise
+                                                    <input type="radio" name="status" value="deferida"{% if atividade.validacao == SITUACAO_DEFERIDA %} checked{% endif %}> Deferida
+                                                    <input type="radio" name="status" value="indeferida"{% if atividade.validacao == SITUACAO_INDEFERIDA %} checked{% endif %}> Indeferida
+                                                </form>
+                                            {% endif %}
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        </table>
+                    </div>
+                </div>
+             </div>
+        {% endfor %}
+
+    {% endbox %}
+
+{% endblock %}

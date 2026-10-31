@@ -1,0 +1,133 @@
+{% extends super_template %}
+
+{% block extrahead %}
+<script src="/static/djtools/graficos/highcharts.js"></script>
+<script src="/static/djtools/graficos/exporting.js"></script>
+{% endblock %}
+
+{% block bodyclass %}{% if questionario_agrupado %}hasAsideRight{% endif %}{% endblock %}
+
+{% block content %}
+
+	<div class="container">
+		<div id="ancora-formulario">
+			{% box "Formulário" %}
+					{% render_form form %}
+			{% endbox %}
+		</div>
+		{% if questionario_agrupado %}
+			{% for categoria, perguntas in questionario_agrupado.items %}
+				<div id="grafico_categoria_{{ forloop.counter }}">
+					{% box categoria %}
+						{% for identificador_pergunta, opcoes_respostas in perguntas.items %}
+							<h4>
+							    <p>Pergunta {{ identificador_pergunta }}:</p>
+                                {% for texto_pergunta in opcoes_respostas.texto_perguntas %}
+                                   <p>{{ texto_pergunta }}</p>
+                                {% endfor %}
+                            </h4>
+							<div class="grafico-item">
+                                <script>
+                                    {{ opcoes_respostas.grafico|safe }}
+                                </script>
+                                <div id="grafico{{ opcoes_respostas.id }}"></div>
+                                {% for opcao_resposta, item in opcoes_respostas.items %}
+                                    {% if item.id_grafico_faixa_etaria %}
+                                        <script>
+                                            {{ item.grafico_faixa_etaria|safe }}
+                                        </script>
+                                        <div id="{{ item.id_grafico_faixa_etaria }}" class="grafico-item"></div>
+                                    {% endif %}
+                                {% endfor %}
+							</div>
+						{% endfor %}
+					{% endbox %}
+				</div>
+			{% endfor %}
+		{% else %}
+			{% if form.cleaned_data %}
+				<p class="alert alert-warning">
+					Nenhum questionário encontrado.
+				</p>
+			{% endif %}
+		{% endif %}
+		{% if questionarios %}
+			{% for questionario in questionarios %}
+				{% box questionario %}
+					{% for categoria in questionario.categorias %}
+						{% if categoria.perguntas %}
+							<table id="questionario_{{ questionario.publico }}">
+								<thead>
+									<tr>
+										<th id="categoria_{{ questionario.publico }}_{{ categoria.id }}">{{ categoria }}</th>
+										{% for opcao in opcoes %}
+											<th><strong class="text hint hint-bottom" aria-label="{{ opcao.nome }}">{{ forloop.counter }}</strong></th>
+										{% endfor %}
+										{% for opcao in opcoes %}
+											<th><strong class="text hint hint-bottom" aria-label="Porcentagem de {{ opcao.nome }}">{{ forloop.counter }}</strong></th>
+										{% endfor %}
+										<th>N. Respondentes</th>
+									</tr>
+								</thead>
+								<tbody>
+									{% for pergunta in categoria.perguntas %}
+										{% if pergunta.objetiva %}
+										<tr>
+											<td>{{ forloop.counter }}. [{{ pergunta.identificador }}]{{ pergunta.get_html|safe }}</td>
+											{% for qtd_respostas in pergunta.qtd_respostas_por_opcao %}
+												<td>{{ qtd_respostas }}</td>
+											{% endfor %}
+											{% for porcentagem_respostas in pergunta.porcentagem_respostas_por_opcao %}
+												<td>{{ porcentagem_respostas }}</td>
+											{% endfor %}
+											<td>{{ pergunta.qtd_respondentes }}</td>
+										</tr>
+										{% endif %}
+									{% endfor %}
+								</tbody>
+							</table>
+						{% endif %}
+					{% endfor %}
+				{% endbox %}
+			{% endfor %}
+		{% else %}
+			{% if form.cleaned_data %}
+				<p class="alert alert-warning">
+					Nenhum questionário encontrado.
+				</p>
+			{% endif %}
+		{% endif %}
+	</div>
+{% endblock %}
+
+{% block asideright %}
+
+	{% if questionario_agrupado %}
+
+		<aside class="right">
+			<ul class="ancoras">
+				<li><a href="#ancora-formulario">Formulário</a></li>
+				<li>
+					<span>Gráficos</span>
+					<ul>
+						{% for categoria, perguntas in questionario_agrupado.items %}
+							<li><a href="#grafico_categoria_{{ forloop.counter }}">{{ categoria }}</a></li>
+						{% endfor %}
+					</ul>
+				</li>
+				<li>
+					<span>Quadro Resumo</span>
+					<ul>
+						{% for categoria, perguntas in questionario_agrupado.items %}
+							<li><a href="#categoria_{{ forloop.counter }}">{{ categoria }}</a></li>
+						{% endfor %}
+					</ul>
+				</li>
+				{% for questionario in questionarios %}
+					<li><a href="#questionario_{{ questionario.publico }}">Quadro Resumo {{ questionario }}</a></li>
+				{% endfor %}
+			</ul>
+		</aside>
+	{% endif %}
+
+{% endblock %}

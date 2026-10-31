@@ -1,0 +1,143 @@
+{% extends "admin/base_anonima.html" %}
+
+{% block content %}
+
+<div class="alert alert-info">
+    <p>Permite a visualização completa de Processos Eletrônicos de nível <strong>público</strong> se:</p>
+    <ul>
+        <li>o tipo do processo eletrônico também estiver definido como público;</li>
+        <li>ou se o processo estiver vinculado a um contrato.</li>
+    </ul>
+</div>
+
+{% if not processos_qs %}
+    <p class="alert alert-warning">Dados não encontrados. Verifique os dados e tente novamente.</p>
+{% else %}
+    {% autopaginate processos_qs %}
+    {% paginate %}
+    {% for processo in processos_qs %}
+        <div class="general-box">
+            <div class="primary-info">
+                <div class="status-info-container">
+                    {{ processo.get_status_display|status }}
+                    {{ processo.get_nivel_acesso_display|status }}
+                </div>
+                {% if processo.pode_ler_consulta_publica %}
+                    <h3 class="title">
+                        <a href="{{ processo.get_absolute_url_consulta_publica }}">Processo {{ processo.numero_protocolo_fisico }}</a>
+                    </h3>
+                {% else %}
+                    <h3 class="title">Processo {{ processo.numero_protocolo_fisico }}</h3>
+                {% endif %}
+                {% if processo.pode_ler_consulta_publica %}
+                    <ul class="action-bar">
+                        <li><a class="btn default" href="{{ processo.get_absolute_url_consulta_publica }}">{% icone "eye" %} Visualizar processo completo</a></li>
+                    </ul>
+                {% endif %}
+                <div class="extra-info">
+                    {% if not processo.eh_privado %}
+                        <dl>
+                            <dt>Assunto:</dt>
+                            {% if processo.eh_restrito %}
+                                <dd class="false">Restrito</dd>
+                            {% else %}
+                                <dd>{{ processo.assunto }}</dd>
+                            {% endif %}
+                        </dl>
+                        {% if not processo.pode_ler_consulta_publica %}
+                            {% if processo.tem_tramite %}
+                                {% box "Trâmites" class="collapsed" %}
+                                    <div class="table-responsive">
+                                        <table class="mt-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>Setor de origem</th>
+                                                    <th>Enviado em</th>
+                                                    <th></th>
+                                                    <th>Setor de destino</th>
+                                                    <th>Recebido em</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for tramite in processo.tramites.all %}
+                                                    {% if tramite.recebido %}
+                                                        <tr>
+                                                            <td>{{ tramite.destinatario_setor }}</td>
+                                                            <td>{{ tramite.data_hora_encaminhamento|date:"d/m/Y H:i" }}</td>
+                                                            <td>&rarr;</td>
+                                                            <td>{{ tramite.destinatario_setor }}</td>
+                                                            <td>{{ tramite.data_hora_recebimento|date:"d/m/Y H:i" }}</td>
+                                                        </tr>
+                                                    {% endif %}
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                {% endbox %}
+                            {% endif %}
+
+                            {% box "Documentos" class="collapsed" %}
+                                <div class="table-responsive">
+                                    <table class="mt-0">
+                                        <thead>
+                                            <tr>
+                                                <th>Tipo de documento</th>
+                                                <th>Assunto</th>
+                                                <th>Adicionado em</th>
+                                                <th>Nível de acesso</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for documento in processo.get_todos_documentos_processo %}
+                                                <tr>
+                                                    {% if documento.classe == 'despacho' %}
+                                                        <td>Despacho</td>
+                                                        <td>Despacho</td>
+                                                        <td>{{ documento.data_hora_encaminhamento|date:"d/m/Y H:i" }}</td>
+                                                        <td>{{ documento.processo.get_nivel_acesso_display|status }}</td>
+                                                    {% else %}
+                                                        <td>{{ documento.documento.tipo }}</td>
+                                                        {% if processo.eh_restrito or documento.documento.eh_restrito or documento.documento.eh_privado %}
+                                                            <td class="false">Restrito</td>
+                                                        {% else %}
+                                                            <td>{{ documento.documento.assunto }}</td>
+                                                        {% endif %}
+                                                        <td>{{ documento.data_hora_inclusao|date:"d/m/Y H:i" }}</td>
+                                                        <td>{{ documento.documento.get_nivel_acesso_display|status }}</td>
+                                                    {% endif %}
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% endbox %}
+                        {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+            <dl class="secondary-info">
+                {% if not processo.eh_privado %}
+                    <div class="list-item">
+                        <dt>{% icone "square" %} Tipo:</dt>
+                        <dd>{{ processo.tipo_processo }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>{% icone "users" %} Interessados:</dt>
+                        <dd>{% for interessado in processo.interessados.all %}{{ interessado.nome }}{% if not forloop.last %}, {% endif %}{% endfor %}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>{% icone "square" %} Setor atual:</dt>
+                        <dd>{{ processo.setor_atual }}</dd>
+                    </div>
+                {% endif %}
+                <div class="list-item">
+                    <dt>{% icone "calendar" %} Data de criação:</dt>
+                    <dd>{{ processo.data_hora_criacao|date:"d/m/Y H:i" }}</dd>
+                </div>
+            </dl>
+        </div>
+    {% endfor %}
+    {% paginate %}
+{% endif %}
+
+{% endblock %}

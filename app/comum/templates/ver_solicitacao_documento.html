@@ -1,0 +1,166 @@
+{% extends super_template %}
+
+{% block action-bar %}
+    {% if pode_atender_solicitacao %}
+        <ul class="action-bar">
+            <li><a class="btn success confirm" href="/comum/marcar_solicitacao_atendida/{{ solicitacao.pk }}/">Marcar Solicitação como Atendida</a></li>
+        </ul>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+
+    {% box "Histórico da Solicitação" %}
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Justificativa</th>
+                        <th>Responsável pela Solicitação</th>
+                        <th>Data</th>
+                        <th>Situação da Solicitação</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for registro in historico %}
+                        <tr>
+                            <td>{{ registro.motivo }}</td>
+                            <td>{{ registro.responsavel_vinculo|format }}</td>
+                            <td>{{ registro.data_historico|format }}</td>
+                            <td><span class="status status-{{ registro.get_classe_css }}">{{ registro.get_situacao_historico_display }}</span></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endbox %}
+
+    {% box "Dados do Solicitante" %}
+        <div class="photo-circle lg">
+            <img src="{{ servidor.get_foto_150x200_url }}" alt="Foto de {{ servidor.pessoa_fisica.nome_usual }}">
+        </div>
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>Nome Usual</dt>
+                <dd>{{ servidor.pessoa_fisica.nome_usual }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Ativo</dt>
+                <dd>{{ servidor.ativo|yesno|capfirst }}</dd>
+            </div>
+            {% if verificacao_propria or is_rh %}
+                <div class="list-item">
+                    <dt>CPF</dt>
+                    <dd>{{ servidor.pessoa_fisica.cpf|format }}</dd>
+                </div>
+            {% endif %}
+            {% if verificacao_propria or is_rh %}
+                <div class="list-item">
+                    <dt>Nascimento</dt>
+                    <dd>{{ servidor.pessoa_fisica.nascimento_data|format }} ({{ servidor.pessoa_fisica.nascimento_data|timesince }})</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Estado Civil</dt>
+                    <dd>{{ servidor.pessoa_fisica.estado_civil|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Naturalidade</dt>
+                    <dd>{{ servidor.pessoa_fisica.nascimento_municipio|format }}
+                    {% if endereco_irregular %} <span class="status status-alert">Para atualizar a naturalidade, atualize o endereço.</span> {% endif %} </dd>
+                </div>
+                <div class="list-item">
+                    <dt>Sexo</dt>
+                    <dd>{{ servidor.get_sexo_display|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>G. Sanguíneo/RH</dt>
+                    <dd>{{ servidor.pessoa_fisica.grupo_sanguineo }}{{ servidor.pessoa_fisica.fator_rh }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Dependentes IR</dt>
+                    <dd>{{ servidor.pessoa_fisica.qtde_depend_ir }}</dd>
+                </div>
+                <tdiv class="list-item flex-basis-50">
+                    <dt>Nome do Pai</dt>
+                    <dd> {{ servidor.pessoa_fisica.nome_pai|format }}
+                    {% if endereco_irregular %} <span class="status status-alert">Para atualizar o nome do pai, atualize o endereço.</span> {% endif %} </dd>
+                </tdiv>
+                <div class="list-item flex-basis-50">
+                    <dt>Nome da Mãe</dt>
+                    <dd>{{ servidor.pessoa_fisica.nome_mae|format }}</dd>
+                </div>
+                <div class="list-item flex-basis-100">
+                    <dt>PIS/PASEP</dt>
+                    <dd colspan="7">{{ servidor.pessoa_fisica.pis_pasep|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Identidade</dt>
+                    <dd>{{ servidor.pessoa_fisica.rg|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Órgão Expedidor</dt>
+                    <dd>{{ servidor.pessoa_fisica.rg_orgao|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>UF</dt>
+                    <dd>{{ servidor.pessoa_fisica.rg_uf|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Data Expedição</dt>
+                    <dd>{{ servidor.pessoa_fisica.rg_data|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Título de Eleitor</dt>
+                    <dd>{{ servidor.pessoa_fisica.titulo_numero|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Zona</dt>
+                    <dd>{{ servidor.pessoa_fisica.titulo_zona|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Seção</dt>
+                    <dd>{{ servidor.pessoa_fisica.titulo_secao|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>UF</dt>
+                    <dd>{{ servidor.pessoa_fisica.titulo_uf|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Endereço</dt>
+                    <dd>{{ servidor.pessoa_fisica.endereco|format }}
+                    {% if endereco_irregular %} <div class="false">(Atualize no
+                        {% if servidor.identificacao_unica_siape and verificacao_propria %}
+                        <form id="frm_siapnet" method="post" target="_blank" action="https://www.siapenet.gov.br/Portal/Servidor/login/ControleServidor.asp">
+                            {% csrf_token %}
+                            <input type="hidden" value="{{ servidor.identificacao_unica_siape }}" name="idUnica" />
+                            <input type="submit" id="btn_link" value="SIAPEnet" />
+                        </form> {% else %} <a target="_blank" href="https://www.siapenet.gov.br/Portal/Servidor.asp">SIAPEnet</a> {% endif %}
+                        )</div> {% endif %} </dd>
+                </div>
+                {% if servidor.cnh_carteira %}
+                    <div class="list-item">
+                        <dt>CNH Carteira</dt>
+                        <dd>{{ servidor.pessoa_fisica.cnh_carteira|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Registro</dt>
+                        <dd>{{ servidor.pessoa_fisica.cnh_registro|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Categoria</dt>
+                        <dd>{{ servidor.pessoa_fisica.cnh_categoria|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Emissão</dt>
+                        <dd>{{ servidor.pessoa_fisica.cnh_emissao|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Validade</dt>
+                        <dd>{{ servidor.pessoa_fisica.cnh_validade|format }}</dd>
+                    </div>
+                {% endif %}
+            {% endif %}
+        </dl>
+    {% endbox %}
+
+{% endblock %}

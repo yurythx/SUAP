@@ -1,0 +1,117 @@
+{% load rsc_tags %}
+
+{% for avaliacao in avaliacoes %}
+    {% box 'Avaliação do avaliador {{ avaliacao.avaliador.vinculo.user.get_profile}}' %}
+        {% regroup avaliacao.itens by arquivo.criterio.diretriz.tipo_rsc.nome as avaliacaoitens_tiporsc %}
+        {% for avaliacao_item in avaliacaoitens_tiporsc %}
+            <p class="negrito">Itens da {{ avaliacao_item.grouper }}</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th rowspan="2">Nº</th>
+                        <th rowspan="2">Descrição</th>
+                        <th rowspan="2">Ver Arquivo</th>
+                        <th rowspan="2">Fator de Pontuação</th>
+                        <th rowspan="2">Peso</th>
+                        <th colspan="3">Requerente</th>
+                        <th colspan="3">Avaliador</th>
+                    </tr>
+                    <tr>
+                        <th>Quantidade de Itens</th>
+                        <th>Data de Referência</th>
+                        <th>Pontuação</th>
+                        <th>Quantidade de Itens</th>
+                        <th>Data de Referência</th>
+                        <th>Pontuação</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% regroup avaliacao_item.list by arquivo.criterio.diretriz as arquivos_diretriz %}
+                    {% for arquivo_diretriz in arquivos_diretriz %}
+                    <tr>
+                        <td colspan="11" class="negrito">{{ arquivo_diretriz.grouper }}</td>
+                    </tr>
+                    {% for arquivo_rsc in arquivo_diretriz.list %}
+	                    <tr>
+	                        <td align="right" {% if arquivo_rsc.justificativa %}rowspan="2" {% endif %}>{{ arquivo_rsc.arquivo.criterio.numero }}</td>
+	                        <td>{{ arquivo_rsc.arquivo.criterio.nome }}</td>
+	                        <td><a href="/rsc/visualizar_arquivo_pdf/{{ arquivo_rsc.arquivo.encrypted_pk }}" target="_blank">Visualizar o arquivo</a></td>
+	                        <td align="center">{{ arquivo_rsc.arquivo.criterio.fator }}</td>
+	                        <td align="center">{{ arquivo_rsc.arquivo.criterio.diretriz.peso }}</td>
+	                        <td align="center">{{ arquivo_rsc.arquivo.qtd_itens }}</td>
+	                        <td align="center">{{ arquivo_rsc.arquivo.data_referencia|format }}</td>
+	                        <td align="center">{{ arquivo_rsc.arquivo.nota_pretendida }}</td>
+	                        <td align="center">{{ arquivo_rsc.qtd_itens_validado|format }}</td>
+	                        <td align="center">{{ arquivo_rsc.data_referencia|format }}</td>
+	                        <td align="center"> {{ arquivo_rsc.pontuacao_validada|format }} </td>
+	                    </tr>
+	                    {% if arquivo_rsc.justificativa %}
+		                    <tr>
+		                        <td colspan="10">
+			                        <p><strong>Justificativa da alteração: </strong> {{ arquivo_rsc.justificativa }} </p>
+			                    </td>
+		                    </tr>
+	                    {% endif %}
+                    {% if forloop.last %}
+                    <tr>
+                        <td colspan="10" align="right"><strong>Subtotal com teto* da diretriz:</strong> </td>
+                        <td align="center">
+                            <strong>
+                            {% if ponto_teto_diretriz|tem_chave:arquivo_rsc.arquivo.criterio.diretriz.id %}
+                                {{ ponto_teto_diretriz|get_value_dict:arquivo_rsc.arquivo.criterio.diretriz.id }}
+                            {% else %}
+                                0
+                            {% endif %}
+                            </strong>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="10" align="right">Subtotal global da diretriz: </td>
+                        <td align="center">
+                            {% if ponto_global_diretriz|tem_chave:arquivo_rsc.arquivo.criterio.diretriz.id %}
+                                {{ ponto_global_diretriz|get_value_dict:arquivo_rsc.arquivo.criterio.diretriz.id }}
+                            {% else %}
+                                0
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                    {% endfor %}
+                    <tr>
+                        <td colspan="10" align="right"> <strong>Subtotal pontuação com teto* por RSC:</strong> </td>
+                        <td align="center">
+                            <strong>
+                            {% if avaliacao_item.grouper == 'RSC-I' %}
+                                {{ avaliacao.subtotal_teto_rsc1 }}
+                            {% endif %}
+                            {% if avaliacao_item.grouper == 'RSC-II' %}
+                                {{ avaliacao.subtotal_teto_rsc2 }}
+                            {% endif %}
+                            {% if avaliacao_item.grouper == 'RSC-III' %}
+                                {{ avaliacao.subtotal_teto_rsc3 }}
+                            {% endif %}
+                            </strong>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="10" align="right"> <strong>Subtotal Pontuação Global por RSC:</strong> </td>
+                        <td align="center">
+                            {% if avaliacao_item.grouper == 'RSC-I' %}
+                                {{ avaliacao.subtotal_rsc1 }}
+                            {% endif %}
+                            {% if avaliacao_item.grouper == 'RSC-II' %}
+                                {{ avaliacao.subtotal_rsc2 }}
+                            {% endif %}
+                            {% if avaliacao_item.grouper == 'RSC-III' %}
+                                {{ avaliacao.subtotal_rsc3 }}
+                            {% endif %}
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        {% endfor %}
+
+        <p class="alert alert-warning">* Refere-se à pontuação solicitada em cada documento apresentado, sem considerar as regras e cortes para pontuação mínima necessária previstos na Resolução.</p>
+    {% endbox %}
+{% endfor %}

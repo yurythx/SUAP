@@ -1,0 +1,233 @@
+{% extends super_template %}
+
+
+{% block extrahead %}
+    <script>
+        function submit_form(url){
+            if (confirm("Deseja mesmo realizar o pagamento das avaliações marcadas?")){
+                var form = $('#form_avaliacoes');
+                form.attr('target', '_blank');
+                form.attr('action', url);
+                form.submit()
+            }
+        }
+        function submit_form_relatorio(url){
+            var form = $('#form_avaliacoes');
+            form.attr('target', '_blank');
+            form.attr('action', url);
+            form.submit()
+        }
+    </script>
+{% endblock %}
+
+{% block content %}
+
+    <ul class="action-bar">
+        <li class="has-child">
+            <a href="#" class="btn default">Relatórios</a>
+            <ul>
+                <li><a href="javascript:;" onclick="submit_form_relatorio('/rsc/relatorio_pagamento_pdf/?relatorio=processo')">Processos</a></li>
+                <li><a href="javascript:;" onclick="submit_form_relatorio('/rsc/relatorio_pagamento_pdf/?relatorio=interno')">Avaliadores Internos</a></li>
+                <li><a href="javascript:;" onclick="submit_form_relatorio('/rsc/relatorio_pagamento_pdf/?relatorio=externo')">Avaliadores Externos</a></li>
+                <li><a href="javascript:;" onclick="submit_form_relatorio('/rsc/relatorio_pagamento_pdf/?relatorio=externo_instituicao_origem')">Avaliadores Externos por Instituição de Origem</a></li>
+            </ul>
+        </li>
+        {% if not avaliacoes_pagas %}
+            <li><a href="javascript:;" onclick="submit_form('/rsc/relatorio_pagamento_pdf/?pagar=1')" class="btn primary">Marcar Avaliações Filtradas como Pagas</a></li>
+        {% endif %}
+        
+        {% if pode_reverter_pagamento %}
+            <li><a href="javascript:;" onclick="submit_form('/rsc/relatorio_pagamento_pdf/?reverter_pagamento=1')" class="btn warning">Reverter Pagamentos</a></li>
+        {% endif %}
+    </ul>
+
+    <div id="formbox">
+        {% render_form form %}
+    </div>
+
+    {% if form.is_valid %}
+    <form id="form_avaliacoes" method="POST">
+    {% csrf_token %}
+        <div class="tab-pane" data-title="Processos <span>{{ total_processos }}</span>" data-tab="processos">
+            {% if processos %}
+                Total de Processos: {{ total_processos }}
+                <table>
+                <thead>
+                    <tr>
+                        <th>Processo</th>
+                        <th>Avaliadores</th>
+                        <th>Data de Finalização</th>
+                        <th>Situação do Processo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for processo in processos %}
+                    <tr>
+                        <td>{{ processo|format }}</td>
+                        <td>
+                            <ul>
+                                {% for avaliador in processo.banca_avaliadora_final %}
+                                    <li>{{ avaliador|normalizar }}</li>
+                                {% endfor %}
+                            </ul>
+                        </td>
+                        <td>{{ processo.data_finalizacao_processo|date:'d/m/Y' }}</td>
+                        <td>{{ processo.status_estilizado|safe }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+                <p class="alert alert-warning">Nenhum processo encontrado. </p>
+            {% endif %}
+        </div>
+
+        <div class="tab-pane" data-title="Avaliadores Internos <span>{{ total_avaliacoes_internos }}</span>" data-tab="avaliadores_internos">
+            {% if avaliadores_internos %}
+                Total de Avaliações dos Avaliadores Internos: {{ total_avaliacoes_internos }}
+                {% for avaliador in avaliadores_internos %}
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Avaliador</th>
+                                <th width="20%">Qtde. de Avaliação</th>
+                                <th width="20%">Valor a Pagar</th>
+                                <th width="20%">Qtde. de Horas</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>{{ avaliador|format }}</td>
+                                <td>{{ avaliador.qtde_avaliacoes|format }}</td>
+                                <td>{{ avaliador.valor_a_pagar|format_money }}</td>
+                                <td>{{ avaliador.qtde_horas|format }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <table>
+                        <thead>
+                            <th colspan="2">Processo Avaliado por {{ avaliador|format }}</th>
+                            <th width="15%">Data de Finalização</th>
+                            <th width="10%">Situação da Avaliação</th>
+                        </thead>
+                        <tbody>
+                            {% for avaliacao in avaliador.avaliacoes %}
+                                <tr>
+                                    <td width="1%"><input type="checkbox" name="avaliacoes" value="{{ avaliacao.id }}" checked="checked"/></td>
+                                    <td>{{ avaliacao.processo|format }}</td>
+                                    <td>{{ avaliacao.data_finalizacao|date:'d/m/Y' }}</td>
+                                    <td>{{ avaliacao.get_status_display|format }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    <br />
+                {% endfor %}
+            {% else %}
+                <p class="alert alert-warning">Nenhuma avaliação encontrada. </p>
+            {% endif %}
+        </div>
+
+        <div class="tab-pane" data-title="Avaliadores Externos <span>{{ total_avaliacoes_externos }}</span>" data-tab="avaliadores_externos">
+            {% if avaliadores_externos %}
+                Total de Avaliações dos Avaliadores Externos: {{ total_avaliacoes_externos }}
+                {% for avaliador in avaliadores_externos %}
+                    <table>
+		                <thead>
+		                    <tr>
+		                        <th colspan="4">{{ avaliador.vinculo.user.get_profile.nome|upper }}</th>
+		                    </tr>
+		                </thead>
+		                <tbody>
+		                    <tr>
+		                        <td><strong>Matrícula:</strong> {{ avaliador.matricula_siape|format }}</td>
+		                        <td colspan="3"><strong>Data Nascimento:</strong> {{ avaliador.vinculo.user.get_profile.nascimento_data|format }}</td>
+		                    </tr>
+		                    <tr>
+		                        <td><strong>CPF:</strong> {{ avaliador.vinculo.user.get_profile.cpf|format }}</td>
+		                        <td colspan="3"><strong>Telefone:</strong> {{ avaliador.vinculo.user.get_profile.telefones }}</td>
+		                    </tr>
+		                    <tr>
+		                        <td><strong>E-mail para contato:</strong> {{ avaliador.email_contato|format }}</td>
+		                        <td><strong>Instituição de Origem:</strong> {{ avaliador.instituicao_origem|format }}</td>
+                                <td><strong>UG:</strong> {{ avaliador.instituicao_origem.unidade_gestora|format }}</td>
+                                <td><strong>UASG:</strong> {{ avaliador.instituicao_origem.uasg|format }}</td>
+		                    </tr>
+		                    <tr>
+		                        <td><strong>Número do Documento de Identificação:</strong> {{ avaliador.numero_documento_identificacao|format }}</td>
+		                        <td colspan="3"><strong>Emissor do Documento de Identificação:</strong> {{ avaliador.emissor_documento_identificacao|format }}</td>
+		                    </tr>
+		                    <tr>
+		                        <td colspan="4"><strong>PIS/PASEP:</strong> {{ avaliador.pis_pasep|format }}</td>
+		                    </tr>
+		                    <tr>
+		                        <td><strong>Logradouro:</strong> {{ avaliador.endereco_logradouro|format }}</td>
+		                        <td><strong>Número:</strong> {{ avaliador.endereco_numero|format }}</td>
+		                        <td colspan="2"><strong>Município:</strong> {{ avaliador.endereco_municipio|format }}</td>
+		                    </tr>
+		                    <tr>
+		                        <td><strong>Complemento:</strong> {{ avaliador.endereco_complemento|format }}</td>
+		                        <td><strong>Bairro:</strong> {{ avaliador.endereco_bairro|format }}</td>
+		                        <td colspan="2"><strong>CEP:</strong> {{ avaliador.endereco_cep|format }}</td>
+		                    </tr>
+		                    <tr>
+		                        <td><strong>Banco:</strong> {{ avaliador.banco|format }}</td>
+		                        <td><strong>Número da Agência:</strong> {{ avaliador.numero_agencia|format }}</td>
+		                        <td colspan="2"><strong>Tipo da Conta:</strong> {{ avaliador.tipo_conta|format }}</td>
+		                    </tr>
+		                    <tr>
+		                        <td><strong>Número da Conta:</strong> {{ avaliador.numero_conta|format }}</td>
+		                        <td colspan="3"><strong>Operação:</strong> {{ avaliador.operacao|format }}</td>
+		                    </tr>
+		                </tbody>
+		            </table>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Qtde. de Avaliação</th>
+                                <th>Valor Bruto a Pagar</th>
+                                <th>Desconto INSS (11%)</th>
+                                <th>Desconto ISS (5%)</th>
+                                <th>Valor Líquido a Pagar</th>
+                                <th>Qtde. de Horas</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>{{ avaliador.qtde_avaliacoes|format }}</td>
+                                <td>{{ avaliador.valor_a_pagar|format_money }}</td>
+                                <td>{{ avaliador.desconto_inss_a_pagar|format_money }}</td>
+                                <td>{{ avaliador.desconto_iss_a_pagar|format_money }}</td>
+                                <td>{{ avaliador.valor_liquido_a_pagar|format_money }}</td>
+                                <td>{{ avaliador.qtde_horas|format }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <table>
+                        <thead>
+                            <th colspan="2">Processo Avaliado por {{ avaliador|format }}</th>
+                            <th width="15%">Data de Finalização</th>
+                            <th width="10%">Situação da Avaliação</th>
+                        </thead>
+                        <tbody>
+                            {% for avaliacao in avaliador.avaliacoes %}
+                                <tr>
+                                    <td width="1%"><input type="checkbox" name="avaliacoes" value="{{ avaliacao.id }}" checked="checked"/></td>
+                                    <td>{{ avaliacao.processo|format }}</td>
+                                    <td>{{ avaliacao.data_finalizacao|date:'d/m/Y' }}</td>
+                                    <td>{{ avaliacao.get_status_display|format }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    <br />
+                {% endfor %}
+            {% else %}
+                <p class="alert alert-warning">Nenhuma avaliação encontrada. </p>
+            {% endif %}
+        </div>
+    </form>
+    {% endif %}
+
+
+{% endblock %}

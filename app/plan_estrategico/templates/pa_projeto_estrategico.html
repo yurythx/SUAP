@@ -1,0 +1,172 @@
+{% if projeto_plano_atividade_pode_incluir %}
+    <ul class="action-bar">
+        <li><a href="{% url 'plano_atividade_projeto_associar' plano_atividade.id %}" class="btn popup success">Selecionar Macroprocessos</a></li>
+    </ul>
+
+{% endif %}
+{% if not em_periodo_preloa %}
+    <ul class="action-bar">
+        <li><a href="{% url 'ver_extrato_reserva_tecnica' plano_atividade.id %}" class=" btn popup default">Demonstrativo da reserva técnica</a></li>
+        <li><a href="{% url 'ver_extrato_unidade' plano_atividade.id %}" class="btn default">Demonstrativo por unidades</a></li>
+        {% if plano_atividade.em_periodo_projeto_posloa %}
+            <li><a href="{% url 'relatorio_distribuicao_recursos_projetos' plano_atividade.id %}" class="btn default"> Demonstrativo - distribuição macroprocessos</a></li>
+        {% endif %}
+        {% if plano_atividade.em_periodo_atividades_posloa %}
+            <li><a href="{% url 'relatorio_distribuicao_recursos_ua' plano_atividade.id %}" class="btn default">Demonstrativo - distribuição UAs</a></li>
+        {% endif %}
+        <li><a href="{% url 'ver_resumo_plano' plano_atividade.id %}" class="btn default">Resumo do plano de atividades</a></li>
+    </ul>
+{% endif %}
+{% if projetos %}
+    {% for projeto_plano_atividade in projetos_plano_atividade %}
+        {% box "{{ projeto_plano_atividade.projeto.codigo }} - {{ projeto_plano_atividade.projeto.nome }} - {{ projeto_plano_atividade.projeto.unidade_gestora.setor_equivalente }}" class="collapsed bordered" %}
+            {% if projeto_plano_atividade.projeto.descricao %}
+                <h4><strong>Descrição:</strong> {{ projeto_plano_atividade.projeto.descricao }} </h4>
+            {% endif %}
+                <ul class="action-bar">
+                    <li><a href="{% url 'plano_atividade_detalhar_projeto' projeto_plano_atividade.projeto.pk %}" class="btn popup"> Detalhar macroprocesso </a></li>
+                    {% if em_periodo_atividade_preloa or em_periodo_posloa %}
+                        <li><a href="{% url 'ver_extrato_projeto' projeto_plano_atividade.pk %}" class="btn default">Extrato do Macroprocesso </a></li>
+                    {% endif %}
+                    {% if projeto_plano_atividade_pode_incluir and projeto_plano_atividade.eh_dono %}
+                        <li><a href="{% url 'plano_atividade_origem_recurso_projeto_associar' projeto_plano_atividade.id %}" class="btn popup success">Selecionar Origem de Recurso</a></li>
+                        <li><a href="{% url 'plano_atividade_projeto_etapa_associar' projeto_plano_atividade.id %}" class="btn popup success">Selecionar componentes funcionais</a></li>
+                        {% if projeto_plano_atividade_pode_incluir and projeto_plano_atividade.eh_dono and not projeto_plano_atividade.tem_atividade %}
+                            <li><a href="/admin/plan_estrategico/projetoplanoatividade/{{ projeto_plano_atividade.id }}/delete/" class="btn danger">Desvincular Macroprocesso</a></li>
+                        {% endif %}
+                    {% endif %}
+                </ul>
+                <h4>Origens de Recurso</h4>
+                {% if projeto_plano_atividade.origemrecursoprojeto_set.all %}
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Origem de recurso</th>
+                                <th>Valor disponibilizado</th>
+                                {% if not em_periodo_preloa %}
+                                    <th>Valor distribuído para os componentes funcionais</th>
+                                {% endif %}
+                                {% if origem_recurso_pode_incluir_valor or origem_recurso_pode_ratear_valor %}
+                                    <th> Ações </th>
+                                {% endif %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for origem in projeto_plano_atividade.origemrecursoprojeto_set.all %}
+                                <tr>
+                                <td>{{ origem }}</td>
+                                <td align="right"> R$ {{ origem.get_valor|format_money }}</td>
+                                {% if not em_periodo_preloa %}
+                                    <td align="right"> R$ {{ origem.get_valor_distribuido|format_money }}</td>
+                                {% endif %}
+                                {% if origem_recurso_pode_incluir_valor or origem_recurso_pode_ratear_valor %}
+                                    <td>
+                                        <ul class="action-bar">
+                                            {% if origem_recurso_pode_incluir_valor and eh_administrador %}
+                                                <li><a href="{% url 'informar_valor_origemrecurso_projeto' plano_atividade.id origem.id %}" class="btn popup success">Informar Valor</a></li>
+                                            {% endif %}
+                                            {% if origem_recurso_pode_ratear_valor and projeto_plano_atividade.eh_dono %}
+                                                <li><a href="{% url 'adicionar_valores_origem_etapas' origem.id %}" class="btn success">Ratear valor por componente funcional</a></li>
+                                            {% endif %}
+                                        </ul>
+                                    </td>
+                                {% endif %}
+                                </tr>
+                            {% endfor %}
+                            <tr>
+                                <td> <strong> Total</strong></td>
+                                <td align="right">
+                                    <strong> R$ {{ projeto_plano_atividade.get_valor_total_origem_recurso|format_money }} </strong>
+                                </td>
+                                {% if not em_periodo_preloa %}
+                                    <td align="right">
+                                        <strong> R$ {{ projeto_plano_atividade.get_valor_disponivel_origem_recurso|format_money }} </strong>
+                                    </td>
+                                {% endif %}
+                                {% if origem_recurso_pode_incluir_valor or origem_recurso_pode_ratear_valor %}
+                                    <td></td>
+                                {% endif %}
+                                </tr>
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p class="alert alert-warning">Nenhuma origem de recurso selecionada para este macroprocesso.</p>
+                {% endif %}
+                <h4>Componentes funcionais</h4>
+                {% for etapa in projeto_plano_atividade.etapaprojetoplanoatividade_set.all %}
+                    {% if forloop.first %}
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Código</th>
+                                <th>Descrição</th>
+                                <th>Origens de recursos</th>
+                                <th>Unidades administrativas</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                    {% endif %}
+                        <tr>
+                            <td>{{ etapa.etapa.codigo }}</td>
+                            <td>{{ etapa.etapa.descricao }} {% if etapa.tipo_especial %} <strong>(Componente funcional Especial)</strong> {% endif %}</td>
+                            <td>
+                                {% for or_etapa in etapa.origens_recurso_etapa.all %}
+                                    <ul>
+                                        <li>{{ or_etapa.origem_recurso_projeto }} {% if or_etapa.tipo_especial %} <strong>(Especial)</strong> {% endif %} {% if not em_periodo_preloa %} <strong>(R$ {{ or_etapa.get_valor|format_money }}) </strong> {% endif %}</li>
+                                    </ul>
+                                {% empty %}
+                                <span class="status status-alert">Nenhuma origem de recurso selecionada.</span>
+                                {% endfor %}
+                            </td>
+                            <td>
+                                {% for or_etapa in etapa.get_unidades_etapa %}
+                                    <span>{{ or_etapa.campi }}</span>
+                                {% empty %}
+                                    <span class="status status-alert">Nenhuma unid. administrativa selecionada.</span>
+                                {% endfor %}
+                            </td>
+                            <td>
+                                <ul class="action-bar">
+                                    {% if projeto_plano_atividade_pode_incluir and projeto_plano_atividade.eh_dono %}
+                                        <li><a href="{% url 'plano_atividade_origem_recurso_etapa_projeto_associar' projeto_plano_atividade.pk etapa.etapa.pk %}" class="btn popup default">Selecionar Origem de Recurso</a></li>
+                                        <li><a href="{% url 'unidade_gestora_etapa_associar' projeto_plano_atividade.pk etapa.etapa.pk %}" class="btn popup default">Selecionar Unidade Administrativa</a></li>
+                                        <li><a href="{% url 'remover_etapaplanoatividade' etapa.pk %}" class="btn danger">Desvincular componente funcional</a></li>
+                                    {% endif %}
+                                    {% if pode_ver_todas_atividades %}
+                                        {% if eh_administrador %}
+                                            <li><a class="btn" href="{% url 'ver_atividades_etapa' etapa.pk %}">Ver Atividades</a></li>
+                                        {% elif not etapa.etapa_dono and etapa.tem_unidade_adm %}
+                                            <li><a class="btn" href="{% url 'ver_atividades_etapa' etapa.pk %}">Ver Atividades</a></li>
+                                        {% elif etapa.etapa_dono %}
+                                            <li><a class="btn" href="{% url 'ver_atividades_etapa' etapa.pk %}">Ver Atividades</a></li>
+                                        {% endif %}
+                                    {% else %}
+                                        {% if pode_ver_atividades and etapa.tem_unidade_adm %}
+                                            <li><a class="btn" href="{% url 'ver_atividades_etapa' etapa.pk %}">Ver Atividades</a></li>
+                                        {% endif %}
+                                    {% endif %}
+                                    {% if not em_periodo_preloa %}
+                                        <li><a class="btn" href="{% url 'ver_rateio_atividades' plano_atividade.pk etapa.pk %}">Ver Rateio por Unidades</a></li>
+                                    {% endif %}
+                                    {% if not tem_etapa_especial and pode_incluir_dados_orcamentarios and eh_administrador %}
+                                        <li><a href="{% url 'definir_etapa_especial' projeto_plano_atividade.pk etapa.etapa.pk %}" class="btn popup success">Definir componente funcional especial</a></li>
+                                    {% endif %}
+                                    {% if etapa.eh_especial and pode_incluir_dados_orcamentarios and eh_administrador %}
+                                        <li><a href="{% url 'cancelar_etapa_especial' etapa.etapa.pk %}" class="btn danger"> Cancelar componente funcional especial</a></li>
+                                    {% endif %}
+                                </ul>
+                            </td>
+                        </tr>
+                    {% if forloop.last %}
+                        </tbody>
+                    </table>
+                    {% endif %}
+                    {% empty %}
+                    <p class="alert alert-warning">Nenhum processo selecionado para este macroprocesso.</p>
+                {% endfor %}
+        {% endbox %}
+    {% endfor %}
+{% else %}
+    <p class="alert alert-warning">Nenhum macroprocesso selecionado para este plano de atividades.</p>
+{% endif %}

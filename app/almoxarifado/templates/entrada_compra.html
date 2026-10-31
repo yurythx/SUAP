@@ -1,0 +1,112 @@
+{% extends super_template %}
+
+{% block extrahead %}
+<script src="/static/almoxarifado/js/jquery.form.js"></script>
+<script src="/static/djtools/jquery/jquery.autocomplete.js"></script>
+<script src="/static/djtools/jquery/jquery.bgiframe.min.js"></script>
+<script src="/static/admin/js/admin/RelatedObjectLookups.js"></script>
+<script src="/static/almoxarifado/js/jquery.autocomplete.js"></script>
+<script src="/static/almoxarifado/js/validacao.js"></script>
+<script src="/static/almoxarifado/js/mask.js"></script>
+<script src="/static/almoxarifado/js/auxiliar.js"></script>
+{% endblock %}
+
+{% block extracss %}
+<style type="text/css">
+	#empenho_itens{
+		margin-top: 20px;
+	}
+	.options {
+		text-align:right;
+	}
+	#valor_total {
+		font-weight: bold;
+	}
+</style>
+{% endblock %}
+
+{% block content %}
+
+	<form action="/almoxarifado/entrada_realizar/" method="post" id="entrada_realizar">
+		{% csrf_token %}
+
+		<fieldset class="module aligned">
+			<div class="form-row">
+				<div class="field-box">
+					<label class="required">Campus:</label>
+					<input readonly="readonly" type="text" value="{{ uo }}" />
+				</div>
+			</div>
+			<div class="form-row">
+				<div class="field-box">
+                    <label class="required">Data Entrada:</label>
+                    <input type="date" id="id_data_entrada" name="data_entrada" maxlength="10" value="{% now "Y-m-d" %}" />
+                </div>
+            </div>
+			<div class="form-row">
+                <div class="field-box">
+                    <label class="required">Tipo Entrada:</label>
+                    <input type="text" name="tipo_entrada" readonly="readonly" value="Compra" />
+                    <input type="hidden" id="tipoMaterial" />
+                </div>
+			</div>
+			<div id="tr_empenho" class="form-row">
+                <div class="field-box">
+				    <label class="required">Empenho:</label>
+				    <input type="text" id="empenho" name="empenho" />
+                </div>
+			</div>
+			<div id="tr_fornecedor" class="form-row">
+                <div class="field-box">
+				    <label class="required">Fornecedor:</label>
+				    <input type="text" id="fornecedor" name="fornecedor" />
+                </div>
+			</div>
+		    <div id="tr_numero_nota_fiscal" class="form-row">
+                <div class="field-box">
+				    <label class="required">Nº Nota Fiscal:</label>
+				    <input type="number" class="input_text" maxlength="25" name="numero_nota" value="" />
+                </div>
+			</div>
+		    <div id="tr_data_nota_fiscal" class="form-row">
+                <div class="field-box">
+				    <label class="required">Data Nota Fiscal:</label>
+				    <input type="date" maxlength="10" name="data_nota" id="id_data_nota" value="">
+                </div>
+			</div>
+		</fieldset> 
+
+		<div id="empenho_itens"></div>
+
+		<div class="options">
+		    Valor Total: <span id="valor_total"></span>
+		</div>
+
+		<div class="submit-row">
+			<input class="default" type="button" value="Efetuar" onclick="validate_and_submit('/almoxarifado/validar/entrada/', '#entrada_realizar')" />
+		</div>
+
+	</form>
+
+<script>
+
+function get_itens_empenho() {
+	$.ajax({
+		 type: "POST",
+		 url: "/almoxarifado/ajax/get_itens_empenho/",
+		 data: "empenho_id="+$("#empenho_hidden").attr("value"),
+		 dataType: "json",
+			 success: function(response) {
+				$("div#empenho_itens").html(response.itens);
+				$("input[name=fornecedor]").addClass("ac_filled_hidden").val(response.vinculo_fornecedor.nome);
+				$("input[name=fornecedor_hidden]").val(response.vinculo_fornecedor.id);
+			}
+	 });
+}
+
+$("[name=tipo_entrada][value=compra]").click();
+createAutoComplete("empenho", "/almoxarifado/buscar_empenho/", {"afterSelect": get_itens_empenho});
+createAutoComplete("fornecedor", "/almoxarifado/buscar_fornecedor/");
+</script>
+
+{% endblock %}

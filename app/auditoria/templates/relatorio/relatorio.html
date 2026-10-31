@@ -1,0 +1,112 @@
+{% extends super_template %}
+
+{% block extrahead %}
+<script>
+jQuery(document).ready(function() {
+    jQuery(".relatorio-details").click(function() {
+        jQuery(".doc-error").toggleClass("d-none");
+        jQuery(this).toggleClass("active");
+        if (jQuery(this).hasClass("active")) {
+            jQuery(this).text("Esconder documentos removidos");
+        } else {
+            jQuery(this).text("Mostrar documentos removidos ");
+        }
+        return false;
+    });
+});
+</script>
+{% endblock %}
+
+{% block content %}
+
+    <dl class="definition-list flex"> 
+        <div class="list-item">
+            <dt>Ação</dt>
+            <dd>{{ relatorio.acao }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Ano do Relatório</dt>
+            <dd>{{ relatorio.ano }}</dd>
+        </div> 
+        <div class="list-item">
+            <dt>Ano/PAINT</dt>
+            <dd>{{ relatorio.ano_paint }}</dd>
+        </div> 
+        <div class="list-item">
+            <dt>Período de abrangência</dt>
+            <dd>{{ relatorio.data_inicio }} a {{ relatorio.data_fim }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Núcleo de Auditoria</dt>
+            <dd>{{ relatorio.nucleo }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Unidades Auditadas</dt>
+            <dd>{{ relatorio.unidades_auditadas.all|join:", " }}</dd>
+        </div>
+    </dl>
+
+    <div class="tab-pane" data-title="Documentos" data-counter="{{ relatorio.documentos.count }}">
+        {% if relatorio|method:"pode_editar"|call:request.user %}
+            <ul class="action-bar">
+            <li>
+                    <a href="{% url 'auditoria:listar_relatorios_anexar' relatorio.id %}" class="btn success">Adicionar Documento Eletrônico</a>
+                </li>
+                <li>
+                    <a href="{% url 'auditoria:upload_documento_ao_relatorio' relatorio.id %}" class="btn success">Adicionar Documento Externo</a>
+                </li>
+                {% if quantidade_documentos_removidos %}
+                    <li><a href="#" class="btn default relatorio-details">Exibir Documentos Removidos</a></li>
+                {% endif %}
+            </ul>
+        {% endif %}
+        {% for relatorio_documento in relatorio.documentos.all %}
+            <div class="general-box {% if relatorio_documento.removido_em %} danger doc-error {% endif %}">
+                {% include 'includes/relatorio_documento.html' with documento=relatorio_documento obj=relatorio %}
+            </div>
+        {% empty %}
+            <p class="alert alert-warning">Nenhum documento eletrônico associado.</p>
+        {% endfor %}
+    </div>
+
+    <div class="tab-pane" data-title="Equipe de trabalho" data-tab="equipe" data-counter="{{ relatorio.equipe.count }}">
+        <div class="d-flex flex-wrap gap-3">
+            {% for auditor in relatorio.equipe.all %}
+                <div class="person sm">
+                    <div class="photo-circle sm"><img src="/static/comum/img/default.jpg" alt="Foto {{ auditor }}"></div>
+                    <dl>
+                        <dt class="visually-hidden">Nome</dt>
+                        <dd>{{ auditor|format }} ({{ auditor.user.username }})</dd>
+                        <dt class="visually-hidden">Cargo</dt>
+                        <dd>Auditor</dd>
+                    </dl>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="tab-pane" data-title="Histórico de alterações" data-tab="historico">
+        <ul class="timeline">
+            {% for historico in relatorio.historico.all %}
+                <li class="obs">
+                    <div class="timeline-date">{{ historico.modificado_em|format }}</div>
+                    <div class="timeline-icon"></div>
+                    <div class="timeline-content">
+                        <h4>
+                            {{ historico.modificado_por.get_profile.nome_usual }} modificou o campo '{{ historico.campo_editado }}'
+                        </h4>
+                        <dl>
+                            <dt>Valor antigo:</dt>
+                            <dd>{{ historico.valor_antigo }}</dd>
+                        </dl>
+                        <dl>
+                            <dt>Valor novo:</dt>
+                            <dd>{{ historico.valor_novo }}</dd>
+                        </dl>
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+
+{% endblock %}

@@ -1,0 +1,168 @@
+{% extends super_template %}
+
+{% block content %}
+    {% box "Dados gerais" %}
+        <dl class="definition-list">
+            <dt>Componentes A</dt>
+            {% for componente in obj.componentes.all %}
+                <dd>{{ componente }}</dd>
+            {% endfor %}
+            <dt>Componentes B</dt>
+            {% for componente in obj.equivalentes.all %}
+                <dd>{{ componente }}</dd>
+            {% endfor %}
+        </dl>
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>Ativa</dt>
+                <dd>{{ obj.ativa|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Aprovada</dt>
+                <dd>{{ obj.aprovada|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Automática</dt>
+                <dd>{{ obj.automatica|format }}</dd>
+            </div>
+        </dl>
+    {% endbox %}
+
+    <div class="tab-pane" data-title="Matrizes" data-tab="matrizes">
+        <div class="table-responsive">
+            <table>
+                <caption>Matrizes com componentes equivalentes</caption>
+                <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Matriz A</th>
+                    <th>Matriz B</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for registro in obj.equivalenciacomponentematriz_set.all %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td>{{ registro.matriz_origem|format }}</td>
+                        <td>{{ registro.matriz_destino|format }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="tab-pane ajax-rendered" data-title="Avaliadores" data-tab="avaliadores">
+        {% if request.GET.tab == "avaliadores" %}
+            <ul class="action-bar">
+                {% if pode_adicionar_avaliador %}
+                    <li><a class="btn success popup" href="{% url 'adicionar_avaliador_equivalenciacomponente' obj.pk %}">Adicionar avaliador</a></li>
+                {% endif %}
+            </ul>
+
+            <div class="table-responsive">
+                <table>
+                    <caption>Avaliadores da equivalência</caption>
+                    <thead>
+                    <tr>
+                        {% if pode_adicionar_avaliador and perms.edu.delete_avaliadorequivalenciacomponente %}
+                            <th class="no-print text-end">Ações</th>
+                        {% endif %}
+                        <th>Avaliador</th>
+                        <th>Aprovada</th>
+                        <th>Data da avaliação</th>
+                        <th>Observação</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for registro in avaliadores %}
+                        <tr>
+                            {% if pode_adicionar_avaliador and perms.edu.delete_avaliadorequivalenciacomponente %}
+                            <td class="no-print field-get_acoes">
+                                {% if registro|method:"can_delete"|call:request.user %}
+                                    {% icon "delete" "/comum/excluir/edu/avaliadorequivalenciacomponente/{{ registro.pk }}/" "Excluir" "no-confirm popup" %}
+                                {% endif %}
+                                {% if is_administrador and registro.data_avaliacao and obj.pode_ser_excluida %}
+                                    {% icon "undo" "?cancelar_avaliacao={{ registro.pk }}" "Cancelar Avaliação" "confirm" %}
+                                {% endif %}
+                            </td>
+                            {% endif %}
+                            <td>{{ registro.vinculo|format }}</td>
+                            <td>{{ registro.aprovada|format }}</td>
+                            <td>{{ registro.data_avaliacao|format }}</td>
+                            <td>{{ registro.observacao|format }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr class="highlight">
+                            <td colspan="5">Nenhum avaliador foi cadastrado.</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}        
+    </div>
+
+    <div class="tab-pane ajax-rendered" data-title="Equivalências pendentes" data-tab="acoes">
+        {% if request.GET.tab == "acoes" %}
+            {% if acoes %}
+                {% if is_administrador and obj.is_aprovada %}
+                    <ul class="action-bar">
+                        <li>
+                            <a href="?registrar=1" class="btn success">Aplicar equivalências e automatizar</a>
+                        </li>
+                    </ul>
+                {% endif %}
+                <br><br>
+                <ol>
+                    {% for acao in acoes %}
+                    <li>{{ acao }}<br><br></li>
+                    {% endfor %}
+                </ol>
+            {% else %}
+                <p class="alert alert-warning">Nenhuma ação pendente para essa configuração de equivalência.</p>
+            {% endif %}
+        {% endif %}
+    </div>
+
+    <div class="tab-pane ajax-rendered" data-title="Equivalências realizadas" data-tab="equivalencias">
+        {% if request.GET.tab == "equivalencias" %}
+            {% if equivalencias %}
+                {% if is_administrador %}
+                    <ul class="action-bar">
+                        <li>
+                            <a href="?desfazer=1" class="btn danger">Desfazer todas as equivalências</a>
+                        </li>
+                    </ul>
+                {% endif %}
+                <div class="table-responsive">
+                    <table>
+                        <caption>Equivalências aplicadas</caption>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Aluno</th>
+                                <th>Matriz</th>
+                                <th>Curso</th>
+                                <th>Diretoria</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for registro in equivalencias %}
+                                <tr>
+                                    <td>{{ forloop.counter }}</td>
+                                    <td><a href="/edu/aluno/{{ registro.matricula_periodo.aluno.matricula }}/">{{ registro.matricula_periodo.aluno.pessoa_fisica.nome_usual }}</a> ({{ registro.matricula_periodo.aluno.matricula }})</td>
+                                    <td>{{ registro.matricula_periodo.aluno.matriz_id }} - {{ registro.matricula_periodo.aluno.matriz.descricao }}</td>
+                                    <td>{{ registro.matricula_periodo.aluno.curso_campus.codigo }} - {{ registro.matricula_periodo.aluno.curso_campus.descricao }}</td>
+                                    <td>{{ registro.matricula_periodo.aluno.curso_campus.diretoria.setor.sigla }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="alert alert-warning">Nenhuma equivalência realizada.</p>
+            {% endif %}
+        {% endif %}
+    </div>
+{% endblock %}

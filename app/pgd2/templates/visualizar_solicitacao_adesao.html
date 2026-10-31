@@ -1,0 +1,141 @@
+{% extends super_template %}
+
+{% block object-status %}
+    {{ sol.get_situacao_display|status }}
+    {% if estah_vigente is not None and not estah_vigente %}
+        <span class="status status-alert">Esta adesão não está vigente</span>    
+    {% endif %}
+    {% if sol.data_desligamento_efeitos_a_partir_de %}
+        <span class="status status-alert">Desligamento com efeitos a partir de {{ sol.data_desligamento_efeitos_a_partir_de|format }}</span>    
+        {% if sol.get_carencia_ate %}
+            <span class="status status-alert">Após {{ sol.data_desligamento_efeitos_a_partir_de|format }} terá carência até {{ sol.get_carencia_ate|format }} (para algumas operações no {{ nomenclatura.pit_rit_pgd2 }})</span>    
+        {% endif %}
+    {% endif %}
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if pode_avaliar %}
+            <li>
+                <a class="btn success" href="{% url 'alterar_situacao_solicitacao_adesao_pgd2' sol.id 4 %}">Deferir</a>
+            </li>
+        {% endif %}
+        {% if pode_editar_telefone_pgd %}
+            <li>
+                <a class="btn primary" href="{% url 'editar_telefone_pgd_pgd2' sol.id %}">Editar Telefone para contato PGD</a>
+            </li>
+        {% endif %}
+        {% if pode_cancelar_servidor %}
+            <li>
+                <a class="btn warning" href="{% url 'alterar_situacao_solicitacao_adesao_pgd2' sol.id 2 %}">Cancelar</a>
+            </li>
+        {% endif %}
+        {% if pode_cancelar_avaliador %}
+            <li>
+                <a class="btn warning" href="{% url 'alterar_situacao_solicitacao_adesao_pgd2' sol.id 3 %}">Cancelar</a>
+            </li>
+        {% endif %}
+        {% if pode_avaliar %}
+            <li>
+                <a class="btn danger" href="{% url 'alterar_situacao_solicitacao_adesao_pgd2' sol.id 5 %}">Indeferir</a>
+            </li>
+        {% endif %}
+        {% if pode_cadastrar_desligamento %}
+            <li>
+                <a class="btn danger" href="{% url 'cadastrar_desligamento_pgd_pgd2' sol.id %}">Cadastrar desligamento</a>
+            </li>
+        {% endif %}
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+    {% include "includes/dados_servidor2.html" %}
+
+    {% box 'Observações/Regras' %}
+        <h4>{{ documento_vigente.get_verbose_simples|format }} </h4>
+        {{ documento_vigente.descricao|safe }}
+    {% endbox %}
+
+    {% box 'Contato PGD' %}
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>Preferência de contato</dt>
+                <dd>
+                    {{ sol.get_preferencia_contato_display|format }}
+                    {% if link_whats %}
+                        {{ link_whats }}
+                    {% endif %}
+                </dd>
+            </div>
+            <div class="list-item">
+                <dt>Telefone</dt>
+                <dd>{{ sol.telefone|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Código do país</dt>
+                <dd>{{ sol.codigo_contato_pais|format }}</dd>
+            </div>
+            
+        </dl>
+    {% endbox %}
+
+    {% if desligamentos %}
+        {% box 'Desligamento' %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Justificativa</th>
+                            <th>Observação</th>
+                            <th>Desligamento com efeitos a partir de</th>
+                            <th>Data de cadastro</th>
+                            <th>Usuário do cadastro</th>
+                            <th>Desligamento cancelado em</th>
+                            <th>A partir desta data já pode solicitar nova adesão</th>
+                            <th class="no-print">Opções</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for desligamento in desligamentos %}
+                            <tr>
+                                <td>{{ desligamento.justificativa|format }}</td>
+                                <td>{{ desligamento.observacao|format }}</td>
+                                <td>{{ desligamento.data_desligamento_efeitos_a_partir_de|format }}</td>
+                                <td>{{ desligamento.data_cadastro|format }}</td>
+                                <td>{{ desligamento.usuario_cadastro|format }}</td>
+                                <td>{{ desligamento.data_cancelamento|format }}</td>
+                                <td>{{ desligamento.data_pode_solicitar_nova_adesao|format }}</td>
+
+                                <td class="no-print">
+                                    <ul class="action-bar">
+                                        {% if desligamento|method:'pode_cancelar'|call:request.user %}
+                                            <li><a href="/pgd2/cancelar_desligamento_pgd/{{ desligamento.id }}" class="btn danger">Cancelar Desligamento</a></li>
+                                        {% endif %}
+                                    </ul>
+                                </td>
+
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endbox %}
+    {% endif %}
+
+    {% box 'Histórico de alterações' %}
+        <ul class="timeline compact">
+            {% for registro_acao in registros_acoes %}
+                <li>
+                    <div class="timeline-date">{{ registro_acao.data|format }}</div>
+                    <div class="timeline-icon"></div>
+                    <div class="timeline-content">
+                        <h4>{{ registro_acao.user|format }}: {{ registro_acao.get_tipo_display }}</h4>
+                        <p>{{ registro_acao.observacao }}</p>
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    {% endbox %}
+
+{% endblock %}

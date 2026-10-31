@@ -1,0 +1,216 @@
+---
+- name: Instalar openssl para certificado TLS
+  ansible.builtin.apt:
+    name: openssl
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Criar árvore /opt/suap
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner | default('root') }}"
+    group: "{{ item.group | default('root') }}"
+    mode: "{{ item.mode | default('0750') }}"
+  loop:
+    - { path: "{{ suap_base_dir }}", mode: "0755" }
+    - { path: "{{ suap_app_dir }}", owner: "{{ suap_app_uid }}", group: "{{ suap_app_gid }}" }
+    - { path: "{{ suap_compose_dir }}", mode: "0755" }
+    - { path: "{{ suap_compose_dir }}/nginx" }
+    - { path: "{{ suap_compose_dir }}/postgres" }
+    - { path: "{{ suap_compose_dir }}/compose-overlay" }
+    - { path: "{{ suap_data_dir }}" }
+    # postgres:18 oficial usa UID/GID 999
+    - { path: "{{ suap_data_dir }}/postgres", owner: "999", group: "999", mode: "0700" }
+    - { path: "{{ suap_data_dir }}/redis", owner: "999", group: "999", mode: "0750" }
+    - { path: "{{ suap_data_dir }}/tls" }
+    - { path: "{{ suap_backups_dir }}" }
+
+- name: Validar manage.py no controlador
+  ansible.builtin.stat:
+    path: "{{ suap_local_app_src }}/manage.py"
+  delegate_to: localhost
+  become: false
+  register: suap_manage_py
+
+- name: Falhar se ./app não for a raiz do SUAP
+  ansible.builtin.assert:
+    that:
+      - suap_manage_py.stat.exists
+    fail_msg: >-
+      Esperado manage.py em ./app (fonte oficial na raiz).
+      Não use app/suap-master — mova o conteúdo para ./app.
+
+- name: Sincronizar código ./app → /opt/suap/app
+  ansible.posix.synchronize:
+    src: "{{ suap_local_app_src }}/"
+    dest: "{{ suap_app_dir }}/"
+    delete: false
+    recursive: true
+    rsync_opts:
+      - "--exclude=.git"
+      - "--exclude=__pycache__"
+      - "--exclude=*.pyc"
+      - "--exclude=*.pyo"
+      - "--exclude=.env"
+      - "--exclude=.venv"
+      - "--exclude=venv"
+      - "--exclude=.mypy_cache"
+      - "--exclude=.pytest_cache"
+      - "--exclude=.idea"
+      - "--exclude=.vscode"
+      - "--exclude=.claude"
+      - "--exclude=.codex"
+      - "--exclude=.agents"
+      - "--exclude=.opencode"
+  delegate_to: localhost
+  when: not (suap_skip_sync | default(false) | bool)
+
+- name: Ajustar dono do código para www-data (UID 33)
+  ansible.builtin.file:
+    path: "{{ suap_app_dir }}"
+    state: directory
+    owner: "{{ suap_app_uid }}"
+    group: "{{ suap_app_gid }}"
+    recurse: true
+  when: not (suap_skip_sync | default(false) | bool)
+
+- name: Sincronizar Compose de produção
+  ansible.builtin.copy:
+    src: "{{ suap_local_compose_src }}/"
+    dest: "{{ suap_compose_dir }}/"
+    owner: root
+    group: root
+    mode: preserve
+    directory_mode: "0755"
+  when: not (suap_skip_sync | default(false) | bool)
+
+- name: Publicar .dockerignore na raiz de build (/opt/suap)
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../.dockerignore"
+    dest: "{{ suap_base_dir }}/.dockerignore"
+    owner: root
+    group: root
+    mode: "0644"
+  when: not (suap_skip_sync | default(false) | bool)
+
+- name: Validar artefatos já presentes no host (modo suap_skip_sync)
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ suap_app_dir }}/manage.py"
+    - "{{ suap_compose_dir }}/docker-compose.prod.yml"
+    - "{{ suap_compose_dir }}/.env"
+  register: suap_preloaded
+  when: suap_skip_sync | default(false) | bool
+
+- name: Falhar se skip_sync sem artefatos
+  ansible.builtin.assert:
+    that:
+      - suap_preloaded.results[0].stat.exists
+      - suap_preloaded.results[1].stat.exists
+      - suap_preloaded.results[2].stat.exists
+    fail_msg: "suap_skip_sync=true mas faltam manage.py, compose ou .env em /opt/suap"
+  when: suap_skip_sync | default(false) | bool
+
+- name: Garantir entrypoint executável
+  ansible.builtin.file:
+    path: "{{ suap_compose_dir }}/compose-overlay/entrypoint.sh"
+    mode: "0755"
+
+- name: Garantir .env de produção
+  ansible.builtin.copy:
+    src: "{{ suap_compose_dir }}/.env.example"
+    dest: "{{ suap_env_file }}"
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0600"
+    force: false
+
+- name: Gerar certificado TLS autoassinado se ausente
+  ansible.builtin.command:
+    cmd: >-
+      openssl req -x509 -nodes -newkey rsa:2048 -days 825
+      -keyout {{ suap_data_dir }}/tls/privkey.pem
+      -out {{ suap_data_dir }}/tls/fullchain.pem
+      -subj /CN=suap.autarquia.local
+    creates: "{{ suap_data_dir }}/tls/fullchain.pem"
+
+- name: Restringir chave privada TLS
+  ansible.builtin.file:
+    path: "{{ suap_data_dir }}/tls/privkey.pem"
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Instalar unit systemd do Compose
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/{{ suap_systemd_unit }}"
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=SUAP Docker Compose (IFRN 4.x / Autarquia)
+      Requires=docker.service
+      After=docker.service network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      WorkingDirectory={{ suap_compose_dir }}
+      EnvironmentFile=-{{ suap_env_file }}
+      ExecStart=/usr/bin/docker compose -p {{ suap_compose_project }} -f {{ suap_compose_dir }}/{{ suap_compose_file }} up -d --remove-orphans
+      ExecStop=/usr/bin/docker compose -p {{ suap_compose_project }} -f {{ suap_compose_dir }}/{{ suap_compose_file }} down
+      TimeoutStartSec=0
+      Restart=on-failure
+      RestartSec=15
+
+      [Install]
+      WantedBy=multi-user.target
+  notify: reload systemd
+
+- name: Flush handlers
+  ansible.builtin.meta: flush_handlers
+
+- name: Build e up da stack SUAP
+  ansible.builtin.command:
+    cmd: >-
+      docker compose
+      -p {{ suap_compose_project }}
+      -f {{ suap_compose_dir }}/{{ suap_compose_file }}
+      up -d --build --remove-orphans
+  args:
+    chdir: "{{ suap_compose_dir }}"
+  register: suap_up
+  changed_when: >-
+    ('Started' in suap_up.stderr) or
+    ('Created' in suap_up.stderr) or
+    ('Building' in suap_up.stderr) or
+    ('Recreated' in suap_up.stderr)
+
+- name: Habilitar serviço systemd
+  ansible.builtin.systemd:
+    name: "{{ suap_systemd_unit }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Status dos containers
+  ansible.builtin.command:
+    cmd: >-
+      docker compose
+      -p {{ suap_compose_project }}
+      -f {{ suap_compose_dir }}/{{ suap_compose_file }}
+      ps
+  args:
+    chdir: "{{ suap_compose_dir }}"
+  register: suap_ps
+  changed_when: false
+
+- name: Exibir status
+  ansible.builtin.debug:
+    var: suap_ps.stdout_lines

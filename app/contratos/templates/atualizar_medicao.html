@@ -1,0 +1,85 @@
+{% extends super_template %}
+
+{% block content %}
+
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {% render_form form render_full=False submit_label=False %}
+
+        {% if formset %}
+            <div class="input-group-append mb-3">
+                <input type="button" value="Adicionar mais empenhos" id="adicionar_mais">
+            </div>
+
+            {{ formset.management_form }}
+
+            <div id="form_set">
+                {% for fiscal_form in formset %}
+                    {% render_form fiscal_form False %}
+                {% endfor %}
+                {% for form in formset %}
+                    {% for hidden in form.hidden_fields %}
+                        {{ hidden }}
+                    {% endfor %}
+                    <!-- form.visible fields go here -->
+                {% endfor %}
+            </div>
+            <div id="empty_form" class="d-none">
+                {% render_form formset.empty_form submit_label=False %}
+            </div>
+        {% endif %}
+        <div class="submit-row">
+            <input class="default" value="Salvar" type="submit">
+        </div>
+    </form>
+
+    <script>
+        $(document).ready(function() {
+            atualizer_valor();
+        });
+        $('#adicionar_mais').click(function() {
+            var form_idx = $('#id_documentos_empenho_medicao-TOTAL_FORMS').val();
+            $('#form_set').append($('#empty_form').html().replace(/__prefix__/g, form_idx));
+            $('#id_documentos_empenho_medicao-TOTAL_FORMS').val(parseInt(form_idx) + 1);
+            sync_widgets()
+            atualizer_valor();
+        });
+        function atualizer_valor() {
+            $('input[name$=valor]').on('keyup', function () {
+                somarValores();
+            });
+            $('input[name$=-DELETE]').click(function() {
+                somarValores();
+            });
+        }
+
+        function somarValores() {
+            const valor_executado_element = $('input[name=valor_executado]');
+            var total = '0';
+            $('input[name$=valor]').each(function(){
+                const el = $(this);
+                const checkbox_del = el.closest('div.valor').next().find('input[type=checkbox]');
+                if (!checkbox_del.prop('checked')){
+                    total = sumValuesInReal(total, el.val());
+                }
+            });
+            valor_executado_element.val(total);
+        }
+
+        function sumValuesInReal(val1, val2) {
+            if (val2 == ''){
+                val2 = '0';
+            }
+            const convertedVal1 = parseFloat(val1.replace(/[^\d,]/g, '').replace(',', '.'));;
+            const convertedVal2 = parseFloat(val2.replace(/[^\d,]/g, '').replace(',', '.'));;
+            const locale = 'pt-BR';
+            const options = {
+                style: 'decimal',
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+                useGrouping: true
+            };
+            return new Intl.NumberFormat(locale, options).format((convertedVal1 + convertedVal2));
+        }
+    </script>
+{% endblock %}

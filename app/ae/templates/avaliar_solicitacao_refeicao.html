@@ -1,0 +1,305 @@
+{% extends super_template %}
+
+{% block action-bar %}
+    {% if perms.ae.view_programa %}
+        <ul class="action-bar">
+            <li><a href="/ae/programa/{{ programa.pk }}/" class="btn default">Visualizar programa</a></li>
+        </ul>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+
+{% include "includes/disponibilidade.html" %}
+
+<div class="search-and-filters">
+    {% render_form form %}
+</div>
+
+<div class="tab-pane" data-title="Pré-seleção" data-counter="{{ solicitacoes_pendentes_pre_selecao|length }}">
+    {% box "Pré-seleção" %}
+        {% if solicitacoes_pendentes_pre_selecao %}
+            <div class="alert alert-info">
+                <p><strong>Critérios da Pré-seleção:</strong> os alunos solicitantes serão elencados, dentro da quantidade de vagas conforme a Tabela de Disponibilidade para o dia e tipo de refeição, na seguinte ordem:</p>
+                <ol>
+                    <li>Inscrição ativa em qualquer programa de Assistência Estudantil.</li>
+                    <li>Documentação entregue e válida.</li>
+                    <li>Inscrição com parecer 'Deferido, mas sem recurso disponível'.</li>
+                    <li>Menor valor de renda per capita.</li>
+                    <li>Não participação no programa de Alimentação.</li>
+                    <li>Ordem de solicitação.</li>
+                </ol>
+                <p>Caso o sistema não consiga elencar alunos suficientes para a quantidade de ofertas disponíveis, os alunos solicitantes restantes deverão ser elencados pela ordem de:</p>
+                <ol>
+                    <li>Menor valor de renda per capita.</li>
+                    <li>Ordem de solicitação.</li>
+                </ol>
+            </div>
+
+            <form method="POST" action="/ae/indeferir_solicitacoes/{{ programa.pk }}/" onsubmit="return confirm('Tem certeza que deseja deferir todas as solicitações selecionadas?');">
+                {% csrf_token %}
+
+                {% if pode_avaliar_solicitacao %}
+                    <div class="actions">
+                        <label>Ação:
+                            <select name="action">
+                                <option></option>
+                                <option>Deferir em massa</option>
+                            </select>
+                        </label>
+                        <button value="0" name="index" title="Executar ação selecionada" class="button" type="submit">Aplicar</button>
+                    </div>
+                {% endif %}
+
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th class="no-print">Seleção<input type="checkbox" onchange="var is = this.parentNode.parentNode.parentNode.parentNode.getElementsByTagName('input');for(var i=0; i<is.length; i++){ is[i].checked = this.checked;}" /></th>
+                                <th>Aluno</th>
+                                <th>Data da solicitação</th>
+                                <th>Tipo da refeição</th>
+                                <th>Motivo da solicitação</th>
+                                <th>Parecer</th>
+                                <th>Situação da documentação</th>
+                                <th>Situação da participação em Programa de Alimentação</th>
+                                <th>Solicitações deferidas na semana</th>
+                                <th>Faltas nos últimos 30 dias</th>
+                                <th>Renda Per Capita</th>
+                                {% if pode_avaliar_solicitacao %}
+                                    <th class="no-print text-end">Opções</th>
+                                {% endif %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for solicitacao in solicitacoes_pendentes_pre_selecao %}
+                                <tr>
+                                    <td class="no-print"><INPUT TYPE="checkbox" NAME="registros" value="{{ solicitacao.id }}"></td>
+                                    <td><a href="/edu/aluno/{{ solicitacao.aluno.matricula }}/">{{ solicitacao.aluno }}</a></td>
+                                    <td>{{ solicitacao.data_solicitacao|format }}</td>
+                                    <td>{{ solicitacao.get_tipo_refeicao_display }}</td>
+                                    <td>{{ solicitacao.motivo_solicitacao }}</td>
+                                    <td>
+                                        {% if solicitacao.aluno.get_inscricoes_ativas.exists and solicitacao.aluno.get_inscricao_programa_alimentacao %}
+                                            <span class="status status-alert">{{ solicitacao.aluno.get_inscricao_programa_alimentacao.situacao_parecer }}</span>
+                                        {% else %}
+                                            <span class="status status-error">Não há inscrição ativa no programa de alimentação</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ solicitacao.aluno.get_situacao_documentacao|safe }}</td>
+                                    <td>
+                                        {% if solicitacao.get_participacao_alimentacao %}
+
+                                            <span class="status status-success">É participante</span>
+                                            <dl>
+                                                {% if solicitacao.get_participacao_alimentacao.sub_instance.solicitacao_atendida_cafe.valida %}
+                                                    <dt>Café da manhã:</dt>
+                                                    <dd>{{ solicitacao.get_participacao_alimentacao.sub_instance.solicitacao_atendida_cafe }}</dd>
+                                                {% endif %}
+                                                {% if solicitacao.get_participacao_alimentacao.sub_instance.solicitacao_atendida_almoco.valida %}
+                                                    <dt>Almoço:</dt>
+                                                    <dd>{{ solicitacao.get_participacao_alimentacao.sub_instance.solicitacao_atendida_almoco }}</dd>
+                                                {% endif %}
+                                                {% if solicitacao.get_participacao_alimentacao.sub_instance.solicitacao_atendida_janta.valida %}
+                                                    <dt>Jantar:</dt>
+                                                    <dd>{{ solicitacao.get_participacao_alimentacao.sub_instance.solicitacao_atendida_janta }}</dd>
+                                                {% endif %}
+                                            </dl>
+                                        {% else %}
+                                            <span class="status status-error">Não participante</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ solicitacao.get_solicitacoes_deferidas_esta_semana }}</td>
+                                    <td>{{ solicitacao.get_faltas_no_ultimo_mes }}</td>
+                                    <td>R$ {{ solicitacao.get_renda|format }}<br><small>Atualizada em {{ solicitacao.get_renda_atualizada_em|format }}</small></td>
+                                    {% if pode_avaliar_solicitacao %}
+                                        <td class="no-print">
+                                            <ul class="action-bar">
+                                                <li><a href="?id={{ solicitacao.pk }}&deferir=1&{{ request.META.QUERY_STRING }}" class="btn success">Deferir</a></li>
+                                                <li><a href= "?id={{ solicitacao.pk }}&{{ request.META.QUERY_STRING }}" class="btn danger">Indeferir</a></li>
+                                            </ul>
+                                        </td>
+                                    {% endif %}
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </form>
+        {% else %}
+            <p class="alert alert-warning">Nenhum agendamento cadastrado.</p>
+        {% endif %}
+    {% endbox %}
+</div>
+
+<div class="tab-pane" data-title="Refeições solicitadas" data-counter="{{ solicitacoes_pendentes|length }}">
+    {% box "Refeições Solicitadas" %}
+        {% if solicitacoes_pendentes %}
+            <form method="POST" action="/ae/indeferir_solicitacoes/{{ programa.pk }}/" onsubmit="return confirm('Tem certeza que deseja indeferir todas as solicitações selecionadas?');">
+                {% csrf_token %}
+
+                {% if pode_avaliar_solicitacao %}
+                    <div class="actions">
+                        <label>Ação:
+                            <select name="action">
+                                <option></option>
+                                <option>Indeferir em massa</option>
+                            </select>
+                        </label>
+                        <button value="0" name="index" title="Executar ação selecionada" class="button" type="submit">Aplicar</button>
+                    </div>
+                {% endif %}
+
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                {% if pode_avaliar_solicitacao %}
+                                    <th class="no-print">Seleção<input type="checkbox" onchange="var is = this.parentNode.parentNode.parentNode.parentNode.getElementsByTagName('input');for(var i=0; i<is.length; i++){ is[i].checked = this.checked;}" /></th>
+                                {% endif %}
+                                <th>Aluno</th>
+                                <th>Data da Solicitação</th>
+                                <th>Tipo da Refeição</th>
+                                <th>Motivo da Solicitação</th>
+                                <th>Parecer</th>
+                                <th>Situação da Documentação</th>
+                                <th>Situação da Participação em Programa de Alimentação</th>
+                                <th>Solicitações Deferidas na Semana</th>
+                                <th>Faltas nos últimos 30 dias</th>
+                                <th>Renda Per Capita</th>
+                                {% if pode_avaliar_solicitacao %}
+                                    <th class="no-print">Opções</th>
+                                {% endif %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for solicitacao in solicitacoes_pendentes %}
+                                <tr>
+                                    {% if pode_avaliar_solicitacao %}
+                                        <td class="no-print"><INPUT TYPE="checkbox" NAME="registros" value="{{ solicitacao.id }}" /></td>
+                                    {% endif %}
+                                    <td><a href="/edu/aluno/{{ solicitacao.aluno.matricula }}/">{{ solicitacao.aluno }}</a></td>
+                                    <td>{{ solicitacao.data_solicitacao|format }}</td>
+                                    <td>{{ solicitacao.get_tipo_refeicao_display }}</td>
+                                    <td>{{ solicitacao.motivo_solicitacao }}</td>
+                                    <td>
+                                        {% if solicitacao.aluno.get_inscricoes_ativas.exists %}
+                                            <span class="status status-alert">{{ solicitacao.aluno.get_inscricao_programa_alimentacao.situacao_parecer }}</span>
+                                        {% else %}
+                                            <span class="status status-error">Não há inscrição ativa</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ solicitacao.aluno.get_situacao_documentacao|safe }}</td>
+                                    <td>
+                                        {% if solicitacao.get_participacao_alimentacao %}
+                                            <span class="status status-success">É participante</span>
+                                            <dl>
+                                                {% if solicitacao.get_participacao_alimentacao.sub_instance.solicitacao_atendida_cafe.valida %}
+                                                    <dt>Café da manhã:</dt>
+                                                    <dd>{{ solicitacao.get_participacao_alimentacao.sub_instance.solicitacao_atendida_cafe }}</dd>
+                                                {% endif %}
+                                                {% if solicitacao.get_participacao_alimentacao.sub_instance.solicitacao_atendida_almoco.valida %}
+                                                    <dt>Almoço:</dt>
+                                                    <dd>{{ solicitacao.get_participacao_alimentacao.sub_instance.solicitacao_atendida_almoco }}</dd>
+                                                {% endif %}
+                                                {% if solicitacao.get_participacao_alimentacao.sub_instance.solicitacao_atendida_janta.valida %}
+                                                    <dt>Jantar:</dt>
+                                                    <dd>{{ solicitacao.get_participacao_alimentacao.sub_instance.solicitacao_atendida_janta }}</dd>
+                                                {% endif %}
+                                            </dl>
+                                        {% else %}
+                                            <span class="status status-error">Não participante</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ solicitacao.get_solicitacoes_deferidas_esta_semana }}</td>
+                                    <td>{{ solicitacao.get_faltas_no_ultimo_mes }}</td>
+                                    <td>R$ {{ solicitacao.get_renda|format }}<br><small>Atualizada em {{ solicitacao.get_renda_atualizada_em|format }}</small></td>
+                                    {% if pode_avaliar_solicitacao %}
+                                        <td class="no-print">
+                                            <ul class="action-bar">
+                                                <li><a href="?id={{ solicitacao.pk }}&deferir=1" class="btn success">Deferir</a></li>
+                                                <li><a href="?id={{ solicitacao.pk }}" class="btn danger">Indeferir</a></li>
+                                            </ul>
+                                        </td>
+                                    {% endif %}
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </form>
+        {% else %}
+            <p class="alert alert-warning">Nenhum agendamento cadastrado.</p>
+        {% endif %}
+    {% endbox %}
+</div>
+
+<div class="tab-pane" data-title="Solicitações Deferidas" data-counter="{{ solicitacoes_deferidas.count }}">
+    {% box "Solicitações Deferidas" %}
+        {% if solicitacoes_deferidas.exists %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Aluno</th>
+                            <th>Data da Solicitação</th>
+                            <th>Tipo</th>
+                            <th>Motivo</th>
+                            <th>Avaliador</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for solicitacao in solicitacoes_deferidas %}
+                            <tr>
+                                <td><a href="/edu/aluno/{{ solicitacao.aluno.matricula }}/">{{ solicitacao.aluno }}</a></td>
+                                <td>{{ solicitacao.data_solicitacao|format }}</td>
+                                <td>{{ solicitacao.get_tipo_refeicao_display }}</td>
+                                <td>{{ solicitacao.motivo_solicitacao|format }}</td>
+                                <td>{{ solicitacao.avaliador_vinculo.user|format }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Nenhuma solicitação deferida.</p>
+        {% endif %}
+    {% endbox %}
+</div>
+
+<div class="tab-pane" data-title="Solicitações Indeferidas" data-counter="{{ solicitacoes_indeferidas.count }}">
+    {% box "Solicitações Indeferidas" %}
+        {% if solicitacoes_indeferidas.exists %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Aluno</th>
+                            <th>Data da Refeição</th>
+                            <th>Tipo</th>
+                            <th>Motivo</th>
+                            <th>Avaliador</th>
+                        </tr>
+                    </thead>
+                    {% autopaginate solicitacoes_indeferidas 25 %}
+                    {% paginate %}
+                    <tbody>
+                        {% for solicitacao in solicitacoes_indeferidas %}
+                            <tr>
+                                <td><a href="/edu/aluno/{{ solicitacao.aluno.matricula }}/">{{ solicitacao.aluno }}</a></td>
+                                <td>{{ solicitacao.data_auxilio|format }}</td>
+                                <td>{{ solicitacao.get_tipo_refeicao_display }}</td>
+                                <td>{{ solicitacao.motivo_solicitacao|format }}</td>
+                                <td>{{ solicitacao.avaliador_vinculo.user|format }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Nenhuma solicitação indeferida.</p>
+        {% endif %}
+    {% endbox %}
+</div>
+
+{% endblock %}

@@ -1,0 +1,372 @@
+{% extends super_template %} 
+
+{% block object-status %}
+    {{ obj.get_tipo_convocacao_display|status }}
+{% endblock %}
+
+{% block action-bar %}
+    {% if acesso_total %}
+        <ul class="action-bar">
+            {% if perms.edu.change_convocacaoenade %}
+                <li><a class="btn primary" href="/admin/edu/convocacaoenade/{{ obj.pk }}/change/">Editar dados gerais</a></li>
+                {% if is_avaliacao_teorica %}
+                    <li><a class="btn primary popup" href="/edu/editar_datas_inscricao_convocacaoenade/{{ obj.pk }}/">Editar datas de inscrição</a></li>
+                {% endif %}
+            {% endif %}
+            {% if obj|method:"pode_processar_lista_convocados"|call:request.user %}
+                <li class="has-child">
+                    <a href="#" class="btn {% if possui_convocacao %}primary{% else %}success{% endif %}">{% if possui_convocacao %}Rep{% else %}P{% endif %}rocessar convocações</a>
+                    <ul>
+                        {% if is_avaliacao_teorica %}
+                            <li><a href="/edu/atualizar_lista_convocados_enade/{{ obj.pk }}/">Somente um curso</a></li>
+                            <li><a href="/edu/atualizar_lista_convocados_enade/{{ obj.pk }}/?curso_campus=">Todos os cursos</a></li>
+                        {% else %}
+                            <li><a href="/edu/atualizar_lista_convocados_enade/{{ obj.pk }}/">Processar por período</a></li>
+                        {% endif %}
+                    </ul>
+                </li>
+            {% endif %}
+            <li class="has-child">
+                <a href="#" class="btn">Exportar</a>
+                <ul>
+                   <li><a class="btn" href="/edu/imprimir_lista_convocados_enade_pdf/{{ obj.pk }}/">PDF</a></li>
+                    <li><a class="btn" href="?xls=1">XLS</a></li>
+                </ul>
+            </li>
+            
+        </ul>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+
+    {% if is_avaliacao_teorica %}
+        {% if obj.data_inscricao_ingressantes %}
+            <p class="alert alert-info">A lista de ingressantes convocados não poderá ser atualizada após {{ obj.data_inscricao_ingressantes|format }}.</p>
+        {% else %}
+            <p class="alert alert-danger">A data limite para inscrição de ingressantes não foi informada.</p>
+        {% endif %}
+        {% if obj.data_inscricao %}
+            <p class="alert alert-info">A lista de concluintes convocados não poderá ser atualizada após {{ obj.data_inscricao|format }}.</p>
+        {% else %}
+            <p class="alert alert-danger">A data limite para inscrição de concluintes não foi informada.</p>
+        {% endif %}
+    {% endif %}
+
+    {% box "Dados da Convocação" %}
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>Ano letivo</dt>
+                <dd>{{ obj.ano_letivo|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Tipo de convocação</dt>
+                <dd>{{ obj.get_tipo_convocacao_display|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Situações</dt>
+                <dd>{{ obj.situacoes_convocadas|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Áreas</dt>
+                <dd>{{ obj.areas_cursos_formacao_superior|format }}</dd>
+            </div>
+            {% if is_avaliacao_teorica %}
+                <div class="list-item">
+                    <dt>Data limite para inscrição de ingressantes</dt>
+                    <dd>{{ obj.data_inscricao_ingressantes|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Data de início para inscrição de concluintes</dt>
+                    <dd>{{ obj.data_inicio_inscricao|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Data limite para inscrição de concluintes</dt>
+                    <dd>{{ obj.data_inscricao|format }}</dd>
+                </div>
+            {% endif %}
+        </dl>
+    {% endbox %}
+
+    <div class="tab-pane" data-title="Quadro de convocados" data-tab="convocados" data-counter="{{ obj.cursos.count }}">
+        {% for mce in obj.modalidadeconvocacaoenade_set.all %}
+            {% box "{{ mce.modalidade }}" %}
+                <ul class="action-bar">
+                    {% if pode_editar_criterios_teorica %}
+                        <li><a class="btn primary popup" href="/edu/editar_modalidadeconvocacaoenade/{{ mce.id }}/">Editar critérios de convocação</a></li>
+                    {% endif %}
+                    {% if acesso_total %}
+                        {% if is_avaliacao_teorica %}
+                            <li class="has-child">
+                                <a href="#" class="btn">Enviar mensagem</a>
+                                <ul>
+                                    <li><a class="btn" href="/edu/enviar_mensagem/?enade={{ obj.id }}&modalidade={{ mce.modalidade_id }}&tipo_convocacao=1">Ingressantes</a></li>
+                                    <li><a class="btn" href="/edu/enviar_mensagem/?enade={{ obj.id }}&modalidade={{ mce.modalidade_id }}&tipo_convocacao=2">Concluintes</a></li>
+                                    <li><a class="btn" href="/edu/enviar_mensagem/?enade={{ obj.id }}&modalidade={{ mce.modalidade_id }}&tipo_convocacao=">Todos</a></li>
+                                </ul>
+                            </li>
+                            
+                        {% else %}
+                            <li class="has-child">
+                                <a href="#" class="btn">Enviar mensagem</a>
+                                <ul>
+                                    {% for periodo in obj.periodoconvocacaoregencia_set.all %}
+                                        <li><a href="/edu/enviar_mensagem/?enade={{ obj.id }}&modalidade={{ mce.modalidade_id }}&tipo_convocacao=&periodo={{ periodo.id }}">Convocados no período {{ periodo|format }}</a></li>
+                                    {% endfor %}
+                                </ul>
+                            </li>
+                        {% endif %}
+                    {% endif %}
+                </ul>
+                {% if is_avaliacao_teorica %}
+                    {% include 'includes_enade/quadro_convocacao_teorica.html' %}
+                {% else %}
+                    {% for periodo in obj.periodoconvocacaoregencia_set.all %}
+                        {% include 'includes_enade/quadro_convocacao_pratica.html' with periodo=periodo %}
+                    {% empty %}
+                        <p class="alert alert-warning">Nenhum período de convocação foi adicionado.</p>
+                    {% endfor %}
+                {% endif %}
+            {% endbox %}
+        {% endfor %}
+    </div>
+    
+    {% if is_avaliacao_teorica %}
+        <div class="tab-pane" data-title="Possíveis integralizados" data-tab="possiveis_integralizados">
+            {% for mce in obj.modalidadeconvocacaoenade_set.all %}  
+            
+                {% if mce.data_limite_integralizacao_concluinte %}
+                    <dl class="definition-list flex">
+                        <div class="list-item">
+                            <dt>Data limite</dt>
+                            <dd>{{ mce.data_limite_integralizacao_concluinte|format }}</dd>
+                        </div>
+                    </dl>
+                    
+                    <div class="table-responsive">
+                        <table>
+                            <caption>Possíveis integralizados: {{ mce.modalidade }}</caption>
+                            <thead>
+                                <tr>
+                                    <th class="no-print">Ações</th>
+                                    <th>Curso</th>
+                                    <th>Campus</th>
+                                    <th class="text-center">Convocados</th>
+                                    <th class="text-center">Não convocados</th>
+                                    <th class="text-center">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for registro in mce.get_possiveis_integralizados %}
+                                <tr>
+                                    <td class="no-print">{% icon "view" "/edu/possiveis_integralizados_enade/{{ obj.pk }}/{{ registro.curso.pk }}/" %}</td>
+                                    <td><strong>{{ registro.curso.codigo }}</strong> - {{ registro.curso.descricao_historico }}</td>
+                                    <td>{{ registro.curso.diretoria.setor.uo }}</td>
+                                    <td class="text-center">{{ registro.total_convocados }}</td>
+                                    <td class="text-center">{{ registro.total_nao_convocados }}</td>
+                                    <td class="text-center">{{ registro.total_alunos }}</td>
+                                </tr>
+                                {% empty %}
+                                    <tr><td colspan="6"><span class="status status-alert">Nenhum possível integralizado identificado.</span></td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="alert alert-info"><strong>Atenção:</strong> Não há data limite para integralização de concluinte configurada para a modalidade {{ mce.modalidade }}.{% if pode_editar_criterios_teorica %} <a class="popup" href="/edu/editar_modalidadeconvocacaoenade/{{ mce.id }}/">Edite os critérios de convocação</a>.{% endif %}</p>
+                {% endif %}
+            {% endfor %}
+
+        </div>
+
+        <div class="tab-pane" data-title="Possíveis concluintes" data-tab="possiveis_concluintes">
+            {% for mce in obj.modalidadeconvocacaoenade_set.all %}  
+            
+                {% if mce.data_limite_conclusao %}
+                    <dl class="definition-list flex">
+                        <div class="list-item">
+                            <dt>Data limite</dt>
+                            <dd>{{ mce.data_limite_conclusao|format }}</dd>
+                        </div>
+                    </dl>
+                    
+                    <div class="table-responsive">
+                        <table>
+                            <caption>Possíveis concluintes: {{ mce.modalidade }}</caption>
+                            <thead>
+                                <tr>
+                                    <th class="no-print">Ações</th>
+                                    <th>Curso</th>
+                                    <th>Campus</th>
+                                    <th class="text-center">Convocados</th>
+                                    <th class="text-center">Não convocados</th>
+                                    <th class="text-center">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for registro in mce.get_possiveis_concluintes %}
+                                <tr>
+                                    <td class="no-print">{% icon "view" "/edu/possiveis_concluintes_enade/{{ obj.pk }}/{{ registro.curso.pk }}/" %}</td>
+                                    <td><strong>{{ registro.curso.codigo }}</strong> - {{ registro.curso.descricao_historico }}</td>
+                                    <td>{{ registro.curso.diretoria.setor.uo }}</td>
+                                    <td class="text-center">{{ registro.total_convocados }}</td>
+                                    <td class="text-center">{{ registro.total_nao_convocados }}</td>
+                                    <td class="text-center">{{ registro.total_alunos }}</td>
+                                </tr>
+                                {% empty %}
+                                    <tr><td colspan="6"><span class="status status-alert">Nenhum possível concluinte identificado.</span></td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="alert alert-info"><strong>Atenção:</strong> Não há data limite de conclusão configurada para a modalidade {{ mce.modalidade }}.</p>
+                {% endif %}
+            {% endfor %}
+        </div>
+
+        <div class="tab-pane" data-title="Quadro de não convocados" data-tab="nao_convocados">
+            {% if tabela_nao_convocados %}
+                {% if perms.edu.change_convocacaoenade %}
+                    <ul class="action-bar">
+                        <li><a class="btn" href="/edu/dispensar_nao_convocados/{{ obj.pk }}/">Dispensar ingressantes</a></li>
+                    </ul>
+                {% endif %}
+                {% regroup tabela_nao_convocados by curso_campus.justificativa_dispensa_ingressante as grupos %}
+                {% for grupo in grupos %}
+                    {% box "Justificativa: {{ grupo.grouper|format }}" %}
+                        {% if not grupo.grouper %}
+                            <p class="alert alert-warning"><strong>Atenção:</strong> Informe a justificativa de dispensa padrão do curso. Alunos de cursos sem justificativa especificada não terão a dispensa aplicada automaticamente.</p>
+                        {% endif %}
+                        <div class="table-responsive">
+                        <table>
+                            <caption>Cursos não convocados {% if grupo.grouper %}com{% else %}<strong>sem</strong>{% endif %} justificativa de dispensa</caption>
+                            <thead>
+                                <tr>
+                                    <th class="no-print">Ações</th>
+                                    <th>Curso</th>
+                                    <th>Campus</th>
+                                    <th class="text-center">Alunos Ingressantes</th>
+                                    <th class="text-center">Alunos Concluintes</th>
+                                    <th class="text-center">Total</th>
+                                    {% if perms.edu.change_convocacaoenade %}
+                                        <th>Opções</th>
+                                    {% endif %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for registro in grupo.list %}
+                                    <tr>
+                                        <td class="no-print">
+                                            {% icon "view" "/edu/convocados_enade/{{ obj.pk }}/{{ registro.curso_campus.pk }}/" %}
+                                        </td>
+                                        <td><strong>{{ registro.curso_campus.codigo }}</strong>
+                                            - {{ registro.curso_campus.descricao_historico }}</td>
+                                        <td>{{ registro.curso_campus.diretoria.setor.uo }}</td>
+                                        <td class="text-center">{{ registro.total_ingressantes }}</td>
+                                        <td class="text-center">{{ registro.total_concluintes }}</td>
+                                        <td class="text-center">{{ registro.total_alunos }}</td>
+                                        {% if perms.edu.change_convocacaoenade %}
+                                        <td class="no-print text-center">
+                                            <ul class="action-bar">
+                                                {% if grupo.grouper %}
+                                                    <li><a class="btn primary popup" href="/edu/editar_justificativa_dispensa/{{ registro.curso_campus.id }}"> Editar justificativa de dispensa </a></li>
+                                                {% else %}
+                                                <li><a class="btn success popup" href="/edu/editar_justificativa_dispensa/{{ registro.curso_campus.id }}"> Informar justificativa de dispensa </a></li>
+                                                {% endif %}
+                                            </ul>
+                                        </td>
+                                        {% endif %}
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        </div>
+                    {% endbox %}
+                {% endfor %}
+            {% else %}
+                <p class="alert alert-warning">Nenhum curso encontrado.</p>
+            {% endif %}
+        </div>
+    {% else %}
+        <div class="tab-pane" data-title="Períodos de convocação" data-tab="periodos">
+            {% if pode_editar_criterios_pratica %}
+                <ul class="action-bar">
+                    <li><a class="btn primary popup" href="/admin/edu/periodoconvocacaoregencia/add/?convocacao_enade={{ pk }}">Adicionar período</a></li>
+                </ul>
+            {% endif %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Períodos de convocação ({{ obj.periodoconvocacaoregencia_set.count }})</caption>
+                    <thead>
+                        <tr>
+                            {% if pode_editar_criterios_pratica %}
+                                <th class="no-print">Ações</th>
+                            {% endif %}
+                            <th>Data inicial</th>
+                            <th>Data final</th>
+                            <th>Quantidade convocados</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for registro in obj.periodoconvocacaoregencia_set.all %}
+                        <tr>
+                            {% if pode_editar_criterios_pratica %}
+                                <td class="no-print">
+                                    {% icon "edit" "/admin/edu/periodoconvocacaoregencia/{{ registro.pk }}/" "Editar" %}
+                                    {% icon "delete" "/comum/excluir/edu/periodoconvocacaoregencia/{{ registro.pk }}/" "Excluir" "popup no-confirm" %}
+                                </td>
+                            {% endif %}
+                            <td>{{ registro.data_inicio }}</td>
+                            <td>{{ registro.data_fim }}</td>
+                            <td>{{ registro.get_total_convocados }}</td>
+                        </tr>
+                        {% empty %}
+                            <tr><td colspan="{% if pode_editar_criterios_pratica %}4{% else %}3{% endif %}"><span class="status status-alert">Nenhum período de regência vinculado.</span></td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% endif %}
+    
+    {% if cursos_desabilitados %}
+    <div class="tab-pane" data-title="Cursos desabilitados" data-tab="cursos_desabilitados" data-counter="{{ cursos_desabilitados.count }}">            
+        <div class="table-responsive">
+            <table>
+                <caption>Cursos não habilitados para convocação no ENADE</caption>
+                <thead>
+                    <tr>
+                        <th>Curso</th>
+                        <th>Campus</th>
+                        <th class="no-print">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for registro in cursos_desabilitados %}
+                    <tr>
+                        <td><strong>{{ registro.codigo }}</strong> - {{ registro.descricao_historico }}</td>
+                        <td>{{ registro.diretoria.setor.uo }}</td>                        
+                        <td class="no-print"><a href="{% url 'habilitar_desabilitar_curso_enade' obj.pk registro.pk %}" class="btn success">Habilitar</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>        
+    </div>
+    {% endif %}
+
+    <div class="tab-pane" data-title="Documentos" data-tab="documentos">
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>Portaria</dt>
+                <dd>{% if obj.portaria %}<a href="{{ obj.portaria.url }}">{{ obj.portaria|filename }}</a>{% else %}-{% endif %}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Edital</dt>
+                <dd>{% if obj.edital %}<a href="{{ obj.edital.url }}">{{ obj.edital|filename }}</a>{% else %}-{% endif %}</dd>
+            </div>
+        </dl>
+    </div>
+
+{% endblock %}

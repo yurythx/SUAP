@@ -1,0 +1,76 @@
+{% extends super_template %}
+
+{% block content %}
+<dl>
+    <dt>Código:</dt>
+    <dd>{{ material.codigo }}</dd>
+    <dt>Material:</dt>
+    <dd>{{ material }}</dd>
+</dl>
+
+{% for uo_sigla, movimentos in historicos.items %}
+
+    <div class="tab-pane ajax-rendered" data-title="{{ uo_sigla }}" data-tab="{{ uo_sigla }}" {% if movimentos|length > 1 %}data-counter="{{ movimentos|length }}"{% endif %}>
+        {% box "Histórico de Movimentação ({{ uo_sigla }})" %}
+            {% for i in movimentos %}
+                {% if forloop.last %}
+                    {% if user|in_group:"Coordenador de Almoxarifado Sistêmico" %}
+                        <ul class="action-bar">
+                            <li><a href="/almoxarifado/atualizar_valor_medio/{{ uo_sigla }}/{{ material.id }}/" class="btn">
+                                Atualizar Valor Médio
+                            </a></li>
+                        </ul>
+                    {% endif %}
+                    <dl>
+                        <dt>Estoque Atual:</dt>
+                        <dd>{{ i.estoque_atual }}</dd>
+                        <dt>Valor Médio:</dt>
+                        <dd>{{ i.valor_medio }}</dd>
+                    </dl>
+                    </tr>
+                {% endif %}
+            {% endfor %}             
+            <table>
+                <caption>Histórico de movimentação</caption>
+                <thead>
+                    <tr>
+                        <th>Tipo</th>
+                        <th>Data</th>
+                        <th>UO</th>
+                        <th class="text-end">Qtd</th>
+                        <th class="text-end">Estoque</th>
+                        <th class="text-end">Valor</th>
+                        <th class="text-end">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for i in movimentos %}
+                    {% if forloop.last %}
+                        <tr class="negrito">
+                    {% else %}
+                        <tr class="{% if i.qtd >= 0 %}true{% else %}false{% endif %}">
+                    {% endif %}
+                        <td><a href="{{ i.get_origem.get_absolute_url|safe }}">{{ i.tipo }}</a>{% if i.get_origem.observacoes %}<br>Observações: {{ i.get_origem.observacoes }}{% endif %}</td>
+                        <td>{{ i.data|format }}</td>
+                        <td>{{ i.uo }}</td>
+                        <td class="text-end">{{ i.qtd|format_quantity }}</td>
+                        <td class="text-end">{{ i.estoque|format_quantity }}</td>
+                        <td class="text-end">{{ i.valor|format_money_almox }}</td>
+                        <td class="text-end">{{ i.total|format_money_almox }}</td>
+                    </tr>
+                    {% if forloop.last %}
+                        {% if i.qtd < 0 or i.total < 0 %}
+                            <p class="alert alert-info"> <strong>Atenção:</strong> As movimentações abaixo podem conter erros que tornam os saldos/quantidades inconsistentes.</p>
+                        {% elif i.qtd == 0 and i.total > 0 %}
+                            <p class="alert alert-info"> <strong>Atenção:</strong> As movimentações abaixo podem conter erros que tornam os saldos/quantidades inconsistentes.</p>
+                        {% endif %}
+                    {% endif %}
+                {% endfor %}
+                </tbody>
+            </table>
+        {% endbox %}
+    </div>
+
+{% endfor %}
+
+{% endblock %}

@@ -1,0 +1,494 @@
+{% extends super_template %}
+
+{% block extrahead %}
+    <script>
+        function onChangeTabs(){
+            if (window.current_tab == 'vagas' && typeof init_tab_vagas === 'function'){
+                init_tab_vagas();
+            }
+        }
+    </script>
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if is_administrador and obj.possui_curso_proitec %}
+            <li><a href="/processo_seletivo/matricular_alunos_proitec/{{ obj.id }}/{{ obj.ano.pk }}/{{ obj.semestre }}/"
+                class="btn success">Matricular Alunos Proitec</a></li>
+            <li><a class="btn primary" href="?processar_matriculas_proitec=1">Processar Matriculas Alunos Proitec</a></li>
+        {% endif %}
+        {% if perms.processo_seletivo.add_edital and not obj.ofertavagacurso_set.exists %}
+            <li><a class="btn" href="/processo_seletivo/importar_edital_xml/{{ obj.pk }}/">Importar Dados (XML)</a>
+            <li><a class="btn" href="/processo_seletivo/importar_edital_csv/{{ obj.pk }}/">Importar Dados (CSV)</a>
+        {% endif %}
+        {% if request.user.is_superuser and obj.arquivo_xml %}
+            <li><a class="btn" href="{{ obj.arquivo_xml.url }}">Baixar Arquivo (XML)</a></li>
+        {% endif %}
+        {% if request.user.is_superuser and obj.webservice and obj.webservice.url_edital %}
+            <li><a class="btn primary" href="/processo_seletivo/edital/{{ obj.pk }}/atualizar_aprovacoes/">Atualizar Aprovações em Bancas</a></li>
+        {% endif %}
+        <li><a class="btn default" href="?relatorio_matricula=1">Relatório de Matrículas</a></li>
+        {% if obj.sisu %}
+            <li><a class="btn default" href="?sisu_gestao=1">Relatório SISU Gestão</a></li>
+        {% endif %}
+        {% help_button %}
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+    {% if is_administrador and obj.possui_curso_proitec %}
+        <p class="alert alert-info">
+            Este edital possui cursos Proitec. Para matricular os alunos no sistema, clique no botão "Matricular Alunos
+            Proitec" no canto superior direito da tela.
+        </p>
+    {% endif %}
+
+    {% if pendencias %}
+        <div class="alert alert-warning">
+            <p><strong>Pendências:</strong></p>
+            <ul>
+                {% for pendencia in pendencias %}
+                    <li>{{ pendencia }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+
+    {% box 'Dados do Edital' %}
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>Código</dt>
+                <dd>{{ obj.codigo|default:obj.pk }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Ano/Semestre</dt>
+                <dd>{{ obj.ano }}/{{ obj.semestre }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Descrição</dt>
+                <dd>{{ obj.descricao }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>WebService</dt>
+                <dd>{{ obj.webservice.descricao|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Edital de Vagas Remanescentes</dt>
+                <dd>{{ obj.remanescentes|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Sisu</dt>
+                <dd>{{ obj.sisu|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Início das Matrículas</dt>
+                <dd>{{ obj.data_inicio_matricula|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Fim das Matrículas</dt>
+                <dd>{{ obj.data_fim_matricula|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Limite para Avaliação</dt>
+                <dd>{{ obj.data_limite_avaliacao|format }}</dd>
+            </div>
+        </dl>
+    {% endbox %}
+
+    <div class="tab-pane ajax-rendered" data-title="Listas" data-counter="{{ obj.lista_set.count }}"
+         data-tab="lista">
+        {% if request.GET.tab == "lista" or not request.GET.tab %}
+            {% if obj.lista_set.exists %}
+                <div class="table-responsive">
+                    <table>
+                        <caption>Listas do Edital</caption>
+                        <thead>
+                        <tr>
+                            <th>Descrição</th>
+                            <th>Forma de Ingresso</th>
+                            <th>Requer Avaliação em Banca</th>
+                            {% if perms.processo_seletivo.change_lista %}
+                                <th class="no-print">Opções</th>
+                            {% endif %}
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for lista in obj.lista_set.all %}
+                            <tr>
+                                <td>{{ lista.descricao|format }}</td>
+                                <td>{{ lista.forma_ingresso|format }}</td>
+                                <td>{{ lista.requer_avaliacao_banca|format }}</td>
+                                {% if perms.processo_seletivo.change_lista %}
+                                    <td class="no-print">
+                                        {% if not possui_aluno_matriculado %}
+                                            <a class="popup btn primary" href="/processo_seletivo/definir_forma_ingresso/{{ lista.pk }}/">Definir Forma de Ingresso</a></li>
+                                        {% endif %}
+                                    </td>
+                                {% endif %}
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="alert alert-warning">Nenhuma lista cadastrada para esse edital.</p>
+            {% endif %}
+        {% endif %}
+    </div>
+
+    <div class="tab-pane ajax-rendered" data-title="Configuração de Migração de Vagas" data-tab="migracao">
+        {% if request.GET.tab == "migracao" %}
+            {% if perms.processo_seletivo.add_configuracaomigracaovaga %}
+                <ul class="action-bar">
+                    <li><a href="/processo_seletivo/definir_configuracao_migracao_vaga/{{ obj.pk }}/" class="btn success popup">
+                        Definir Configuração de Migração de Vagas
+                    </a></li>
+                    {% if conf.pk %}
+                        <li><a class="btn primary" href="/processo_seletivo/configuracaomigracaovaga/{{ conf.pk }}/">Editar Configuração de Migração de Vagas</a></li>
+                    {% endif %}
+                </ul>
+            {% endif %}
+
+            {% if conf %}
+                {% include "includes/configuracao_migracao.html" %}
+            {% else %}
+                <p class="alert alert-warning">Configuração de migração de vagas não definida até o momento.</p>
+            {% endif %}
+        {% endif %}
+    </div>
+
+    <div class="tab-pane ajax-rendered" data-title="Candidatos" data-counter="{{ candidatos.count }}"
+         data-tab="candidatos">
+        {% if request.GET.tab == "candidatos" %}
+            {% box 'Relação de Candidatos' %}
+                <ul class="action-bar">
+                    <li><a href="?tab=candidatos&xls_candidatos=1" class="btn">Exportar Candidatos para Excel</a></li>
+                </ul>
+                <div class="search-and-filters">
+
+                    <form id="changelist-search" method="get">
+                        <div class="filter">
+                            <label>Buscar:</label>
+                            <input type="hidden" name="tab" value="candidatos">
+                            <input type="text" size="40" name="candidato" value="{{ candidato }}" id="candidato"
+                                   class="search-query">
+                            <input type="submit" value="Ir">
+                        </div>
+                        <div class="filter">
+                            <label>Campus:</label>
+                            <select name="uo_selecionada" onchange="$('#changelist-search').submit();">
+                                <option {% if not uo_selecionada %} selected="selected" {% endif %} value="">Todos
+                                </option>
+                                {% for uo in uos %}
+                                    <option {% if uo_selecionada == uo.pk %} selected="selected" {% endif %}
+                                                                             value="{{ uo.pk }}">{{ uo }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="filter">
+                            <label>Polo:</label>
+                            <select name="polo_selecionado" onchange="$('#changelist-search').submit();">
+                                <option {% if not polo_selecionado %} selected="selected" {% endif %} value="">Todos
+                                </option>
+                                {% for polo in polos %}
+                                    <option {% if polo_selecionado == polo %} selected="selected" {% endif %}
+                                                                              value="{{ polo }}">{{ polo }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </form>
+
+                </div>
+                {% autopaginate candidatos 25 %}
+                {% if candidatos.exists %}
+                    <div class="table-responsive">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>Nº Inscrição</th>
+                            <th>CPF</th>
+                            <th>Nome</th>
+                            <th>Telefone</th>
+                            <th>E-mail</th>
+                            <th>Curso</th>
+                            <th>Turno</th>
+                            <th>Listas</th>
+                            {% if perms.processo_seletivo.pode_liberar_periodos %}
+                                <th>Ações</th>
+                            {% endif %}
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for candidato in candidatos %}
+                            <tr>
+                                <td>{{ candidato.inscricao }}</td>
+                                <td>{{ candidato.cpf }}</td>
+                                <td>{{ candidato.nome }}</td>
+                                <td>{{ candidato.telefone }}</td>
+                                <td>{{ candidato.email }}</td>
+                                <td>{{ candidato.curso_campus|format }}</td>
+                                <td class="text-center">{{ candidato.turno|format }}</td>
+                                <td>
+                                    <ul>
+                                        {% for candidatovaga in candidato.candidatovaga_set.all %}
+                                            <li><a class="popup"
+                                                   title="{{ candidatovaga.oferta_vaga.lista }}"
+                                                   href="{{ candidatovaga.oferta_vaga.get_absolute_url }}">{{ candidatovaga.oferta_vaga.lista }}</a>
+                                            </li>
+                                        {% endfor %}
+                                    </ul>
+                                </td>
+                                {% if perms.processo_seletivo.pode_liberar_periodos %}
+                                    <td>
+                                        <a href="/processo_seletivo/participacao_banca/{{ candidato.id }}/" class="btn default popup">Controlar Participação em Banca</a>
+                                    </td>
+                                {% endif %}
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                    </div>
+                    {% paginate %}
+                {% else %}
+                    {% if candidato %}
+                        <p class="alert alert-warning">Nenhum candidato cadastrado com essas informações.</p>
+                    {% else %}
+                        <p class="alert alert-warning">Nenhum candidato cadastrado para esse edital.</p>
+                    {% endif %}
+                {% endif %}
+            {% endbox %}
+        {% endif %}
+    </div>
+
+    <div class="tab-pane ajax-rendered" data-title="Ofertas de Vagas" data-counter="{{ obj.get_quantidade_vagas }}" data-tab="vagas" >
+        {% if request.GET.tab == "vagas" %}
+
+            {% if uos %}
+                <ul class="action-bar">
+                    <li>
+                        <a href="?lista_convocados=0&uo_selecionada={{ uo_selecionada }}&polo_selecionado={{ polo_selecionado }}&tab=vagas&divulgacao=0"
+                        class="btn">Exportar Última Convocação dos Cursos  (Interna)</a>
+                    </li>
+                    <li>
+                        <a href="?lista_convocados=0&uo_selecionada={{ uo_selecionada }}&polo_selecionado={{ polo_selecionado }}&tab=vagas&divulgacao=1"
+                            class="btn">Exportar Última Convocação dos Cursos (Publicação)</a>
+                    </li>
+                </ul>
+
+                <div class="search-and-filters">
+                    <form id="changelist-search2" method="get">
+                        <div class="filter">
+                            <input type="hidden" name="tab" value="vagas">
+                            <label>Campus:</label>
+                            <select name="uo_selecionada" onchange="$('#changelist-search2').submit();">
+                                {% if uos.count > 1 %}
+                                    <option value="" {% if not uo_selecionada %} selected="selected" {% endif %}>Selecione o Campus</option>
+                                {% endif %}
+                                {% for uo in uos %}
+                                    <option {% if uo_selecionada == uo.pk %} selected="selected" {% endif %} value="{{ uo.pk }}">{{ uo }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="filter">
+                            <label>Polo:</label>
+                            <select name="polo_selecionado" onchange="$('#changelist-search2').submit();">
+                                {% if polos.count > 1 %}
+                                    <option value="" {% if not polo_selecionado %} selected="selected" {% endif %}>Selecione o Polo</option>
+                                {% endif %}
+                                {% for polo in polos %}
+                                    <option {% if polo_selecionado == polo %} selected="selected" {% endif %} value="{{ polo }}">{{ polo }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </form>
+                </div>
+
+                {% if ofertas_vagas_curso.exists %}
+                    <script>
+                        function init_tab_vagas(){
+                            {% for oferta_vaga_curso in ofertas_vagas_curso %}
+                                atualizar_oferta_vaga_curso({{ oferta_vaga_curso.id }});
+                            {% endfor %}
+                        }
+
+                        function atualizar_oferta_vaga_curso(pk){
+                            $.get(
+                                "/processo_seletivo/oferta_vaga_curso_ajax/"+pk+"/?&uo_selecionada={{ uo_selecionada }}&polo_selecionado={{ polo_selecionado }}",
+                                function(data) {
+                                    $('#oferta-'+pk).html(data.html);
+                                    init_data_progress($('#oferta-'+pk));
+                                    init_action_bar($('#oferta-'+pk));
+                                    replaceAddAnotherLinks();
+                                }
+                            );
+                        }
+                    </script>
+                    {% for oferta_vaga_curso in ofertas_vagas_curso %}
+                        <div id="oferta-{{ oferta_vaga_curso.pk }}">
+                            <div class="table-responsive">
+                                <table class="mt-1">
+                                    <thead>
+                                        <tr>
+                                            <th colspan="14">
+                                                {{ oferta_vaga_curso.curso_campus.codigo }} - {{ oferta_vaga_curso.curso_campus.descricao_historico }}
+                                                {% if oferta_vaga_curso.turno_id %} - {{ oferta_vaga_curso.turno }} {% endif %}
+                                                {% if oferta_vaga_curso.linha_pesquisa_id %}({{ oferta_vaga_curso.linha_pesquisa|format }}){% endif %}
+                                                {% if oferta_vaga_curso.campus_polo %} / {{ oferta_vaga_curso.campus_polo }}{% endif %}
+                                            </th>
+                                        </tr>
+                                        <tr>
+                                            <th colspan="14"><span class="fas fa-spinner fa-spin" aria-hidden="true"></span> Aguarde...</th>
+                                        </tr>
+                                    </thead>
+                                </table>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="alert alert-info">Campus/Polo não selecionado.</p>
+                {% endif %}
+            {% else %}
+                <p class="alert alert-info">Não há cursos da sua diretoria neste edital.</p>    
+            {% endif %}
+        {% endif %}
+
+    </div>
+
+    <div class="tab-pane ajax-rendered" data-title="Quantitativo de Inscritos" data-tab="resumo">
+        {% if request.GET.tab == "resumo" %}
+            {% if obj.sisu %}
+                <p class="alert alert-info">Verificar no SISUGESTÃO.</p>
+            {% else %}
+                <table>
+                    <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Curso</th>
+                        <th>Diretoria</th>
+                        <th>Quantidade de Inscritos</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for oferta_vaga_curso in ofertas_vagas_curso_resumo %}
+                        <tr>
+                            <td>{{ forloop.counter }}</td>
+                            <td>{{ oferta_vaga_curso.curso_campus.descricao_historico }}</td>
+                            <td>{{ oferta_vaga_curso.curso_campus.diretoria }}</td>
+                            <td>{{ oferta_vaga_curso.qtd_inscritos }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% endif %}
+        {% endif %}
+    </div>
+
+    <div class="tab-pane ajax-rendered" data-title="Períodos de Liberação" data-tab="liberacao">
+        {% if request.GET.tab == "liberacao" %}
+            {% if perms.processo_seletivo.pode_liberar_periodos %}
+                <ul class="action-bar">
+                    <li><a href="/processo_seletivo/edital/{{ obj.pk }}/liberacao/" class="btn popup success">Adicionar Período</a></li>
+                </ul>
+            {% endif %}
+            <div class="search-and-filters">
+                <form id="changelist-liberacoes" method="get">
+                    <input type="hidden" name="tab" value="liberacao"/>
+                    <div class="filter">
+                        <label>Campus:</label>
+                        <select name="uo_selecionada" onchange="this.form.submit();">
+                            {% if is_administrador %}
+                                <option {% if not uo_selecionada %} selected="selected" {% endif %} value="">Todos
+                                </option>
+                            {% endif %}
+                            {% for uo in uos %}
+                                <option {% if uo_selecionada == uo.pk %} selected="selected" {% endif %}
+                                                                         value="{{ uo.pk }}">{{ uo }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </form>
+            </div>
+            {% if liberacoes %}
+            <table>
+                <thead>
+                <tr>
+                    {% if perms.processo_seletivo.pode_liberar_periodos %}
+                        <th>Ações</th>
+                    {% endif %}
+                    <th>Campus</th>
+                    <th>Data Inicial</th>
+                    <th>Data Final</th>
+                    <th>Data Limite Avaliação</th>
+                    {% if perms.processo_seletivo.pode_liberar_periodos %}
+                        <th>Opções</th>
+                    {% endif %}
+                </tr>
+                </thead>
+                <tbody>
+                {% for liberacao in liberacoes %}
+                    <tr>
+                        {% if perms.processo_seletivo.pode_liberar_periodos %}
+                            <td class="field-show_list_display_icons">
+                                {% if liberacao|method:"pode_editar"|call:request.user %}
+                                    <a href="/processo_seletivo/edital/{{ obj.pk }}/liberacao/{{ liberacao.pk }}/change/"
+                                    class="icon icon-edit popup" title="{{ liberacao }}"><span
+                                            class="visually-hidden">{{ liberacao }}</span></a>
+                                {% endif %}
+                            </td>
+                        {% endif %}
+                        <td>{{ liberacao.uo }}</td>
+                        <td>{{ liberacao.data_inicio_matricula }}</td>
+                        <td>{{ liberacao.data_fim_matricula }}</td>
+                        <td>{{ liberacao.data_limite_avaliacao }}</td>
+                        {% if perms.processo_seletivo.pode_liberar_periodos %}
+                        <td>
+                            <ul class="action-bar">
+                                <li><a href="/processo_seletivo/edital/historico_edital_periodo_liberacao/{{ liberacao.pk }}/"class="btn default popup" title="Histórico de Alteração {{ liberacao }}">Visualizar alterações</a></li>
+                                {% if liberacao.introducao_notifiacao_matricula and liberacao.detalhamento_notifiacao_matricula %}
+                                    <li><a href="?enviar_notificacoes_matricula=&liberacao={{ liberacao.pk }}" class="btn primary">Enviar Notificações de Matrícula</a></li>
+                                    <li><a href="/processo_seletivo/monitorar_notificacoes_matricula/{{ liberacao.pk }}/" class="btn default">Monitorar Notificações de Matrícula</a></li>
+                                {% endif %}
+                            </ul>
+                        </td>
+                        {% endif %}
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+                <p class="alert alert-warning">Nenhuma registro encontrado.</p>
+            {% endif %}
+        {% endif %}
+    </div>
+
+    {% if obj.importacaocsv_set.count %}
+        <div class="tab-pane ajax-rendered" data-title="Arquivos de Importação" data-tab="importacao">
+            {% if request.GET.tab == "importacao" %}
+                <table>
+                <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Arquivos</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for registro in obj.importacaocsv_set.all %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td>
+                            <a href="{{ registro.arquivo_listas.url }}" class="btn default">Arquivo de Listas</a>
+                            <a href="{{ registro.arquivo_vagas.url }}" class="btn default">Arquivo de Vagas</a>
+                            <a href="{{ registro.arquivo_candidatos.url }}" class="btn default">Arquivo de Candidatos</a>
+                            <a href="{{ registro.arquivo_resultado.url }}" class="btn default">Arquivo de Resultado</a>
+                            <a href="{{ registro.arquivo_dados_pessoais.url }}" class="btn default">Arquivo de Dados Pessoais</a>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+        </div>
+    {% endif %}
+
+{% endblock %}

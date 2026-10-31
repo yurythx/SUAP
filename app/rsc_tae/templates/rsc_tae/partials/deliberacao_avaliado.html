@@ -1,0 +1,156 @@
+{% comment %}
+Relato da deliberação ao avaliado. Contexto: `deliberacao_avaliado` (rsc_tae.views._deliberacao_avaliado).
+
+Aqui NÃO se identifica quem votou o quê: a decisão sai consolidada, com a contagem dos votos e as
+justificativas do colegiado. Os membros deliberantes aparecem como lista, sem ligação com o voto.
+{% endcomment %}
+
+{% with dados=deliberacao_avaliado %}
+
+{% box 'Resultado do processo' %}
+
+    {% if dados.sem_deliberacao_crsc %}
+        <p class="alert alert-warning">
+            Este processo foi decidido antes da deliberação colegiada da CRSC. O detalhamento abaixo
+            reflete a avaliação dos avaliadores auxiliares.
+        </p>
+    {% endif %}
+
+    <dl class="definition-list flex">
+        <div class="list-item">
+            <dt>Resultado</dt>
+            <dd>
+                {% if dados.deferido %}
+                    <span class="status status-success">Deferido</span>
+                {% else %}
+                    <span class="status status-error">Indeferido</span>
+                {% endif %}
+            </dd>
+        </div>
+        <div class="list-item">
+            <dt>Pontuação final</dt>
+            <dd>{{ dados.resumo.total_pontos|format }} / {{ dados.resumo.pontos_requeridos|format }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Itens reconhecidos</dt>
+            <dd>{{ dados.resumo.itens_validados }} / {{ dados.resumo.itens_requeridos }}</dd>
+        </div>
+    </dl>
+
+    {% if dados.deliberacao.justificativa %}
+        <h3 class="mt-4 mb-2">Justificativa da comissão</h3>
+        <p>{{ dados.deliberacao.justificativa|linebreaksbr }}</p>
+    {% endif %}
+
+    {% if dados.motivos %}
+        <h3 class="mt-4 mb-2">Fundamentos do indeferimento</h3>
+        <ul>
+            {% for motivo in dados.motivos %}
+                <li>{{ motivo }}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    {% if dados.membros %}
+        <h3 class="mt-4 mb-2">Comissão deliberante</h3>
+        <p class="text-muted">A decisão é do colegiado; o voto individual de cada membro não é divulgado.</p>
+        <ul>
+            {% for membro in dados.membros %}
+                <li>{{ membro.nome }}{% if membro.desempate %} <span class="status status-alert">voto de desempate</span>{% endif %}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+{% endbox %}
+
+{% box 'O que foi decidido em cada documento' %}
+
+    <p class="text-muted">
+        Documentos que ninguém contestou valem como você declarou. Os contestados foram deliberados
+        pela comissão, que fixou a pontuação reconhecida.
+    </p>
+
+    <div class="table-responsive">
+        <table>
+            <caption>Documentos enviados e a decisão da comissão</caption>
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Documento</th>
+                    <th class="text-center w-10">Você declarou</th>
+                    <th class="text-center w-10">Comissão reconheceu</th>
+                    <th class="w-30">O que houve</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for linha in dados.linhas %}
+                    <tr>
+                        <td>{{ linha.item.titulo }}</td>
+                        <td>{{ linha.anexo.nome_original|default:linha.anexo.arquivo.name }}</td>
+                        <td class="text-center">{{ linha.unidades_declaradas|format }}</td>
+                        <td class="text-center">
+                            {% if linha.estado == 'aceito_como_declarado' %}
+                                {{ linha.unidades_declaradas|format }}
+                            {% elif linha.estado == 'consolidado' %}
+                                {{ linha.nota_crsc|format }}
+                            {% elif linha.estado == 'avaliado_pelos_auxiliares' and linha.nota_auxiliares is not None %}
+                                {{ linha.nota_auxiliares|format }}
+                            {% else %}
+                                <span class="status status-default">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if linha.estado == 'aceito_como_declarado' %}
+                                <span class="status status-success">Aceito como declarado</span>
+                            {% elif linha.estado == 'consolidado' %}
+                                <span class="status status-info">
+                                    Deliberado pela comissão ({{ linha.votos_deferir }} pelo deferimento, {{ linha.votos_indeferir }} pelo indeferimento)
+                                </span>
+                            {% elif linha.estado == 'avaliado_pelos_auxiliares' %}
+                                <span class="status status-info">Conforme a avaliação dos avaliadores auxiliares</span>
+                            {% else %}
+                                <span class="status status-warning">Sem deliberação concluída</span>
+                            {% endif %}
+
+                            {% if linha.observacoes_auxiliares %}
+                                <div class="mt-2">
+                                    <strong>Apontamentos da avaliação:</strong>
+                                    <ul>
+                                        {% for observacao in linha.observacoes_auxiliares %}
+                                            <li>{{ observacao }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            {% endif %}
+
+                            {% if linha.justificativas %}
+                                <div class="mt-2">
+                                    <strong>Justificativa da comissão:</strong>
+                                    <ul>
+                                        {% for justificativa in linha.justificativas %}
+                                            <li>{{ justificativa }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="5">Nenhum documento foi anexado a este processo.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <ul class="action-bar mt-4">
+        <li><a href="{% url 'rsc_tae:parecer_pdf' processo.id %}" class="btn default" target="_blank" rel="noopener">Parecer conclusivo</a></li>
+        {% if not dados.sem_deliberacao_crsc %}
+            <li><a href="{% url 'rsc_tae:deliberacao_crsc_pdf' processo.id %}" class="btn default" target="_blank" rel="noopener">Deliberação da CRSC</a></li>
+        {% endif %}
+    </ul>
+
+{% endbox %}
+
+{% endwith %}

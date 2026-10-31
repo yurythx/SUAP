@@ -1,0 +1,505 @@
+{% extends super_template %}
+
+{% block object-status %}
+    {% if obj.ativo %}
+        {{ "Ativo"|status }}
+    {% else %}
+        {{ "Inativo"|status }}
+    {% endif %}
+    {% if obj.extinto %}
+        <span class="status status-error">Extinto</span>
+    {% elif obj.em_extincao %}
+        {{ "Em extinção"|status }}
+    {% elif obj.suspenso %}
+        <span class="status status-alert">Suspenso</span>
+    {% endif %}
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if perms.edu.efetuar_matricula and not obj.mesmo_curso %}
+            <li><a class="btn primary popup" href="/edu/editar_diretoria_curso/{{ obj.pk }}/">Editar Diretoria</a></li>
+            <li><a class="btn popup" href="/edu/definir_coordenador_curso/{{ obj.pk }}/">Definir Coordenação</a></li>
+        {% endif %}
+        {% if pode_definir_coordenador_estagio_docente %}
+            <li><a class="btn popup" href="/edu/definir_coordenador_estagio_docente/{{ obj.pk }}/">Adicionar Coordenador de Estágio Docente</a></li>
+        {% endif %}
+        {% if perms.edu.add_cursocampus %}
+            <li><a class="btn popup" href="/edu/cursocampus/{{ obj.pk }}/replicar/">Replicar Curso</a></li>
+        {% endif %}
+        {% help_button %}
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+    {% if obj.cursocampus_set.exists %}
+        <div class="alert alert-info">
+            <p><strong>Atenção:</strong> Este curso gerencia dados gerais e de funcionamento, código, coordenação de curso e atos regulatórios dos cursos:</p>
+            <ul>
+                {% for c in obj.cursocampus_set.all %}
+                    <li><a href="{{ c.get_absolute_url }}">{{ c|format }}</a></li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+
+    {% if obj.mesmo_curso %}
+        <p class="alert alert-info"><strong>Atenção:</strong> O cadastro deste curso corresponde ao curso <a href="{{ obj.mesmo_curso.get_absolute_url }}">{{ obj.mesmo_curso|format }}</a>. Dados gerais e de funcionamento, código, coordenação de curso e atos regulatórios serão editados somente no curso indicado.</p>
+    {% else %}
+
+        {% if pode_extinguir_curso %}
+            <p class="alert alert-danger"><strong>Atenção:</strong> Este curso não possui alunos com situação de matrícula ativa e pode ser extinto.</p>
+        {% endif %}  
+        
+        {% if obj.is_solicitacao_reconhecimento_pendente %}
+            <p class="alert alert-danger"><strong>Atenção:</strong> O curso atingiu 50% de funcionamento em {{ obj.data_solicitacao_reconhecimento }}. A solicitação do reconhecimento deve ser realizada até {{ obj.data_limite_reconhecimento|format }}.</p>
+        {% endif %}  
+        
+        {% if obj.is_solicitacao_reconhecimento_pendente_fora_do_prazo %}
+            <p class="alert alert-warning"><strong>Atenção:</strong> O curso não possui ato regulatório de reconhecimento e superou 75% de funcionamento da primeira turma em {{ obj.data_limite_reconhecimento|format }}.</p>
+        {% endif %}  
+
+        {% if obj.is_autorizacao_pendente %}
+            <p class="alert alert-warning"><strong>Atenção:</strong> O ato regulatório de autorização deste curso não foi informado.</p>
+        {% endif %}
+        
+        {% if obj.is_criacao_pendente %}
+            <p class="alert alert-warning"><strong>Atenção:</strong> O ato regulatório de criação deste curso não foi informado.</p>
+        {% endif %}
+        
+        {% if obj.em_extincao %}
+            <p class="alert alert-warning"><strong>Atenção:</strong> Este curso está em processo de extinção. Novas vagas não serão ofertadas para alunos ingressantes.</p>
+        {% elif obj.suspenso %}
+            <p class="alert alert-warning"><strong>Atenção:</strong> Este curso está suspenso para ofertar novas vagas a alunos ingressantes. Suspenso desde {{ ato_suspensao.data|format }}.</p>
+        {% endif %}
+
+        {% if pendente_homologacao_ato %}
+            <p class="alert alert-warning"><strong>Atenção:</strong> Este curso possui ato regulatório Ad Referendum pendende de homologação.</p>
+        {% endif %}
+
+        
+    {% endif %}  
+
+    {% box "Identificação" %}
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>Diretoria</dt>
+                <dd><a href="{{ obj.diretoria.get_absolute_url }}">{{ obj.diretoria|format }}</a></dd>
+            </div>
+            <div class="list-item">
+                <dt>Código</dt>
+                <dd>{{ obj.codigo|format }}</dd>
+            </div>
+            <div class="list-item flex-basis-100">
+                <dt>Descrição</dt>
+                <dd>{{ obj.descricao }}</dd>
+            </div>
+            <div class="list-item flex-basis-100">
+                <dt>Descrição no histórico</dt>
+                <dd>{{ obj.descricao_historico }}</dd>
+            </div>
+        </dl>
+    {% endbox %}
+
+    <div class="tab-pane ajax-rendered" data-title="Dados gerais" data-tab="dados_gerais">
+        {% if request.GET.tab == "dados_gerais" or not request.GET.tab %}
+            {% box "Dados de funcionamento" %}
+                <dl class="definition-list flex">
+                    <div class="list-item">
+                        <dt>Data de criação</dt>
+                        <dd>{{ obj.data_inicio|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Data de funcionamento</dt>
+                        <dd>{{ obj.data_funcionamento|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Ano Letivo</dt>
+                        <dd>{{ obj.ano_letivo|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Período Letivo</dd>
+                        <dd>{{ obj.periodo_letivo|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Quantidade de vagas anuais autorizadas</dt>
+                        <dd>{{ obj.quantidade_vagas|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Ativo</dt>
+                        <dd>{{ obj.ativo|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Suspenso</dt>
+                        <dd>{{ obj.suspenso|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Em extinção</dt>
+                        <dd>{{ obj.em_extincao|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Extinto</dt>
+                        <dd>{{ obj.extinto|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Data de extinção</dt>
+                        <dd>{{ obj.data_fim|format }}</dd>
+                    </div>
+                </dl>
+            {% endbox %}
+            {% box "Dados gerais" %}
+                <dl class="definition-list flex">
+                    <div class="list-item">
+                        <dt>Exige ENADE</dt>
+                        <dd>{{ obj.exige_enade|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Exige Colação de Grau</dt>
+                        <dd>{{ obj.exige_colacao_grau|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Ciência sem Fronteiras</dt>
+                        <dd>{{ obj.ciencia_sem_fronteira|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Certificado/Diploma Emitido pelo Campus</dt>
+                        <dd>{{ obj.emite_diploma|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Certificado/Diploma Assinado via Certificado ICP-EDU</dt>
+                        <dd>{{ obj.assinatura_eletronica|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Certificado/Diploma Assinado via Certificado ICP-Brasil</dt>
+                        <dd>{{ obj.assinatura_digital|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Curso de Formação de Professores</dt>
+                        <dd>{{ obj.formacao_de_professores|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Periodicidade</dt>
+                        <dd>{{ obj.get_periodicidade_display|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Modalidade</dt>
+                        <dd>{{ obj.modalidade|format }}</dd>
+                    </div>
+                    {% if obj.modalidade.is_graduacao %}
+                        <div class="list-item">
+                            <dt>Área do curso de formação superior</dt>
+                            <dd>{{ obj.area_curso_formacao_superior.get_areas|format }}</dd>
+                        </div>
+                    {% endif %}
+                    <div class="list-item">
+                        <dt>{% if obj.eixo %}Eixo{% elif obj.area %}Área{% else %}Área Capes{% endif %}</dt>
+                        <dd>{% if obj.eixo %}{{ obj.eixo|format }}{% elif obj.area %}{{ obj.area|format }}{% else %}{{ obj.area_capes|format }}{% endif %}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Área de Concentração</dt>
+                        <dd>{{ obj.area_concentracao|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Programa</dt>
+                        <dd>{{ obj.programa|format }}</dd>
+                    </div>
+                </dl>
+            {% endbox %}
+        {% endif %}
+    </div>
+
+    <div class="tab-pane ajax-rendered" data-title="Coordenação" data-tab="coordenacao">
+        {% if request.GET.tab == "coordenacao" %}
+            {% box "Coordenação" %}
+                <dl class="definition-list flex">
+                    <div class="list-item flex-basis-50">
+                        <dt>Coordenador</dt>
+                        <dd>{{ obj.coordenador|format }}</dd>
+                    </div>
+                    <div class="list-item flex-basis-50">
+                        <dt>Nº da Portaria</dt>
+                        <dd>{{ obj.numero_portaria_coordenador|format }}</dd>
+                    </div>
+                    <div class="list-item flex-basis-50">
+                        <dt>Coordenador substituto</dt>
+                        <dd>{{ obj.coordenador_2|format }}</dd>
+                    </div>
+                    <div class="list-item flex-basis-50">
+                        <dt>Nº da Portaria</dt>
+                        <dd>{{ obj.numero_portaria_coordenador_2|format }}</dd>
+                    </div>
+                </dl>
+            {% endbox %}
+            {% box "Histórico de Mudança" %}
+                {% if logs %}
+                    <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Data da Mudança</th>
+                                <th>Função</th>
+                                <th>Atual</th>
+                                <th>Anterior</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for historico in logs %}
+                            <tr>
+                                <td>{{ historico.0 }}</td>
+                                <td>{{ historico.3 }}</td>
+                                <td>{{ historico.2 }}</td>
+                                <td>{{ historico.1 }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    </div>
+                {% else %}
+                    <p class="alert alert-warning">Não existe histórico de mudança de coordenador para este curso.</p>
+                {% endif %}
+            {% endbox %}
+            {% if possui_estagio_docente %}
+                {% box "Coordenação de Estágio Docente" %}
+                    <dl class="definition-list">
+                        {% for coordenador in obj.coordenadores_estagio_docente.all %}
+                            <dt>Coordenador</dt>
+                            <dd>{{ coordenador.vinculo.relacionamento|format }}</dd>
+                        {% endfor %}
+                    </dl>
+                {% endbox %}
+            {% endif %}
+        {% endif %}
+    </div>
+
+    <div class="tab-pane ajax-rendered" data-title="Códigos do MEC" data-tab="mec">
+        {% if request.GET.tab == "mec" %}
+            {% box "Dados da Criação" %}
+                <dl class="definition-list flex">
+                    <div class="list-item">
+                        <dt>Código CENSUP</dt>
+                        <dd>{{ obj.codigo_censup|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Código e-MEC</dt>
+                        <dd>{{ obj.codigo_emec|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Código SISTEC</dt>
+                        <dd>{{ obj.codigo_sistec|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Código EDUCACENSO</dt>
+                        <dd>{{ obj.codigo_educacenso|format }}</dd>
+                    </div>
+                    {% if obj.modalidade.is_graduacao %}
+                        <div class="list-item">
+                            <dt>Código CINE</dt>
+                            <dd>{{ obj.area_curso_formacao_superior.codigo_cine|format }}</dd>
+                        </div>
+                    {% endif %}
+                </dl>
+            {% endbox %}
+        {% endif %}
+    </div>
+
+    <div class="tab-pane ajax-rendered" data-title="Matrizes" data-tab="matrizes">
+        {% if alerta_matriz_modular %}
+            <p class="alert alert-danger"><strong>Atenção:</strong> Este curso de periodicidade <strong>{{ obj.get_periodicidade_display }}</strong> possui uma ou mais matrizes com estrutura modular.</p>
+        {% endif %} 
+
+        {% if request.GET.tab == "matrizes" %}
+            {% box "Matrizes" %}
+                {% if perms.edu.add_matrizcurso %}
+                    <ul class="action-bar">
+                        <li><a class="btn success popup" href="/edu/adicionar_matriz_curso/{{ obj.pk }}/">Vincular Matriz</a></li>
+                    </ul>
+                {% endif %}
+
+                <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="no-print">Ações</th>
+                            <th>Código</th>
+                            <th>Descrição</th>
+                            <th>Tipo de Avaliação</th>
+                            <th>Ativa</th>
+                            {% if perms.edu.efetuar_matricula or perms.edu.add_matriz or pode_visualizar_estatistica or perms.edu.change_autorizacao or perms.edu.change_reconhecimento %}
+                                <th class="no-print">Opções</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for matriz_curso in matrizes_curso %}
+                        <tr>
+                            <td class="no-print">
+                                {% icon "view" "/edu/matriz/{{ matriz_curso.matriz.pk }}/" %}
+                                {% if perms.edu.change_cursocampus and matriz_curso.pode_ser_excluida %}
+                                    {% icon "delete" "/comum/excluir/edu/matrizcurso/{{ matriz_curso.pk }}/" "Remover" "no-confirm popup" %}
+                                {% endif %}
+                            </td>
+                            <td>{{ matriz_curso.matriz.id }}</td>
+                            <td>{{ matriz_curso.matriz.descricao }}</td>
+                            <td>{{ matriz_curso.matriz.estrutura.get_tipo_avaliacao_display|format }}</td>
+                            <td>{{ matriz_curso.matriz.ativo|format }}</td>
+                            {% if perms.edu.efetuar_matricula or perms.edu.add_matriz or pode_visualizar_estatistica or perms.edu.change_autorizacao or perms.edu.change_reconhecimento %}
+                                <td class="no-print">
+                                    <ul class="action-bar">
+                                        <li><a href="/edu/relatorio/?matriz={{ matriz_curso.matriz.pk }}&curso_campus={{ matriz_curso.curso_campus.pk }}&formatacao=simples&ordenacao=Nome&agrupamento=Campus&exibicao=situacao&quantidade_itens=25" class="btn default">Consultar alunos</a></li>
+                                        {% if is_avaliador_regulador %}
+                                            <li><a href="/edu/editar_legislacao_matriz/{{ matriz_curso.pk }}/" class="btn primary popup">Editar Legislação</a></li>
+                                        {% endif %}
+                                        {% if pode_migrar_aluno %}
+                                            <li><a class="btn" href="/edu/integralizar_alunos/{{ matriz_curso.matriz.id }}/">Migrar Alunos do Q-Acadêmico</a></li>
+                                        {% endif %}
+                                        {% if pode_visualizar_estatistica %}
+                                            <li><a class="btn" href="/edu/analise_curso/{{ matriz_curso.pk }}/">Análise Componente-Aluno</a></li>
+                                        {% endif %}
+                                        {% with matrizppc=matriz_curso.matriz.get_matrizppc %}
+                                            {% if matrizppc %}
+                                                <li><a class="btn" href="{{ matrizppc.get_absolute_url }}">Visualizar matriz do PPC</a></li>
+                                            {% endif %}
+                                        {% endwith %}
+                                    </ul>
+                                </td>
+                            {% endif %}
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7"><p class="alert alert-warning">Nenhuma matriz adicionada.</p></td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                </div>
+            {% endbox %}
+        {% endif %}
+    </div>
+
+    <div class="tab-pane ajax-rendered" data-title="Atos regulatórios" data-tab="atos">
+        {% if request.GET.tab == "atos" %}
+            {% if obj.mesmo_curso %}
+                <p class="alert alert-info"><strong>Atenção:</strong> O atos regulatórios deste curso são gerenciados pelo curso <a href="{{ obj.mesmo_curso.get_absolute_url }}?tab=atos">{{ obj.mesmo_curso|format }}</a>.</p>
+            {% else %}
+                {% if perms.edu.add_atoregulatoriocurso %}
+                    <ul class="action-bar">
+                        <li><a class="btn success popup" href="/edu/cursocampus/{{ pk }}/adicionar_atoregulatorio/">Adicionar ato regulatório</a></li>
+                    </ul>
+                {% endif %}
+                {% if atos.exists %}
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th class="no-print">Ações</th>
+                                    <th>Tipo de ato regulatório</th>
+                                    <th>Tipo de documento</th>
+                                    <th>Data</th>
+                                    <th>Número</th>
+                                    <th>Órgão</th>
+                                    <th>Ad Referendum</th>
+                                    <th class="no-print">Opções</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for ato in atos %}
+                                    <tr>
+                                        <td class="no-print">
+                                            {% icon "view" "/edu/atoregulatoriocurso/{{ ato.pk }}/" "Visualizar" %}
+                                            {% if perms.edu.change_atoregulatoriocurso %}
+                                                {% icon "edit" "/edu/atoregulatoriocurso/{{ ato.pk }}/editar/" "Editar" "popup" %}
+                                            {% endif %}
+                                            {% if perms.edu.delete_atoregulatoriocurso and not ato.ato_homologador %}
+                                                {% icon "delete" "/comum/excluir/edu/atoregulatoriocurso/{{ ato.pk }}/" "Remover" "no-confirm popup" %}
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ ato.get_tipo_display }}</td>
+                                        <td>{{ ato.get_tipo_documento_display }}</td>
+                                        <td>{{ ato.data }}</td>
+                                        <td>{{ ato.numero }}</td>
+                                        <td>{{ ato.orgao }}</td>
+                                        <td>{{ ato.ad_referendum|format }}</td>
+                                        <td class="no-print">
+                                            <ul class="action-bar">
+                                                {% if perms.edu.add_atoregulatoriocurso and ato.ad_referendum and not ato.ato_homologador %}
+                                                    <li><a class="btn popup success" href="/edu/cursocampus/{{ pk }}/adicionar_atoregulatorio/{{ ato.pk }}/">Adicionar ato de homologação</a></li>
+                                                {% endif %}
+                                                {% if ato.ato_homologador %}
+                                                    <li><a class="btn" href="/edu/atoregulatoriocurso/{{ ato.ato_homologador_id }}/">Visualizar ato de homologação</a></li>
+                                                    {% if perms.edu.add_atoregulatoriocurso and ato.ad_referendum %}
+                                                        <li><a class="btn popup primary" href="/edu/atoregulatoriocurso/{{ ato.ato_homologador_id }}/editar/">Editar ato de homologação</a></li>
+                                                        {% if perms.edu.delete_atoregulatoriocurso %}
+                                                            <li><a class="btn danger no-confirm popup" href="/comum/excluir/edu/atoregulatoriocurso/{{ ato.ato_homologador_id }}/">Remover ato de homologação</a></li>
+                                                        {% endif %}
+                                                    {% endif %}
+                                                {% endif %}
+                                            </ul>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="alert alert-warning">Nenhum ato regulatório adicionado.</p>
+                {% endif %}
+            {% endif %}
+        {% endif %}
+    </div>
+
+    {% if obj.is_reconhecimento_obrigatorio and not obj.possui_reconhecimento %}
+        <div class="tab-pane ajax-rendered" data-title="Solicitação de reconhecimento" data-tab="reconhecimento">
+            {% if request.GET.tab == "reconhecimento" %}
+                <ul class="action-bar">
+                    {% if pode_solicitar_reconhecimento %}
+                        <li><a class="btn success popup" href="/edu/cursocampus/{{ pk }}/adicionar_tramitacaoprocessoemec/">Adicionar processo e-MEC</a></li>
+                    {% endif %}
+                    {% if processo %}
+                        <li><a class="btn primary popup" href="/edu/tramitacaoprocessoemec/{{ processo.pk }}/editar/">Editar processo e-MEC</a></li>
+                    {% endif %}
+                    {% if perms.edu.add_atoregulatoriocurso %}
+                        <li><a class="btn primary popup" href="/edu/cursocampus/{{ pk }}/editar_funcionamento/">Editar datas de funcionamento</a></li>
+                    {% endif %}
+                </ul>
+                <dl class="definition-list flex">
+                    <div class="list-item">
+                        <dt>Data de início do funcionamento</dt>
+                        <dd>{{ obj.data_funcionamento|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Data de 50% do funcionamento</dt>
+                        <dd>{{ obj.data_solicitacao_reconhecimento|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Data de 75% do funcionamento</dt>
+                        <dd>{{ obj.data_limite_reconhecimento|format }}</dd>
+                    </div>
+                </dl>
+                {% if processo %}
+                    <dl class="definition-list flex">
+                        <div class="list-item">
+                            <dt>Número</dt>
+                            <dd>{{ processo.numero_processo|format }}</dd>
+                        </div>
+                        <div class="list-item">
+                            <dt>Tipo</dt>
+                            <dd>{{ processo.get_tipo_processo_display|format }}</dd>
+                        </div>
+                        <div class="list-item">
+                            <dt>Data de cadastro</dt>
+                            <dd>{{ processo.data_cadastro|format }}</dd>
+                        </div>
+                        <div class="list-item">
+                            <dt>Data do protocolo</dt>
+                            <dd>{{ processo.data_protocolo|format }}</dd>
+                        </div>
+                    </dl>
+                {% else %}
+                    <p class="alert alert-warning">Nenhuma tramitação de processo e-MEC adicionada.</p>
+                {% endif %}
+            {% endif %}
+        </div>
+    {% endif %}
+
+{% endblock %}

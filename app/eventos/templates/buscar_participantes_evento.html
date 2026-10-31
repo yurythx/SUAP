@@ -1,0 +1,201 @@
+{% extends super_template %}
+
+{% block extrahead %}
+    {{ block.super }}
+    <script>
+    function verificarSelecaoParticipantes() {
+        if ($("input[name='ids']:checked").length === 0) {
+            alert("Nenhum participante selecionado.");
+            return false;
+        }
+        return true;
+    }
+
+    function confirmarPresencaParticipantesSelecionados() {
+        if (!verificarSelecaoParticipantes()) {
+            return;
+        }
+        $('#acao-input').val('confirmar_presenca');
+        $('#form-participantes').submit();
+    }
+
+    function cancelarPresencaParticipantesSelecionados() {
+        if (!verificarSelecaoParticipantes()) {
+            return;
+        }
+        $('#acao-input').val('cancelar_presenca');
+        $('#form-participantes').submit();
+    }
+
+    // Script para marcar/desmarcar todos os checkboxes
+    $(document).ready(function() {
+        // Garantir que todos os checkboxes iniciem desmarcados
+        $('input[name="ids"]').prop('checked', false);
+        $('input[data-markall="true"]').prop('checked', false);
+        
+        $('input[data-markall="true"]').on('change', function() {
+            var isChecked = $(this).is(':checked');
+            $('input[name="ids"]').prop('checked', isChecked);
+        });
+        
+        // Desmarcar o "marcar todos" se algum item for desmarcado
+        $('input[name="ids"]').on('change', function() {
+            if (!$(this).is(':checked')) {
+                $('input[data-markall="true"]').prop('checked', false);
+            }
+        });
+    });
+    </script>
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        <li>
+            <a href="/eventos/evento/{{ evento.pk }}/" class="btn">{% icone "return" %} Voltar para Evento</a>
+        </li>
+    </ul>
+{% endblock %}
+
+{% block content %}
+    <h4>{{ evento.nome }}</h4>
+    {% box "Buscar Participantes" %}
+        <form method="get">
+            <div class="search-and-filters">
+                <div class="filter">
+                    <label for="q">Nome ou CPF:</label>
+                    <input type="text"
+                           id="q"
+                           name="q"
+                           value="{{ query|default:"" }}"
+                           placeholder="Digite o nome ou CPF"
+                           autofocus>
+                </div>
+                <div class="submit-button">
+                    <button type="submit" class="btn default">Buscar</button>
+                </div>
+            </div>
+        </form>
+        {% if participantes_encontrados %}
+            <p class="alert alert-info">{{ participantes_encontrados|length }} participante(s) encontrado(s).</p>
+            <form method="post"
+                  action="{% url 'processar_presenca_participantes' %}"
+                  id="form-participantes">
+                {% csrf_token %}
+                <input type="hidden" name="evento_id" value="{{ evento.id }}">
+                <input type="hidden" name="acao" id="acao-input" value="">
+                <input type="hidden" name="query" value="{{ query }}">
+                <div class="markall-container mb-5">
+                    <label for="markall-participantes">Marcar os {{ participantes_encontrados|length }} participantes</label>
+                    <input type="checkbox"
+                           id="markall-participantes"
+                           data-markall="true"
+                           data-markall-total="{{ participantes_encontrados|length }}">
+                </div>
+                <h4 class="mb-0">Para participantes marcados:</h4>
+                <div class="submit-row mb-5 mt-3">
+                    <button type="button"
+                            class="btn success"
+                            onclick="confirmarPresencaParticipantesSelecionados()">Confirmar Presença</button>
+                    <button type="button"
+                            class="btn warning"
+                            onclick="cancelarPresencaParticipantesSelecionados()">Cancelar Presença</button>
+                </div>
+                {% for participante in participantes_encontrados %}
+                    <div class="general-box">
+                        <div class="custom-checkbox">
+                            <input id="id_participante_{{ participante.pk }}"
+                                   name="ids"
+                                   type="checkbox"
+                                   value="{{ participante.id }}">
+                            <label for="id_participante_{{ participante.pk }}"></label>
+                        </div>
+                        <div class="primary-info">
+                            <div class="status-info-container">
+                                {% if participante.inscricao_validada %}
+                                    <span class="status status-success">Inscrição confirmada</span>
+                                {% else %}
+                                    <span class="status status-error">Inscrição não confirmada</span>
+                                {% endif %}
+                                {% if participante.presenca_confirmada %}
+                                    <span class="status status-success">Presença confirmada</span>
+                                {% else %}
+                                    <span class="status status-error">Presença não confirmada</span>
+                                {% endif %}
+                            </div>
+                            <h4 class="title">
+                                <a href="{% url 'exibir_informacoes_participante' participante.id %}">{{ participante.nome|format }}</a>
+                            </h4>
+                        </div>
+                        <dl class="secondary-info">
+                            <div class="list-item">
+                                <dt>Tipo de participante:</dt>
+                                <dd>
+                                    {{ participante.tipo }}
+                                </dd>
+                            </div>
+                            <div class="list-item">
+                                <dt>E-mail:</dt>
+                                <dd>
+                                    {{ participante.email|format }}
+                                </dd>
+                            </div>
+                            {% with documento=participante.get_documento_identificacao %}
+                                <div class="list-item">
+                                    <dt>{{ documento.tipo_documento }}:</dt>
+                                    <dd>
+                                        {{ documento.numero_documento|format }}
+                                    </dd>
+                                </div>
+                            {% endwith %}
+                            {% if participante.telefone %}
+                                <div class="list-item">
+                                    <dt>Telefone:</dt>
+                                    <dd>
+                                        {{ participante.telefone|format }}
+                                    </dd>
+                                </div>
+                            {% endif %}
+                            {% if participante.vinculo %}
+                                <div class="list-item">
+                                    <dt>Vínculo:</dt>
+                                    <dd>
+                                        {{ participante.vinculo.user|format }}
+                                    </dd>
+                                </div>
+                            {% endif %}
+                            <div class="list-item">
+                                <dt>Perfil:</dt>
+                                <dd>
+                                    {{ participante.publico_alvo|format }}
+                                </dd>
+                            </div>
+                            <div class="list-item">
+                                <dt>C.H. Total:</dt>
+                                <dd>
+                                    {{ participante.get_ch_total }}h
+                                </dd>
+                            </div>
+                            <div class="list-item">
+                                <dt>Inscrito em:</dt>
+                                <dd>
+                                    {{ participante.data_cadastro|format }}
+                                </dd>
+                            </div>
+                        </dl>
+                    </div>
+                {% endfor %}
+                <h4 class="mb-0">Para participantes marcados:</h4>
+                <div class="submit-row mb-5 mt-3">
+                    <button type="button"
+                            class="btn success"
+                            onclick="confirmarPresencaParticipantesSelecionados()">Confirmar Presença</button>
+                    <button type="button"
+                            class="btn warning"
+                            onclick="cancelarPresencaParticipantesSelecionados()">Cancelar Presença</button>
+                </div>
+            </form>
+        {% elif query %}
+            <p class="alert alert-warning">Nenhum participante encontrado com os critérios de busca informados.</p>
+        {% endif %}
+    {% endbox %}
+{% endblock %}

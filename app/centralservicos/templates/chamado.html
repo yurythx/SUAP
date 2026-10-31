@@ -1,0 +1,376 @@
+{% extends super_template %}
+{% load centralservicos_templatetags %}
+
+{% block extracss %}
+    <style>
+    textarea#id_texto {
+        margin-top: 5px;
+    }
+    #id_bases_conhecimento > li {
+        list-style: none;
+    }
+    </style>
+{% endblock %}
+
+{% block extrahead %}
+    <script>
+        jQuery.getScript('/static/centralservicos/js/BaseConhecimento.js');
+
+        jQuery(document).ready(function() {
+            function ocultarComentariosArquivados() {
+                jQuery(".timeline [data-comentario-arquivado]").addClass("d-none");
+                jQuery(".timeline-arquivados")
+                    .removeClass("active")
+                    .attr("aria-pressed", "false")
+                    .text("Exibir comentários arquivados");
+            }
+
+            function selecionarModoLinhaTempo(botao) {
+                jQuery(".timeline-details, .timeline-only-comments").removeClass("active");
+                jQuery(botao).addClass("active");
+                ocultarComentariosArquivados();
+            }
+
+            jQuery(".timeline-only-comments").click(function() {
+                selecionarModoLinhaTempo(this);
+                jQuery(".timeline [data-chamado-obs]").addClass("d-none");
+                return false;
+            });
+
+            jQuery(".timeline-details").click(function() {
+                selecionarModoLinhaTempo(this);
+                jQuery(".timeline [data-chamado-obs]").removeClass("d-none");
+                return false;
+            });
+
+            jQuery(".timeline-arquivados").click(function() {
+                var botao = jQuery(this);
+                var exibir = botao.attr("aria-pressed") !== "true";
+                jQuery(".timeline [data-comentario-arquivado]").toggleClass("d-none", !exibir);
+                botao
+                    .toggleClass("active", exibir)
+                    .attr("aria-pressed", exibir ? "true" : "false")
+                    .text(exibir ? "Esconder comentários arquivados" : "Exibir comentários arquivados");
+                return false;
+            });
+
+            jQuery('#alterar_para_resolvido').on('click', function(e){
+                e.preventDefault();
+                changeTabs('bases');
+                var target = this.hash,
+                    $target = $(target);
+                $('html, body').stop().animate({
+                    'scrollTop': $target.offset().top
+                });
+            });
+        });
+    </script>
+    {% if initial_tab %}
+        <script>
+            jQuery(document).ready(function() {
+                changeTabs('{{ initial_tab }}');
+            })
+        </script>
+    {% endif %}
+{% endblock %}
+
+{% block bodyclass %}hasAsideRight{% endblock %}
+
+{% block object-status %}
+    {{ chamado.get_status_display|status }}
+    {% if chamado.get_tempo_ultrapassado %}
+        <span class="status status-error">Tempo de atendimento previsto ultrapassado</span>
+    {% endif %}
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if pode_assumir %}
+            <li>
+                <a class="btn success"
+                   href="/centralservicos/auto_atribuir_chamado/{{ chamado.id }}/">Assumir</a>
+            </li>
+        {% endif %}
+        {% if pode_alterar_status %}
+            {% if chamado.eh_proximo_status_em_atendimento or chamado.estah_suspenso %}
+                <li>
+                    <a class="btn success"
+                       href="/centralservicos/colocar_em_atendimento/{{ chamado.id }}/">Alterar para Em Atendimento</a>
+                </li>
+            {% else %}
+                <li>
+                    <a class="btn success"
+                       href="#bases-tab-pane"
+                       id="alterar_para_resolvido">Alterar para Resolvido</a>
+                </li>
+            {% endif %}
+        {% endif %}
+        {% if pode_fechar %}
+            <li>
+                {% if chamado.interessado == request.user %}
+                    <a class="btn success"
+                       href="/centralservicos/fechar_chamado/{{ chamado.id }}/">Fechar Chamado</a>
+                {% else %}
+                    <form method="post"
+                          action="/centralservicos/fechar_chamado/{{ chamado.pk }}/">
+                        {% csrf_token %}
+                        <div class="submit-row">
+                            <input class="btn success" type="submit" value="Fechar Chamado" />
+                        </div>
+                    </form>
+                {% endif %}
+            </li>
+        {% endif %}
+        {% if pode_reabrir %}
+            <li>
+                <a class="btn primary" href="/centralservicos/reabrir_chamado/{{ chamado.id }}/">Reabrir chamado</a>
+            </li>
+        {% endif %}
+        {% if acoes %}
+            <li class="has-child">
+                <a class="btn" href="#">Ações</a>
+                <ul>
+                    {% for acao in acoes %}{{ acao|safe }}{% endfor %}
+                </ul>
+            </li>
+        {% endif %}
+        {% if pode_suspender %}
+            <li>
+                <a class="btn warning"
+                   href="/centralservicos/suspender_chamado/{{ chamado.id }}/">Suspender</a>
+            </li>
+        {% endif %}
+        {% if pode_cancelar %}
+            <li>
+                <a class="btn danger"
+                   href="/centralservicos/cancelar_chamado/{{ chamado.id }}/">Cancelar</a>
+            </li>
+        {% endif %}
+    </ul>
+{% endblock %}
+
+{% block content %}
+    {% box chamado.servico %}
+        {% include "include_dados_interessado.html" %}
+    {% endbox %}
+    {% include "tab_visualizar_chamado/tab_linha_tempo.html" %}
+    {% if exibir_tab_tarefas %}
+        {% include "tab_visualizar_chamado/tab_tarefas.html" %}
+    {% endif %}
+    {% if perms.centralservicos.change_chamado %}
+        {% if eh_atendente or user in chamado.get_atendentes_equipe_atendimento or user in chamado.get_responsaveis_equipe_atendimento %}
+            {% include "tab_visualizar_chamado/tab_notas_internas.html" %}
+        {% endif %}
+    {% endif %}
+    {% if chamado.servico.permite_anexos or chamado.chamadoanexo_set.exists %}
+        {% include "tab_visualizar_chamado/tab_anexos.html" %}
+    {% endif %}
+    {% if user.is_superuser or eh_atendente or user in chamado.get_responsaveis_equipe_atendimento %}
+        {% if pode_alterar_status and chamado.estah_em_atendimento %}
+            {% include "tab_visualizar_chamado/tab_artigos_relacionados.html" with resolver_chamado_form=resolver_chamado_form %}
+        {% endif %}
+        {% if chamado.estah_fechado or chamado.estah_resolvido %}
+            {% include "tab_visualizar_chamado/tab_bases_utilizadas.html" %}
+        {% endif %}
+    {% endif %}
+    {% if chamado.servico.get_bases_conhecimento_faq.exists %}
+        {% if request.user == chamado.requisitante or request.user == chamado.interessado %}
+            {% include "tab_visualizar_chamado/tab_artigos_publicos.html" %}
+        {% endif %}
+    {% endif %}
+    {% include "tab_visualizar_chamado/tab_situacoes.html" %}
+{% endblock %}
+
+{% block asideright %}
+    <aside class="right">
+        <details open="open">
+            <summary>Dados gerais</summary>
+            <dl class="details-container">
+                {% if chamado.tags.exists %}
+                    <dt>Tags:</dt>
+                    <dd>
+                        <ul class="tags">
+                            {% for tag in chamado.tags.all %}
+                                <li>
+                                    {{ tag.nome }}
+                                    {% if user.is_superuser or eh_atendente or user in chamado.get_responsaveis_equipe_atendimento %}
+                                        <form method="post"
+                                              action="/centralservicos/remover_tag_do_chamado/{{ chamado.pk }}/{{ tag.pk }}/">
+                                            {% csrf_token %}
+                                            <button type="submit">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    {% endif %}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </dd>
+                {% endif %}
+                <dt>Área:</dt>
+                <dd>
+                    {{ chamado.servico.area.nome }}
+                </dd>
+                <dt>Meio de Abertura:</dt>
+                <dd>
+                    {{ chamado.get_meio_abertura_display }}
+                </dd>
+                {% if chamado.patrimonio %}
+                    <dt>Número do Patrimônio:</dt>
+                    <dd>
+                        {{ chamado.patrimonio.numero }}
+                    </dd>
+                {% endif %}
+                <dt>Aberto em:</dt>
+                <dd>
+                    {{ chamado.aberto_em }}
+                </dd>
+            </dl>
+        </details>
+        <details open="open">
+            <summary>Atendimento</summary>
+            <div class="details-container">
+                {% if chamado.get_atendimento_atribuicao_atual.atribuido_para %}
+                    <div class="person sm">
+                        <div class="photo-circle sm">
+                            <img alt="{{ chamado.get_atendimento_atribuicao_atual.atribuido_para.get_profile.nome_usual }}"
+                                 src="{{ chamado.get_atendimento_atribuicao_atual.atribuido_para.get_vinculo.get_foto_75x100_url }}" />
+                        </div>
+                        <dl>
+                            <dt>Atendente:</dt>
+                            <dd>
+                                {{ chamado.get_atendimento_atribuicao_atual.atribuido_para|format }}
+                            </dd>
+                            <dt>Atribuído em:</dt>
+                            <dd>
+                                {{ chamado.get_atendimento_atribuicao_atual.atribuido_em }}
+                            </dd>
+                            <dt>Grupo de atendimento:</dt>
+                            <dd>
+                                {{ chamado.get_atendimento_atribuicao_atual.grupo_atendimento.nome }}
+                            </dd>
+                        </dl>
+                    </div>
+                {% else %}
+                    <dl>
+                        <dt>Grupo de atendimento:</dt>
+                        <dd>
+                            {{ chamado.get_atendimento_atribuicao_atual.grupo_atendimento.nome }}
+                        </dd>
+                    </dl>
+                {% endif %}
+                <dl>
+                    <dt>Centro de atendimento:</dt>
+                    <dd>
+                        {{ chamado.get_atendimento_atribuicao_atual.grupo_atendimento.centro_atendimento.nome }}
+                        {% if chamado.campus %}/{{ chamado.campus.sigla }}{% endif %}
+                    </dd>
+                    {% if chamado.get_tempo_resposta %}
+                        <dt class="hint hint-bottom"
+                            aria-label="Tempo de Resposta entre as situações Aberto e Em Atendimento.">
+                            Tempo de resposta:
+                        </dt>
+                        <dd>
+                            {{ chamado.get_tempo_resposta|format }}
+                        </dd>
+                    {% endif %}
+                    <dt>Data limite:</dt>
+                    <dd>
+                        {{ chamado.data_limite_atendimento }}
+                        {% if chamado.data_limite_atendimento >= hoje %}(Faltam {{ chamado.data_limite_atendimento|timeuntil }}){% endif %}
+                    </dd>
+                    {% if chamado.get_tempo_atendimento %}
+                        <dt class="hint hint-bottom"
+                            aria-label="Tempo de Atendimento entre as situações Em Atendimento e Resolvido.">
+                            Tempo de atendimento:
+                        </dt>
+                        <dd>
+                            {{ chamado.get_tempo_atendimento|format }}
+                        </dd>
+                    {% endif %}
+                    {% if chamado.estah_fechado or chamado.estah_resolvido %}
+                        <dt>Tempo total:</dt>
+                        <dd>
+                            {{ chamado.get_tempo_gasto|format }}
+                        </dd>
+                    {% endif %}
+                    {% if chamado.get_tempo_ultrapassado %}
+                        <dt class="hint hint-bottom"
+                            aria-label="Tempo ultrapassado em relação ao Tempo de Atendimento Previsto (SLA).">
+                            Tempo ultrapassado:
+                        </dt>
+                        <dd class="false">
+                            {{ chamado.get_tempo_ultrapassado|format }}
+                        </dd>
+                    {% endif %}
+                    {% if chamado.data_ultima_interacao|timesince %}
+                        <dt class="hint hint-bottom"
+                            aria-label="Tempo ultrapassado desde a última interação com o chamado.">
+                            Última interação:
+                        </dt>
+                        <dd>
+                            {{ chamado.data_ultima_interacao|timesince }}
+                        </dd>
+                    {% endif %}
+                </dl>
+            </div>
+        </details>
+        {% if chamado.servico.permite_abertura_terceiros %}
+            <details open="open">
+                <summary>Requisitante</summary>
+                <div class="details-container">
+                    {% include "includes/chamado_ator_detalhes.html" with user=chamado.requisitante %}
+                </div>
+            </details>
+        {% endif %}
+
+        {% if chamado.outros_interessados.exists %}
+            <details open="open">
+                <summary>Outros interessados <span class="badge">{{ chamado.outros_interessados.count }}</span></summary>
+                <div class="details-container">
+                    {% if pode_adicionar_outros_interessados %}
+                        {% for interessado in chamado.outros_interessados.all %}
+                            {% include "includes/chamado_ator_detalhes.html" with user=interessado user_delete_action_base='/centralservicos/remover_outros_interessados' %}
+                        {% endfor %}
+                    {% else %}
+                        {% for interessado in chamado.outros_interessados.all %}
+                            {% include "includes/chamado_ator_detalhes.html" with user=interessado %}
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </details>
+        {% endif %}
+        <details open="open">
+            <summary>Aberto por</summary>
+            <div class="details-container">
+                {% include "includes/chamado_ator_detalhes.html" with user=chamado.aberto_por %}
+            </div>
+        </details>
+        {% if chamado.servico.sla_em_horas or chamado.servico.texto_ajuda or chamado.servico.texto_modelo %}
+            <details open="open">
+                <summary>Sobre o serviço</summary>
+                <div class="details-container">
+                    {% if chamado.servico.sla_em_horas %}
+                        <h5>Previsão de Atendimento</h5>
+                        <p>{{ chamado.servico.sla_em_horas|format_hours:'-' }}</p>
+                        <h5>Cálculo da data limite do atendimento</h5>
+                        <p>
+                            Aplica-se a previsão de atendimento a partir da data de abertura do chamado. 
+                            Se a data de abertura for um final de semana ou feriado (liberação), a previsão 
+                            será aplicada a partir do primeiro dia útil após a abertura. Serão desconsiderados 
+                            finais de semana e feriados (liberações) para fins de ajuste na data limite final.
+                        </p>
+                    {% endif %}
+                    {% if chamado.servico.texto_ajuda %}
+                        <h5>Informações adicionais</h5>
+                        {{ chamado.servico.texto_ajuda|linebreaksbr }}
+                    {% endif %}
+                    {% if chamado.servico.texto_modelo %}
+                        <h5>Informações para Preenchimento do Chamado</h5>
+                        {{ chamado.servico.texto_modelo|linebreaksbr }}
+                    {% endif %}
+                </div>
+            </details>
+        {% endif %}
+    </aside>
+{% endblock %}

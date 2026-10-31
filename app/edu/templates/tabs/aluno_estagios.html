@@ -1,0 +1,221 @@
+{% box 'Registros de Estágios' %}
+    {% if obj.praticaprofissional_set.all.exists %}
+        <div class="table-responsive">
+        <table>
+            <thead>
+            <tr>
+                <th class="no-print">Ações</th>
+                <th>Tipo</th>
+                <th>Orientador</th>
+                <th>Concedente</th>
+                <th>Data de Início</th>
+                <th>Data Prevista para Encerramento</th>
+                <th>Data de Encerramento</th>
+                <th>Relatórios Semestrais</th>
+                <th>Situação</th>
+                <th>C.H. Final</th>
+                <th>Forma do Encerramento</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for estagio in obj.praticaprofissional_set.all %}
+                <tr>
+                    <td class="no-print">
+                        {% icon "view" "/estagios/pratica_profissional/{{ estagio.pk }}/" %}
+                    </td>
+                    <td>{{ estagio.get_tipo_display }}</td>
+                    <td>{{ estagio.orientador }}</td>
+                    <td>{{ estagio.empresa }}</td>
+                    <td>{{ estagio.data_inicio }}</td>
+                    <td>{{ estagio.data_prevista_fim }}</td>
+                    <td>{{ estagio.data_fim|default:"Em Andamento" }}</td>
+                    <td>
+                        <p>O estágio tem {{ estagio.get_periodos_semestrais|length }} períodos semestrais
+                            e deve ser submetido um relatório para cada período. Para enviar o relatório
+                            semestral acesse a página do Estágio na lupa a sua esquerda.
+                        </p>
+                        <ul>
+                            {% for periodo in estagio.get_periodos_semestrais %}
+                                <li>De {{ periodo.inicio }} até {{ periodo.fim }} (Obs.: Poderá ser cadastrado o
+                                    relatório deste período a partir do dia seguinte ao dia {{ periodo.fim }}.)
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </td>
+                    <td>{{ estagio.resumo_pendencias|format }}</td>
+                    <td>{{ estagio.ch_final|default:"Em Andamento" }}</td>
+                    <td>{{ estagio.get_movito_encerramento_display|default:"Em Andamento" }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    {% else %}
+        <p class="alert alert-warning">Nenhum estágio registrado para este aluno.</p>
+    {% endif %}
+{% endbox %}
+
+{% box 'Registros de Aprendizagem' %}
+    {% if obj.aprendizagem_set.all.exists %}
+        <div class="table-responsive">
+        <table>
+            <thead>
+            <tr>
+                <th class="no-print">Ações</th>
+                <th>Orientador</th>
+                <th>Concedente</th>
+                <th>Data de Encerramento</th>
+                <th>Relatórios Semestrais</th>
+                <th>Situação</th>
+                <th>C.H. Final</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for aprendizagem in obj.aprendizagem_set.all %}
+                <tr>
+                    <td class="no-print">
+                        {% icon "view" "/estagios/aprendizagem/{{ aprendizagem.pk }}/" %}
+                    </td>
+                    <td>{{ aprendizagem.orientador }}</td>
+                    <td>{{ aprendizagem.empresa }}</td>
+                    <td>{{ aprendizagem.data_encerramento|default:"Em Andamento" }}</td>
+                    <td>
+                        <p>A aprendizagem tem {{ aprendizagem.moduloaprendizagem_set.all|length }} módulos. Para cada
+                            módulo deve ser realizado o envio de um relatório. O relatório do módulo pode ser enviado
+                            a partir do dia seguinte ao término do módulo.
+                        </p>
+                        <ul>
+                            {% for modulo in aprendizagem.moduloaprendizagem_set.all %}
+                                <li>{{ modulo }} -
+                                    {% if modulo.tem_relatorio_aprendiz %}
+                                        Relatório já enviado.
+                                    {% else %}
+                                        Relatório pendente.
+                                    {% endif %}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </td>
+                    <td>{{ aprendizagem.resumo_pendencias|format }}</td>
+                    <td>{{ aprendizagem.ch_final|default:"Em Andamento" }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    {% else %}
+        <p class="alert alert-warning">Nenhuma aprendizagem em registrada para este aluno.</p>
+    {% endif %}
+{% endbox %}
+
+{% box 'Registros de Atividade Profissional Efetiva' %}
+    {% if obj.atividadeprofissionalefetiva_set.all.exists %}
+        <div class="table-responsive">
+        <table>
+            <thead>
+            <tr>
+                <th class="no-print">Ações</th>
+                <th>Orientador</th>
+                <th>Instituição de Realização da Atividade</th>
+                <th>Data de Encerramento</th>
+                <th>Declaração de Realização de Atividade Profissional Efetiva</th>
+                <th>Situação</th>
+                <th>C.H. Final</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for atividade in obj.atividadeprofissionalefetiva_set.all %}
+                <tr>
+                    <td class="no-print">
+                        {% icon "view" "/estagios/atividade_profissional_efetiva/{{ atividade.pk }}/" %}
+                    </td>
+                    <td>{{ atividade.orientador }}</td>
+                    <td>{{ atividade.instituicao }}</td>
+                    <td>{{ atividade.encerramento|default:"Em Andamento" }}</td>
+                    <td>
+                        {% if atividade.relatorio_final_aluno %}
+                            <a href="{{ atividade.relatorio_final_aluno.url }}">Relatório</a>
+                        {% else %}
+                            <p class="alert alert-warning">A declaração de realização de atividade profissional efetiva ainda não
+                                foi entregue pelo aluno.</p>
+                            {% if atividade.is_em_andamento and request.user == atividade.aluno.get_user %}
+                                <ul class="action-bar">
+                                    <li>
+                                        <a class="btn popup"
+                                           href="/estagios/submeter_relatorio_atividade_profissional_efetiva/{{ atividade.pk }}/">Enviar
+                                            Declaração de Realização de Atividade Profissional Efetiva</a>
+                                    </li>
+                                </ul>
+                            {% endif %}
+                        {% endif %}
+                    </td>
+                    <td>{{ atividade.get_situacao_display|format }}</td>
+                    <td>{{ atividade.ch_final|default:"Em Andamento" }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    {% else %}
+        <p class="alert alert-warning">Nenhuma atividade profissional efetiva registrada para este aluno.</p>
+    {% endif %}
+{% endbox %}
+
+{% if obj.curso_campus.is_licenciatura %}
+    {% box 'Registros de Estágios Docentes' %}
+        {% if obj.get_estagios_docentes.all.exists %}
+            <div class="table-responsive">
+            <table>
+                <thead>
+                <tr>
+                    <th class="no-print">Ações</th>
+
+                    <th>Tipo</th>
+                    <th>Professor Coordenador</th>
+                    <th>Professor Orientador</th>
+                    <th>Escola</th>
+
+                    <th>Data de Início</th>
+                    <th>Data de Fim</th>
+                    <th>Data de Final para Envio do Portfólio</th>
+                    <th>Situação no Diário</th>
+                    <th>Situação deste Estágio</th>
+                    {% if is_proprio_aluno %}
+                        <th class="no-print">Opções</th>
+                    {% endif %}
+                </tr>
+                </thead>
+                <tbody>
+                {% for estagio in obj.get_estagios_docentes %}
+                    <tr>
+                        <td class="no-print">
+                            {% icon "view" "/edu/estagio_docente/{{ estagio.pk }}/" "Visualizar" %}
+                        </td>
+                        <td>{{ estagio.tipo_estagio_docente }}</td>
+                        <td>{{ estagio.professor_coordenador|format }}</td>
+                        <td>{{ estagio.professor_orientador|format }}</td>
+                        <td>{{ estagio.get_escola|format }}</td>
+
+                        <td>{{ estagio.data_inicio|format }}</td>
+                        <td>{{ estagio.data_fim|format }}</td>
+                        <td>{{ estagio.data_final_envio_portfolio|format }}</td>
+                        <td>{{ estagio.matricula_diario.get_situacao_display|format }}</td>
+                        <td>{{ estagio.get_situacao_display|format }}</td>
+                        {% if is_proprio_aluno %}
+                            <td class="no-print">
+                                {% if estagio.data_fim and not estagio.situacao == estagio.SITUACAO_MUDANCA and not estagio.situacao == estagio.SITUACAO_ENCERRADO and not estagio.situacao == estagio.SITUACAO_NAO_CONCLUIDO %}
+                                    <a class="btn popup" href="/edu/enviar_portfolio_estagio_docente/{{ estagio.pk }}/">Enviar
+                                        Portfólio</a>
+                                {% endif %}
+                            </td>
+                        {% endif %}
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Nenhum estágio docente para este aluno.</p>
+        {% endif %}
+    {% endbox %}
+{% endif %}

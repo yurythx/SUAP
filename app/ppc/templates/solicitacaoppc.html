@@ -1,0 +1,446 @@
+{% extends super_template %}
+
+{% block extrahead %}
+    <script>
+        function change_tab(aba){
+            if (aba.includes("/")) {
+                window.location.href = aba
+            }else{
+                if (aba.includes("#")) {
+                    a = aba.substring(0, aba.indexOf("#"));
+                    ancora = aba.substring(aba.indexOf("#")+1);
+                    changeTabs(a);
+                    const elemAncora = document.getElementById(ancora);
+                    if (elemAncora) elemAncora.scrollIntoView();
+                }
+                else{
+                    changeTabs(aba)
+                }
+            }
+        };
+    </script>
+{% endblock %}
+
+{% block object-status %}
+    {% if situacoes %}
+        <ul class="steps">
+            {% for situacao in situacoes %}
+                <li><span class="step-{% if situacao.1 == 'Solicitada' %}info{% elif situacao.1 == 'Finalizada' %}success{% else %}alert{% endif %} {% if situacao.0 == solicitacao.situacao %}active{% endif %}">{{ situacao.1 }}</span></li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        {{ solicitacao.get_situacao_display|status }}
+    {% endif %}
+{% endblock %}
+
+{% block action-bar %}
+    {% if perms.ppc.change_solicitacaoppc %}
+        <ul class="action-bar">
+            {% if pode_solicitar_avaliacao_elaboradores %}
+                <li><a class="btn success popup" href="{% url 'enviar_solicitacaoppc' solicitacao.pk %}">Enviar para análise</a></li>
+            {% endif %}
+            {% if pode_solicitar_ata %}
+                <li><a class="btn success" href="{% url 'solicitar_ata_solicitacaoppc' solicitacao.pk %}">Solicitar emissão de ata</a></li>
+            {% endif %}
+            {% if pode_emitir_ata %}
+            <li><a class="btn success" href="{% url 'emitir_ata_solicitacaoppc' solicitacao.pk %}">Emitir ata</a></li>
+            {% endif %}
+            {% if pode_solicitar_portaria %}
+                <li><a class="btn success" href="/ppc/solicitar_emissao_portaria/{{ solicitacao.id }}/">{% if portaria.estah_finalizado %}Finalizar{% else %}Solicitar emissão de portaria{% endif %}</a></li>
+            {% endif %}
+            {% if pode_emitir_portaria %}
+                <li><a class="btn success" href="{% url 'emitir_portaria_solicitacaoppc' solicitacao.pk %}">Emitir portaria</a></li>
+            {% endif %}
+            {% if pode_devolver_analise %}
+                <li><a class="btn warning" href="{% url 'devolver_analise_solicitacaoppc' solicitacao.pk %}">Retornar para análise</a></li>
+            {% endif %}
+            {% if pode_editar %}
+                <li><a class="btn primary" href="/admin/ppc/solicitacaoppc/{{ solicitacao.id }}/change/">Editar</a></li>
+            {% endif %}
+            {% if pode_editar_setor_avaliacao_elaboradores %}
+                <li><a class="btn primary popup" href="{% url 'editar_setor_avaliacao_elaboradores_solicitacaoppc' solicitacao.pk %}">Alterar setor de avaliação da comissão de elaboração</a></li>
+            {% endif %}
+            {% if pode_avaliar_elaboradores or pode_emitir_portaria %}
+                <li><a class="btn warning popup" href="{% url 'devolver_solicitacaoppc' solicitacao.pk %}">Solicitar correção</a></li>
+            {% endif %}
+            {% if ppc %}
+                <li><a class="btn default" href="{{ ppc.get_absolute_url }}">Visualizar PPC</a></li>
+            {% endif %}
+            {% if pode_emitir_portaria or pode_emitir_ata %}
+                <li><a class="btn danger popup no-confirm" href="{% url 'reprovar_solicitacaoppc' solicitacao.pk %}">Reprovar</a></li>
+            {% endif %}
+            {% if pode_suspender %}
+                <li><a class="btn danger popup no-confirm" href="{% url 'suspender_solicitacaoppc' solicitacao.pk %}">Suspender</a></li>
+            {% endif %}
+        </ul>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+
+    {% if solicitacao.id_ata and ata == None %}
+        <p class="alert alert-danger"><strong>Atenção:</strong> O documento da Ata do Colegiado não foi encontrado.{% if pode_reemitir_ata %} Caso ele tenha sido excluído, <a href="{% url 'emitir_ata_solicitacaoppc' solicitacao.pk %}">repita o procedimento de emissão</a>.{% endif %}</p>
+    {% endif %}
+
+    {% if solicitacao.id_portaria and portaria == None %}
+        <p class="alert alert-danger"><strong>Atenção:</strong> O documento da Portaria de Elaboração do PPC não foi encontrado.{% if pode_reemitir_portaria %} Caso ele tenha sido excluído, <a href="{% url 'emitir_portaria_solicitacaoppc' solicitacao.pk %}">repita o procedimento de emissão</a>.{% endif %}</p>
+    {% endif %}
+    
+    {% if solicitacao.justificativa_correcao and pode_editar %}
+        <p class="alert alert-warning"><strong>Motivo da devolução:</strong> {{ solicitacao.justificativa_correcao }}</p>
+    {% endif %}
+
+    {% if exibe_alerta_indicacao_elaborador %}
+        <p class="alert alert-warning"><strong>Atenção:</strong> Nenhum membro foi indicado para a <a onclick="javascript:change_tab('indicacao#abas')">comissão de elaboração</a>.</p>
+    {% endif %}
+    
+    {% if exibe_alerta_portaria_pendente %}
+        <p class="alert alert-warning"><strong>Atenção:</strong> Aguardando finalização da <a onclick="javascript:change_tab('documentos#abas')">portaria de elaboração do PPC</a>.</p>
+    {% endif %}
+
+    {% if exibe_alerta_ata_pendente %}
+        <p class="alert alert-warning"><strong>Atenção:</strong> Aguardando finalização da <a onclick="javascript:change_tab('documentos#abas')">ata do colegiado</a>.</p>
+    {% endif %}
+
+    {% if exibe_alerta_avaliacao_elaborador %}
+        <p class="alert alert-warning"><strong>Atenção:</strong> Aguardando deferimento dos membros indicados para a <a onclick="javascript:change_tab('indicacao#abas')">comissão de elaboração</a>.</p>
+    {% endif %}
+
+    {% if exibe_alerta_sem_portaria %}
+        <p class="alert alert-warning"><strong>Atenção:</strong> Aguardando a emissão da portaria.</p>
+    {% endif %}
+
+    {% if exibe_alerta_nome_curso %}
+        <p class="alert alert-warning"><strong>Atenção:</strong> Foram encontrados <a href="/admin/edu/cursocampus/?ativo__exact=1&q={{ solicitacao.nome_curso }}&tab=tab_any_data">cursos ativos com este nome</a>.</p>
+    {% endif %}
+
+    {% if erro %}
+        <p class="alert alert-danger"><strong>Atenção:</strong> {{ erro }}</p>
+    {% endif %}
+
+    {% if solicitacao.motivo_rejeicao %}
+        <p class="alert alert-light"><strong>Motivo da rejeição:</strong> {{ solicitacao.motivo_rejeicao }}</p>
+    {% endif %}
+
+    {% box "Dados gerais" %}
+        <dl class="definition-list flex">
+            <div class="list-item flex-basis-50">
+                <dt>Nome do Curso</dt>
+                <dd>{{ solicitacao.get_nome_curso }}</dd>
+            </div>
+            <div class="list-item flex-basis-50">
+                <dt>Situação do PPC</dt>
+                <dd>{{ solicitacao.get_situacao_ppc|status }}</dd>
+            </div>
+            <div class="list-item flex-basis-100">
+                <dt>Justificativa</dt>
+                <dd>{{ solicitacao.justificativa }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Solicitante</dt>
+                <dd>{{ solicitacao.solicitante }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Data de solicitação</dt>
+                <dd>{{ solicitacao.data_solicitacao }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Tipo de oferta</dt>
+                <dd>{{ solicitacao.tipo_oferta }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Modalidade</dt>
+                <dd>{{ solicitacao.modalidade }}</dd>
+            </div>
+            {% if solicitacao.eixo_tecnologico %}
+            <div class="list-item">
+                <dt>Eixo tecnológico</dt>
+                <dd>{{ solicitacao.eixo_tecnologico }}</dd>
+            </div>
+            {% endif %}
+            {% if solicitacao.convenio %}
+                <div class="list-item">
+                    <dt>Convênio</dt>
+                    <dd>
+                        {{ solicitacao.convenio|format }}
+                        {% if processo_convenio %}
+                            (<a href="{{ processo_convenio.get_absolute_url }}">{{ processo_convenio }}</a>)
+                        {% endif %}
+                    </dd>
+                </div>
+            {% endif %}
+            {% if solicitacao.setor_avaliacao %}
+                <div class="list-item">
+                    <dt>Setor de avaliação da comissão de elaboração</dt>
+                    <dd>{{ solicitacao.setor_avaliacao }}</dd>
+                </div>
+            {% endif %}
+        </dl>
+    {% endbox %}
+
+    <span id="abas"></span>
+
+    {% if exige_ata %}
+        <div class="tab-pane" data-title="Colegiado" data-tab="colegiado" data-counter="{{ solicitacao.membrocolegiado_set.count }}">
+
+            {% box "Colegiado" %}
+
+                {% if pode_solicitar_ata or solicitacao.membrocolegiado_set.exists %}
+                    <p class="alert alert-info">O documento eletrônico gerado pelo sistema será compartilhado com o solicitante do PPC e os membros indicados abaixo.</p>
+                {% endif %}
+
+                {% if pode_solicitar_ata or pode_emitir_ata %}
+                    <ul class="action-bar">
+                        <li><a class="btn success popup" href="{% url 'adicionar_avaliador_solicitacaoppc' solicitacao.pk %}">Adicionar membro</a></li>
+                    </ul>
+                {% endif %}
+
+                {% if solicitacao.membrocolegiado_set.exists %}
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    {% if pode_solicitar_ata or pode_emitir_ata %}
+                                        <th class="no-print">Ações</th>
+                                    {% endif %}
+                                    <th>Servidor</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for avaliador in solicitacao.membrocolegiado_set.all %}
+                                    <tr>
+                                        {% if pode_solicitar_ata or pode_emitir_ata %}
+                                            <td class="no-print field-get_acoes">
+                                                {% icon "delete" "/comum/excluir/ppc/membrocolegiado/{{ avaliador.pk }}/" "Excluir Membro" "no-confirm popup" %}
+                                            </td>
+                                        {% endif %}
+                                        <td>{{ avaliador.servidor }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="alert alert-warning">Nenhum membro adicionado.</p>
+                {% endif %}
+            {% endbox %}
+        </div>
+    {% endif %}
+
+    
+    <div class="tab-pane" data-title="Comissão de Elaboração" data-tab="indicacao" data-counter="{{ indicacoes.count }}">
+
+        {% box "Comissão de Elaboração" %}
+            {% if pode_avaliar_elaboradores and not pode_solicitar_portaria %}
+                <div class="alert alert-info">
+                    <p><strong>Atenção:</strong> Para habilitar a próxima etapa desta solicitação é necessário:</p>
+                    <ul>
+                        <li>Avaliar todas as indicações.</li>
+                        <li>Existir um membro na função Coordenador.</li>
+                    </ul>
+                </div>
+            {% endif %}
+            <ul class="action-bar">
+                {% if pode_indicar_elaborador or pode_avaliar_elaboradores %}
+                    <li><a class="btn success popup" href="{% url 'indicar_avaliador_solicitacaoppc' solicitacao.pk %}">Indicar membro</a></li>
+                {% endif %}
+                {% if exibe_alerta_portaria_pendente %}
+                    <li><button class="btn" onclick="copyToClip()">Copiar dados</button></li>
+                {% endif %}
+            </ul>
+
+            {% if pode_indicar_elaborador %}
+                <p class="alert alert-info">Indique os membros que farão parte da comissão de elaboração do PPC.</p>
+            {% endif %}
+
+            {% if indicacoes.exists %}
+                <div class="table-responsive">
+                    <table>
+                        <caption>Membros indicados</caption>
+                        <thead>
+                            <tr>
+                                {% if pode_indicar_elaborador or pode_avaliar_elaboradores %}
+                                    <th class="no-print">Ações</th>
+                                {% endif %}
+                                <th>Servidor</th>
+                                <th>Função</th>
+                                <th>Representação</th>
+                                <th>Setor</th>
+                                <th>Campus</th>
+                                <th>Aprovado</th>
+                                {% if pode_avaliar_elaboradores %}
+                                    <th>Opções</th>
+                                {% endif %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for indicacao in indicacoes %}
+                                <tr>
+                                    {% if pode_indicar_elaborador or pode_avaliar_elaboradores %}
+                                        <td class="no-print field-get_acoes">
+                                            {% if indicacao.deferido == None or pode_avaliar_elaboradores %}
+                                                {% icon "edit" "/ppc/editar_indicacaoelaboradorppc/{{ indicacao.pk }}/" "Editar" "popup" %}
+                                                {% icon "delete" "/comum/excluir/ppc/indicacaoelaboradorppc/{{ indicacao.pk }}/" "Excluir Indicação" "no-confirm popup" %}
+                                            {% endif %}
+                                        </td>
+                                    {% endif %}
+                                    <td>{{ indicacao.vinculo }}</td>
+                                    <td>{{ indicacao.get_funcao_display }}</td>
+                                    <td>{{ indicacao.get_representacao_display }}</td>
+                                    <td>{{ indicacao.vinculo.setor|format }}</td>
+                                    <td>{{ indicacao.vinculo.setor.uo|format }}</td>
+                                    <td>
+                                        {{ indicacao.deferido|format }}
+                                        {% if indicacao.justificativa_rejeicao %}
+                                            <dl class="definition-list compact">
+                                                <div class="list-item flex-basis-100">
+                                                    <dt>Justificativa</dt>
+                                                    <dd>{{ indicacao.justificativa_rejeicao }}</dd>
+                                                </div>
+                                            </dl>
+                                        {% endif %}
+                                    </td>
+                                    {% if pode_avaliar_elaboradores %}
+                                    <td>
+                                        {% if indicacao.deferido == None %}
+                                            <ul class="action-list">
+                                                <li><a class="btn success" href="/ppc/aprovar_indicacao_elaboracao/{{ indicacao.pk }}/">Aprovar</a></li>
+                                                <li><a class="btn danger popup no-confirm" href="/ppc/negar_indicacao_elaboracao/{{ indicacao.pk }}/">Reprovar</a></li>
+                                            </ul>
+                                        {% endif %}
+                                    </td>
+                                    {% endif %}
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div id="dados_copia" class="d-none">
+                    <table border="1">
+                        <thead>
+                            <tr>
+                                <th>Matrícula SIAPE</th>
+                                <th>Nome do Servidor</th>
+                                <th>Representação</th>
+                                <th>Função</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for indicacao in indicacoes_deferidas %}
+                                <tr>
+                                    <td>{{ indicacao.vinculo.user.username }}</td>
+                                    <td>{{ indicacao.vinculo.nome }} </td>
+                                    <td>{{ indicacao.get_representacao_display }}</td>
+                                    <td>{{ indicacao.get_funcao_display }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="alert alert-warning">Nenhuma indicação adicionada.</p>
+            {% endif %}
+
+            <script>
+                function copy_clipboard() {
+                    // copia texto puro
+                    var copyText = document.getElementById("dados_copia").innerHTML;
+                    navigator.clipboard.writeText(copyText);
+                    alert("Dados copiados!");
+                }
+
+                function copyToClip() {
+                    // copia texto com formatação
+                    var str = document.getElementById("dados_copia").innerHTML;
+                    function listener(e) {
+                      e.clipboardData.setData("text/html", str);
+                      e.clipboardData.setData("text/plain", str);
+                      e.preventDefault();
+                    }
+                    document.addEventListener("copy", listener);
+                    document.execCommand("copy");
+                    document.removeEventListener("copy", listener);
+                    alert("Dados copiados!");
+                  };
+            </script>
+
+
+        {% endbox %}
+    </div>
+
+    <div class="tab-pane" data-title="Documentos" data-tab="documentos" data-counter="{{ qtd_documentos }}">
+        
+        <ul class="action-bar">
+            {% if pode_vincular_portaria %}
+                <li><a class="btn success popup" href="{% url 'vincular_portaria_solicitacaoppc' solicitacao.pk %}">Vincular portaria de elaboração do PPC</a></li>
+            {% endif %}
+        </ul>
+
+        {% if solicitacao.id_ata and ata %}
+            {% box "Atas" %}
+                {% if not ata.estah_finalizado %}
+                    <p class="alert alert-warning"><strong>Atenção:</strong> A ata do colegiado (<a href="{{ ata.get_absolute_url }}">{{ ata }}</a>) precisa ser finalizada.</p>
+                {% endif %}
+                <dl class="definition-list flex">
+                    <div class="list-item flex-basis-50">
+                        <dt>Ata do Colegiado</dt>
+                        <dd><a href="{{ ata.get_absolute_url }}">{{ ata }}</a></dd>
+                    </div>
+                    <div class="list-item flex-basis-50">
+                        <dt>Situação</dt>
+                        <dd>{{ ata.get_status_display|status }}</dd>
+                    </div>
+                </dl>
+            {% endbox %}
+        {% endif %}
+        {% if solicitacao.id_portaria and portaria %}
+            {% box "Portarias" %}
+                {% if not portaria.estah_finalizado %}
+                    <p class="alert alert-warning"><strong>Atenção:</strong> A portaria de Elaboração do PPC (<a href="{{ portaria.get_absolute_url }}">{{ portaria }}</a>) precisa ser finalizada.</p>
+                {% endif %}
+                <dl class="definition-list flex">
+                    <div class="list-item flex-basis-50">
+                        <dt>Portaria de Elaboração do PPC</dt>
+                        <dd><a href="{{ portaria.get_absolute_url }}">{{ portaria }}</a></dd>
+                    </div>
+                    <div class="list-item flex-basis-50">
+                        <dt>Situação</dt>
+                        <dd>{{ portaria.get_status_display|status }}</dd>
+                    </div>
+                    <div class="list-item flex-basis-50">
+                        <dt>Criado por</dt>
+                        <dd>{{ portaria.usuario_criacao|format }}</dd>
+                    </div>
+                </dl>
+            {% endbox %}
+        {% endif %}
+        {% if not solicitacao.id_ata and not solicitacao.id_portaria %}
+            <p class="alert alert-warning">Nenhum documento vinculado a esta solicitação.</p>
+        {% endif %}
+    </div>
+
+    <div class="tab-pane" data-title="Histórico de movimentações" data-tab="movimentacoes" data-counter="{{ movimentacoes.count }}">
+        {% box "Histórico de movimentações" %}
+            {% if movimentacoes %}
+                <ul class="timeline compact">
+                    {% for movimentacao in movimentacoes %}
+                        <li class="{% if movimentacao.get_situacao_display == 'Solicitada' %}info{% elif movimentacao.get_situacao_display == 'Finalizada' %}success{% elif movimentacao.get_situacao_display == 'Reprovada' %}danger{% else %}warning{% endif %}">
+                            <div class="timeline-date">{{ movimentacao.data }}</div>
+                            <div class="timeline-icon"></div>
+                            <div class="timeline-content">
+                                {% if movimentacao.acao %}
+                                    <h4>{{ movimentacao.acao }}<br><small>({% if movimentacao.usuario %}ação realizada por {{ movimentacao.usuario|format }}{% else %}ação realizada pelo sistema{% endif %})</small></h4>
+                                {% else %}
+                                    <h4>{{ movimentacao.get_situacao_display }}<br><small>({% if movimentacao.usuario %}situação alterada por {{ movimentacao.usuario|format }}{% else %}situação alterada pelo sistema{% endif %})</small></h4>
+                                {% endif %}
+                            </div>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="alert alert-warning">Não houve movimentação.</p>
+            {% endif %}
+        {% endbox %}
+    </div>
+
+{% endblock %}

@@ -1,0 +1,273 @@
+{% extends "relatorio_pdf.html" %}
+
+{% block style %}
+	html {
+		font-size: 8pt;
+	}
+	table td, table th, h3 {
+		font-size: 8pt;
+	}
+    table.definicoes,
+    table.definicoes td {
+        border: 0 none;
+        vertical-align: top;
+    }
+    table.definicoes .com_borda {
+        border: 1px solid #ddd;
+    }
+    table.definicoes strong {
+        display: inline;
+    }
+    h1 {
+		font-size: 10pt;
+	}
+	h2 {
+		font-size: 9pt;
+        margin-bottom: 0;
+	}
+    .assinatura {
+        margin: 10px auto;
+    }
+    .comprovante {
+        margin-top: 10px;
+    }
+{% endblock %}
+
+{% block content %}
+
+    <h1>COMPROVANTE DE MATRÍCULA</h1>
+
+    <h2>DADOS INSTITUCIONAIS</h2>
+    <table class="definicoes">
+        <tbody>
+        <tr>
+            <td><strong>Matrícula:</strong> {{ aluno.matricula }}</td>
+            <td>{% if aluno.aluno_especial %}<strong>Aluno Especial:</strong> {{ aluno.aluno_especial|format }}{% endif %}</td>
+            {# djlint:off H021 #}{# inline styles necessários em PDF weasyprint #}
+            <td rowspan="5" style="width: 75px;">
+                {% if aluno.foto %}
+                    <img src="{{ aluno.foto.url_75x100 }}" alt="Foto do aluno"/>
+                {% else %}
+                    <img src="/static/comum/img/default.jpg" alt="Foto do aluno"/>
+                {% endif %}
+            </td>
+            {# djlint:on #}
+        </tr>
+        <tr>
+            <td><strong>Curso:</strong> {{ aluno.curso_campus.descricao_historico }}</td>
+            <td><strong>Ano/Período Letivo:</strong> {{ aluno.ano_letivo }}/{{ aluno.periodo_letivo }}</td>
+        </tr>
+        <tr>
+            <td><strong>Forma de Ingresso:</strong> {{ aluno.forma_ingresso.descricao|format }}</td>
+            <td><strong>Turma:</strong> {{ aluno.matriculaperiodo_set.all.0.turma|format }}</td>
+        </tr>
+        <tr>
+            <td><strong>Instituição:</strong> {{ aluno.curso_campus.diretoria.setor.uo.nome|normalizar }}</td>
+            <td><strong>Turno:</strong> {{ aluno.turno.descricao|format }}</td>
+        </tr>
+        <tr>
+            <td><strong>Convênio:</strong> {{ aluno.convenio.descricao|format }}</td>
+            <td><strong>Modalidade:</strong> {{ aluno.curso_campus.modalidade.descricao }}</td>
+        </tr>
+        </tbody>
+    </table>
+
+    <h2>DADOS ESCOLARES</h2>
+    <table class="definicoes">
+        <tbody>
+            <tr>
+                <td><strong>Instituição de Origem:</strong> {{ aluno.tipo_instituicao_origem|format|normalizar }}</td>
+                <td><strong>Nível de Ensino:</strong> {{ aluno.nivel_ensino_anterior|format }}</td>
+                <td><strong>Ano de Conclusão:</strong> {{ aluno.ano_conclusao_estudo_anterior|format }}</td>
+            </tr>
+            {% if aluno.nome_instituicao_anterior %}
+                <tr>
+                    <td colspan="3"><strong>Nome:</strong> {{ aluno.nome_instituicao_anterior|format }}</td>
+                </tr>
+            {% endif %}
+        </tbody>
+    </table>
+
+    <h2>DADOS PESSOAIS</h2>
+    <table class="definicoes">
+        <tbody>
+        <tr>
+            <td colspan="3"><strong>Nome:</strong> {{ aluno.get_nome_social_composto|normalizar }}</td>
+        </tr>
+        <tr>
+        	<td>{% if aluno.pessoa_fisica.cpf %}<strong>CPF:</strong> {{ aluno.pessoa_fisica.cpf|format }}{% else %}<strong>Passaporte:</strong> {{ aluno.passaporte|format }}{% endif %}</td>
+            <td><strong>Data de Nascimento:</strong> {{ aluno.pessoa_fisica.nascimento_data|format }}</td>
+            <td><strong>Sexo:</strong> {{ aluno.pessoa_fisica.sexo|format }}</td>
+        </tr>
+        <tr>
+            <td><strong>Tel. Principal:</strong> {{ aluno.telefone_principal|format }}</td>
+            <td><strong>Tel. Secundário:</strong> {{ aluno.telefone_secundario|format }}</td>
+            <td><strong>E-mail:</strong> {% if aluno.email_pessoal %}
+                    {{ aluno.email_pessoal|format }}
+                {% else %}
+                    {{ aluno.email_notificacao|format }}
+                {% endif %}
+            </td>
+        </tr>
+        <tr>
+            <td><strong>Tipo Sanguíneo:</strong> {{ aluno.tipo_sanguineo|format }}</td>
+            <td><strong>Estado Civil:</strong> {{ aluno.estado_civil|format }}</td>
+            <td><strong>Etnia:</strong> {{ aluno.raca|format }}</td>
+        </tr>
+        <tr>
+            {% if aluno.nacionalidade == 'Estrangeira' %}
+                <td><strong>Nacionalidade:</strong> {{ aluno.get_nacionalidade_display|format }}{% if aluno.estrangeiro_sem_passaporte %} (sem passaporte){% endif %}</td>
+                <td colspan="2"><strong>País de Origem:</strong> {{ aluno.pais_origem|format }}</td>
+            {% else %}
+                <td colspan="3"><strong>Naturalidade:</strong> {{ aluno.naturalidade|format|normalizar }}</td>
+            {% endif %}
+        </tr>
+        </tbody>
+    </table>
+
+    <h2>DADOS FAMILIARES</h2>
+    <table class="definicoes">
+        <tbody>
+        <tr>
+            <td><strong>Nome do Pai:</strong> {{ aluno.nome_pai|format|normalizar }}</td>
+            <td><strong>Estado Civil:</strong> {{ aluno.estado_civil_pai|format }}</td>
+            <td><strong>Falecido:</strong> {% if aluno.pai_falecido %} Sim {% else %} Não {% endif %}</td>
+        </tr>
+        <tr>
+            <td><strong>Nome da Mãe:</strong> {{ aluno.nome_mae|format|normalizar }}</td>
+            <td><strong>Estado Civil:</strong> {{ aluno.estado_civil_mae|format }}</td>
+            <td><strong>Falecida:</strong> {% if aluno.mae_falecida %} Sim {% else %} Não {% endif %}</td>
+        </tr>
+        <tr>
+            <td><strong>Responsável:</strong> {{ aluno.responsavel|format|normalizar }} {% if aluno.cpf_responsavel %}({{ aluno.cpf_responsavel }}){% endif %}</td>
+            <td><strong>Parentesco:</strong> {{ aluno.parentesco_responsavel|format }}</td>
+            <td><strong>Chave de Acesso:</strong> {{ aluno.get_chave_responsavel|format }}</td>
+        </tr>
+        <tr>
+            <td><strong>Tel. do Responsável:</strong> {{ aluno.telefone_adicional_1|format }}</td>
+            <td><strong>Tel. do Responsável:</strong> {{ aluno.telefone_adicional_2|format }}</td>
+        </tr>
+        </tbody>
+    </table>
+
+    <h2>ENDEREÇO</h2>
+    <table class="definicoes">
+        <tbody>
+        <tr>
+            <td><strong>Logradouro:</strong> {{ aluno.logradouro|normalizar }} {{ aluno.numero }} {{ aluno.complemento|normalizar }}</td>
+            <td><strong>Bairro:</strong> {{ aluno.bairro }}</td>
+        </tr>
+        <tr>
+            <td><strong>CEP:</strong> {{ aluno.cep }}</td>
+            <td><strong>Zona Residencial:</strong> {{ aluno.get_tipo_zona_residencial_display|format }}</td>
+        </tr>
+        <tr>
+            <td><strong>Cidade:</strong> {{ aluno.cidade.nome|normalizar|format }}</td>
+            <td><strong>Estado:</strong> {{ aluno.cidade.estado.nome|normalizar|format }}</td>
+        </tr>
+        </tbody>
+    </table>
+
+    <h2>DOCUMENTAÇÃO</h2>
+    <table class="definicoes">
+        <tr>
+            <td class="com_borda">
+                <table class="defixnicoes">
+                    <tr><td><strong>IDENTIDADE:</strong></td></tr>
+                    <tr><td><strong>RG:</strong> {{ aluno.numero_rg|format|normalizar }}</td></tr>
+                    <tr><td><strong>Órgão Emissor:</strong> {{ aluno.orgao_emissao_rg|format }}</td></tr>
+                    <tr><td><strong>UF:</strong> {{ aluno.uf_emissao_rg|format|normalizar }}</td></tr>
+                    <tr><td><strong>Data de Expedição:</strong> {{ aluno.data_emissao_rg|format }}</td></tr>
+                </table>
+            </td>
+            <td class="com_borda">
+                <table class="defixnicoes">
+                    <tr><td><strong>TÍTULO DE ELEITOR:</strong></td></tr>
+                    <tr><td><strong>Número:</strong> {{ aluno.numero_titulo_eleitor|format }}</td></tr>
+                    <tr><td><strong>Zona / Seção:</strong> {{ aluno.zona_titulo_eleitor|format }} / {{ aluno.secao|format }}</td></tr>
+                    <tr><td><strong>UF:</strong> {{ aluno.uf_emissao_titulo_eleitor|format|normalizar }}</td></tr>
+                    <tr><td><strong>Data de Expedição:</strong> {{ aluno.data_emissao_titulo_eleitor|format }}</td></tr>
+                </table>
+            </td>
+            <td class="com_borda">
+                <table class="defixnicoes">
+                    <tr><td><strong>SERVIÇO MILITAR:</strong></td></tr>
+                    <tr><td><strong>Carteira de Reservista:</strong> {{ aluno.numero_carteira_reservista|format }}</td></tr>
+                    <tr><td><strong>Região/ Série:</strong> {{ aluno.regiao_carteira_reservista|format }} / {{ aluno.serie_carteira_reservista|format }}</td></tr>
+                    <tr><td><strong>UF:</strong> {{ aluno.estado_emissao_carteira_reservista|format|normalizar }}</td></tr>
+                    <tr><td><strong>Ano:</strong> {{ aluno.ano_carteira_reservista|format }}</td></tr>
+                </table>
+            </td>
+            <td class="com_borda">
+                <table class="defixnicoes">
+                    <tr><td><strong>CERTIDÃO DE NASCIMENTO:</strong></td></tr>
+                    {% if aluno.get_tipo_certidao_display %}
+                        <tr><td><strong>Tipo de Certidão:</strong> {{ aluno.get_tipo_certidao_display|format }}</td></tr>
+                    {% endif %}
+                    {% if aluno.cartorio %}
+                        <tr><td><strong>Cartório:</strong> {{ aluno.cartorio|format }}</td></tr>
+                    {% endif %}
+                    <tr><td><strong>Número:</strong> {{ aluno.numero_certidao|format }}</td></tr>
+                    <tr><td><strong>Folha:</strong> {{ aluno.folha_certidao|format }}</td></tr>
+                    <tr><td><strong>Livro:</strong> {{ aluno.livro_certidao|format }}</td></tr>
+                    {% if aluno.matricula_certidao %}
+                        <tr><td><strong>Matrícula:</strong> {{ aluno.matricula_certidao|format }}</td></tr>
+                    {% endif %}
+                    <tr><td colspan="2"><strong>Data de Expedição:</strong> {{ aluno.data_emissao_certidao|format }}</td></tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+
+    <p>
+        <span class="negrito">Nº da Pasta:</span> {{ aluno.numero_pasta|format }}
+    </p>
+
+    <p class="right">{{ uo.municipio.nome|normalizar }}/{{ uo.municipio.uf }}, {{ hoje|format }}</p>
+	{% if not is_matricula_online %}
+        <p class="assinatura">Assinatura do Aluno</p>
+    {% endif %}
+    <hr/>
+
+    <table class="comprovante">
+    	<tr>
+    		<td rowspan="0"><img src="/static/comum/img/logo_instituicao_icone.jpg" alt="Logotipo do IFRN"/></td>
+    	</tr>
+    	<tr>
+            <td class="negrito" colspan="4">Comprovante de Matrícula</td>
+        </tr>
+    	<tr>
+            <td class="negrito" colspan="4">Diretoria Acadêmica - {{ aluno.curso_campus.diretoria }}</td>
+        </tr>
+        {# djlint:off H021 #}{# inline styles necessários em PDF weasyprint #}
+        <tr>
+            <td style="width: 80px;" class="negrito">Curso:</td>
+            <td colspan="3">{{ aluno.curso_campus.codigo }} - {{ aluno.curso_campus.descricao }}</td>
+        </tr>
+        <tr>
+            <td class="negrito">Aluno:</td>
+            <td>{{ aluno.get_nome_social_composto|normalizar }}</td>
+            <td style="width: 70px;" class="negrito">CPF:</td>
+            <td>{{ aluno.pessoa_fisica.cpf|format }}</td>
+        </tr>
+        {# djlint:on #}
+        <tr>
+            <td class="negrito">Matrícula:</td>
+            <td>{{ aluno.matricula }}</td>
+            <td class="negrito">Turno:</td>
+            <td>{{ aluno.turno.descricao|format }}</td>
+        </tr>
+        <tr>
+            <td class="negrito">Ano/Período:</td>
+            <td>{{ aluno.ano_letivo }}/{{ aluno.periodo_letivo }}</td>
+            <td class="negrito">Nº da Pasta:</td>
+            <td>{{ aluno.numero_pasta|format }}</td>
+        </tr>
+    </table>
+    <p class="right">{{ uo.municipio.nome|normalizar }}/{{ uo.municipio.uf }}, {{ hoje|format }}</p>
+    {% if not is_matricula_online %}
+        <p class="assinatura">Assinatura do Funcionário</p>
+    {% endif %}
+{% endblock %}
+{% block footer %}
+{% endblock %}

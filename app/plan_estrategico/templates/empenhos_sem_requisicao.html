@@ -1,0 +1,91 @@
+{% extends super_template %}
+
+{% block action-bar %}
+    {% if resumo.total %}
+        <ul class="action-bar">
+            <li><a href="{{ url_xls }}" class="btn">Exportar para XLS</a></li>
+        </ul>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    <p class="alert alert-warning">Notas de empenhos e ROs de reforço/anulação emitidos no SIAFI em {{ plano_atividade.ano_base }}, sem requisição de despesa vinculada.{% if codigo_unidade_orcamentaria %} Unidade orçamentária: {{ codigo_unidade_orcamentaria }}.{% endif %}</p>
+    {% if not codigo_unidade_orcamentaria %}
+        <p class="alert alert-info">O código da unidade orçamentária da instituição não está configurado: a listagem inclui empenhos de todas as UOs, inclusive os recebidos por destaque orçamentário (TED). Entre em contato com o Administrador de Planejamento Estratégico para configurar o código da unidade orçamentária.</p>
+    {% endif %}
+    <div class="search-and-filters">
+        {% render_form form %}
+    </div>
+    {% if resumo.total %}
+        {% box "Resumo" %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="text-end">Notas de empenho com pendência</th>
+                            <th class="text-end">Inclusões</th>
+                            <th class="text-end">Reforços</th>
+                            <th class="text-end">Anulações</th>
+                            <th class="text-end">Total de registros</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="text-end">{{ resumo.empenhos }}</td>
+                            <td class="text-end">{{ resumo.inclusoes }}</td>
+                            <td class="text-end">{{ resumo.reforcos }}</td>
+                            <td class="text-end">{{ resumo.anulacoes }}</td>
+                            <td class="text-end"><strong>{{ resumo.total }}</strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        {% endbox %}
+    {% endif %}
+    {% box "Empenhos" %}
+        {% if registros.exists %}
+            {% autopaginate registros 100 %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Número</th>
+                            <th>Evento</th>
+                            <th>Empenho de origem</th>
+                            <th>Data de emissão</th>
+                            <th>UG emitente</th>
+                            <th>UGR</th>
+                            <th>Macroprocesso</th>
+                            <th>Plano interno</th>
+                            <th>Origem de recurso</th>
+                            <th>Subitem</th>
+                            <th class="text-end">Valor</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for registro in registros %}
+                            {% with empenho=registro.documento_empenho %}
+                                <tr>
+                                    <td>{{ empenho.numero }}</td>
+                                    <td>{{ registro.evento.nome|format }}</td>
+                                    <td>{% if empenho.tipo == 'RO' %}{{ empenho.documento_empenho_inicial.numero|format }}{% else %}-{% endif %}</td>
+                                    <td>{{ empenho.data_emissao|format }}</td>
+                                    <td>{{ empenho.emitente_ug|format }}</td>
+                                    <td>{{ empenho.responsavel_ug|format }}</td>
+                                    <td>{{ registro.macroprocesso|format }}</td>
+                                    <td>{{ empenho.plano_interno|format }}</td>
+                                    <td>{{ empenho.acao_governo_original }}.{{ empenho.ptres.codigo }}.{{ empenho.grupo_despesa_original }}</td>
+                                    <td>{{ registro.subitem_original|format }}</td>
+                                    <td class="text-end"><small>R$</small> {{ registro.valor|format_money }}</td>
+                                </tr>
+                            {% endwith %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% paginate %}
+        {% else %}
+            <p class="alert alert-success">Nenhum empenho sem requisição de despesa.</p>
+        {% endif %}
+    {% endbox %}
+{% endblock %}

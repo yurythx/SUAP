@@ -1,0 +1,70 @@
+{% extends super_template %}
+
+{% block extrahead %}
+	{% media_filter_box %}
+{% endblock %}
+
+{% block content %}
+
+<div class="search-and-filters">
+	<div class="filter filter-large-select">
+		<form class="pesquisa_campus" method="post">
+			{% csrf_token %}
+			{{ form.as_ul }}
+		</form>
+	</div>
+</div>
+
+{% if mensagem %}
+	<p class="alert alert-info">{{ mensagem }}</p>
+{% endif %}
+
+<table>
+    <thead>
+        <tr>
+        	<th></th>
+			{% for dimensao in lista_dimensoes|dictsort:"sigla" %}
+				<th>{{ dimensao.sigla }}</th>
+			{% endfor %}
+			<th>Previsão</th>
+			<th>Saldo</th>
+        </tr>
+    </thead>
+    <tbody>
+    	{% for origem in origens_recursos %}
+	        <tr>
+	        	<td>
+	        		{% if origem.tipo == 'recurso' %}
+	        			<a class="lnk_relatorio" href="/planejamento/relatorio/despesas/recurso/dimensao/?origemrecurso={{origem.id }}">{{ origem.nome|truncatechars:30 }}</a>
+					{% else %}
+						{{ origem.nome }}
+					{% endif %}
+				</td>
+				{% for dimensao in origem.dimensoes|dictsort:"sigla" %}
+		            <td class="text-end">
+						{% if origem.tipo == 'recurso' %}
+							<a class="lnk_relatorio" href="/planejamento/relatorio/despesas/recurso/dimensao/?origemrecurso={{origem.id }}&dimensao={{dimensao.id }}&configuracao={{configuracao.id }}">{{ dimensao.valor|mascara_dinheiro }}</a>
+						{% else %}
+							<a class="lnk_relatorio" href="/planejamento/relatorio/acoes/origemrecurso/{{origem.id }}/dimensao/{{dimensao.id }}/unidadeadministrativa/{{origem.unidade_administrativa.id }}/">{{ dimensao.valor|mascara_dinheiro }}</a>
+						{% endif %}
+					</td>
+				{% endfor %}
+				<td class="text-end">{{ origem.orcamento|mascara_dinheiro }}</td>
+				<td class="text-end" class="{% if origem.credito %}true{% else %}false{% endif %}">
+					{% if origem.debito %}-{% endif %}{{ origem.saldo|mascara_dinheiro }}
+				</td>
+	        </tr>
+		{% endfor %}
+    </tbody>
+	<tfoot>				
+		<tr>
+			<td class="text-end" colspan="9">Total</td>
+			<td class="text-end">{{ total_previsao|mascara_dinheiro }}</td>
+			<td class="text-end" class="{% if total_orcamento_negativo %}false{% else %}true{% endif %}">
+				{% if total_orcamento_negativo %}-{% endif %}{{ total_orcamento|mascara_dinheiro }}
+			</td>
+		</tr>
+	</tfoot>
+</table>
+
+{% endblock %}

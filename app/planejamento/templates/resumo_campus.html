@@ -1,0 +1,79 @@
+{% extends super_template %}
+
+{% block extrahead %}
+	{% media_filter_box %}
+{% endblock %}
+
+{% block content %}
+
+<h2>Resumo das Ações e Atividades</h2>
+
+<form method="post">
+	{% csrf_token %}
+	{% filter_box True %}
+	<table>
+		<tr>
+			<td>{{ configuracao_form.configuracao.label }}</td>
+			<td>{{ configuracao_form.configuracao }}</td>
+		</tr>
+	</table>
+	{% endfilter_box %}
+</form>
+
+{% if acoes %}
+	{% regroup acoes by meta_unidade.meta.objetivo_estrategico.dimensao as lista_dimensoes %}
+	{% for dimensao in lista_dimensoes %}
+		{% box dimensao.grouper %}
+			<table>
+				<thead>
+					<tr>
+						<th>-</th>
+						<th>Código</th>
+						<th>Ação / Atividade</th>
+						<th>Execução</th>
+					</tr>
+				</thead>
+				<tbody>
+					{% for acao in dimensao.list|dictsort:"orderstr" %}
+						{% with acao.atividade_set.all as atividades %}
+							<tr>
+								<td>{% icon "view" "/planejamento/acao/{{ acao.id }}/" %}</td>
+								<td class="text-center">{{ acao.get_codigo_completo }}</td>
+								<td><strong>{{ acao }}</strong></td>
+								<td>
+									{% if acao.execucao == 100 %}
+										<span class="status status-success">Executada</span>
+									{% else %}
+										<span class="status status-error">Não Executada</span>
+									{% endif %}
+								</td>		
+							</tr>
+							{% for atividade in atividades %}
+								<tr>
+									<td>{% icon "view" "/planejamento/atividade/{{ atividade.id }}/" %}</td>
+									<td>-</td>
+									<td>{{ atividade }}</td>
+									<td>
+										{% if atividade.execucao == 100 %}
+											<span class="status status-success">Executada</span>
+										{% else %}
+											<span class="status status-error">Não Executada</span>
+										{% endif %}
+									</td>
+								</tr>
+							{% endfor %}
+						{% endwith %}
+					{% endfor %}
+				</tbody>
+			</table>
+		{% endbox %}
+	{% endfor %}
+{% else %}
+	<p class="alert alert-warning">Não existem ações cadastradas até o momento.</p>
+{% endif %}
+
+{% if erro %}
+	<p class="alert alert-warning">{{ erro }}</p>
+{% endif %}
+
+{% endblock %}

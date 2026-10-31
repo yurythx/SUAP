@@ -1,0 +1,244 @@
+{% extends super_template %}
+
+{% block extrahead %}
+<script src="/static/djtools/graficos/highcharts.js"></script>
+<script src="/static/djtools/graficos/exporting.js"></script>
+{% endblock %}
+
+{% block content %}
+
+<ul class="action-bar">
+    <li><a class="btn" href="/admin/rsc/processorsc/?tab=tab_processos_pendentes">Lista de Processos</a></li>
+</ul>
+
+<div id="formbox" class="mb-4">
+    {% render_form form %}
+</div>
+
+{# ---------- Indicadores (cards) ---------- #}
+<ul class="flex-container boxes infos mb-4">
+    <li class="box-item warning">
+        <a href="/admin/rsc/processorsc/?tab=tab_processos_pendentes">
+            <p class="stat">{{ indicadores.aguardando_validacao }}</p>
+            <p class="title">Aguardando validação da CPPD</p>
+        </a>
+    </li>
+    <li class="box-item warning">
+        <a href="/admin/rsc/processorsc/?tab=tab_processos_validados">
+            <p class="stat">{{ indicadores.aguardando_avaliadores }}</p>
+            <p class="title">Aguardando seleção de avaliadores</p>
+        </a>
+    </li>
+    <li class="box-item warning">
+        <a href="/admin/rsc/processorsc/?tab=tab_processos_em_avaliacao">
+            <p class="stat">{{ indicadores.aguardando_aceite }}</p>
+            <p class="title">Aguardando aceite de avaliador</p>
+        </a>
+    </li>
+    <li class="box-item">
+        <a href="/admin/rsc/processorsc/?tab=tab_processos_em_avaliacao">
+            <p class="stat">{{ indicadores.em_avaliacao }}</p>
+            <p class="title">Em avaliação</p>
+        </a>
+    </li>
+    <li class="box-item warning">
+        <a href="/admin/rsc/processorsc/?tab=tab_processos_ciente_resultado">
+            <p class="stat">{{ indicadores.aguardando_finalizacao }}</p>
+            <p class="title">Aguardando finalização pela CPPD</p>
+        </a>
+    </li>
+    <li class="box-item error">
+        <a href="#rsc-sem-reserva">
+            <p class="stat">{{ lista_sem_reserva|length }}</p>
+            <p class="title">Processos sem avaliador reserva</p>
+        </a>
+    </li>
+    <li class="box-item error">
+        <a href="#rsc-prazo">
+            <p class="stat">{{ lista_prazo_critico|length }}</p>
+            <p class="title">Avaliadores com prazo vencendo</p>
+        </a>
+    </li>
+    <li class="box-item error">
+        <a href="#rsc-avaliadores-incompletos">
+            <p class="stat">{{ lista_avaliadores_incompletos|length }}</p>
+            <p class="title">Processos com avaliadores incompletos</p>
+        </a>
+    </li>
+</ul>
+
+{# ---------- Gráficos ---------- #}
+<script>{{ grafico_situacao|safe }}</script>
+<script>{{ grafico_tipo|safe }}</script>
+<script>{{ grafico_unidade|safe }}</script>
+<script>{{ grafico_resultado|safe }}</script>
+<script>{{ grafico_finalizados|safe }}</script>
+<div class="graficos-container mb-4">
+    <div class="grafico-item flex-basis-100" id="grafico_situacao"></div>
+    <div class="grafico-item" id="grafico_tipo"></div>
+    <div class="grafico-item" id="grafico_unidade"></div>
+    <div class="grafico-item" id="grafico_resultado"></div>
+    <div class="grafico-item flex-basis-100" id="grafico_finalizados"></div>
+</div>
+
+{# ---------- Ação imediata da CPPD ---------- #}
+{% box 'Processos que precisam de ação da CPPD' class='mb-4' %}
+    <div class="table-responsive">
+        <table class="mt-0">
+            <caption class="hidden">Processos que precisam de ação da CPPD</caption>
+            <thead>
+                <tr>
+                    <th>Processo</th>
+                    <th>Docente</th>
+                    <th>Tipo RSC</th>
+                    <th>Situação</th>
+                    <th>Parado há</th>
+                    <th>Ação</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in lista_acao_cppd %}
+                    <tr>
+                        <td>{{ item.processo.numero|default:item.processo.id }}</td>
+                        <td>{{ item.processo.servidor }}</td>
+                        <td>{{ item.processo.tipo_rsc }}</td>
+                        <td>{{ item.processo.status_estilizado|safe }}</td>
+                        <td>{% if item.parado_dias is not None %}{{ item.parado_dias }} dia(s){% else %}—{% endif %}</td>
+                        <td><a class="btn" href="/admin/rsc/processorsc/?q={{ item.processo.servidor.pessoa_fisica.nome|urlencode }}">Abrir</a></td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="6"><p class="alert alert-info">Nenhum processo aguardando ação da CPPD.</p></td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endbox %}
+
+{# ---------- Avaliadores com prazo crítico ---------- #}
+<a id="rsc-prazo"></a>
+{% box 'Avaliadores com prazo vencido ou próximo do vencimento (≤ 3 dias)' class='mb-4' %}
+    <div class="table-responsive">
+        <table class="mt-0">
+            <caption class="hidden">Avaliadores com prazo vencido ou próximo do vencimento</caption>
+            <thead>
+                <tr>
+                    <th>Avaliador</th>
+                    <th>Tipo</th>
+                    <th>Docente avaliado</th>
+                    <th>Situação</th>
+                    <th>Prazo</th>
+                    <th>Restante</th>
+                    <th>Ação</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in lista_prazo_critico %}
+                    <tr>
+                        <td>{{ item.avaliador.avaliador }}</td>
+                        <td>{{ item.avaliador.get_tipo_avaliador_display }}</td>
+                        <td>{{ item.avaliador.processo.servidor }}</td>
+                        <td>{{ item.avaliador.get_status_display }}</td>
+                        <td>{{ item.avaliador.data_limite }}</td>
+                        <td>
+                            {% if item.dias < 0 %}
+                                <span class="status status-error">Vencido</span>
+                            {% else %}
+                                <span class="status status-alert">{{ item.dias }} dia(s)</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a class="btn" href="/admin/rsc/processorsc/?q={{ item.avaliador.processo.servidor.pessoa_fisica.nome|urlencode }}">Abrir</a>
+                            {% if item.avaliador.pode_reenviar_email %}
+                                <a class="btn primary" href="/rsc/reenviar_email_avaliador/{{ item.avaliador.id }}/">Reenviar e-mail</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="7"><p class="alert alert-info">Nenhum avaliador com prazo crítico.</p></td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endbox %}
+
+{# ---------- Processos sem avaliador reserva ---------- #}
+<a id="rsc-sem-reserva"></a>
+{% box 'Processos sem avaliador reserva' class='mb-4' %}
+    <div class="table-responsive">
+        <table class="mt-0">
+            <caption class="hidden">Processos sem avaliador reserva</caption>
+            <thead>
+                <tr>
+                    <th>Processo</th>
+                    <th>Docente</th>
+                    <th>Situação</th>
+                    <th>Reserva interna</th>
+                    <th>Reserva externa</th>
+                    <th>Ação</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for processo in lista_sem_reserva %}
+                    <tr>
+                        <td>{{ processo.numero|default:processo.id }}</td>
+                        <td>{{ processo.servidor }}</td>
+                        <td>{{ processo.status_estilizado|safe }}</td>
+                        <td>{{ processo.qtd_avaliadores_internos_reserva }}</td>
+                        <td>{{ processo.qtd_avaliadores_externos_reserva }}</td>
+                        <td><a class="btn" href="/admin/rsc/processorsc/?q={{ processo.servidor.pessoa_fisica.nome|urlencode }}">Abrir</a></td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="6"><p class="alert alert-info">Todos os processos em andamento possuem avaliador reserva.</p></td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endbox %}
+
+{# ---------- Processos com avaliadores principais incompletos ---------- #}
+<a id="rsc-avaliadores-incompletos"></a>
+{% box 'Processos com avaliadores principais incompletos (deve ter 1 interno e 2 externos)' class='mb-4' %}
+    <div class="table-responsive">
+        <table class="mt-0">
+            <caption class="hidden">Processos com quantidade incorreta de avaliadores principais</caption>
+            <thead>
+                <tr>
+                    <th>Processo</th>
+                    <th>Docente</th>
+                    <th>Situação</th>
+                    <th>Internos</th>
+                    <th>Externos</th>
+                    <th>Ação</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in lista_avaliadores_incompletos %}
+                    <tr>
+                        <td>{{ item.processo.numero|default:item.processo.id }}</td>
+                        <td>{{ item.processo.servidor }}</td>
+                        <td>{{ item.processo.status_estilizado|safe }}</td>
+                        <td>
+                            {% if item.internos != 1 %}
+                                <span class="status status-error">{{ item.internos }} / 1</span>
+                            {% else %}
+                                {{ item.internos }} / 1
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if item.externos != 2 %}
+                                <span class="status status-error">{{ item.externos }} / 2</span>
+                            {% else %}
+                                {{ item.externos }} / 2
+                            {% endif %}
+                        </td>
+                        <td><a class="btn" href="/admin/rsc/processorsc/?q={{ item.processo.servidor.pessoa_fisica.nome|urlencode }}">Abrir</a></td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="6"><p class="alert alert-info">Todos os processos em andamento têm 1 avaliador interno e 2 externos.</p></td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endbox %}
+
+{% endblock %}

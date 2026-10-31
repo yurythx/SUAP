@@ -1,0 +1,172 @@
+{% extends super_template %}
+
+{% block action-bar %}
+<ul class="action-bar">
+    <li>
+        <a href="{{ url_retorno }}" class="btn">Voltar</a>
+    </li>
+</ul>
+{% endblock %} 
+
+{% block content %}
+
+    {{ block.super }}
+
+    {% box 'Dados da Entrega' class='collapsed' %}
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>Descrição</dt>
+                <dd> {{ entrega_pes.descricao|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Métrica/Meta</dt>
+                <dd> {{ entrega_pes.get_metrica_display|format }} ({{ entrega_pes.get_meta_str|format }})</dd>
+            </div>
+            <div class="list-item">
+                <dt>Prazo</dt>
+                <dd>{{ entrega_pes.data_prazo|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Critérios de avaliação</dt>
+                <dd>{{ entrega_pes.criterios_avaliacao|linebreaks }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Setores Demandantes</dt>
+                <dd>{{ entrega_pes.get_setores_demandantes|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Pessoas Demandantes</dt>
+                <dd>{{ entrega_pes.get_vinculos_demandantes|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Setores Destinatários</dt>
+                <dd>{{ entrega_pes.get_setores_destinatarios|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Pessoas Destinatárias</dt>
+                <dd>{{ entrega_pes.get_vinculos_destinatarios|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Cancelado</dt>
+                <dd>{{ entrega_pes.cancelado|format }}</dd>
+            </div>
+            {% if utilizar_plan_estrat %}
+                <div class="list-item">
+                    <dt>Vínculo com planejamento estratégico</dt>
+                    <dd>
+                        {% if not entrega_pes.get_atividade_processo_plan_estrategico.exists %}
+                            <span class="status status-error">Não</span>
+                        {% else %}
+                            <ul>
+                            {% for pe in entrega_pes.get_atividade_processo_plan_estrategico %}
+                                <li>
+                                ({{ pe.unidade_gestora.setor_equivalente }})
+                                {{ pe.etapa_projeto_plano_atividade.projeto_plano_atividade.plano_atividade.pdi }} > 
+                                {{ pe.etapa_projeto_plano_atividade.etapa.descricao }} > 
+                                {{ pe.nome }} > 
+                                {{ pe.descricao }}
+                                </li>
+                            {% endfor %}
+                            </ul>
+                        {% endif %}
+                    </dd>
+                </div>
+            {% endif %}
+
+        </dl>
+    {% endbox %}
+
+    {% box 'Detalhes da execução' class='collapsed' %}
+        {% if not entregas_rit %}
+            <p class="alert alert-warning">Não há entregas de {{ nomenclatura.relatorio_individual_de_trabalho_sigla_pgd2 }} executadas.</p>
+        {% else %}
+            <p class="alert alert-info">Entregas {{ qtd_entregas_executadas }} executadas.</p>
+            {% if entrega_pes.tem_metrica_de_quantidade %}
+                <p class="alert alert-info">Quantidade total executada: {{ qtd_executada }}.</p>
+            {% endif %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th rowspan="2" class="no-print">Ações</th>
+                            
+                            <th rowspan="2">Servidor</th>
+                            
+                            <th rowspan="2">Período / Setor do {{ nomenclatura.plano_individual_de_trabalho_sigla_pgd2 }}</th>
+                            
+                            <th rowspan="2">{{ nomenclatura.relatorio_individual_de_trabalho_sigla_pgd2 }}</th>
+
+                            {% if entrega_pes.tem_metrica_de_quantidade %}
+                                <th colspan="6">Entrega</th>
+                            {% else %}
+                                <th colspan="5">Entrega</th>
+                            {% endif %}
+                        </tr>
+                        <tr>
+                            <th>Título / Descrição</th>
+                            <th>Tempo executado / % executado em teletrabalho?</th>
+                            {% if entrega_pes.tem_metrica_de_quantidade %}
+                                <th>Execução</th>
+                            {% endif %}
+                            <th>Data início / fim</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for entrega_rit in entregas_rit %}
+                            <tr>
+                                <td class="no-print">
+                                    {% icon "view" "/pgd2/visualizar_rit/{{ entrega_rit.entrega_pit.pit.id }}" %}
+                                </td>
+
+                                <td>
+                                    {{ entrega_rit.entrega_pit.pit.adesao.servidor }}
+                                </td>
+                                <td>
+                                    {{ entrega_rit.entrega_pit.pit.periodo_pit_rit.get_verbose_simples|format }} ({{ entrega_rit.entrega_pit.pit.setor_pode_homologar_pit_rit|format }})
+                                </td>
+                                <td>
+                                    {{ entrega_rit.entrega_pit.pit.get_situacao_rit_display|status }}
+                                </td>
+
+                                <td>
+                                    {{ entrega_rit.titulo|format }}
+                                    <dl>
+                                        {% if entrega_rit.anexo %}
+                                            <dt>Anexo:</dt>
+                                            <dd><a href="{{ entrega_rit.anexo.url }}" target="_blank">Anexo</a></dd>
+                                        {% endif %}
+                                        {% if entrega_rit.descricao %}
+                                            <dt>Descrição:</dt>
+                                            <dd>{{ entrega_rit.descricao|linebreaks }}</dd>
+                                        {% endif %}
+                                    </dl>
+                                </td>
+                                <td>
+                                    {{ entrega_rit.tempo_executado|format_hours }} ({{ entrega_rit.perc_executada_em_teletrabalho|format_money }}%)
+                                </td>
+                                {% if entrega_pes.tem_metrica_de_quantidade %}
+                                    <td>
+                                        {{ entrega_rit.get_quantidade_progresso_str|format }} 
+                                    </td>
+                                {% endif %}
+                                <td>
+                                    {% if entrega_rit.data_inicio and entrega_rit.data_fim %}
+                                        {{ entrega_rit.data_inicio|format }} - {{ entrega_rit.data_fim|format }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>                
+            </div>
+        {% endif %}
+
+    {% endbox %}
+
+    {% box 'Análise' %}
+        {% render_form form %}
+    {% endbox %}
+
+{% endblock %}

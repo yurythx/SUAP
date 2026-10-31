@@ -1,0 +1,113 @@
+{% extends super_template %}
+
+{% block extrahead %}
+<script src="/static/djtools/graficos/highcharts.js"></script>
+<script src="/static/djtools/graficos/exporting.js"></script>
+{% endblock %}
+
+{% block bodyclass %}{% if questionario %}hasAsideRight{% endif %}{% endblock %}
+
+{% block content %}
+
+	<div class="container">
+		<div id="ancora-formulario">
+			{% box "Formulário" %}
+				{% render_form form %}
+			{% endbox %}
+		</div>
+		{% if questionario %}
+            {% box "Gráfico de Colunas Empilhadas" %}
+                <div class="grafico-item">
+                    <script>
+                        {{ grafico_empilhado|safe }}
+                    </script>
+                    <div id="grafico_empilhado"></div>
+                </div>
+            {% endbox %}
+			{% box "Quadro Resumo" %}
+				{% for categoria in categorias %}
+					{% if categoria.perguntas %}
+						<table>
+							<thead>
+								<tr>
+									<th id="categoria_{{ categoria.id }}">{{ categoria }}</th>
+									{% for opcao in opcoes %}
+										<th><strong class="text hint hint-bottom" aria-label="{{ opcao.nome }}">{{ forloop.counter }}</strong></th>
+									{% endfor %}
+									<th>Total</th>
+								</tr>
+							</thead>
+							<tbody>
+								{% for pergunta in categoria.perguntas %}
+									{% if pergunta.objetiva %}
+									<tr>
+										<td>{{ forloop.counter }}. [{{ pergunta.identificador }}]{{ pergunta.get_html|safe }}</td>
+										{% for data in pergunta.data %}
+											<td>{{ data }}</td>
+										{% endfor %}
+										<td>{{ pergunta.total }}</td>
+									</tr>
+									{% endif %}
+								{% endfor %}
+							</tbody>
+						</table>
+					{% endif %}
+				{% endfor %}
+			{% endbox %}
+			{% for categoria in categorias %}
+				{% if categoria.perguntas %}
+					<div id="grafico_categoria_{{ categoria.id }}">
+						{% box categoria %}
+							{% for pergunta in categoria.perguntas %}
+								<h4>{{ forloop.counter }}. [{{ pergunta.identificador }}]{{ pergunta.get_html|safe }}</h4>
+								<div class="grafico-item">
+									{% if pergunta.objetiva %}
+										<script>
+											{{ pergunta.grafico|safe }}
+										</script>
+										<div id="grafico{{ pergunta.id }}"></div>
+									{% else %}
+                                        <p>Esta pergunta é subjetiva. <a href="/cpa/respostas_subjetivas/{{ pergunta.id }}/?{{ form.data.urlencode }}" class="popup" data-reload-on-close="false">Visualize as respostas informadas pelos usuários</a>.</p>
+									{% endif %}
+								</div>
+							{% endfor %}
+						{% endbox %}
+					</div>
+				{% endif %}
+			{% endfor %}
+		{% else %}
+			{% if form.cleaned_data %}
+				<p class="alert alert-warning">Nenhum questionário encontrado.</p>
+			{% endif %}
+		{% endif %}
+	</div>
+{% endblock %}
+
+{% block asideright %}
+
+	{% if questionario %}
+
+        <aside class="right">
+            <ul class="ancoras">
+                <li><a href="#ancora-formulario">Formulário</a></li>
+                <li>
+                    <span>Quadro Resumo</span>
+                    <ul>
+                        {% for categoria in categorias %}
+                            <li><a href="#categoria_{{ categoria.id }}">{{ categoria }}</a></li>
+                        {% endfor %}
+                    </ul>
+                </li>
+                <li>
+                    <span>Gráficos</span>
+                    <ul>
+                        {% for categoria in categorias %}
+                            <li><a href="#grafico_categoria_{{ categoria.id }}">{{ categoria }}</a></li>
+                        {% endfor %}
+                    </ul>
+                </li>
+            </ul>
+        </aside>
+	{% endif %}
+
+{% endblock %}

@@ -1,0 +1,100 @@
+{% extends super_template %}
+
+{% block action-bar %}
+    <ol class="action-bar">
+        <li><a href="{% url 'ver_resumo_plano' plano_atividade.id %}" class="btn default">Plano de Atividades Original</a></li>
+        <li><a href="{% url 'realocacoes' plano_atividade.id %}" class="btn default">Realocações</a></li>
+        <li><a href="{% url 'movimentacoes_credito' plano_atividade.id %}" class="btn default">Movimentações</a></li>
+    </ol>
+{% endblock %}
+
+{% block content %}
+    <div class="search-and-filters">
+		{% render_form resumoplano_form %}
+    </div>
+    <ul class="action-bar">
+            {% if pode_requisitar_despesa %}
+                <li class="has-child">
+                    <a class="btn success" href="#">Adicionar requisição de despesa</a>
+                    <ul>
+                        <li><a href="{% url 'dotacaoprovisoria' plano_atividade.id %}">Dotação provisória</a></li>
+                        <li><a href="{% url 'dotacaoempenho' plano_atividade.id %}">Dotação para empenho</a></li>
+                        <li><a href="{% url 'reforcoempenho' plano_atividade.id %}">Reforço de empenho</a></li>
+                        <li><a href="{% url 'anulacaoempenho' plano_atividade.id %}">Anulação de empenho</a></li>
+                    </ul>
+                </li>
+            {% endif %}
+        {% if exibir_empenhos_sem_requisicao %}
+            <li><a href="{% url 'empenhos_sem_requisicao' plano_atividade.id %}" class="btn warning">Empenhos sem requisição de despesa</a></li>
+        {% endif %}
+        {% if plano_concluido %}
+            <li><a href="/admin/plan_estrategico/requisicaodespesa/?ano_cadastro={{ plano_atividade.ano_base }}" class="btn default">Requisições de despesa</a></li>
+        {% endif %}
+    </ul>
+    {% box 'Legenda' %}
+        <div class="legenda">
+            <p><strong>Legenda:</strong></p>
+            <ul>
+                <li class="warning">{% icone "circle" %} Atividades complementares</li>
+            </ul>
+        </div>
+    {% endbox %}
+    {% for item in lista_projetos %}
+        {% box "{{ item.projeto_plano.projeto.codigo }} - {{ item.projeto_plano.projeto.nome }}" %}
+            {% if item.atividades %}
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Unidade gestora</th>
+                                <th>Origem de recurso</th>
+                                <th>Plano interno</th>
+                                <th>Componente funcional</th>
+                                <th>Atividade</th>
+                                <th>Valor movimentado disponível do plano interno (R$)</th>
+                                <th>Dotação provisória total emitida do plano interno</th>
+                                <th>Valor total empenhado do plano interno (R$)</th>
+                                <th>Saldo disponível para empenho do plano interno (R$)</th>
+                                <th>Valor atualizado da atividade (R$)</th>
+                                <th>Valor empenhado da atividade (R$)</th>
+                                <th>Valor de requisições de despesas em tramitação</th>
+                                <th>Saldo disponível para empenho da atividade (R$)</th>
+                                <th>Opções</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for atividade in item.atividades %}
+                                {% if atividade.atividade_complementar %}
+                                    <tr class="highlight">
+                                {% else %}
+                                    <tr>
+                                {% endif %}
+                                    <td class="text-end">{{ atividade.unidade_gestora_sigla }}</td>
+                                    <td class="text-end">{{ atividade.origem_recurso_etapa|format }}</td>
+                                    <td class="text-end">{{ atividade.plano_interno|format }}</td>
+                                    <td>{{ atividade.etapa_codigo }} - {{ atividade.etapa_descricao }}</td>
+                                    <td>{{ atividade.nome }}</td>
+                                    {% if atividade.plano_interno %}
+                                        <td class="text-end">{{ atividade.plano_interno_valor_disponivel_movimentado|format }}</td>
+                                    {% else %}
+                                        <td class="text-end">0,00</td>
+                                    {% endif %}
+                                    <td class="text-end">0,00</td>
+                                    <td class="text-end">0,00</td>
+                                    <td class="text-end">0,00</td>
+                                    <td class="text-end">{{ atividade.get_valor_disponivel_realocacao|format_money }}</td>
+                                    <td class="text-end">{{ atividade.get_total_empenhados_atividade|format_money }}</td>
+                                    <td class="text-end">{{ atividade.get_total_em_tramitacao|format_money }}</td>
+                                    <td class="text-end">{{ atividade.saldo_disponivel_empenho_atividade|format_money }}</td>
+                                    <td><a href="{% url 'listar_requisicoes_despesa' plano_atividade.id atividade.id %}" class=" btn default">Detalhar</a></td>
+                                </tr>
+                            {% endfor %}
+                         </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="alert alert-warning">Nenhuma atividade neste macroprocesso conforme o filtro aplicado.</p>
+            {% endif %}
+        {% endbox %}
+    {% endfor %}
+{% endblock %}

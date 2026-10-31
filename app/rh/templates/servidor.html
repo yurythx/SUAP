@@ -1,0 +1,223 @@
+{% extends super_template %}
+
+{% block object-status %}
+    {% if not servidor.ativo %}<span class="status status-error">Excluído</span>{% else %}<span class="status status-success">Ativo</span>{% endif %}
+    {% if servidor.pessoa_fisica.tem_digital %}<span class="status status-success">Tem impressão digital</span>{% else %}<span class="status status-error">Não tem impressão digital</span>{% endif %}
+    {% if esta_em_pgd %}<span class="status status-info">Em PGD</span>{% endif %}
+    {% if estah_afastado_ou_de_ferias %}<span class="status status-default">{{ estah_afastado_ou_de_ferias }}</span>{% endif %}
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if perms.rh.change_servidor or servidor.get_user and perms.auth.change_user or verificacao_propria or perms.rh.pode_editar_email_secundario_servidor or perms.rh.pode_cadastrar_digital %}
+            <li class="has-child">
+                <a href="#" class="btn primary">{% icone "edit" %} Editar</a>
+                <ul>
+                    {% if perms.rh.pode_editar_email_secundario_servidor or verificacao_propria %}
+                        <li><a class="popup" href="/comum/atualizar_email_secundario/{{ servidor.get_vinculo.pk }}/">E-mail</a></li>
+                    {% endif %}
+                    {% if perms.comum.view_contatoemergencia or verificacao_propria %}
+                        <li><a href="/comum/pessoa_fisica/{{ servidor.pessoa_fisica.pk }}/listar_contatos_de_emergencia">Contatos de Emergência</a></li>
+                    {% endif %}
+                    {% if verificacao_propria or perms.rh.change_servidor %}
+                        {% if perms.rh.change_servidor %}
+                            <li><a href="/admin/rh/servidor/{{ servidor.pk }}/">Servidor</a></li>
+                            {% if servidor.eh_docente and perms.rh.eh_rh_sistemico %}
+                                <li><a class="popup" href="/edu/editar_disciplina_docente/{{ servidor.pessoa_fisica_id }}/">Dados como Professor</a></li>
+                            {% endif %}
+                            {% if servidor.cargo_emprego.cargoempregoarea_set.exists and perms.rh.eh_rh_sistemico %}
+                                <li><a class="popup" href="{% url 'editar_servidor_cargo_emprego_area' servidor.pk %}">Área do Cargo</a></li>
+                            {% endif %}
+                        {% else %}
+                            <li><a class="popup" href="/rh/servidor/editar_informacoes_pessoais/">Informações Pessoais</a></li>
+                        {% endif %}
+                    {% endif %}
+                    {% if perms.rh.pode_cadastrar_digital or verificacao_propria and servidor.tem_digital_fraca %}
+                        <li><a class="popup" href="/rh/editar_informacoes_digitais_fracas/{{ servidor.pessoa_fisica_id }}/">{% if perms.rh.pode_cadastrar_digital %}Informações de Digitais Fracas{% else %}Editar Senha do Ponto{% endif %}</a></li>
+                    {% endif %}
+                    {% if servidor.get_user and perms.auth.change_user %}
+                        <li><a href="/admin/comum/user/{{ servidor.get_user.pk }}/">Usuário</a></li>
+                    {% endif %}
+                </ul>
+            </li>
+        {% endif %}
+
+        {% if verificacao_propria %}
+            <li><a class="btn" href="/rh/atualizar_meus_dados_servidor/">{% icone "square" %} Importar Meus Dados</a></li>
+        {% endif %}
+
+        {% ldap_actions servidor %}
+
+        {% if servidor.get_vinculo.professor_set.exists and perms.edu.view_professor %}
+            <li><a href="{{ servidor.professor.get_absolute_url }}" class="btn default">{% icone "info-circle" %} Dados do Professor</a></li>
+        {% endif %}
+
+        <li class="has-child">
+            <a href="#" class="btn default">{% icone "list" %} Outras opções</a>
+            <ul>
+                <li><a href="/admin/rh/solicitacaoalteracaofoto/add/">Alterar Foto</a></li>
+                {% if perms.rh.pode_gerar_cracha and pode_gerar_cracha %}
+                    <li><a href="/rh/cracha_pessoa/{{ servidor.pessoa_fisica_id }}/">Crachá</a></li>
+                {% endif %}
+                {% if servidor.get_vinculo.vinculo_curriculo_lattes %}
+                    <li><a href="/cnpq/curriculo/{{ servidor.pk }}/">Currículo Lattes</a></li>
+                {% else %}
+                    <li><a href="/cnpq/atualizar_curriculo/{{ servidor.matricula }}/{{ servidor.id }}/">Importar Currículo Lattes</a></li>
+                {% endif %}
+                <li><a href="/comum/grupos_usuario/{{ servidor.get_user.pk }}/" class="popup">Grupos</a></li>
+                {% if servidor.get_user.tem_historico_grupos %}
+                    <li><a class="popup" href="/comum/usuario/{{ servidor.get_user.pk }}/historico_grupos/">Histórico em Grupos</a></li>
+                {% endif %}
+                {% if pode_ver_dados_pessoais_servidor %}
+                    <li><a class="popup" href="/rh/pessoa_info_complementar/{{ vinculo.id }}/">Informações Complementares</a></li>
+                {% endif %}
+                {% if request.user.is_superuser %}
+                <li><a href="/processo_eletronico/permissoes_processos_documentos/{{ servidor.matricula }}/">Permissões de Processos e Documentos Eletrônicos</a></li>
+                {% endif %}
+            </ul>
+        </li>
+
+        {% if verificacao_propria %}
+            <li><a class="btn default" href="/comum/minha_conta/">{% icone "user" %} Minha conta</a></li>
+        {% endif %}
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+    <div class="photo-circle lg">
+        <img src="{{ servidor.get_foto_150x200_url }}" alt="Foto de {{ servidor.pessoa_fisica.nome|format }}">
+    </div>
+    <dl class="definition-list flex">
+        <div class="list-item">
+            <dt>Nome usual</dt>
+            <dd>{{ servidor.pessoa_fisica.nome_usual }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>E-mail institucional</dt>
+            <dd><a href="mailto:{{ servidor.email_institucional }}">{{ servidor.email_institucional|format }}</a></dd>
+        </div>
+        <div class="list-item">
+            <dt>E-mail SIAPE</dt>
+            <dd><a href="mailto:{{ servidor.email_siape }}">{{ servidor.email_siape|format }}</a></dd>
+        </div>
+        <div class="list-item">
+            <dt>Email pessoal para recuperação de senha</dt>
+            <dd><a href="mailto:{{ servidor.email_pessoal }}">{{ servidor.email_pessoal|format }}</a></dd>
+        </div>
+        <div class="list-item">
+            <dt>E-mail para notificações</dt>
+            <dd><a href="mailto:{{ servidor.email_notificacao }}">{{ servidor.email_notificacao|format }}</a></dd>
+        </div>
+        <div class="list-item">
+            <dt>E-mail Google Sala de Aula <span class="fas fa-question-circle" aria-label="O login para este e-mail, e para os recursos do Google for Education, é realizado exclusivamente através do link para o Google Sala de Aula localizado no rodapé de todas as páginas do SUAP. O login através de senha NÃO ESTÁ HABILITADO para os serviços do Google for Education." title="O login para este e-mail, e para os recursos do Google for Education, é realizado exclusivamente através do link para o Google Sala de Aula localizado no rodapé de todas as páginas do SUAP. O login através de senha NÃO ESTÁ HABILITADO para os serviços do Google for Education."></span></dt>
+            <dd>
+                {% if servidor.email_google_classroom %}
+                    <p><a href="mailto:{{ servidor.email_google_classroom }}">{{ servidor.email_google_classroom|format }}</a></p>
+                {% else %}
+                    <p>-</p>
+                {% endif %}
+            </dd>
+        </div>
+        {% if servidor.email_academico %}
+            <div class="list-item">
+                <dt>E-mail acadêmico</dt>
+                <dd><a href="mailto:{{ servidor.email_academico }}">{{ servidor.email_academico|format }}</a></dd>
+            </div>
+        {% endif %}
+        <div class="list-item">
+            <dt>Telefones institucionais</dt>
+            <dd>{{ servidor.telefones_institucionais|format }}</dd>
+        </div>
+        {% if pode_ver_telefones_pessoais_servidor %}
+            <div class="list-item">
+                <dt>Telefones pessoais</dt>
+                <dd>{{ servidor.pessoa_fisica.telefones_pessoais|format }}</dd>
+            </div>
+        {% endif %}
+        {% if servidor.pessoa_fisica.lattes %}
+            <div class="list-item">
+                <dt>Currículo Lattes</dt>
+                <dd><a href="{{ servidor.pessoa_fisica.lattes }}">{{ servidor.pessoa_fisica.lattes }}</a></dd>
+            </div>
+        {% endif %}
+        {% if servidor.pessoa_fisica.orcid %}
+            <div class="list-item">
+                <dt>ORCID</dt>
+                <dd><a href="{{ servidor.pessoa_fisica.orcid }}">{{ servidor.pessoa_fisica.orcid }}</a></dd>
+            </div>
+        {% endif %}
+        {% if verificacao_propria or perms.comum.view_contatoemergencia %}
+            {% with contatos_emergencia=servidor.pessoa_fisica.contatoemergencia_set %}
+                {% if contatos_emergencia.exists %}
+                    <div class="list-item">
+                        <dt>Contatos de emergência</dt>
+                        {% for contato in contatos_emergencia.all %}
+                            <dd>{{ contato.nome_contato }}: {{ contato.telefone|format }}</dd>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+        {% endif %}
+        <div class="list-item">
+            <dt>Em PGD (dados do suap)</dt>
+            <dd>{{ esta_em_pgd|format }}</dd>
+        </div>
+        {% if esta_em_pgd and adesao_pgd and eh_servidor %}
+            <div class="list-item">
+                <dt>Contato PGD (dados do suap)</dt>
+                <dd>
+                    {{ adesao_pgd.get_contato_preferencia }}
+                    {% if not esta_em_pgd2 %}
+                        <a href="/pgd2/meu_pgd/{{ servidor.matricula }}/" class="btn default">+ Detalhes</a>
+                    {% endif %}
+                </dd>
+            </div>
+        {% endif %}
+    </dl>
+
+    <!-- tab dados gerais do servidor -->
+    {{ tab_dados_gerais }}
+
+    <!-- tab de ocorrências e afastamentos -->
+    {% if pode_ver_ocorrencias_afastamentos_servidor %}
+        {{ tab_ocorrencia_afastamento }}
+    {% endif %}
+
+    <!-- tab de histórico de setores -->
+    {% if pode_ver_historico_setores_servidor %}
+        {% if historico_setor or historico_setor_siape %}
+            {{ tab_historico_setor }}
+        {% endif %}
+    {% endif %}
+
+    <!-- tab histórico funcional do servidor -->
+    {% if pode_ver_historico_funcional_servidor %}
+        {{ tab_historico_funcional }}
+    {% endif %}
+
+    <!-- tab de histórico de função -->
+    {% if pode_ver_historico_funcao_servidor %}
+        {% if servidor_historico_funcao %}
+            {{ tab_servidor_historico_funcao }}
+        {% endif %}
+    {% endif %}
+
+    <!-- tab de histórico de carga horária -->
+    {{ tab_alteracao_carga_horaria }}
+
+    <!-- tab de signals -->
+    {% for tab in extra_tabs %}
+        {{ tab }}
+    {% endfor %}
+
+    <!-- tab de dependentes -->
+    {% if pode_ver_dados_pessoais_servidor %}
+        {{ tab_dependentes }}
+    {% endif %}
+
+    <!-- tab de diárias e passagens -->
+    {% if pode_ver_viagens_servidor %}
+        {{ tab_viagens_servidor }}
+    {% endif %}
+{% endblock %}

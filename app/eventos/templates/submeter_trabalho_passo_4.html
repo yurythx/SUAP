@@ -1,0 +1,115 @@
+{% extends "admin/base_anonima.html" %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        <li><a class="btn" href="{% url 'submeter_trabalho_passo_3' evento.id area_tematica.id modalidade.id%}">Voltar</a></li>
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+    {% if autores|length > 0 %}
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>Modalidade</dt>
+                <dd>{{ modalidade.tipo.titulo }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Área temática</dt>
+                <dd>{{ area_tematica.titulo }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Tipo de submissão</dt>
+                <dd>{{ modalidade.get_tipo_submissao_formatado }}</dd>
+            </div>
+        </dl>
+
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <fieldset>
+                {% for autor in autores %}
+                    <div class="form-row required">
+                        <div class="field-box-first">
+                            <label for="id_autor_{{ autor.id }}">Tipo de autor para {{ autor.nome }} ({{ autor.email }}):</label>
+                            <select class="tipo-autor" data-autor-id="{{ autor.id }}" id="id_autor_{{ autor.id }}" required>
+                                <option value="autor">Autor</option>
+                                <option value="orientador">Orientador</option>
+                                <option value="coorientador">Coorientador</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="field-box-second">
+                            <label>
+                                <input type="radio" name="autor_correspondente" id="autor_correspondente" value="{{ autor.id }}"
+                                    {% if autores|length == 1 %}checked{% endif %}>
+                                Autor correspondente
+                                <p class="help">Marque este campo caso o autor seja o responsável pela comunicação com os avaliadores.</p>
+                            </label>
+                        </div>
+                    </div>
+                {% endfor %}
+                {% for field in form %}
+                    <div class="form-row{% if field.field.required %} required{% endif %}{% if field.errors %} errors{% endif %} {{ field.label|slugify }}">
+                        <div class="field-box-first">
+                            {{ field.errors }}
+                            {{ field.label_tag }}
+                            {{ field }}
+                            <p class="help">{{ field.help_text }}</p>
+                        </div>
+                    </div>
+                {% endfor %}
+            </fieldset>
+            <div class="submit-row">
+                <input type="submit" class="success" value="Submeter trabalho">
+            </div>
+        </form>
+    {% else %}
+        <p class="alert alert-warning">Autores não localizados. Por favor, <a href="{% url 'submeter_trabalho_passo_3' evento.id area_tematica.id modalidade.id %}">retornar ao passo anterior</a>.</p>
+    {% endif %}
+
+    <script>
+        $(document).ready(function() {
+            $('form').on('submit', function(e) {
+                if ($('input[name="autor_correspondente"]:checked').length === 0) {
+                    alert('Por favor, selecione um autor correspondente.');
+                    e.preventDefault();
+                    return false;
+                }
+            });
+            $('.tipo-autor').on('change', function() {
+                let selectElement = $(this);
+                let autorId = selectElement.data('autor-id');
+                let tipoAutor = selectElement.val();
+                let feedbackDiv = $('<div class="feedback-mensagem"></div>');
+
+                $.ajax({
+                    url: "{% url 'submeter_trabalho_atualizar_tipo_autor' evento.id %}",
+                    method: 'POST',
+                    data: {
+                        'autor_id': autorId,
+                        'tipo_autor': tipoAutor,
+                        'csrfmiddlewaretoken': $('input[name="csrfmiddlewaretoken"]').val()
+                    },
+                    success: function(response) {
+                        feedbackDiv.text('Autor alterado com sucesso!').css('color', 'green');
+                    },
+                    error: function(xhr) {
+                        feedbackDiv.text('Erro ao atualizar o tipo de autor.').css('color', 'red');
+                    },
+                    complete: function() {
+                        // Remove mensagens anteriores e insere a nova mensagem ao lado do select
+                        selectElement.siblings('.feedback-mensagem').remove();
+                        selectElement.after(feedbackDiv);
+
+                        // Remove a mensagem após 3 segundos
+                        setTimeout(function() {
+                            feedbackDiv.fadeOut(300, function() { $(this).remove(); });
+                        }, 5000);
+                    }
+                });
+            });
+        });
+    </script>
+         
+{% endblock %}

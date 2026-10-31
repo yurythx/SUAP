@@ -1,0 +1,1432 @@
+{% extends super_template %}
+{% load professor_titular_tags %}
+
+{% block extrahead %}
+<script src="/static/arquivo/js/fileuploader.js"></script>
+<script src="/static/arquivo/js/compatibility.js"></script>
+<script src="/static/arquivo/js/pdf.js"></script>
+<style>
+    .instrucoes_gerais li{
+        margin: 0;
+    }
+    /* Pontuação já preenchida exibida no cabeçalho do critério, alinhada à
+       direita (margin-left:auto no flex do .accordion-button), antes da seta. */
+    .accordion-button .pt-pontos-header{
+        margin-left: auto;
+        margin-right: 1rem;
+        padding: 0.15rem 0.5rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+        white-space: nowrap;
+        color: #0c5460;
+        background-color: #d1ecf1;
+        border-radius: 0.25rem;
+    }
+    /* Indicador de pendência: algum arquivo do critério está sem Quantidade,
+       Data de referência ou Descrição. Fica à direita da pontuação, antes da seta. */
+    .accordion-button .pt-problema-header{
+        margin-right: 1rem;
+        padding: 0.15rem 0.5rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+        white-space: nowrap;
+        color: #721c24;
+        background-color: #f8d7da;
+        border-radius: 0.25rem;
+    }
+    /* Quando não há pontuação à esquerda, a pendência vira a âncora à direita. */
+    .accordion-button .pt-problema-header.pt-anchor-right{
+        margin-left: auto;
+    }
+    /* Destaque temporário ao navegar do Quadro Resumo até o item com problema. */
+    .pt-item-destacado{
+        animation: pt-flash 2.5s ease-out;
+    }
+    @keyframes pt-flash{
+        0%   { background-color: #fff3cd; }
+        100% { background-color: transparent; }
+    }
+</style>
+
+<script>
+    $( document ).ready(function() {
+        iniciar_autosalvamento_campos_estaticos();
+        iniciar_pontos_header_criterios();
+        atualiza_status_problemas_criterios();
+        $('#recalcular_pontuacao').click(function () {
+            if ($(this).attr("disabled") === "disabled")
+                return false;
+            else
+            {
+               $(this).attr("disabled", "disabled");
+               $(this).html('Aguarde...');
+            }
+        });
+    });
+
+	function iniciar_autosalvamento_campos_estaticos(){
+        var ids = [
+        	'id_data_concessao_titulacao_doutor',
+            'id_data_graduacao_EBTT',
+            'id_data_progressaoD404',
+            'id_data_avaliacao_desempenho',
+            'id_introducao_relatorio_descritivo',
+            'itinerario_formacao_txt',
+            'atuacao_docente_txt',
+            'producao_cademica_txt',
+            'prestacao_servicos_txt',
+            'atividade_adm_txt',
+            'titulos_homenagens_txt',
+            'id_conclusao_relatorio_descritivo'
+        ];
+
+        $.each(ids, function(index, value) {
+            $('#'+value).attr('onchange','Processa_Salvamento(\'Autosalvar\', {{ processo.id }}, \'{{ processo.tipo_rsc }}\', \'Aguardando envio para CPPD\')');
+        });
+    }
+
+    function onInitTabs(){
+        preencher_relatorio_descritivo();
+        $("a[data-tab='relatorio_descritivo']").on('click', function(){
+            preencher_relatorio_descritivo();
+        });
+
+        preencher_quadro_resumo_pontuacao_requerida();
+        $("a[data-tab='quadro_resumo_pontuacao_requerida']").on('click', function(){
+            preencher_quadro_resumo_pontuacao_requerida();
+        });
+    }
+
+    function preencher_relatorio_descritivo(){
+        $.get("/professor_titular/relatorio_descritivo/{{ processo.id }}/", function(data) {
+            $("div[data-tab='relatorio_descritivo']").html(data);
+        }).always(function() {
+            iniciar_autosalvamento_campos_estaticos();
+        });
+    }
+
+    function preencher_quadro_resumo_pontuacao_requerida(){
+        $.get("/professor_titular/quadro_resumo_pontuacao_requerida/{{ processo.id }}/", function(data) {
+            $("div[data-tab='quadro_resumo_pontuacao_requerida']").html(data);
+        });
+    }
+
+    function human_file_size(bytes, si) {
+        var thresh = si ? 1000 : 1024;
+        if(bytes < thresh) return bytes + ' B';
+        var units = si ? ['kB','MB','GB','TB','PB','EB','ZB','YB'] : ['KB','MB','GB','TB','PB','EB','ZB','YB'];
+        var u = -1;
+        do {
+            bytes /= thresh;
+            ++u;
+        } while(bytes >= thresh);
+        return bytes.toFixed(1)+' '+units[u];
+    };
+
+    function calcula_pontuacao_total_grupo(classe_grupo, teto_grupo){
+
+        var pontuacao_total_grupo = 0;
+        $('span.'+classe_grupo).filter('.total_indicador').each(function() {
+            var pontuacao_total = parseFloat($(this).html());
+            pontuacao_total_grupo += pontuacao_total;
+        });
+
+        if(pontuacao_total_grupo > teto_grupo) {
+            pontuacao_total_grupo = teto_grupo;
+
+            $('#feedback_message').addClass("d-none");
+            $('#error').attr('class','errornote');
+            $('#error').html('A pontuação máxima(teto) neste grupo foi atingida.');
+            $('#error').removeClass("d-none");
+        }
+
+        if(classe_grupo == "A") {
+            $("#rsc1").html(pontuacao_total_grupo.toFixed(2));
+            $("#rsc1hidden").val(pontuacao_total_grupo.toFixed(2));
+        } else if (classe_grupo == "B") {
+            $("#rsc2").html(pontuacao_total_grupo.toFixed(2));
+            $("#rsc2hidden").val(pontuacao_total_grupo.toFixed(2));
+        } else if (classe_grupo == "C") {
+            $("#rsc3").html(pontuacao_total_grupo.toFixed(2));
+            $("#rsc3hidden").val(pontuacao_total_grupo.toFixed(2));
+        }
+          else if (classe_grupo == "D") {
+            $("#rsc4").html(pontuacao_total_grupo.toFixed(2));
+            $("#rsc4hidden").val(pontuacao_total_grupo.toFixed(2));
+        } else if (classe_grupo == "E") {
+            $("#rsc5").html(pontuacao_total_grupo.toFixed(2));
+            $("#rsc5hidden").val(pontuacao_total_grupo.toFixed(2));
+        } else if (classe_grupo == "F") {
+            $("#rsc6").html(pontuacao_total_grupo.toFixed(2));
+            $("#rsc6hidden").val(pontuacao_total_grupo.toFixed(2));
+        }else if (classe_grupo == "G") {
+            $("#rsc7").html(pontuacao_total_grupo.toFixed(2));
+            $("#rsc7hidden").val(pontuacao_total_grupo.toFixed(2));
+        }else if (classe_grupo == "H") {
+            $("#rsc8").html(pontuacao_total_grupo.toFixed(2));
+            $("#rsc8hidden").val(pontuacao_total_grupo.toFixed(2));
+        }
+
+        // pontuação requerida (Soma das pontuações dos grupos)
+        var total_pontuacao_pretendida = parseFloat($("#rsc1hidden").val()) + parseFloat($("#rsc2hidden").val())
+            + parseFloat($("#rsc3hidden").val()) + parseFloat($("#rsc4hidden").val()) + parseFloat($("#rsc5hidden").val())
+            + parseFloat($("#rsc6hidden").val()) + parseFloat($("#rsc7hidden").val()) + parseFloat($("#rsc8hidden").val());
+        $("#pontuacao_requerida").html(total_pontuacao_pretendida);
+    }
+
+    function calcula_pontuacao_total_indicador(id_indicador){
+        var pontuacao_total_indicador = 0;
+        $(".indicador_class_"+id_indicador).each(function() {
+            var pontuacao_criterio = parseFloat($(this).html());
+            pontuacao_total_indicador += pontuacao_criterio;
+        });
+        var obj = $('#total_indicador_'+ id_indicador);
+        // obj.parent().parent().find('p.alert').remove();
+        obj.html(pontuacao_total_indicador.toFixed(2))
+    }
+
+    function calcula_pontuacao_total_criterio(id_criterio){
+        var pontuacao_total_criterio = 0;
+        $(".criterio_class_"+id_criterio).each(function() {
+            var pontuacao_criterio = parseFloat($(this).html());
+            pontuacao_total_criterio += pontuacao_criterio;
+        });
+        var valor = pontuacao_total_criterio.toFixed(2);
+        $('#total_pontos_criterio_'+ id_criterio).html(valor);
+        atualiza_pontos_header_criterio(id_criterio, valor);
+    }
+
+    // Exibe/atualiza, no cabeçalho do critério, a pontuação já preenchida,
+    // alinhada à direita (antes da seta de expandir do accordion).
+    function atualiza_pontos_header_criterio(id_criterio, valor){
+        var $btn = $('button[data-bs-target="#criterio_' + id_criterio + '"]');
+        if (!$btn.length) {
+            return;
+        }
+        var $header = $btn.find('.pt-pontos-header');
+        if (!$header.length) {
+            $header = $('<span class="pt-pontos-header"></span>');
+            $btn.append($header);
+        }
+        $header.text('Pontos: ' + valor);
+    }
+
+    // Inicializa os cabeçalhos a partir do valor já renderizado no corpo de cada critério.
+    function iniciar_pontos_header_criterios(){
+        $('span[id^="total_pontos_criterio_"]').each(function(){
+            var id_criterio = this.id.replace('total_pontos_criterio_', '');
+            atualiza_pontos_header_criterio(id_criterio, $(this).text().trim());
+        });
+    }
+
+    // Marca/limpa no cabeçalho do critério um aviso de que há item(ns) com
+    // Quantidade, Data de referência ou Descrição não preenchidos.
+    function atualiza_problema_header_criterio(id_criterio, tem_problema){
+        var $btn = $('button[data-bs-target="#criterio_' + id_criterio + '"]');
+        if (!$btn.length) {
+            return;
+        }
+        var $flag = $btn.find('.pt-problema-header');
+        if (tem_problema) {
+            if (!$flag.length) {
+                $flag = $('<span class="pt-problema-header" title="Há item(ns) com Quantidade, Data de referência ou Descrição não preenchidos."><i class="fas fa-exclamation-triangle"></i> Informações pendentes</span>');
+                // Fica logo após a pontuação (antes da seta). Sem pontuação, vira a âncora à direita.
+                var $pontos = $btn.find('.pt-pontos-header');
+                if ($pontos.length) {
+                    $flag.insertAfter($pontos);
+                } else {
+                    $flag.addClass('pt-anchor-right');
+                    $btn.append($flag);
+                }
+            }
+        } else {
+            $flag.remove();
+        }
+    }
+
+    // Verifica, em cada critério, se algum arquivo está com Quantidade, Data de
+    // referência ou Descrição em branco e atualiza o aviso no cabeçalho.
+    function atualiza_status_problemas_criterios(){
+        $('table[id^="arquivos_selecionados"]').each(function(){
+            var id_criterio = this.id.replace('arquivos_selecionados', '');
+            var tem_problema = false;
+            $(this).find('.integer-widget, input[type=date], .textarea_descricao').each(function(){
+                var valor = $(this).val();
+                if (valor === '' || valor === null) {
+                    tem_problema = true;
+                    return false;
+                }
+            });
+            atualiza_problema_header_criterio(id_criterio, tem_problema);
+        });
+    }
+
+    // Expande um accordion (Bootstrap collapse) pelo id, caso esteja recolhido.
+    function abrirAccordion(collapseId){
+        if (!collapseId) {
+            return;
+        }
+        var $collapse = $('#' + collapseId);
+        if ($collapse.length && !$collapse.hasClass('show')) {
+            $('button[data-bs-target="#' + collapseId + '"]').trigger('click');
+        }
+    }
+
+    // Navega do Quadro Resumo até o item com problema: ativa a aba do grupo,
+    // expande os accordions do indicador e do critério e destaca a linha do arquivo.
+    function irParaItemComProblema(idCriterio, encryptedPk){
+        var $criterio = $('#criterio_' + idCriterio);
+        if (!$criterio.length) {
+            return false;
+        }
+
+        // 1. Ativa a aba (tab-pane) que contém o critério.
+        var paneId = $criterio.closest('.tab-pane').attr('id');
+        if (paneId) {
+            $('.nav-tabs .nav-link[data-bs-target="#' + paneId + '"]').trigger('click');
+        }
+
+        // 2. Expande o indicador e o critério, se estiverem recolhidos.
+        var idIndicador = $criterio.closest('.accordion-body').closest('.accordion-collapse').attr('id');
+        abrirAccordion(idIndicador);
+        abrirAccordion('criterio_' + idCriterio);
+
+        // 3. Após a troca de aba/expansão, rola até a linha do arquivo (ou o critério) e a destaca.
+        setTimeout(function(){
+            var $alvo = encryptedPk ? $('#linha-arquivo-' + encryptedPk) : $criterio;
+            if (!$alvo.length) {
+                $alvo = $criterio;
+            }
+            $('html, body').animate({ scrollTop: $alvo.offset().top - 80 }, 400);
+            $alvo.addClass('pt-item-destacado');
+            setTimeout(function(){ $alvo.removeClass('pt-item-destacado'); }, 2500);
+        }, 350);
+
+        return false;
+    }
+
+    function calcula_nota_pretendida(field_qtd, arquivo_id, id_indicador, id_grupo, criterio_id, pontos, teto_grupo) {
+        nota =  parseFloat(field_qtd.value * pontos).toFixed(2);
+        $("span#pontuacao_arquivo_" + arquivo_id).html(nota);
+        $("#nota_" + arquivo_id).attr('value', nota);
+        var id_pontuacao_arquivo = field_qtd.id.replace('qtd', 'pontuacao_arquivo')
+        var classe_grupo = $(field_qtd).parent().parent().find("span#"+id_pontuacao_arquivo).attr("class").split(" ").pop();
+        calcula_pontuacao_total_indicador(id_indicador);
+        calcula_pontuacao_total_grupo(classe_grupo, teto_grupo);
+        calcula_pontuacao_total_criterio(criterio_id);
+        Valida_qtds();
+    }
+
+    //sendAjax | Função genérica do processamento Ajax + Jquery + Json
+    function sendAjax(url, parametros, sucesso, erro) {
+        $.ajax({
+            type: "POST",
+            url: url,
+            data: parametros,
+            contentType: "application/json; charset=utf-8",
+            dataType: "json",
+            success: sucesso,
+            error: erro
+        });
+    }
+
+    function Excluir(id, msg, url, processo_id, documentos_exigidos) {
+        var parametros = { "Id": "" };
+        parametros.Id = id;
+        if (documentos_exigidos==undefined){
+            var classes_span = $("#linha-" + id).find('span:last').attr('class').split(' ');
+            var criterio_id = classes_span[1].split('_').pop();
+            var criterio_span = $('span#total_pontos_criterio_'+criterio_id);
+
+            var indicador_id = classes_span[0].split('_').pop();
+            var div_indicador = $('div#'+indicador_id)
+        }
+
+
+        if (confirm(msg)) {
+            sendAjax(url, JSON.stringify(parametros), function (retorno) {
+                        if (retorno.ok)
+                        {
+                            $(".linha-" + id).animate({ backgroundColor: "#fbc7c7" }, "slow").animate({ opacity: "hide" }, "slow", function () {
+                                $(this).remove();
+                                if (documentos_exigidos==undefined){
+                                    calcula_pontuacao_total_criterio(criterio_id)
+                                    calcula_pontuacao_total_indicador(indicador_id);
+                                    calcula_pontuacao_total_grupo(classes_span[2], 100);
+                                }
+                                Salvar_Processo_Titular(processo_id, true);
+                                $('#data_referencia_retroatividade').html(retorno.data_referencia_retroatividade);
+                                // Reavalia as pendências dos critérios após remover o arquivo.
+                                atualiza_status_problemas_criterios();
+                            })
+                        } else {
+                            alert(retorno.msg)
+                        }
+                    },
+                    function (XMLHttpRequest, textStatus, errorThrown) {
+                        alert(retorno.msg)
+                    });
+        }
+    }
+
+    function valida_documentos_preliminares(){
+        if($('#arquivos_selecionados_data_conclusao_titulacao_doutor tbody').html().trim() === ''){
+            alert('Adicione um arquivo em Título que habilita a classe titular');
+            return false;
+        }
+        if($('#arquivos_selecionados_data_termo_avaliacao_desempenho tbody').html().trim() === ''){
+            alert('Adicione um arquivo em Termo de avaliaçao de desempenho');
+            return false;
+        }
+        if($('#arquivos_selecionados_data_graduacao_ingresso_ebtt tbody').html().trim() === ''){
+            alert('Adicione um arquivo em diploma de graduação para ingresso no cargo de professor de EBTT');
+            return false;
+        }
+        if($('#arquivos_selecionados_Declaracao_DIGPE tbody').html().trim() === ''){
+            alert('Adicione um arquivo progressão ou enquadramento no nível D404');
+            return false;
+        }
+
+        return true;
+    }
+
+    function getUnique(inputArray){
+        var outputArray = [];
+        for (var i = 0; i < inputArray.length; i++) {
+            if ((jQuery.inArray(inputArray[i], outputArray)) == -1) {
+                outputArray.push(inputArray[i]);
+            }
+        }
+        return outputArray;
+    }
+
+    // Retorna o nome legível da aba (data-title) a partir de um campo. Todas as
+    // abas (fixas e de grupo) possuem data-title; as abas de grupo não têm data-tab.
+    // Remove o "&#10003;" (✓) usado para marcar grupos pontuados e espaços extras.
+    function get_tab_label(el){
+        var label = $(el).closest('.tab-pane').attr('data-title');
+        if (!label) {
+            return null;
+        }
+        return label.replace('✓', '').replace(/\s+/g, ' ').trim();
+    }
+
+    function Valida_datas(acao){
+        let rsc_error = [];
+        $('input[type=date]').each(function (item) {
+            var data = $(this).attr('id');
+            if ((acao == "salvar") || (acao == "Autosalvar")) {
+                if ((data != 'id_data_conclusao_titulacao_doutor') && (data != 'id_data_graduacao_EBTT') && (data != 'id_data_concessao_titulacao_doutor') && (data != 'id_data_progressaoD404') && (data != 'id_data_avaliacao_desempenho')  )  {
+                    if ($("#" + data).val() == '') {
+                        $("#" + data).css("border", "red solid 1px");
+                        let rsc = get_tab_label(this);
+                        if (rsc) {
+                            rsc_error.push(rsc);
+                        }
+                    } else {
+                        $("#" + data).css("border", "");
+                    }
+                }
+            }else{
+                if ($('#' + data).val() === '') {
+                    $('#' + data).css('border', 'red solid 1px')
+
+                    let rsc = get_tab_label(this)
+                    if (rsc) {
+                        rsc_error.push(rsc)
+                    }
+
+                } else {
+                    $('#' + data).css('border', '')
+                }
+            }
+        });
+        return rsc_error;
+    }
+
+    function Valida_qtds(){
+        var rsc_error = [];
+        $(".integer-widget").each(function (item) {
+            var qtd = $(this).attr('id');
+            var data = qtd.replace('qtd','data');
+            if ($("#"+qtd).val() == '') {
+                $("#"+qtd).css("border", "red solid 1px");
+                $("#"+qtd).parents('.box:first').css("border", "red solid 1px");
+
+                $("#"+qtd).parents('.box:first').children('div').show();
+                id_box =  $("#"+qtd).parents('.box:first').attr('id');
+                $('#'+id_box).attr('class', 'box');
+                var rsc = get_tab_label(this);
+                if (rsc) {
+                    rsc_error.push(rsc);
+                }
+            } else {
+                $("#"+qtd).css("border", "");
+                if ($("#"+data).val() != '') {
+                    $("#"+qtd).parents('.box:first').css("border", "");
+                }
+            }
+        });
+        return rsc_error;
+    }
+
+    function Valida_descricoes(){
+        var rsc_error = [];
+        $(".textarea_descricao").each(function (item) {
+            var descricao = $(this).attr('id');
+            var data = descricao.replace('qtd','descricao');
+            if ($("#"+descricao).val() == '') {
+                $("#"+descricao).css("border", "red solid 1px");
+                $("#"+descricao).parents('.box:first').css("border", "red solid 1px");
+                $("#"+descricao).parents('.box:first').children('div').show();
+                var rsc = get_tab_label(this);
+                if (rsc) {
+                    rsc_error.push(rsc);
+                }
+            } else {
+                $("#"+descricao).css("border", "");
+                if ($("#"+data).val() != ''){
+                    $("#"+descricao).parents('.box:first').css("border", "");
+                }
+            }
+        });
+        return rsc_error;
+    }
+
+    function Salvar_Processo_Titular(processo_id, autoSalvamento){
+
+        $.ajax({
+            type: "POST",
+            url: '/professor_titular/salvar_processo_titular/'+processo_id+'/',
+            data: $('#form_rsc').serialize(),
+            success: function (retorno) {
+                if (retorno.ok) {
+                    if (autoSalvamento == "nao") {//Se não for o autoSalvamento ele mostra a mensagem
+                        $('#error').addClass("d-none");
+
+                        $('#feedback_message').removeClass("d-none");
+                        $('#feedback_message').html("Alterações salvas com sucesso.");
+                        $('#feedback_message').delay(5000).fadeOut(1500);
+                    } else {
+                        $('#feedback_message').addClass("d-none");
+                        $('#error').addClass("d-none");
+                    }
+                    $('#data_referencia_retroatividade').html(retorno.data_referencia_retroatividade);
+                    $('#requisitos_minimos_aprovacao').html(retorno.requisitos_minimos_processo);
+                }else {
+                    //erro no salvamento
+                    $('#error').addClass("d-none");
+                    $('#feedback_message').attr('class', 'errornote');
+                    $('#feedback_message').removeClass("d-none");
+                    $('#feedback_message').html(retorno.msg);
+                }
+            }
+        });
+    }
+
+    function Enviar_Processo_Titular(processo_id) {
+        if (confirm("Deseja enviar esse processo para avaliação?")) {
+            $('#link_enviar_cppd').click();
+        }
+    }
+
+    function Valida_Pontuacao(pontuacao_minima_exigida){
+        var pontuacoes_grupos = {};
+        pontuacoes_grupos["A"] = $("#rsc1").html();
+        pontuacoes_grupos["B"] = $("#rsc2").html();
+        pontuacoes_grupos["C"] = $("#rsc3").html();
+        pontuacoes_grupos["D"] = $("#rsc4").html();
+        pontuacoes_grupos["E"] = $("#rsc5").html();
+        pontuacoes_grupos["F"] = $("#rsc6").html();
+        pontuacoes_grupos["G"] = $("#rsc7").html();
+        pontuacoes_grupos["H"] = $("#rsc8").html();
+
+        var soma_grupos = 0;
+        for(grupo in pontuacoes_grupos){
+            let valorLimpo = pontuacoes_grupos[grupo].trim().replace(/\s+/g, '').replace(',', '.');
+            let valorFloat = parseFloat(valorLimpo);
+            soma_grupos += valorFloat;
+        }
+
+        let pontuacao_minima_exigida_float = parseFloat(pontuacao_minima_exigida);
+        if (soma_grupos >= pontuacao_minima_exigida_float){
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    function Valida_Quantidade_Grupos(qtd_minima_grupos){
+        var pontuacoes_grupos = {};
+        pontuacoes_grupos["A"] = $("#rsc1").html();
+        pontuacoes_grupos["B"] = $("#rsc2").html();
+        pontuacoes_grupos["C"] = $("#rsc3").html();
+        pontuacoes_grupos["D"] = $("#rsc4").html();
+        pontuacoes_grupos["E"] = $("#rsc5").html();
+        pontuacoes_grupos["F"] = $("#rsc6").html();
+        pontuacoes_grupos["G"] = $("#rsc7").html();
+        pontuacoes_grupos["H"] = $("#rsc8").html();
+
+        var qtd_grupos_pontuando = 0;
+        var soma_grupos = 0;
+        for(grupo in pontuacoes_grupos){
+            pontuacao_grupo = parseFloat(pontuacoes_grupos[grupo]);
+            if(pontuacao_grupo != 0){
+                qtd_grupos_pontuando += 1;
+            }
+        }
+
+        if (qtd_grupos_pontuando >= qtd_minima_grupos){
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    function Processa_Salvamento(acao, processo_id, rsc_pretendido, status, pontuacao_minima_exigida, qtd_minima_grupos){
+        var rsc_error = Valida_qtds();
+        rsc_error = rsc_error.concat(Valida_datas(acao));
+        rsc_error = rsc_error.concat(Valida_descricoes());
+        rsc_error = getUnique(rsc_error.sort());
+        atualiza_status_problemas_criterios();
+        var qtd_error
+
+        qtd_error = rsc_error.length;
+        //alert(qtd_error);
+
+        if (qtd_error > 0)  {
+            // No autosalvamento não interrompemos o preenchimento: os indicadores inline
+            // (borda vermelha + "Informações pendentes" no cabeçalho) já sinalizam o estado.
+            // O banner do topo, com scroll e foco, só aparece em ações explícitas (Salvar/Enviar).
+            if (acao != "Autosalvar") {
+                $('#feedback_message').addClass("d-none");
+                $('#error').attr('class','errornote');
+                $('#error').html('Existe(m) erro(s) na(s) aba(s): ' + rsc_error.join(', '));
+                $('#error').removeClass("d-none");
+                // Leva o usuário até a mensagem e dá foco para que ela seja percebida (inclusive por leitores de tela).
+                $('html, body').animate({ scrollTop: $('#error').offset().top - 80 }, 300);
+                $('#error').attr('tabindex', '-1').focus();
+            }
+        } else {
+
+            if (acao == "salvar") {
+                //if(valida_documentos_preliminares()){
+                    Salvar_Processo_Titular(processo_id, "nao");
+                    alert("Informações salvas com sucesso.");
+                //}
+            } else if (acao == "Autosalvar") {
+                if (status != 'Aguardando avaliação CPPD') {
+                    Salvar_Processo_Titular(processo_id, "sim");
+                }
+            } else {
+                if (Valida_Pontuacao(pontuacao_minima_exigida)) {
+                    if (Valida_Quantidade_Grupos(qtd_minima_grupos)) {
+                        Salvar_Processo_Titular(processo_id);
+
+                        var introducao = $('#id_introducao_relatorio_descritivo').val();
+                        var consideracoes_finais = $('#id_conclusao_relatorio_descritivo').val();
+                        var enviar = false;
+                        if (introducao.trim() == "") {
+                            alert("Você não preencheu a Introdução do memorial descritivo. Este campo é de preenchimento obrigatório!");
+                        } else if (consideracoes_finais.trim() == "") {
+                            alert("Você não preencheu a Considerações Finais do memorial descritivo. Este campo é de preenchimento obrigatório!");
+                        } else {
+                            enviar = true;
+                        }
+                        if (enviar && valida_documentos_preliminares()) {
+                            Enviar_Processo_Titular(processo_id);
+                        }
+                    } else {
+                        alert('Você não atingiu a quantidade mínima de grupos exigidos.');
+                    }
+                } else {
+                    alert('Você não atingiu a pontuação mínima.');
+                }
+            }
+        }
+        return false;
+    }
+
+    function human_file_size(bytes, si) {
+        var thresh = si ? 1000 : 1024;
+        if(bytes < thresh) return bytes + ' B';
+        var units = si ? ['kB','MB','GB','TB','PB','EB','ZB','YB'] : ['KB','MB','GB','TB','PB','EB','ZB','YB'];
+        var u = -1;
+        do {
+            bytes /= thresh;
+            ++u;
+        } while(bytes >= thresh);
+        return bytes.toFixed(1)+' '+units[u];
+    };
+
+    function onCompleteUploadDataTitulacaoDoutor(uploader, id, fileName, responseJSON) {
+        var el = uploader._getItemByFileId(id);
+        var msn = "Deseja continuar?";
+        var url = "/professor_titular/excluir_arquivo_exigido_pdf/" + responseJSON.arquivo_pk_crypto + "/";
+        if (responseJSON.success) {
+            var templateRow = '' +
+                    '<tr id="linha-' + responseJSON.arquivo_pk_crypto + '" class="linha-' + responseJSON.arquivo_pk_crypto + '">' +
+                    '   <td>' +
+                    '       <a class="icon icon-view" href="/professor_titular/visualizar_arquivo_exigido_pdf/' + responseJSON.arquivo_pk_crypto + '" title="Visualizar o arquivo ' + fileName + '"><span class="visually-hidden">Visualizar</span></a>' +
+                    '       <a class="icon icon-delete" href="#" onclick="Excluir(\'' + responseJSON.arquivo_pk_crypto + '\', \'' + msn + '\', \'' + url + '\',\'{{ processo.id }}\',true)"><span class="visually-hidden">Excluir</span></a>' +
+                    '   </td>' +
+                    '   <td><a href="/professor_titular/visualizar_arquivo_exigido_pdf/' + responseJSON.arquivo_pk_crypto + '" target="_blank" title="Visualizar o arquivo ' + fileName + '">' + fileName + '</a></td>' +
+                    '   <td>' + human_file_size(responseJSON.tamanho) + '</td>' +
+                    '</tr>';
+            $("#arquivos_selecionados_data_conclusao_titulacao_doutor tbody").html(templateRow).fadeIn("slow");
+            $($(el).find('.qq-upload-result')[0]).html('<span class="true">Concluído</span>');
+            $(el).fadeOut("fast");
+        } else {
+            $($(el).find('.qq-upload-result')[0]).html('<span class="false">Ocorreu um erro!</span>');
+        }
+        $(el).find('.qq-progress')[0].remove();
+    }
+
+    function onCompleteUploadTermoAvaliacaoDesempenho(uploader, id, fileName, responseJSON) {
+        var el = uploader._getItemByFileId(id);
+        var msn = "Deseja continuar?";
+        var url = "/professor_titular/excluir_arquivo_exigido_pdf/" + responseJSON.arquivo_pk_crypto + "/";
+        if (responseJSON.success) {
+            var templateRow = '' +
+                    '<tr id="linha-' + responseJSON.arquivo_pk_crypto + '" class="linha-' + responseJSON.arquivo_pk_crypto + '">' +
+                    '   <td>' +
+                    '       <a class="icon icon-view" href="/professor_titular/visualizar_arquivo_exigido_pdf/' + responseJSON.arquivo_pk_crypto + '" title="Visualizar o arquivo ' + fileName + '"><span class="visually-hidden">Visualizar</span></a>' +
+                    '       <a class="icon icon-delete no-confirm" href="#" onclick="Excluir(\'' + responseJSON.arquivo_pk_crypto + '\', \'' + msn + '\', \'' + url + '\',\'{{ processo.id }}\',true)"><span class="visually-hidden">Excluir</span></a>' +
+                    '   </td>' +
+                    '   <td><a href="/professor_titular/visualizar_arquivo_exigido_pdf/' + responseJSON.arquivo_pk_crypto + '" title="Visualizar o arquivo ' + fileName + '" target="_blank">' + fileName + '</a></td>' +
+                    '   <td>' + human_file_size(responseJSON.tamanho) + '</td>' +
+                    '</tr>';
+            $("#arquivos_selecionados_data_termo_avaliacao_desempenho tbody").html(templateRow).fadeIn("slow");
+            $($(el).find('.qq-upload-result')[0]).html('<span class="true">Concluído</span>');
+            $(el).fadeOut("fast");
+        } else {
+            $($(el).find('.qq-upload-result')[0]).html('<span class="false">Ocorreu um erro!</span>');
+        }
+        $(el).find('.qq-progress')[0].remove();
+    }
+
+    function onCompleteUploadDataGraduacaoIngressoEBTT(uploader, id, fileName, responseJSON) {
+        var el = uploader._getItemByFileId(id);
+        var msn = "Deseja continuar?";
+        var url = "/professor_titular/excluir_arquivo_exigido_pdf/" + responseJSON.arquivo_pk_crypto + "/";
+        if (responseJSON.success) {
+            var templateRow = '' +
+                    '<tr id="linha-' + responseJSON.arquivo_pk_crypto + '" class="linha-' + responseJSON.arquivo_pk_crypto + '">' +
+                    '   <td>' +
+                    '       <a class="icon icon-view" href="/professor_titular/visualizar_arquivo_exigido_pdf/' + responseJSON.arquivo_pk_crypto + '" title="Visualizar o arquivo ' + fileName + '"><span class="visually-hidden">Visualizar</span></a>' +
+                    '       <a class="icon icon-delete no-confirm" href="#" onclick="Excluir(\'' + responseJSON.arquivo_pk_crypto + '\', \'' + msn + '\', \'' + url + '\',\'{{ processo.id }}\',true)"><span class="visually-hidden">Excluir</span></a>' +
+                    '   </td>' +
+                    '   <td><a href="/professor_titular/visualizar_arquivo_exigido_pdf/' + responseJSON.arquivo_pk_crypto + '" title="Visualizar o arquivo ' + fileName + '" target="_blank">' + fileName + '</a></td>' +
+                    '   <td>' + human_file_size(responseJSON.tamanho) + '</td>' +
+                    '</tr>';
+            $("#arquivos_selecionados_data_graduacao_ingresso_ebtt tbody").html(templateRow).fadeIn("slow");
+            $($(el).find('.qq-upload-result')[0]).html('<span class="true">Concluído</span>');
+            $(el).fadeOut("fast");
+        } else {
+            $($(el).find('.qq-upload-result')[0]).html('<span class="false">Ocorreu um erro!</span>');
+        }
+        $(el).find('.qq-progress')[0].remove();
+    }
+
+	function onCompleteUploadDeclaraçãoDIGPE(uploader, id, fileName, responseJSON) {
+        var el = uploader._getItemByFileId(id);
+        var msn = "Deseja continuar?";
+        var url = "/professor_titular/excluir_arquivo_exigido_pdf/" + responseJSON.arquivo_pk_crypto + "/";
+        if (responseJSON.success) {
+            var templateRow = '' +
+                    '<tr id="linha-' + responseJSON.arquivo_pk_crypto + '" class="linha-' + responseJSON.arquivo_pk_crypto + '">' +
+                    '   <td>' +
+                    '       <a class="icon icon-view" href="/professor_titular/visualizar_arquivo_exigido_pdf/' + responseJSON.arquivo_pk_crypto + '" title="Visualizar o arquivo ' + fileName + '"><span class="visually-hidden">Visualizar</span></a>' +
+                    '       <a class="icon icon-delete no-confirm" href="#" onclick="Excluir(\'' + responseJSON.arquivo_pk_crypto + '\', \'' + msn + '\', \'' + url + '\',\'{{ processo.id }}\',true)"><span class="visually-hidden">Excluir</span></a>' +
+                    '   </td>' +
+                    '   <td><a href="/professor_titular/visualizar_arquivo_exigido_pdf/' + responseJSON.arquivo_pk_crypto + '" title="Visualizar o arquivo ' + fileName + '" target="_blank">' + fileName + '</a></td>' +
+                    '   <td>' + human_file_size(responseJSON.tamanho) + '</td>' +
+                    '</tr>';
+            $("#arquivos_selecionados_Declaracao_DIGPE tbody").html(templateRow).fadeIn("slow");
+            $($(el).find('.qq-upload-result')[0]).html('<span class="true">Concluído</span>');
+            $(el).fadeOut("fast");
+        } else {
+            $($(el).find('.qq-upload-result')[0]).html('<span class="false">Ocorreu um erro!</span>');
+        }
+        $(el).find('.qq-progress')[0].remove();
+    }
+
+    function init_salvar_individual(){
+        $(".salvar-btn-individual").click(function(e) {
+            e.preventDefault();
+
+            var arquivo_id = $(this).data('arquivo-id') || ""; // Pega o atributo ou vazio
+            var processo_id = $(this).data('processo-id');
+
+            // Seleciona todos os trs desse arquivo pelo id (classe gerada)
+            var $grupo = $(".linha-arquivo-" + arquivo_id);
+
+            // Recupera os campos usando $grupo
+            var quantidade = $grupo.find("input[name^='Arquivo_'][name$='_qtd']").val()?.trim();
+            var data = $grupo.find("input[name^='Arquivo_'][name$='_data']").val()?.trim();
+            var nota = $grupo.find("input[name^='Arquivo_'][name$='_nota']").val()?.trim();
+            var descricao = $grupo.find("textarea[name^='Arquivo_'][name$='_descricao']").val()?.trim();
+
+            // Verificação: criticar campos não preenchidos
+            var erros = [];
+            if (!quantidade) {
+                erros.push("Preencha a quantidade.");
+            }
+            if (!data) {
+                erros.push("Preencha a data.");
+            }
+            if (!descricao) {
+                erros.push("Preencha a descrição.");
+            }
+            if (erros.length > 0) {
+                $("#mensagem-retorno-" + arquivo_id).removeClass("hidden").html("<span class=\"status status-error\">Erro(s): <br /> - " + erros.join("<br /> - ") + "</span>");
+                return; // Sai da função se houver erros
+            }
+
+            // Monta objeto de dados para o ajax, só inclui id se existir.
+            var dados = {
+                processo_id: processo_id,
+                quantidade: quantidade,
+                data: data,
+                nota: nota,
+                descricao: descricao,
+                csrfmiddlewaretoken: '{{ csrf_token }}'
+            };
+            if (arquivo_id) {
+                dados.arquivo_id = arquivo_id;
+            }
+
+            var $msg = $("#mensagem-retorno-" + arquivo_id);
+            $.ajax({
+                url: "/professor_titular/salvar_arquivo_individual/",
+                type: "POST",
+                data: dados,
+                success: function(response) {
+                    $msg.removeClass("hidden").html('<span class="status status-success">Salvo com sucesso!</span>')
+                    .fadeIn(200)
+                    .delay(3000)
+                    .fadeOut(200, function() { $msg.addClass("hidden").show(); });
+                },
+                error: function(xhr) {
+                    $msg.removeClass("hidden").html('<span class="status status-error">' + xhr.responseJSON.msg + '</span>');
+                }
+            });
+        });
+    }
+
+    $(document).ready(function() {
+        init_salvar_individual();
+    });
+
+    document.addEventListener('shown.bs.tab', function (event) {
+        console.log('Aba ativada: ', event.target.getAttribute('data-bs-target'));
+        // Verifica se a aba aberta é a desejada
+        if (event.target.getAttribute('data-bs-target') === '#quadro_resumo_pontuacao_requerida-tab-pane') {
+            carregarQuadroResumo();
+        }
+    });
+
+    function carregarQuadroResumo() {
+        const container = document.querySelector('#quadro_resumo_pontuacao_requerida-tab-pane');
+
+        container.innerHTML = '<p>Carregando...</p>';
+
+        fetch('/professor_titular/quadro_resumo_pontuacao_requerida/{{ processo.pk }}/')
+            .then(response => response.text())
+            .then(html => container.innerHTML = html)
+            .catch(() => {
+                container.innerHTML = '<p class="text-danger">Erro ao carregar.</p>';
+            });
+    }
+    </script>
+
+{% endblock %}
+
+{% block before_holder %}
+    <p id="feedback_message" class="d-none"> Processo salvo com sucesso. </p>
+    <p class="errornote d-none" id="error" role="alert" aria-live="assertive"> Por favor, corrija os erros abaixo. </p>
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        <li><a id="recalcular_pontuacao" href="{% url 'recalcular_pontuacao' processo.pk %}" class="btn primary">Recalcular Pontuação</a></li>
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+    <div class="person mb-4">
+        <div class="photo-circle">
+            <img src="{{ processo.servidor.get_foto_75x100_url }}" alt="Foto de {{ processo.servidor.nome_usual }}">
+        </div>
+        <dl class="definition-list flex small-items">
+            <div class="list-item">
+                <dt>Nome</dt>
+                <dd>{{ processo.servidor.pessoa_fisica.nome }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Matrícula</dt>
+                <dd>{{ processo.servidor.matricula }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>E-mail Institucional</dt>
+                <dd><a href="mailto:{{ processo.servidor.email_institucional }}">{{ processo.servidor.email_institucional|format }}</a></dd>
+            </div>
+            <div class="list-item">
+                <dt>Cargo</dt>
+                <dd>{{ processo.servidor.cargo_emprego }}</dd>
+            </div>
+        </dl>
+    </div>
+
+    <a hidden class="popup" id="link_enviar_cppd" href="/professor_titular/enviar_processo_titular/{{ processo.pk }}/"></a>
+
+    <form id="form_rsc" action="" method="post">
+    {% csrf_token %}
+
+    {% if processo.servidor %}
+        {% box 'Dados do processo' %}
+            <dl class="definition-list flex">
+                <div class="list-item">
+                    <dt>Requisição de promoção à classe titular</dt>
+                    <dd>{{ title }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Pontuação Requerida</dt>
+                    <dd><span id="pontuacao_requerida">{{ processo.pontuacao_pretendida|format }}</span></dd>
+                </div>
+                <div class="list-item">
+                    <dt>Data de Retroatividade Requerida</dt>
+                    <dd><span id="data_referencia_retroatividade">{{ processo.get_data_referencia_retroativa|format }}</span></dd>
+                </div>
+                <div class="list-item">
+                    <dt>Requisitos mínimos para aprovação</dt>
+                    <dd>
+                        <span id="requisitos_minimos_aprovacao" class="text-nowrap-normal">Você precisa de {{ processo.get_requisitos_minimos_processo.pontuacao_exigida }} pontos em {{ processo.get_requisitos_minimos_processo.qtd_minima_grupos }} grupos.</span>
+                    </dd>
+                </div>
+                <div class="list-item">
+                    <dt>Situação do Processo</dt>
+                    <dd id="status">{{ processo.get_status_display|status }}</dd>
+                </div>
+                {% if ultima_validacao_processo %}
+                    <div class="list-item">
+                        <dt>Descrição da Validação</dt>
+                        <dd>
+                            {{ ultima_validacao_processo.motivo_rejeicao }}
+                        </dd>
+                    </div>
+                {% endif %}
+                {% if processo.clonado and processo.clonearquivoerro_set.exists and processo.status == processo.STATUS_AGUARDANDO_ENVIO_CPPD %}
+                    <div class="list-item">
+                        <dt>Problemas na clonagem</dt>
+                        <dd>
+                            <div class="alert alert-danger">
+                                <p><strong>Alguns arquivos não foram encontrados ou estão corrompidos. É necessário adicioná-los novamente ao processo.</strong></p>
+                                <ul>
+                                    {% for e in processo.clonearquivoerro_set.all %}
+                                    <li>{{ e.nome_arquivo }}
+                                        <br />
+                                        <small>{{ e.get_localizacao }}</small>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </dd>
+                    </div>
+                {% endif %}
+            </dl>
+        {% endbox %}
+
+        {% if ultima_validacao_processo and ultima_validacao_processo.motivo_rejeicao %}
+            <div class="alert alert-danger">
+                <p><strong>Resumo dos problemas:</strong></p>
+                <ul>
+
+                    {% if ultima_validacao_processo.titulacao_status != 1 %}
+                    <li>
+                        Titulação:
+                        {{ ultima_validacao_processo.get_titulacao_status_display|format }}
+                    </li>
+                    {% endif %}
+
+                    {% if ultima_validacao_processo.graduacao_ebtt_status != 1 %}
+                    <li>
+                        Graduação para Ingresso no Cargo de Professor de EBTT:
+                        {{ ultima_validacao_processo.get_graduacao_ebtt_status_display|format }}
+                    </li>
+                    {% endif %}
+
+                    {% if ultima_validacao_processo.progressao_status != 1 %}
+                    <li>
+                        Progressão/Enquadramento para D404:
+                        {{ ultima_validacao_processo.get_progressao_status_display|format }}
+                    </li>
+                    {% endif %}
+
+                    {% if ultima_validacao_processo.avaliacao_desempenho_status != 1 %}
+                    <li>
+                        Avaliação de Desempenho:
+                        {{ ultima_validacao_processo.get_avaliacao_desempenho_status_display|format }}
+                    </li>
+                    {% endif %}
+
+                    {% if ultima_validacao_processo.formulario_pontuacao_status != 1 %}
+                    <li>
+                        Problemas na aba A, B, C, D, E, F, G ou H: é necessário verificar os arquivos antes de reenviar para a CPPD.
+                    </li>
+                    {% endif %}
+
+                    {% if ultima_validacao_processo.relatorio_descritivo_status != 1 %}
+                    <li>
+                        Problemas no Relatório Descritivo: é necessário preencher os campos corretamente.
+                    </li>
+                    {% endif %}
+
+                </ul>
+            </div>
+        {% endif %}
+
+        <div class="tab-pane" data-title="Instruções Gerais" data-tab="instrucoes_gerais">
+            {{ config.instrucoes_gerais|safe }}
+        </div>
+
+        <div class="tab-pane" data-title="Documentos Preliminares" data-tab="documentos_preliminares">
+
+            <span class="alert alert-warning"><strong>Atenção:</strong> Nesta seção todos os documentos devem ser autenticados.</span>
+
+            {% box 'Diploma de graduação para ingresso no cargo de professor de EBTT' %}
+
+                <fieldset>
+                    <div class="form-row">
+                        <div class="field-box">
+                            <label>Data da Homologação do Diploma:</label>
+                            {{ processo_form.data_graduacao_EBTT }}
+                            <p class="help">Deve ser considerada como data de referência a data de homologação da defesa da monografia ou a data da emissão do diploma (o que for mais antigo).</p>
+                        </div>
+                    </div>
+                </fieldset>
+
+                {% if ultima_validacao and ultima_validacao.data_graduacao_ebtt_validada %}
+                    <p class="alert alert-info">Data validada pela CPPD: <strong>{{ ultima_validacao.data_graduacao_ebtt_validada }}</strong></p>
+                {% endif %}
+
+                {% if processo.avaliado_pode_editar and processo.avaliado_pode_ajustar %}
+	                <div class="alert alert-warning">
+	                    <p>Anexe cópia do certificado ou diploma. Deve ser considerada como data de referência a data de homologação da defesa do doutorado ou a data da emissão do diploma (o que for mais antigo).</p>
+	                    <p>Somente serão carregados arquivos com extensão <strong>pdf</strong>.</p>
+	                </div>
+                {% endif %}
+
+                {% if processo.avaliado_pode_editar and processo.servidor.id == relacionamento.id %}
+                    {% render_form data_graduacao_ingresso_ebtt_form False %}
+                {% endif %}
+
+                <table id="arquivos_selecionados_data_graduacao_ingresso_ebtt">
+                    <thead>
+                        <tr>
+                            <th>Arquivo</th>
+                            <th>Documento</th>
+                            <th>Tamanho</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% if processo_form.arquivo_graduacao_ingresso_ebtt %}
+                        <tr id="linha-{{ processo_form.arquivo_graduacao_ingresso_ebtt.encrypted_id }}" class="linha-{{ processo_form.arquivo_graduacao_ingresso_ebtt.encrypted_id }}">
+                            <td>
+                                {% icon "view" "/professor_titular/visualizar_arquivo_exigido_pdf/{{ processo_form.arquivo_graduacao_ingresso_ebtt.encrypted_id }}" %}
+                                {% if processo.avaliado_pode_editar and processo.servidor.id == relacionamento.id %}
+                                    <a class="icon icon-delete no-confirm" href="#" onclick="Excluir('{{ processo_form.arquivo_graduacao_ingresso_ebtt.encrypted_id }}', 'Deseja continuar?', '/professor_titular/excluir_arquivo_exigido_pdf/{{ processo_form.arquivo_graduacao_ingresso_ebtt.encrypted_id }}/', '{{ processo.id }}',true)"><span class="visually-hidden">Remover</span></a>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="/professor_titular/visualizar_arquivo_exigido_pdf/{{ processo_form.arquivo_graduacao_ingresso_ebtt.encrypted_id }}">
+                                    {{ processo_form.arquivo_graduacao_ingresso_ebtt.nome }}
+                                </a>
+                            </td>
+                            <td>{{ processo_form.arquivo_graduacao_ingresso_ebtt.tamanho|human_file_size }}</td>
+                        </tr>
+                    {% endif %}
+                    </tbody>
+                </table>
+            {% endbox %}
+
+            {% box 'Título que habilita a classe titular (Doutorado)' %}
+
+                <fieldset>
+                    <div class="form-row">
+                        <div class="field-box">
+                            <label>Data da Titulação:</label>
+                            {{ processo_form.data_concessao_titulacao_doutor }}
+                            <p class="help">Deve ser considerada como data de referência a data de homologação da defesa do doutorado ou a data da emissão do diploma (o que for mais antigo).</p>
+                        </div>
+                    </div>
+                </fieldset>
+
+                {% if ultima_validacao and ultima_validacao.data_conclusao_titulacao_validada %}
+                    <p class="alert alert-info">Data validada pela CPPD: <strong>{{ ultima_validacao.data_conclusao_titulacao_validada }}</strong></p>
+                {% endif %}
+
+               	{% if processo.avaliado_pode_editar and processo.avaliado_pode_ajustar %}
+	                <div class="alert alert-warning">
+	                	<p>Anexe cópia do diploma. Deve ser considerada como data de referência a data de homologação da defesa do doutorado ou a data da emissão do diploma (o que for mais antigo).</p>
+	                    <p>Somente serão carregados arquivos com extensão <strong>pdf</strong>.</p>
+	                </div>
+	            {% endif %}
+
+                {% if processo.avaliado_pode_editar and processo.servidor.id == relacionamento.id %}
+                    {% render_form data_concessao_titulacao_doutor_form False %}
+                {% endif %}
+
+                <table id="arquivos_selecionados_data_conclusao_titulacao_doutor">
+                    <thead>
+                        <tr>
+                            <th>Arquivo</th>
+                            <th>Documento</th>
+                            <th>Tamanho</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% if processo_form.arquivo_conclusao_titulacao_titular_pretendido %}
+                        <tr id="linha-{{ processo_form.arquivo_conclusao_titulacao_titular_pretendido.encrypted_id }}" class="linha-{{ processo_form.arquivo_conclusao_titulacao_titular_pretendido.encrypted_id }}">
+                            <td>
+                                {% icon "view" "/professor_titular/visualizar_arquivo_exigido_pdf/{{ processo_form.arquivo_conclusao_titulacao_titular_pretendido.encrypted_id }}" %}
+                                {% if processo.avaliado_pode_editar and processo.servidor.id == relacionamento.id %}
+                                    <a class="icon icon-delete no-confirm" href="#" onclick="Excluir('{{ processo_form.arquivo_conclusao_titulacao_titular_pretendido.encrypted_id }}', 'Deseja continuar?', '/professor_titular/excluir_arquivo_exigido_pdf/{{ processo_form.arquivo_conclusao_titulacao_titular_pretendido.encrypted_id }}/', '{{ processo.id }}',true)"><span class="visually-hidden">Remover</span></a>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="/professor_titular/visualizar_arquivo_exigido_pdf/{{ processo_form.arquivo_conclusao_titulacao_titular_pretendido.encrypted_id }}" target="_blank">
+                                    {{ processo_form.arquivo_conclusao_titulacao_titular_pretendido.nome }}
+                                </a>
+                            </td>
+                            <td>{{ processo_form.arquivo_conclusao_titulacao_titular_pretendido.tamanho|human_file_size }}</td>
+                        </tr>
+                    {% endif %}
+                    </tbody>
+                </table>
+            {% endbox %}
+
+            {% box 'Progressão ou Enquadramento no nível D-IV-4' %}
+                <fieldset>
+                    <div class="form-row">
+                        <div class="field-box">
+                            <label>Data da Progressão / Enquadramento:</label>
+                            {{ processo_form.data_progressaoD404 }}
+                            <p class="help">Devem ser consideradas como data de referência: a  data de conclusão de cursos de graduação, capacitação, especialização ou aperfeiçoamento; e data de homologação da defesa, de cursos de mestrado ou doutorado.</p>
+                        </div>
+                    </div>
+                </fieldset>
+
+                {% if ultima_validacao and ultima_validacao.data_progressao_validada %}
+                    <span class="alert">Data validada pela CPPD: <strong>{{ ultima_validacao.data_progressao_validada }}</strong></span>
+                {% endif %}
+
+                {% if processo.avaliado_pode_editar and processo.avaliado_pode_ajustar %}
+	                <div class="alert alert-warning">
+	                    <p>Anexe cópia de declaração do órgão de gestão de pessoas de lotação (docentes com ingresso anterior a 1º/03/2013) ou cópia da portaria de progressão para D-IV-4.</p>
+	                    <p>Somente serão carregados arquivos com extensão <strong>pdf</strong>.</p>
+	                </div>
+                {% endif %}
+
+                {% if processo.avaliado_pode_editar and processo.servidor.id == relacionamento.id %}
+                    {% render_form declaracao_DIGPE_form False %}
+                {% endif %}
+
+                <table id="arquivos_selecionados_Declaracao_DIGPE">
+                    <thead>
+                        <tr>
+                            <th>Arquivo</th>
+                            <th>Documento</th>
+                            <th>Tamanho</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% if processo_form.arquivo_declarao_DIGPE %}
+                        <tr id="linha-{{ processo_form.arquivo_declarao_DIGPE.encrypted_id }}" class="linha-{{ processo_form.arquivo_declarao_DIGPE.encrypted_id }}">
+                            <td>
+                                {% icon "view" "/professor_titular/visualizar_arquivo_exigido_pdf/{{ processo_form.arquivo_declarao_DIGPE.encrypted_id }}" %}
+                                {% if processo.avaliado_pode_editar and processo.servidor.id == relacionamento.id %}
+                                    <a class="icon icon-delete no-confirm" href="#" onclick="Excluir('{{ processo_form.arquivo_declarao_DIGPE.encrypted_id }}', 'Deseja continuar?', '/professor_titular/excluir_arquivo_exigido_pdf/{{ processo_form.arquivo_declarao_DIGPE.encrypted_id }}/', '{{ processo.id }}',true)"><span class="visually-hidden">Remover</span></a></li>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="/professor_titular/visualizar_arquivo_exigido_pdf/{{ processo_form.arquivo_declarao_DIGPE.encrypted_id }}">
+                                    {{ processo_form.arquivo_declarao_DIGPE.nome }}
+                                </a>
+                            </td>
+                            <td>{{ processo_form.arquivo_declarao_DIGPE.tamanho|human_file_size }}</td>
+                        </tr>
+                    {% endif %}
+                    </tbody>
+                </table>
+            {% endbox %}
+
+            {% box 'Termo de Avaliação de Desempenho' %}
+                <fieldset>
+                    <div class="form-row">
+                        <div class="field-box">
+                            <label>Data de Avaliação de Desempenho:</label>
+                            {{ processo_form.data_avaliacao_desempenho }}
+                        </div>
+                    </div>
+                </fieldset>
+
+                {% if ultima_validacao and ultima_validacao.data_avaliacao_desempenho_validada %}
+                    <span class="status status-info">Data validada pela CPPD: {{ ultima_validacao.data_avaliacao_desempenho_validada }}</span>
+                {% endif %}
+
+                {% if processo.avaliado_pode_editar and processo.avaliado_pode_ajustar %}
+	                <div class="alert alert-warning">
+	                    <p>Anexe cópia do termo de avaliação de desempenho para fins de progressão para a Classe Titular, com resultado positivo, expedido pelo órgão de gestão de pessoas da unidade de lotação.</p>
+	                    <p>Somente serão carregados arquivos com extensão <strong>pdf</strong>.</p>
+	                </div>
+                {% endif %}
+
+                {% if processo.avaliado_pode_editar and processo.servidor.id == relacionamento.id %}
+                    {% render_form termo_avaliacao_desempenho_form False %}
+                {% endif %}
+
+                <table id="arquivos_selecionados_data_termo_avaliacao_desempenho">
+                    <thead>
+                        <tr>
+                            <th>Arquivo</th>
+                            <th>Documento</th>
+                            <th>Tamanho</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% if processo_form.arquivo_termo_avaliacao_desempenho %}
+                        <tr id="linha-{{ processo_form.arquivo_termo_avaliacao_desempenho.encrypted_id }}" class="linha-{{ processo_form.arquivo_termo_avaliacao_desempenho.encrypted_id }}">
+                            <td>
+                                {% icon "view" "/professor_titular/visualizar_arquivo_exigido_pdf/{{ processo_form.arquivo_termo_avaliacao_desempenho.encrypted_id }}" %}
+                                {% if processo.avaliado_pode_editar and processo.servidor.id == relacionamento.id %}
+                                    <a class="icon icon-delete no-confirm" href="#" onclick="Excluir('{{ processo_form.arquivo_termo_avaliacao_desempenho.encrypted_id }}', 'Deseja continuar?', '/professor_titular/excluir_arquivo_exigido_pdf/{{ processo_form.arquivo_termo_avaliacao_desempenho.encrypted_id }}/','{{ processo.id }}',true)"><span class="visually-hidden">Remover</span></a>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="/professor_titular/visualizar_arquivo_exigido_pdf/{{ processo_form.arquivo_termo_avaliacao_desempenho.encrypted_id }}" target="_blank">
+                                    {{ processo_form.arquivo_termo_avaliacao_desempenho.nome }}
+                                </a>
+                            </td>
+                            <td>{{ processo_form.arquivo_termo_avaliacao_desempenho.tamanho }}</td>
+                        </tr>
+                    {% endif %}
+                    </tbody>
+                </table>
+            {% endbox %}
+        </div>
+
+        {% for grupo in grupos_list %}
+            <div class="tab-pane" id="tab{{ forloop.counter }}" data-title="{{ grupo.nome }}{% if grupo.tem_pontos %} &#10003;{% endif %}">
+                <span class="status status-info"><strong>Total no Grupo {{ grupo.nome }}: </strong>
+                    <span id="rsc{{ forloop.counter }}">
+                        {% if forloop.counter == 1 %}
+                            {{ processo.get_pontuacao_pretendida_grupo_A|format }}
+                            {% elif forloop.counter == 2 %}
+                            {{ processo.get_pontuacao_pretendida_grupo_B|format }}
+                            {% elif forloop.counter == 3 %}
+                            {{ processo.get_pontuacao_pretendida_grupo_C|format }}
+                            {% elif forloop.counter == 4 %}
+                            {{ processo.get_pontuacao_pretendida_grupo_D|format }}
+                            {% elif forloop.counter == 5 %}
+                            {{ processo.get_pontuacao_pretendida_grupo_E|format }}
+                            {% elif forloop.counter == 6 %}
+                            {{ processo.get_pontuacao_pretendida_grupo_F|format }}
+                            {% elif forloop.counter == 7 %}
+                            {{ processo.get_pontuacao_pretendida_grupo_G|format }}
+                            {% else %}
+                            {{ processo.get_pontuacao_pretendida_grupo_H|format }}
+                        {% endif %}
+                    </span>
+                </span>
+                <br />
+
+                <input type="hidden" id="rsc{{ forloop.counter }}hidden" name="rsc{{ forloop.counter }}" value="{% if forloop.counter == 1 %}
+                {{ processo.get_pontuacao_pretendida_grupo_A }}
+                {% elif forloop.counter == 2 %}
+                 {{ processo.get_pontuacao_pretendida_grupo_B }}
+                {% elif forloop.counter == 3 %}
+                 {{ processo.get_pontuacao_pretendida_grupo_C }}
+                {% elif forloop.counter == 4 %}
+                 {{ processo.get_pontuacao_pretendida_grupo_D }}
+                {% elif forloop.counter == 5 %}
+                 {{ processo.get_pontuacao_pretendida_grupo_E }}
+                {% elif forloop.counter == 6 %}
+                 {{ processo.get_pontuacao_pretendida_grupo_F }}
+                {% elif forloop.counter == 7 %}
+                 {{ processo.get_pontuacao_pretendida_grupo_G }}
+                 {% else %}
+                 {{ processo.get_pontuacao_pretendida_grupo_H }}
+                {% endif %}">
+
+                {% for indicador in grupo.indicadores %}
+                    {% box "{{ indicador.nome }}: {{ indicador.descricao }}" boxid="indicador_{{ indicador.id }}" %}
+                        <p class="alert alert-info">Total: <span class="{{ grupo.nome }} total_indicador" id="total_indicador_{{ indicador.id }}">{{ indicador.total_ponto }}</span></p>
+                        {% if indicador.criterio_set.all %}
+                            {% for criterio in indicador.criterios %}
+                                {% box "{{ criterio.artigo }} - {{ criterio.nome }}" class="collapsed" boxid="criterio_{{ criterio.id }}" %}
+                                    <p class="alert alert-info">Pontos: <span id="total_pontos_criterio_{{ criterio.id }}">{{ criterio.total_ponto }}</span></p>
+                                    <p class="alert alert-warning">Permitido apenas arquivos com extensão <strong>pdf</strong>.</p>
+
+                                    {% if processo.avaliado_pode_editar and processo.servidor.id == relacionamento.id %}
+                                        {% render_file_field processo criterio %}
+                                        <script>
+                                            function onCompleteUploadCriterio{{ criterio.id }}(uploader, id, fileName, responseJSON) {
+                                                var el = uploader._getItemByFileId(id);
+
+                                                var msn = "Deseja continuar?";
+                                                var url = "/professor_titular/excluir_arquivo_pdf/" + responseJSON.arquivo_pk_crypto + "/";
+
+                                                if(responseJSON.success) {
+                                                    $("#arquivos_selecionados{{ criterio.id }}").removeClass('d-none');
+                                                    hash_arquivo = "arquivo-"+ responseJSON.arquivo_pk_crypto;
+                                                    var templateRow =
+                                                            '<tr id="linha-arquivo-'+responseJSON.arquivo_pk_crypto+'" class="linha-arquivo-'+responseJSON.arquivo_pk_crypto+'">' +
+                                                            '    <td rowspan="3">' +
+                                                            '         <a class="icon icon-view" href="/professor_titular/visualizar_arquivo_pdf/'+responseJSON.arquivo_pk_crypto+'" title="Visualizar o arquivo '+fileName+'"><span class="visually-hidden">Visualizar</span></a>' +
+                                                            '         <a class="icon icon-delete" href="#" onclick="Excluir(\''+hash_arquivo+'\', \''+msn+'\', \''+url+'\',\'{{ processo.id }}\')"><span class="visually-hidden">Remover</span></a>' +
+                                                            '    </td>' +
+                                                            '     <td rowspan="3">' +
+                                                            '         <a href="/professor_titular/visualizar_arquivo_pdf/'+responseJSON.arquivo_pk_crypto+'" title="Visualizar o arquivo '+fileName+'">'+fileName+'</a>' +
+                                                            '        ' + human_file_size(responseJSON.tamanho) +
+                                                            '     </td>' +
+                                                            '     <td>' +
+                                                            '         Quantidade: ({{ criterio.unidade }}): '+responseJSON.field_qtd +
+                                                            '     </td>' +
+                                                            '     <td rowspan="3">'+
+                                                            '         '+ responseJSON.field_nota +
+                                                            '         <span class="indicador_class_{{ criterio.indicador.id }} criterio_class_{{criterio.id }} {{ criterio.indicador.grupo.nome }}" id="pontuacao_arquivo_'+responseJSON.arquivo_pk+'">0.0</span>' +
+                                                            '     </td>' +
+                                                            '</tr>' +
+                                                            '<tr class="linha-arquivo-'+responseJSON.arquivo_pk_crypto+'">' +
+                                                            '     <td>' +
+                                                            '        Data de referência : '+responseJSON.field_data +
+                                                            '     </td>' +
+                                                            '</tr>' +
+                                                            '<tr class="linha-arquivo-'+responseJSON.arquivo_pk_crypto+'">' +
+                                                            '     <td>' +
+                                                            '         Descriçao: '+responseJSON.field_descricao+
+                                                            '         {% if pode_salvar %}' +
+                                                            '          <div class="hidden" id="mensagem-retorno-'+responseJSON.arquivo_pk_crypto+'"></div>' +
+                                                            '          <div class="d-flex justify-content-end mt-2">' +
+                                                            '             <input type="button" class="btn success salvar-btn-individual" value="Salvar" data-arquivo-id="'+responseJSON.arquivo_pk_crypto+'" data-processo-id="{{ processo.id }}" />' +
+                                                            '         </div>{% endif %}' +
+                                                            '     </td>' +
+                                                            '</tr>'
+                                                            ;
+
+                                                    $(templateRow).prependTo("#arquivos_selecionados{{ criterio.id }} tbody").fadeIn("slow");
+                                                    $($(el).find('.qq-upload-result')[0]).html('<span class="true">Concluído</span>');
+                                                    $(el).fadeOut("fast");
+                                                    init_salvar_individual();
+                                                    // Arquivo recém-enviado nasce sem Quantidade/Data/Descrição: sinaliza pendência.
+                                                    atualiza_problema_header_criterio('{{ criterio.id }}', true);
+                                                } else {
+                                                    $($(el).find('.qq-upload-result')[0]).html('<span class="false">Ocorreu um erro!</span>');
+                                                }
+                                                $(el).find('.qq-progress')[0].remove();
+                                            }
+                                        </script>
+                                    {% endif %}
+
+                                    <div class="table-responsive">
+                                        <table id="arquivos_selecionados{{ criterio.id }}" {% if not criterio.arquivo_set.all.count %}class="d-none"{% endif %}>
+                                            <thead>
+                                                <tr>
+                                                <th>Arquivo</th>
+                                                <th>Documento</th>
+                                                <th>Informações</th>
+                                                <th>Pontuação</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                            {% for arquivo in criterio.arquivo_set.all %}
+                                                {% if arquivo.processo_id == processo.pk %}
+                                                    <tr id="linha-arquivo-{{ arquivo.encrypted_pk }}" class="linha-arquivo-{{ arquivo.encrypted_pk }}">
+                                                        <td rowspan="3">
+                                                            {% icon "view" "/professor_titular/visualizar_arquivo_pdf/{{ arquivo.encrypted_pk }}" %}
+                                                            {% if processo.avaliado_pode_editar and processo.servidor.id == relacionamento.id %}
+                                                                <a class="icon icon-delete no-confirm" onclick="Excluir('arquivo-{{ arquivo.encrypted_pk }}', 'Deseja continuar?', '/professor_titular/excluir_arquivo_pdf/{{ arquivo.encrypted_pk }}/', '{{ processo.id }}')" href="#" title="Excluir o arquivo {{ arquivo.nome }}"><span class="visually-hidden">Remover</span></a>
+                                                            {% endif %}
+                                                        </td>
+
+                                                        <td rowspan="3">
+                                                            <a href="/professor_titular/visualizar_arquivo_pdf/{{ arquivo.encrypted_pk }}" title="Visualizar o arquivo {{ arquivo.nome }}" target="_blank">{{ arquivo.nome }}</a>
+                                                            {{ arquivo.tamanho|human_file_size }}
+                                                        </td>
+
+                                                        <td>
+                                                            Quantidade ({{ criterio.unidade }}): {{ arquivo|render_qtd_itens }}
+                                                        </td>
+
+                                                        <td rowspan="3">
+                                                            {{ arquivo|render_nota_pretendida }}
+                                                            <span class="indicador_class_{{ criterio.indicador.id }} criterio_class_{{ criterio.id }} {{ criterio.indicador.grupo.nome }}" id="pontuacao_arquivo_{{ arquivo.id }}">{{ arquivo.nota_pretendida }}</span>
+                                                        </td>
+                                                    </tr>
+                                                    <tr class="linha-arquivo-{{ arquivo.encrypted_pk }}">
+                                                        <td>
+                                                            Data de referência : {{ arquivo|render_data_referencia }}
+                                                        </td>
+                                                    </tr>
+                                                    <tr class="linha-arquivo-{{ arquivo.encrypted_pk }}">
+                                                        <td>
+                                                            <div>Descriçao:</div> {{ arquivo|render_descricao }}
+                                                            {% if pode_salvar %}
+                                                            <div class="hidden" id="mensagem-retorno-{{ arquivo.encrypted_pk }}"></div>
+                                                            <div class="d-flex justify-content-end mt-2">
+                                                                <input type="button" class="btn success salvar-btn-individual" value="Salvar" data-arquivo-id="{{ arquivo.encrypted_pk }}" data-processo-id="{{ processo.id }}" />
+                                                            </div>
+                                                            {% endif %}
+                                                        </td>
+                                                    </tr>
+                                                {% endif %}
+                                            {% endfor %}
+                                            <tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                {% endbox %}
+                            {% endfor %}
+                        {% endif %}
+                    {% endbox %}
+                {% endfor %}
+            </div>
+        {% endfor %}
+
+        <div class="tab-pane" data-title="Memorial Descritivo" data-tab="relatorio_descritivo"></div>
+
+        <div class="tab-pane"
+             id="quadro_resumo_pontuacao_requerida"
+             data-title="Quadro Resumo da Pontuação Requerida"
+             data-tab="quadro_resumo_pontuacao_requerida">
+        </div>
+
+        {% if eh_dono_processo %}
+            {% if processo.avaliado_pode_editar or processo.avaliado_pode_ajustar %}
+            <div class="mt-4">
+                <button type="button" onclick="Processa_Salvamento('salvar', '{{ processo.id }}', '{{ processo.grupo }}')" class="btn success">Salvar</button>
+                <button
+                    type="button"
+                    onclick="Processa_Salvamento(
+                        'enviar_cppd',
+                        '{{ processo.id }}',
+                        '{{ processo.grupo }}',
+                        '',
+                        '{{ pontuacao_minima_exigida }}',
+                        '{{ qtd_minima_grupos }}'
+                    )"
+                    class="btn success"
+                    name="enviar_processo"
+                >
+                    Enviar para CPPD
+                </button>
+
+            </div>
+            {% endif %}
+        {% endif %}
+
+    {% endif %}
+    </form>
+{% endblock %}

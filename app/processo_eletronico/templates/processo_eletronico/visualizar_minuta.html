@@ -1,0 +1,83 @@
+{% extends super_template %}
+
+{% block bodyclass %}hasAsideRight{% endblock %}
+
+{% block content %}
+
+    <div class="document">
+        <iframe src="{% url 'conteudo_minuta' minuta.id %}"></iframe>
+    </div>
+
+{% endblock %}
+
+{% block asideright %}
+
+    <aside class="right">
+
+        <ul class="action-bar">
+            {% if minuta.documento.pode_clonar_documento %}
+                <li><a class="btn primary" href="{% url 'clonar_minuta_em_documento' minuta.id %}">Clonar em Documento</a></li>
+            {% endif %}
+            <li class="has-child">
+                <a class="btn" href="#">Imprimir</a>
+                <ul>
+                    <li><a href="/processo_eletronico/imprimir_minuta_pdf/{{ minuta.id }}/carta/">Carta</a></li>
+                    <li><a href="/processo_eletronico/imprimir_minuta_pdf/{{ minuta.id }}/paisagem/">Paisagem</a></li>
+                </ul>
+            </li>
+        </ul>
+
+        <details open="open">
+            <summary>Processos visíveis em que está incluído</summary>
+            <div class="details-container">
+            {% if processos_incluido.exists %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Processo</th>
+                            <th>Nível de Acesso</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for processo in processos_incluido %}
+                            <tr>
+                                <td><a href="/processo_eletronico/processo/{{ processo.id }}/">{{ processo }}</a></td>
+                                <td>{{ processo.get_nivel_acesso_display }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="alert alert-warning">Não está em nenhum processo.</p>
+            {% endif %}
+            </div>
+        </details>
+        <details open="open">
+            <summary>Registro de Ações</summary>
+            <div class="details-container">
+            {% with registros_acoes=documento.get_registros_acoes %}
+                {% if registros_acoes %}
+                    {% autopaginate registros_acoes %}
+                    {% paginate %}
+                    <ul class="timeline">
+                        {% for registro_acao in registros_acoes %}
+                            <li class="{% if registro_acao.eh_compartilhamento %}success{% elif registro_acao.eh_descompartilhamento %}danger{% endif %}">
+                                <div class="timeline-date">{{ registro_acao.data|format }}</div>
+                                <div class="timeline-icon"></div>
+                                <div class="timeline-content">
+                                    <h4>{{ registro_acao.user|format }}</h4>
+                                    <h4>{{ registro_acao.get_tipo_display }}</h4>
+                                    <p>{{ registro_acao.observacao }}</p>
+                                </div>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                    {% paginate %}
+                {% endif %}
+            {% endwith %}
+            </div>
+        </details>
+
+    </aside>
+
+{% endblock %}

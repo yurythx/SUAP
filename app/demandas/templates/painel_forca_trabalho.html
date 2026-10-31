@@ -1,0 +1,115 @@
+{% extends super_template %}
+{% block extrahead %}
+    <script>
+        $(document).ready(function() {
+            {% for desenvolvedor in analistas_desenvolvedores %}
+                atualizar_card_desenvolvedor({{ desenvolvedor.id }});
+                window.setInterval(function(){
+                    atualizar_card_desenvolvedor({{ desenvolvedor.id }});
+                }, 5*60000);
+            {% endfor %}
+
+            let pontos = 0;
+            let desenvolvedores = [];
+            function atualizar_card_desenvolvedor(desenvolvedor_id){
+                $.get("/demandas/painel_forca_trabalho_desenvolvedor/"+desenvolvedor_id+"/", function(data) {
+                    $('#card-'+desenvolvedor_id).html(data.html);
+                    $('#card-'+desenvolvedor_id).attr("ordem", data.ordem);
+                    if ($.inArray(desenvolvedor_id, desenvolvedores) === -1) {
+                        desenvolvedores.push(desenvolvedor_id);
+                        pontos = pontos + data.total;
+                        $("#pontos").html('<strong>' + pontos + '</strong> pontos');
+                    }
+                    ordenar();
+                });
+            }
+            function ordenar(){
+                var divList = $(".card-desenvolvedor");
+                divList.sort(function(a, b) {
+                    return $(a).attr("ordem") - $(b).attr("ordem")
+                });
+                $("#container-desenvolvedores").html(divList);
+            }
+        });
+    </script>
+{% endblock %}
+
+{% block content %}
+    {% box 'Força-trabalho' %}
+        <dl class="definition-list">
+            <dt>Pontos</dt>
+            <dd id="pontos"></dd>
+        </dl>
+        <div class="table-responsive sticky-head-line">
+            <table class="sticky-first-column">
+                <caption>Analistas e Desenvolvedores</caption>
+                <thead>
+                    <tr>
+                        <th>Analista</th>
+                        <th>Demandas</th>
+                        <th>Chamados, Erros e Issues <small>em andamento</small></th>
+                        <th>Atualização de Issues</th>
+                        <th>Entregas em {{ ano_atual }}</th>
+                    </tr>
+                </thead>
+                <tbody id="container-desenvolvedores">
+                    {% for desenvolvedor in analistas_desenvolvedores %}
+                        <tr id="card-{{ desenvolvedor.id }}" class="card-desenvolvedor">
+                            <td>
+                                <div class="person sm borderless">
+                                    <div class="photo-circle sm">
+                                        <img src="{{ desenvolvedor.usuario.get_vinculo.get_foto_75x100_url }}"
+                                             alt="{{ desenvolvedor.usuario.get_profile.nome_usual }}">
+                                    </div>
+                                    <dl>
+                                        <dt class="visually-hidden">Nome</dt>
+                                        <dd>
+                                            {{ desenvolvedor.usuario.get_profile.nome_usual }}
+                                        </dd>
+                                    </dl>
+                                </div>
+                            </td>
+                            <td colspan="13" class="text-center">
+                                <span class="fas fa-spinner fa-spin" aria-hidden="true"></span> Aguarde...
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="legenda mt-4">
+            <p>Legenda:</p>
+            <ul>
+                <li class="danger">Atrasado</li>
+                <li class="warning">Ocioso</li>
+                <li class="success">Disponível</li>
+            </ul>
+        </div>
+    {% endbox %}
+
+    {% box 'Desenvolvedores por atualizações' %}
+        <div class="card-container">
+            {% for atualizador in atualizadores %}
+                <div class="card center">
+                    <div class="photo">
+                        <img title="{{ atualizador.1 }}"
+                             src="{{ atualizador.3 }}"
+                             alt="{{ atualizador.1 }}" />
+                    </div>
+                    <h4>{{ atualizador.1 }}</h4>
+                    <div class="content">
+                        <div class="clear"></div>
+                        {% for tag in atualizador.2 %}
+                            <p class="note">
+                                <a href="/admin/demandas/atualizacao/?tags__id__exact={{ tag.0 }}&responsaveis__id__exact={{ atualizador.0 }}"><strong>{{ tag.2 }}</strong> {{ tag.1 }}</a>
+                            </p>
+                        {% endfor %}
+                    </div>
+                    <footer>
+                        {{ atualizador.4 }} atualizaç{{ atualizador.4|pluralize:"ão,ões" }}
+                    </footer>
+                </div>
+            {% endfor %}
+        </div>
+    {% endbox %}
+{% endblock %}

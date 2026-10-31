@@ -1,0 +1,2 @@
+class ProcessoEletronicoException(Exception):
+    pass

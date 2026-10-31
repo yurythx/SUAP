@@ -1,0 +1,419 @@
+{% load rsc_tae_extras %}
+{% box 'Resumo da avaliação' %}
+
+<dl class="definition-list flex">
+    <div class="list-item">
+        <dt>Pontos solicitados</dt>
+        <dd>{{ total_pontos_solicitados|format }}</dd>
+    </div>
+    <div class="list-item">
+        <dt>Pontos validados</dt>
+        <dd>
+            {% if pontos_requeridos_nivel and pontos_requeridos_nivel > 0 %}
+                {{ total_pontos_validados|format }} / {{ pontos_requeridos_nivel|format }}
+            {% else %}
+                {{ total_pontos_validados|format }}
+            {% endif %}
+        </dd>
+    </div>
+    <div class="list-item">
+        <dt>Itens validados</dt>
+        <dd>
+            {% if itens_requeridos %}
+                {{ itens_validados }} / {{ itens_requeridos }}
+            {% else %}
+                {{ itens_validados }}
+            {% endif %}
+        </dd>
+    </div>
+</dl>
+
+<dl class="definition-list flex">
+    <div class="list-item">
+        <dt>Anexos</dt>
+        <dd>
+            {{ anexos_total }} total —
+            <span class="status status-success">{{ anexos_deferidos }} deferidos</span>
+            <span class="status status-danger">{{ anexos_indeferidos }} indeferidos</span>
+            <span class="status status-default">{{ anexos_pendentes }} pendentes</span>
+        </dd>
+    </div>
+    <div class="list-item">
+        <dt>Resultado (se finalizar agora)</dt>
+        <dd>
+            {% if resultado_parcial_deferido %}
+                <span class="status status-success">Deferido</span>
+            {% else %}
+                <span class="status status-danger">Indeferido</span>
+            {% endif %}
+        </dd>
+    </div>
+    <div class="list-item">
+        <dt>Avaliação Finalizada</dt>
+        <dd>
+            {% if avaliacao_finalizada %}
+                <span class="status status-success">Sim</span>
+            {% else %}
+                <span class="status status-warning">Não</span>
+            {% endif %}
+        </dd>
+    </div>
+</dl>
+
+<div class="rsc-resumo-sticky rsc-resumo-sticky--static" aria-label="Progresso da avaliação">
+    <dl class="definition-list flex m-0">
+        <div class="list-item">
+            <div class="list-item-header">
+                <dt>Pontos validados</dt>
+                <span class="list-item-total">
+                    <strong>{{ total_pontos_validados|format }}</strong>/{% if pontos_requeridos_nivel and pontos_requeridos_nivel > 0 %}{{ pontos_requeridos_nivel|format }}{% else %}—{% endif %}
+                </span>
+            </div>
+            <dd>{% progressbar pontos_percent %}</dd>
+        </div>
+        <div class="list-item">
+            <div class="list-item-header">
+                <dt>Itens validados</dt>
+                <span class="list-item-total">
+                    <strong>{{ itens_validados }}</strong>/{% if itens_requeridos %}{{ itens_requeridos }}{% else %}—{% endif %}
+                </span>
+            </div>
+            <dd>{% progressbar itens_percent %}</dd>
+        </div>
+    </dl>
+</div>
+
+{% if itens_pendentes_lista %}
+    <div class="mt-3">
+        <h3 class="m-0 mb-2">Pendências</h3>
+        <p class="text-muted m-0 mb-2">Itens com anexos ainda pendentes de avaliação.</p>
+        <ul>
+            {% for it in itens_pendentes_lista %}
+                <li>{{ it.label }} — {{ it.pendentes }} pendente(s)</li>
+            {% endfor %}
+        </ul>
+    </div>
+{% endif %}
+
+{% if avaliacoes_ativas or avaliacoes_substituidas %}
+    <div class="mt-3">
+
+        {# ── Avaliadores que contam para o resultado ─────────────────── #}
+        {% if avaliacoes_ativas %}
+        <h3 class="m-0 mb-2">Resultado por avaliador</h3>
+        <p class="text-muted m-0 mb-2">Apenas avaliadores não substituídos são considerados no cálculo do deferimento.</p>
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Avaliador</th>
+                        <th class="text-center">Finalizada</th>
+                        <th class="text-center">Pontuação final</th>
+                        <th class="text-center">Itens validados</th>
+                        <th class="text-center">Resultado individual</th>
+                        <th>Data de finalização</th>
+                        <th>Motivo do indeferimento</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for av_proc in avaliacoes_ativas %}
+                        <tr>
+                            <td>{% nome_avaliador av_proc.avaliador_vinculo %}</td>
+                            <td class="text-center">
+                                {% if av_proc.finalizada %}
+                                    <span class="status status-success">Sim</span>
+                                {% else %}
+                                    <span class="status status-warning">Não</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {{ av_proc.pontuacao_final|format }}
+                                {% if pontos_requeridos_nivel and pontos_requeridos_nivel > 0 %}
+                                    / {{ pontos_requeridos_nivel|format }}
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if av_proc.itens_validados is not None %}
+                                    {{ av_proc.itens_validados }}
+                                    {% if itens_requeridos %} / {{ itens_requeridos }}{% endif %}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if av_proc.resultado == 4 %}
+                                    <span class="status status-success">Deferido</span>
+                                {% elif av_proc.resultado == 5 %}
+                                    <span class="status status-danger">Indeferido</span>
+                                {% else %}
+                                    <span class="status status-default">—</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ av_proc.data_finalizacao|date:"d/m/Y H:i"|default:"—" }}</td>
+                            <td>{{ av_proc.motivo_indeferimento|default:"—" }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if total_avaliacoes_finalizadas > 0 %}
+            <div class="mt-2">
+                <strong>Resultado do processo (por maioria):</strong>
+                {% if resultado_processo_por_maioria %}
+                    <span class="status status-success">Deferido</span>
+                {% else %}
+                    <span class="status status-danger">Indeferido</span>
+                {% endif %}
+                <span class="text-muted">
+                    ({{ total_deferidos }} deferido(s) / {{ total_indeferidos }} indeferido(s) de {{ total_avaliacoes_finalizadas }} avaliação(ões))
+                </span>
+            </div>
+        {% endif %}
+        {% endif %}
+
+        {# ── Histórico de substituições (registro auditável) ──────────── #}
+        {% if avaliacoes_substituidas %}
+        <h3 class="m-0 mt-4 mb-2">Histórico de substituições</h3>
+        <p class="text-muted m-0 mb-2">Estes avaliadores foram substituídos e <strong>não contam</strong> para o cálculo do deferimento.</p>
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Avaliador</th>
+                        <th class="text-center">Situação</th>
+                        <th>Motivo da substituição</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for av_proc in avaliacoes_substituidas %}
+                        <tr>
+                            <td>{% nome_avaliador av_proc.avaliador_vinculo %}</td>
+                            <td class="text-center">
+                                {% if av_proc.resposta == RESPOSTA_RECUSA %}
+                                    <span class="status status-error">Recusou</span>
+                                {% elif av_proc.resposta == RESPOSTA_IMPEDIMENTO %}
+                                    <span class="status status-error">Impedimento</span>
+                                {% else %}
+                                    <span class="status status-alert">Remanejado</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if av_proc.resposta == RESPOSTA_RECUSA and av_proc.motivo_recusa %}
+                                    {{ av_proc.motivo_recusa }}
+                                {% elif av_proc.resposta == RESPOSTA_IMPEDIMENTO and av_proc.motivo_impedimento %}
+                                    {{ av_proc.motivo_impedimento }}
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+    </div>
+{% endif %}
+
+{% endbox %}
+
+{% box 'Detalhamento por item e arquivo' %}
+
+{% for grupo in grupos_requisito_avaliacao %}
+    <h3 class="rsc-grupo-requisito-label mt-4 mb-3">{{ grupo.label }}</h3>
+    {% for linha in grupo.linhas %}
+    <div class="mb-5">
+        <div class="rsc-saber-titulo">{{ linha.item.titulo }}</div>
+        <div class="text-muted">
+            Pontuação por unidade: {{ linha.item.pontuacao_unidade|default_if_none:"—"|format }} —
+            Totais do item: {{ linha.total_pontos_validados_item|format }} / {{ linha.total_pontos_requeridos_item|format }}
+        </div>
+
+        {% if linha.anexos %}
+            <div class="table-responsive mt-2">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Arquivo</th>
+                            {% if tem_multiplos_avaliadores %}<th class="w-10">Avaliador</th>{% endif %}
+                            <th class="w-10">Situação</th>
+                            <th class="w-10 text-center">Unid. informadas</th>
+                            <th class="w-10 text-center">Unid. validadas</th>
+                            <th class="w-10 text-center">Pontos (req.)</th>
+                            <th class="w-10 text-center">Pontos (val.)</th>
+                            <th class="w-20">Informações</th>
+                            {% if pode_avaliar_anexos %}
+                            <th class="w-10">Ações</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for anexo in linha.anexos %}
+                            {% with anexo_nome=anexo.nome_original|default:anexo.arquivo.name %}
+                            {% if tem_multiplos_avaliadores and anexo.avaliacoes_todos %}
+                                {% for av in anexo.avaliacoes_todos %}
+                                <tr>
+                                    {% if forloop.first %}
+                                    <td rowspan="{{ anexo.avaliacoes_todos|length }}">
+                                        {{ anexo_nome }}
+                                        <span class="text-muted">({{ anexo.arquivo|tamanho_arquivo }})</span>
+                                        {% if anexo.anterior_data_exercicio %}
+                                            <div><span class="status status-error" title="O período começa antes da data de exercício no cargo">Período anterior à data de exercício — não deve ser aceito</span></div>
+                                        {% endif %}
+                                    </td>
+                                    {% endif %}
+                                    <td>
+                                        <span class="text-muted">{% nome_avaliador av.avaliador_vinculo %}</span>
+                                    </td>
+                                    <td>
+                                        {% if av.situacao == 2 %}
+                                            <span class="status status-success">Deferido</span>
+                                        {% elif av.situacao == 3 %}
+                                            <span class="status status-error">Indeferido</span>
+                                        {% else %}
+                                            <span class="status status-default">Pendente</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">{% if linha.item.item_temporal %}{{ anexo.unid_informadas_aval }}{% else %}{{ anexo.pontuacao|format }}{% endif %}</td>
+                                    <td class="text-center">{% if linha.item.item_temporal %}{{ av.unid_validadas_aval }}{% else %}{{ av.pontuacao_validada|format }}{% endif %}</td>
+                                    <td class="text-center">{{ av.pontos_requeridos_calc|format }}</td>
+                                    <td class="text-center">
+                                        {% if av.situacao == 2 %}
+                                            {{ av.pontos_validados_calc|format }}
+                                        {% elif av.situacao == 3 %}
+                                            0
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if av.situacao != 1 %}
+                                            {% if av.pontuacao_validada != anexo.pontuacao %}
+                                                <div class="alert alert-warning">
+                                                    <p><strong>Observações:</strong></p>
+                                                    <ul>
+                                                        <li>Unidades alteradas ({% if linha.item.item_temporal %}{{ anexo.pontuacao|meses_para_anos }} ano(s) → {{ av.pontuacao_validada|meses_para_anos }} ano(s){% else %}{{ anexo.pontuacao|format }} → {{ av.pontuacao_validada|format }}{% endif %}).</li>
+                                                        <li>Pontos alterados ({{ av.pontos_requeridos_calc|format }} → {{ av.pontos_validados_calc|format }}).</li>
+                                                        {% if av.observacao %}
+                                                            <li><strong>Justificativa:</strong> {{ av.observacao }}</li>
+                                                        {% endif %}
+                                                    </ul>
+                                                </div>
+                                            {% elif av.observacao %}
+                                                <span class="status status-info obs-status"><strong>Observação:</strong> {{ av.observacao }}</span>
+                                            {% endif %}
+                                        {% endif %}
+                                    </td>
+                                    {% if pode_avaliar_anexos %}
+                                    <td>
+                                        {% if forloop.first %}
+                                            {% with av_ctx=anexo.avaliacao_anexo %}
+                                            {% if av_ctx and av_ctx.situacao != 1 %}
+                                                <a href="{% url 'rsc_tae:avaliar_arquivo' processo.id anexo.id %}?_popup=1" class="btn primary popup">Editar</a>
+                                            {% else %}
+                                                <a href="{% url 'rsc_tae:avaliar_arquivo' processo.id anexo.id %}?_popup=1" class="btn success popup">Avaliar</a>
+                                            {% endif %}
+                                            {% endwith %}
+                                        {% endif %}
+                                    </td>
+                                    {% endif %}
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                {% with av=anexo.avaliacao_anexo %}
+                                <tr>
+                                    <td>
+                                        {{ anexo_nome }}
+                                        <span class="text-muted">({{ anexo.arquivo|tamanho_arquivo }})</span>
+                                        {% if anexo.anterior_data_exercicio %}
+                                            <div><span class="status status-error" title="O período começa antes da data de exercício no cargo">Período anterior à data de exercício — não deve ser aceito</span></div>
+                                        {% endif %}
+                                    </td>
+                                    {% if tem_multiplos_avaliadores %}
+                                    <td>
+                                        <span class="text-muted">—</span>
+                                    </td>
+                                    {% endif %}
+                                    <td>
+                                        {% if av %}
+                                            {% if av.situacao == 2 %}
+                                                <span class="status status-success">Deferido</span>
+                                            {% elif av.situacao == 3 %}
+                                                <span class="status status-error">Indeferido</span>
+                                            {% else %}
+                                                <span class="status status-default">Pendente</span>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="status status-default">Pendente</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">{% if linha.item.item_temporal %}{{ anexo.unid_informadas_aval }}{% else %}{{ anexo.pontuacao|format }}{% endif %}</td>
+                                    <td class="text-center">{% if linha.item.item_temporal %}{{ anexo.unid_validadas_aval }}{% elif av %}{{ av.pontuacao_validada|format }}{% else %}—{% endif %}</td>
+                                    <td class="text-center">{{ anexo.pontos_requeridos|format }}</td>
+                                    <td class="text-center">
+                                        {% if av and av.situacao == 2 %}
+                                            {{ anexo.pontos_validados|format }}
+                                        {% elif av and av.situacao == 3 %}
+                                            0
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if av %}
+                                            {% if av.situacao != 1 %}
+                                                {% if av.pontuacao_validada != anexo.pontuacao %}
+                                                    <div class="alert alert-warning">
+                                                        <p><strong>Observações:</strong></p>
+                                                        <ul>
+                                                            <li>Unidades alteradas ({% if linha.item.item_temporal %}{{ anexo.pontuacao|meses_para_anos }} ano(s) → {{ av.pontuacao_validada|meses_para_anos }} ano(s){% else %}{{ anexo.pontuacao|format }} → {{ av.pontuacao_validada|format }}{% endif %}).</li>
+                                                            <li>Pontos alterados ({{ anexo.pontos_requeridos|format }} → {{ anexo.pontos_validados|format }}).</li>
+                                                            {% if av.observacao %}
+                                                                <li><strong>Justificativa:</strong> {{ av.observacao }}</li>
+                                                            {% endif %}
+                                                        </ul>
+                                                    </div>
+                                                {% elif av.observacao %}
+                                                    <span class="status status-info obs-status"><strong>Observação:</strong> {{ av.observacao }}</span>
+                                                {% endif %}
+                                            {% endif %}
+
+                                            {% if av.avaliado_por or av.data_avaliacao %}
+                                                <div class="text-muted mt-1">
+                                                    {% if av.avaliado_por %} <strong>Avaliador:</strong> {{ av.avaliado_por }}{% else %}—{% endif %}
+                                                </div>
+                                            {% endif %}
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    </td>
+
+                                    {% if pode_avaliar_anexos %}
+                                    <td>
+                                        {% if av and av.situacao != 1 %}
+                                            <a href="{% url 'rsc_tae:avaliar_arquivo' processo.id anexo.id %}?_popup=1" class="btn primary popup">Editar</a>
+                                        {% else %}
+                                            <a href="{% url 'rsc_tae:avaliar_arquivo' processo.id anexo.id %}?_popup=1" class="btn success popup">Avaliar</a>
+                                        {% endif %}
+                                    </td>
+                                    {% endif %}
+
+                                </tr>
+                                {% endwith %}
+                            {% endif %}
+                            {% endwith %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-muted mt-2">Sem anexos neste item.</div>
+        {% endif %}
+    </div>
+{% endfor %}
+{% empty %}
+    <div class="text-muted">Nenhum item foi preenchido pelo servidor.</div>
+{% endfor %}
+
+{% endbox %}

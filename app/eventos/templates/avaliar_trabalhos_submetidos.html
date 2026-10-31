@@ -1,0 +1,113 @@
+{% extends "admin/base_anonima.html" %}
+
+{% block content %}
+    <p class="alert alert-info mt-1">Avaliador: <strong>{{ participante_logado.nome }}</strong></p>
+    {% box "Avaliar Trabalho" %}
+        <dl class="definition-list mt-1">
+            <dt>Título</dt>
+            <dd>{{ avaliacao_submissao.versao.submissao.titulo }}</dd>
+        </dl>
+        
+        {% if items.exists %}
+            <form method="post" id="avaliacao_trabalho_submetido">
+                {% csrf_token %}
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Critério de Avaliação</th>
+                                <th>Nota Mín.</th>
+                                <th>Nota Máx.</th>
+                                <th>Nota</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for item in items %}
+                            <tr>
+                                <td>{{ item.descricao|safe }}</td>
+                                <td>{{ item.nota_minima|format }}</td>
+                                <td>{{ item.nota_maxima|format }}</td>
+                                <td>
+                                    <input type="number" step="0.01" min="{{ item.nota_minima }}" max="{{ item.nota_maxima }}" name="nota_{{ item.id }}" value="{% if items_avaliados %}{{ items_avaliados|get_value_dict:item.id }}{% endif %}" title="Digite uma nota válida (use vírgula para casas decimais)" required>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        <tr>
+                            <td>Comentário</td>
+                            <td colspan="3">
+                                <div class="form-row comentario ">
+                                    <div class="field-box-first">
+                                        <textarea class="w-100" cols="100" id="id_observacao" name="observacao" rows="50">{{ avaliacao_submissao.observacao|format }}</textarea>
+                                        <p class="help">Escreva um comentário que será visível ao autor. Obs: este campo é obrigatório caso o somatório das notas seja '0'.</p>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Nota interna</td>
+                            <td colspan="3">
+                                <div class="form-row comentario ">
+                                    <div class="field-box-first">
+                                        <textarea class="w-100" cols="100" id="id_observacao_interna" name="observacao_interna" rows="50">{{ avaliacao_submissao.observacao_interna|format }}</textarea>
+                                        <p class="help">Nota interna será enviada aos coordenadores do evento e não será visível aos autores.</p>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>    
+                </div>
+                {% if recomendacoes %}
+                    <div class="form-group">
+                        <label for="recomendacao">Recomendação:</label>
+                        <select id="recomendacao" name="recomendacao" class="form-control" required>
+                            <option value="" disabled selected>Selecione uma opção</option>
+                            {% for value, label in recomendacoes %}
+                            <option value="{{ value }}" {% if avaliacao_submissao.recomendacao == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                {% endif %}
+        
+                <div class="submit-row">
+                    <input type="submit" class="success" value="Enviar avaliação"/>
+                </div>
+            </form>
+        {% else %}
+            <p class="alert alert-warning">Não existem critérios de avaliação cadastrados para esta modalidade.</p>
+        {% endif %}
+    {% endbox %}
+
+    <script>
+        function verificarFormulario(event) {
+        
+        // Obtém todos os elementos do formulário com nomes começando com "nota_"
+            let todasNotasZeradas = true;
+
+            // Verifica se todas as notas são iguais a 0
+            for (const campoNota of camposNota) {
+                if (parseInt(campoNota.value) !== 0) {
+                todasNotasZeradas = false;
+                break;
+                }
+            }
+
+            // Obtém o campo de observação
+            const campoObservacao = document.querySelector('textarea[name="observacao"]');
+
+            // Verifica se todas as notas estão zeradas e se o campo de observação está vazio
+            if (todasNotasZeradas && campoObservacao.value.trim() === '') {
+                // Emite um alerta no campo de observação
+                campoObservacao.value = 'Trabalho não atende aos critérios da seleção.';
+                campoObservacao.focus();
+                // Impede o envio do formulário
+                event.preventDefault();
+            }
+        }
+
+        // Obtém o formulário pelo seu ID
+        const formulario = document.getElementById('avaliacao_trabalho_submetido');
+        // Adiciona um ouvinte de evento para o evento de envio do formulário
+        formulario.addEventListener('submit', verificarFormulario);
+    </script>
+{% endblock %}

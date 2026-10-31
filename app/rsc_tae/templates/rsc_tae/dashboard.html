@@ -1,0 +1,104 @@
+{% extends super_template %}
+{% load static %}
+
+{% block extracss %}
+<link rel="stylesheet" href="{% static 'rsc_tae/css/rsc-tae.css' %}">
+{% endblock %}
+
+{% block extrahead %}
+<script src="/static/djtools/graficos/highcharts.js"></script>
+{% endblock %}
+
+{% block content %}
+
+{# ------------------------------------------------------------------ #}
+{#  KPIs — fora das abas, sempre visíveis                              #}
+{# ------------------------------------------------------------------ #}
+<ul class="flex-container boxes infos horizontal sm">
+    <li class="box-item info">
+        <p class="stat">{{ total_processos }}</p>
+        <h4 class="title">Total de processos</h4>
+    </li>
+    <li class="box-item with-description warning">
+        <p class="stat">{{ total_ativos }}</p>
+        <h4 class="title">Processos</h4>
+        <p class="description">Em andamento</p>
+    </li>
+    <li class="box-item with-description success">
+        {% icone "check" %}
+        <p class="stat">{{ total_deferidos }}</p>
+        <h4 class="title">Processos</h4>
+        <p class="description">Deferidos</p>
+    </li>
+    <li class="box-item with-description error">
+        {% icone "times" %}
+        <p class="stat">{{ total_indeferidos }}</p>
+        <h4 class="title">Processos</h4>
+        <p class="description">Indeferidos</p>
+    </li>
+    {% if taxa_deferimento is not None %}
+        <li class="box-item info">
+            {% icone "percent" %}
+            <p class="stat">{{ taxa_deferimento }}<small>%</small></p>
+            <h4 class="title">Taxa de deferimento</h4>
+        </li>
+    {% endif %}
+    {% if comissao_ativa %}
+        <li class="box-item with-description info">
+            <p class="stat">{{ total_membros_ativos }}</p>
+            <h4 class="title">Membros ativos </h4>
+            <p class="description">Comissão {{ comissao_ativa.nome }}</small></p>
+        </li>
+    {% endif %}
+    <li class="box-item {% if total_sla_estourado %}error{% else %}success{% endif %}">
+        <p class="stat">
+            {% if total_sla_estourado %}
+                {{ total_sla_estourado }}
+            {% else %}
+                Nenhum
+            {% endif %}
+        </p>
+        <h4 class="title">SLA estourado</h4>
+    </li>
+    <li class="box-item with-description {% if total_sla_alerta %}warning{% else %}success{% endif %}">
+        <p class="stat">
+            {% if total_sla_alerta %}
+                {{ total_sla_alerta }}
+            {% else %}
+                Nenhum
+            {% endif %}
+        </p>
+        <h4 class="title">SLA em alerta</h4>
+        <p class="description">≤3 dias</p>
+    </li>
+</ul>
+
+{# ------------------------------------------------------------------ #}
+{#  Abas — geradas pelo componente do Design System a partir do        #}
+{#  data-title de cada painel.                                         #}
+{# ------------------------------------------------------------------ #}
+<div class="tab-pane" data-title="Visão geral">
+    {% include "rsc_tae/partials/dashboard_geral.html" %}
+</div>
+
+<div class="tab-pane" data-title="Avaliadores" data-counter="{{ painel_avaliadores.total_pendentes }}">
+    {% include "rsc_tae/partials/dashboard_avaliadores.html" %}
+</div>
+
+<div class="tab-pane" data-title="Comissão" data-counter="{{ painel_comissao.total_geral }}">
+    {% include "rsc_tae/partials/dashboard_comissao.html" %}
+</div>
+
+<script>
+// Gráficos criados dentro de uma aba oculta nascem sem largura. Ao exibir a aba,
+// o Bootstrap dispara shown.bs.tab e o reflow ajusta todos os gráficos da página.
+document.addEventListener('shown.bs.tab', function () {
+    (Highcharts.charts || []).forEach(function (chart) {
+        if (chart) {
+            chart.reflow();
+        }
+    });
+});
+</script>
+
+{% endblock %}

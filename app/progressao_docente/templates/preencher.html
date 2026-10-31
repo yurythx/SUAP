@@ -1,0 +1,218 @@
+{% extends super_template %}
+
+{% load static progressao_docente_tags %}
+
+{% block extrahead %}
+<style>
+    label { width: auto; }
+    .checkboxes li {
+        flex-basis: auto;
+        list-style: none;
+    }
+</style>
+<script type="text/javascript" src="{% static 'progressao_docente/js/ProgressaoDocente.js' %}" charset="utf-8"></script>
+
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+    {% if estah_em_edicao_reavaliacao %}
+        <li><a href="/progressao_docente/reavaliar_observacao/{{ avaliacao.pk }}/" class="btn success">Enviar para Reavaliação</a></li>
+    {% elif pode_preencher %}
+        {% if processo.pode_acelerar and processo.tipo_aceleracao != None or not processo.pode_acelerar %}
+            <li><a href="/progressao_docente/avaliacao/{{ avaliacao.pk }}/concluir_preenchimento/" class="btn primary confirm">Concluir Preenchimento</a></li>
+        {% endif %}
+    {% endif %}
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+    <h2>{{ avaliacao.formulario }}</h2>
+
+    {% if pode_preencher %}
+
+        {% if processo.pode_acelerar and not processo.tipo_aceleracao or processo.tipo_aceleracao and avaliacao.progressao.validacao_aceleracao == 2 %}
+
+            <div class="alert alert-info">
+                <p><strong>ACELERAÇÃO DA PROGRESSÃO:</strong></p>
+                <ul>
+                    <li><strong>Lei 12.772/2012</strong>: Art. 15. Os docentes aprovados no estágio probatório do respectivo cargo que atenderem os seguintes requisitos de titulação farão jus a processo de aceleração da promoção: (Redação dada pela Lei nº 12.863, de 2013)</li>
+                    <ol>
+                        <li>I - de qualquer nível da Classe D I para o nível 1 da classe D II, pela apresentação de título de especialista; e</li>
+                        <li>II - de qualquer nível das Classes D I e D II para o nível 1 da classe D III, pela apresentação de título de mestre ou doutor."</li>
+                    </ol>
+                </ul>
+            </div>
+
+            {% if processo.pode_acelerar %}
+                {% render_form form_aceleracao %}
+            {% endif %}
+
+        {% else %}
+
+            <form id="form_progressao_docente" action="" method="post">
+            {% for criterio in criterios %}
+            <div class="general-box">
+                <div class="primary-info">
+                    {% if criterio.limite_pontos %}
+                    <div class="status-info-container">
+                        <span class="status status-info"><strong>Atenção: </strong> Este critério tem um limite de pontos de {{ criterio.limite_pontos }}</span>
+                    </div>
+                    {% endif %}
+                    <h4>
+                        <small>{{ criterio.order }}</small>
+                        {{ criterio.nome }}
+                    </h4>
+
+                    <ul class="action-bar">
+                        {% if criterio.usuario_pode_adicionar_pontuacao %}
+                        <li>
+                            <a class="btn success popup" href="/progressao_docente/adicionar_pontuacao/{{ avaliacao.pk }}/{{ criterio.pk }}/">
+                                <span class="fas fa-plus-circle" aria-hidden="true"></span>
+                                Adicionar Pontuação
+                            </a>
+                        </li>
+                        {% endif %}
+                        <li>
+                            <a class="btn default popup" href="/progressao_docente/avaliacaoitem/{{ avaliacao.pk }}/{{ criterio.pk }}/ver_criterio/">
+                                <span class="fas fa-search" aria-hidden="true"></span> Visualizar
+                                <span class="sr-only">Visualizar</span>
+                            </a>
+                        </li>
+                    </ul>
+
+                    <div class="extra-info">
+                        {% if not criterio.necessita_arquivos %}
+
+                            {% if criterio.autoavaliacao %}
+                                {% for item in criterio.item_set.all %}
+                                <div class="mb-2">
+                                    {{ criterio.order }}.{{ forloop.counter }} {{ item.nome }}
+                                    {% render_nota item avaliacao avaliador avaliado_processo %}
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <p class="alert alert-warning mt-2">Este critério é de preenchimento <strong>exclusivo do avaliador</strong>.</p>
+                            {% endif %}
+
+                        {% else %}
+                            {% if criterio.itens %}
+                            <div class="table-responsive">
+                                <table>
+                                    <caption>Lista de itens do critério</caption>
+                                    <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Item</th>
+                                            <th>Arquivo</th>
+                                            <th>Descrição</th>
+                                            <th>Pontuação</th>
+                                            <th>Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                    {% for item in criterio.itens %}
+                                        <tr>
+                                            <td{% if item.deferimento == 2 or item.pontuacao_validada %} rowspan="2"{% endif %}>{{ forloop.counter }}</td>
+                                            <td>{{ item.item }}</td>
+                                            <td>{{ item.arquivo }}</td>
+                                            <td>{{ item.pontuacao.descricao }}</td>
+                                            <td>{{ item.pontuacao.pontos }}</td>
+                                            <td class="field-show_list_display_icons">
+                                                <a class="popup" href="{{ item.arquivo.url }}">
+                                                    <span class="icon icon-view" aria-hidden="true"></span>
+                                                    <span class="sr-only">Visualizar</span>
+                                                </a>
+                                                {% if item.pode_editar %}
+                                                    {% icon "edit" "/progressao_docente/avaliacaoitem/{{ item.pk }}/editar/" "Editar" "popup" %}
+                                                    {% icon "delete" "/progressao_docente/avaliacaoitem/{{ item.pk }}/delete/" "Excluir" %}
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% if item.pontuacao_validada %}
+                                            <tr>
+                                                <td colspan="6">
+                                                    <span class="status status-success">
+                                                        Pontuação Validada: {{ item.pontuacao_validada|format }}
+                                                        <br>
+                                                        Pontuação desconsiderada: {{ item.pontuacao.pontos|format }}
+                                                        <br>
+                                                        Justificativa: {{ item.justificativa }}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        {% endif %}
+                                        {% if item.deferimento == 2 %}
+                                            <tr>
+                                                <td colspan="6"><span class="status status-warning"><strong>Indeferido:</strong> {{ item.justificativa }}</span></td>
+                                            </tr>
+                                        {% endif %}
+                                    {% endfor %}
+                                    </tbody>
+                                    <tfoot>
+                                        <tr>
+                                            <td colspan="4">Total:</td>
+                                            <td colspan="2">{{ criterio.pontuacao_total|getval:"total" }}</td>
+                                        </tr>
+                                        {% if criterio.limite_pontos %}
+                                        <tr>
+                                            <td colspan="4">Total ajustado:</td>
+                                            <td colspan="2">{{ criterio.pontuacao_total|getval:"p" }}</td>
+                                        </tr>
+                                        {% endif %}
+                                    </tfoot>
+                                </table>
+                            </div>
+                            {% else %}
+                                <p class="alert alert-warning mt-2">Nenhum arquivo cadastrado até o momento para este critério.</p>
+                            {% endif %}
+
+                        {% endif %}
+                    </div>
+
+                </div>
+
+                <dl class="secondary-info">
+                    <div class="list-item">
+                        <dt><span class="fas fa-angle-double-up" aria-hidden="true"></span> Pontuação:</dt>
+                        <dd>
+                            {% if criterio.pontuacao_total|get_dict_value:"ajuste" %}
+                                <span class="status status-alert"> Pontuação ajustada para <strong>{{ criterio.pontuacao_total|getval:"p" }}</strong> pontos devido ao limite do critério.</span>
+                            {% else %}
+                                <span id="pontuacao_criterio_{{ criterio.pk }}">
+                                    {% if criterio.pontuacao_total %}
+                                    {{ criterio.pontuacao_total|getval:"p"|format }}
+                                    {% endif %}
+                                </span>
+                            {% endif %}
+                        </dd>
+                    </div>
+
+                    {% if criterio.necessita_arquivos %}
+                    <div class="list-item">
+                        <dt><span class="fas fa-list-ol" aria-hidden="true"></span> Quantidade de Arquivos:</dt>
+                        <dd>
+                            {{ criterio.itens|length  }}
+                        </dd>
+                    </div>
+
+                    <div class="list-item">
+                        <dt><span class="fas fa-check-double" aria-hidden="true"></span> Quantidade de Arquivos Avaliados:</dt>
+                        <dd>
+                            0
+                        </dd>
+                    </div>
+                    {% endif %}
+
+                </dl>
+
+            </div>
+            {% endfor %}
+            </form>
+
+        {% endif %}
+
+    {% endif %}
+
+{% endblock %}

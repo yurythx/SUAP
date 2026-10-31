@@ -1,0 +1,135 @@
+<div class="tab-pane" data-tab="linha_tempo" data-title="Linha do tempo" data-counter="{{ comentarios.count }}">
+    {% if obj.historicocomentarioerro_set.count > 0 %}
+        <ul class="pills justify-content-end" role="group" aria-label="Formas de exibição da linha do tempo">
+            <li>
+                <button type="button" class="timeline-details active">Completa</button>
+            </li>
+            <li>
+                <button type="button" class="timeline-only-comments">Somente comentários</button>
+            </li>
+        </ul>
+    {% endif %}
+
+    {% autopaginate comentarios 25 %}
+    {% paginate %}
+    <ul class="timeline with-photos">
+        {% if pode_comentar %}
+            <li>
+                <div class="timeline-photo">
+                    <img alt="{{ request.user.get_profile.nome_usual }}" src="{{ request.user.get_vinculo.get_foto_75x100_url }}" />
+                </div>
+                <div class="timeline-content">
+                    <form method="post">
+
+                        {% if respostas_frequentes_do_atendente and eh_atendente %}
+                            <h4>Resposta padrão:</h4>
+                            <select id="id_respostafrequente" class="mt-1">
+                                <option value="">------</option>
+                                {% for valor in respostas_frequentes_do_atendente %}
+                                    <option value="{{ valor }}">{{ valor }}</option>
+                                {% endfor %}
+                            </select>
+                            <p class="help mb-5">O texto selecionado será adicionado ao campo de Interação abaixo.</p>
+                        {% endif %}
+
+                        <h4>Adicionar interação:</h4>
+                        {% csrf_token %}
+                        {{ form.non_field_errors }}
+                        {{ form.descricao.errors }}
+                        {{ form.descricao }}
+                        {{ form.descricao.help_text }}
+
+                        {% if eh_atendente %}
+                            <div class="mt-5">
+                                <h4>Alterar situação:</h4>
+                                {{ form.situacao }}
+                            </div>
+                        {% elif obj.situacao == obj.SITUACAO_AGUARDANDO_FEEDBACK %}
+                            <div class="mt-5">
+                                <h4>Enviar feedback:</h4>
+                                {{ form.situacao }}
+                            </div>
+                        {% endif %}
+
+                        <div class="submit-row">
+                            <input class="btn success" type="submit" value="Adicionar interação" id="btn_adicionar_comentario">
+                        </div>
+
+                    </form>
+                </div>
+            </li>
+        {% endif %}
+        {% for comentario in comentarios %}
+            {% if comentario|method:"pode_ver"|call:request.user.get_vinculo %}
+                {% if not comentario.automatico %}
+                    <li {% if comentario.vinculo == request.user.get_vinculo %}class="success"{% endif %}>
+                        <div class="timeline-date">{{ comentario.data_alteracao|format }}</div>
+                        <div class="timeline-photo" title="{{ comentario.vinculo.pessoa.pessoafisica.nome_usual }}">
+                            <img alt="{{ comentario.vinculo.pessoa.pessoafisica.nome_usual }}"
+                                 src="{{ comentario.vinculo.get_foto_75x100_url }}" />
+                        </div>
+                        <div class="timeline-content">
+                            <h4>{{ comentario.vinculo.user|format }} <small>comentou:</small></h4>
+                            {% if not comentario.ativo %}
+                                <s>{{ comentario.descricao|linebreaks }}</s>
+                            {% else %}
+                                {{ comentario.descricao|linebreaks }}
+                            {% endif %}
+                        </div>
+                        {% if comentario|method:"pode_desconsiderar_comentario"|call:request.user.get_vinculo %}
+                            <ul class="action-bar">
+                                <li class="has-child">
+                                    <a href="#" class="btn icon-cog"><span class="fas fa-cog" aria-hidden="true"></span><span class="visually-hidden">Opções</span></a>
+                                    <ul>
+                                        <li><a href="/erros/desconsiderar_comentario/{{ comentario.pk }}/">Desconsiderar comentário</a></li>
+                                    </ul>
+                                </li>
+                            </ul>
+                        {% endif %}
+                    </li>
+                {% else %}
+                    <li class="obs">
+                        <div class="timeline-date">{{ comentario.data_alteracao|format }}</div>
+                        {% if comentario.vinculo %}
+                            <div class="timeline-photo" title="{{ comentario.vinculo.pessoa.pessoafisica.nome_usual }}">
+                                <img alt="{{ comentario.vinculo.pessoa.pessoafisica.nome_usual }}"
+                                     src="{{ comentario.vinculo.get_foto_75x100_url }}" />
+                            </div>
+                        {% else %}
+                            <div class="timeline-icon"></div>
+                        {% endif %}
+                        <div class="timeline-content">
+                            {% if comentario.vinculo %}{{ comentario.vinculo.user|format }}{% endif %} {{ comentario.descricao|safe }}
+                        </div>
+                    </li>
+                {% endif %}
+            {% endif %}
+        {% endfor %}
+        <li class="obs">
+            <div class="timeline-date">{{ obj.data_criacao|format }}</div>
+            <div class="timeline-photo" title="{{ obj.informante.pessoa.pessoafisica.nome_usual }}">
+                <img alt="{{ obj.informante.pessoa.pessoafisica.nome_usual }}"
+                     src="{{ obj.informante.get_foto_75x100_url }}" />
+            </div>
+            <div class="timeline-content">
+                {{ obj.informante.user|format }} abriu este erro.
+            </div>
+        </li>
+    </ul>
+    {% paginate %}
+</div>
+
+{% if respostas_frequentes_do_atendente and eh_atendente %}
+    <script>
+        const selectRespostaFrequente = document.getElementById('id_respostafrequente');
+        const textareaDescricao = document.getElementById('id_descricao');
+
+        // O select pode não estar no DOM (form sem o campo) => addEventListener em
+        // null estoura (Sentry SUAP-TDA).
+        if (selectRespostaFrequente && textareaDescricao) {
+            selectRespostaFrequente.addEventListener('change', function () {
+                textareaDescricao.value = selectRespostaFrequente.value;
+            });
+        }
+    </script>
+{% endif %}

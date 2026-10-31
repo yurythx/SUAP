@@ -1,0 +1,188 @@
+{% extends super_template %}
+
+{% block extrahead %}
+
+    <script src="/static/djtools/graficos/highcharts.js"></script>
+    <script src="/static/djtools/graficos/exporting.js"></script>
+
+
+{% endblock %}
+
+{% block content %}
+
+    {% render_form form %}
+    {% if etapas %}
+    <div id="containeralunos" style="min-width: 310px; margin: 60px auto;"></div>
+    <div id="containermedia" style="min-width: 310px; margin: 0 auto;"></div>
+    <script>
+
+        $(function () {
+            $('#containeralunos').highcharts({
+
+                chart: {
+                    type: 'column'
+                },
+
+                title: {
+                    text: 'Quantitativo de Alunos Acima da Média (' + {{ turma.matriz.estrutura.media_aprovacao_sem_prova_final}} +' pontos)'
+                },
+
+                xAxis: {
+                    categories: [{% for diario in diarios %}
+                    '{{ diario.componente_curricular.componente.sigla }}{% if not abreviar %} - {{ diario.componente_curricular.componente.descricao }}{% endif %}',
+                    {% endfor %}]
+                },
+
+                yAxis: {
+                    allowDecimals: false,
+                    min: 0,
+                    title: {
+                        text: 'Quantidade de Alunos'
+                    }
+                },
+
+                tooltip: {
+                    formatter: function () {
+                        return '<b>' + this.x + '</b><br/>' +
+                            this.series.name + ': ' + this.y + '<br/>' +
+                            'Total: ' + this.point.stackTotal;
+                    }
+                },
+
+                plotOptions: {
+                    column: {
+                        stacking: 'normal',
+                        dataLabels: {
+                            enabled: true
+                        }
+                    }
+                },
+
+                series: [
+                    {% for key, values in etapa_acima.items %}
+                        {
+                            name: 'Acima da Média',
+                            data: [{% for value in values %}{{ value }}, {% endfor %}],
+                            color: '#7cb5ec',
+                            {% if forloop.counter > 1 %}
+                                showInLegend: false,
+                            {% endif %}
+                            stack: 'etapa{{ forloop.counter }}'
+                        },
+                    {% endfor %}
+                    {% for key, values in etapa_abaixo.items %}
+                        {
+                            name: 'Abaixo Média',
+                            data: [{% for value in values %}{{ value }}, {% endfor %}],
+                            color: '#000000',
+                            {% if forloop.counter > 1 %}
+                                showInLegend: false,
+                            {% endif %}
+                            stack: 'etapa{{ forloop.counter }}'
+                        },
+                    {% endfor %}
+                ]
+            });
+        });
+
+        $(function () {
+            $('#containermedia').highcharts({
+
+                chart: {
+                    type: 'column'
+                },
+
+                title: {
+                    text: 'Média da Disciplina por Etapa'
+                },
+
+                xAxis: {
+                    categories: [{% for diario in diarios %}
+                        '{{ diario.componente_curricular.componente.sigla }}{% if not abreviar %} - {{ diario.componente_curricular.componente.descricao }}{% endif %}',
+                    {% endfor %}],
+                    crosshair: true
+                },
+
+                yAxis: {
+                    allowDecimals: false,
+                    min: 0,
+                    max: 100,
+                    title: {
+                        text: 'Percentual'
+                    }
+                },
+
+
+                plotOptions: {
+                    column: {
+                        pointPadding: 0.2,
+                        borderWidth: 0,
+                        dataLabels: {
+                            enabled: true
+                        }
+                    }
+                },
+
+                series: [
+                    {% for key, values in media_turma.items %}
+                        {
+                            name: {% if key == 5 %} 'NAF' {% else %} 'N'+{{ key }} {% endif %},
+                            data: [{% for value in values %} {{ value.0 }}, {% endfor %}],
+                            tooltip: {
+                                headerFormat: '<span>{point.key}</span><br />',
+                                pointFormat: '<span style="color:{series.color}">{series.name}: {point.y:.2f}</span>',
+                                shared: false,
+                                useHTML: true
+                            }
+                        },
+                    {% endfor %}
+                ]
+            });
+        });
+
+    </script>
+    {% box "Legenda" %}
+        {% if diarios.exists %}
+        	<ul class="action-bar">
+                    <li><a class="btn" href="?to_xls=1">Exportar</a></li>
+                </ul>
+            <table>
+                <thead>
+                <tr>
+                    <th class="no-print">Ações</th>
+                    <th>Código</th>
+                    <th>Componente</th>
+                    <th>Etapa</th>
+                    <th>Qtd. Alunos</th>
+                    <th>Acima da Média</th>
+                    <th>Abaixo da Média</th>
+                    <th>Nota Mínima</th>
+                    <th>Nota Média</th>
+                    <th>Nota Máxima</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for diario in diarios %}
+                    {% for key,value in diario.media.items %}
+                            <tr>
+                                <td class="no-print">{% icon "view" "/edu/diario/{{ diario.pk }}/" %}</td>
+                                <td>{{ diario.pk }}</td>
+                                <td>{{ diario.componente_curricular.componente }}{{ diario.get_descricao_dinamica }}</td>
+                                <td>{{ key }}</td>
+                                <td>{{ diario.matriculadiario_set.count }}</td>
+                                <td>{{ value.0 }}</td>
+                                <td>{{ value.1 }}</td>
+                                <td>{{ value.2.minima|format }}</td>
+                                <td>{{ value.2.media|format }}</td>
+                                <td>{{ value.2.maxima|format }}</td>
+                            </tr>
+                    {% endfor %}
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="alert alert-warning">Nenhum diário cadastrado.</p>
+        {% endif %}
+    {% endbox %}
+    {% endif %}
+{% endblock %}

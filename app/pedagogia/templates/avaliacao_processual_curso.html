@@ -1,0 +1,672 @@
+{% extends super_template %}
+
+{% block content %}
+
+<h3>Instrumento de acompanhamento e avaliação do desenvolvimento curricular de curso</h3>
+<p class='alert alert-info'>
+    Caro(a) estudante, este é um instrumento destinado ao acompanhamento e à avaliação processual do Curso {{ aluno.curso_campus.descricao }}.
+</p>
+
+{% if form.non_field_errors %}
+<p class='alert alert-warning'>
+    {{ form.non_field_errors }}
+</p>
+{% endif %}
+
+<form method="POST" action="?passo={{ passo }}">
+
+    {% csrf_token %}
+
+    <div id='box1' {% if passo == 1  %} style="display:none" {% endif %}>
+
+        {% box "Identificação" %}
+            <table class="info">
+                <tr>
+                    <td>Campus</td>
+                    <td>{{ aluno.curso_campus.diretoria.setor.uo.nome|format }}</td>
+                </tr>
+                <tr>
+                    <td>Ano/semestre de ingresso no curso</td>
+                    <td>{{ aluno.ano_letivo.ano|format }} / {{ aluno.periodo_letivo|format }}</td>
+                </tr>
+                <tr>
+                    <td>Programas de Assistência Estudantil a que tem acesso</td>
+                    <td>
+                        {{ form.identificacao_5_bolsa_trabalho }} {{ form.identificacao_5_bolsa_trabalho.label }}
+                        {{ form.identificacao_5_alimentacao }} {{ form.identificacao_5_alimentacao.label }}
+                        {{ form.identificacao_5_transporte }} {{ form.identificacao_5_transporte.label }}
+                        {{ form.identificacao_5_outroi }} {{ form.identificacao_5_outroi.label }}
+                        {{ form.identificacao_5_outroii }}
+                    </td>
+                </tr>
+    
+                <tr>
+                    <td>Participa de algum de projetos de ensino, pesquisa ou extensão com bolsa?</td>
+                    <td> {{ form.identificacao_7_bolsa_de_IC_ifrn }} {{ form.identificacao_7_bolsa_de_IC_ifrn.label }}
+                    {{ form.identificacao_7_bolsa_de_IC_externa }} {{ form.identificacao_7_bolsa_de_IC_externa.label }}
+                    {{ form.identificacao_7_bolsa_de_extensao_ifrn }} {{ form.identificacao_7_bolsa_de_extensao_ifrn.label }}
+                    {{ form.identificacao_7_bolsa_de_extensao_externa }} {{ form.identificacao_7_bolsa_de_extensao_externa.label }}
+                    {{ form.identificacao_7_pibid }} {{ form.identificacao_7_pibid.label }}
+                    {{ form.identificacao_7_pibit }} {{ form.identificacao_7_pibit.label }} </td>
+                </tr>
+                <tr>
+                    <td>Trabalha ou faz estágio?</td>
+                    <td>{{ form.identificacao_8 }}</td>
+                </tr>
+                <tr>
+                    <td>Trabalha ou faz estágio conseguido por intermédio do curso? </td>
+                    <td>{{ form.identificacao_9 }}</td>
+                </tr>
+            </table>
+        {% endbox %}
+
+        {% box "Parte I" %}
+            <p class="alert alert-info">
+                Convidamos você a avaliar a proposta didático-pedagógica elaborada para a formação de nível {{ aluno.curso_campus.modalidade.nivel_ensino|lower }} e avaliar o
+                trabalho desenvolvido no decorrer da implementação deste curso a partir de 2012.1.
+                <br>
+                Os critérios avaliados como <strong>Insuficiente</strong> deverão ser justificados.
+                <br/>
+                Para balizar o seu julgamento utilize os parâmetros apresentados na escala a seguir:
+                <ul>
+                    <li>Ótimo</li>
+                    <li>Bom</li>
+                    <li>Regular</li>
+                    <li>Insuficiente</li>
+                    <li>Desconheço</li>
+                </ul>
+            </p>
+            
+            <div>
+                {% for dado in form.dados %}
+                    {% for item in dado.itens %}
+                        {% for fname in item.areas %}
+                            {{ form|getval:fname }}
+                        {% endfor %}
+                    {% endfor %}
+                {% endfor %}
+            </div>
+            <script>
+            function mostrar(id) {
+                var campo_justificativa = '';
+                if (id != 'id_avaliacao_regime_credito') {
+                    var id_slipt = id.split("-");
+                    campo_justificativa = "'#" + id_slipt[0] + '-' + (parseInt(id_slipt[1]) + 3) + "'";
+                } else {
+                    campo_justificativa = 'id_parte_2_I_4';
+                }
+
+                var justificativa = $(eval(campo_justificativa)).val();
+                if (justificativa != null && justificativa != '') {
+                    $('#icon_' + id.replace('id_', '')).show();
+                }
+            }
+
+            function getJustificativa(id, opcao) {
+                var campo_justificativa = '';
+                if (id != 'id_avaliacao_regime_credito') {
+                    var id_slipt = id.split("-");
+                    campo_justificativa = "'#" + id_slipt[0] + '-' + (parseInt(id_slipt[1]) + 3) + "'";
+                } else {
+                    campo_justificativa = "'#id_parte_2_I_4'";
+                }
+
+                if (opcao == 'Insuficiente' || opcao == null) {
+                    var justificativa = prompt("Justificativa", $(eval(campo_justificativa)).val());
+                    $(eval(campo_justificativa)).val(justificativa);
+                    $('#icon_' + id.replace('id_', '')).show();
+                } else {
+                    $(eval(campo_justificativa)).val('');
+                    $('#icon_' + id.replace('id_', '')).hide();
+                }
+            }
+            </script>
+            <table>
+                <thead>
+                    <tr>
+                        <th rowspan="2">Disciplinas Obrigatórias {{ dado.itens }}</th>
+                        <th colspan="{{ questionario_matriz.get_numero_periodos }}">Número de aulas semanal por Período/Semestre</th>
+                        <th colspan="4">Critérios de avaliação processual do Curso</th>
+                    </tr>
+                    <tr>
+                        {% for periodo in questionario_matriz.get_periodos %}
+                            <th colspan="2">{{ periodo }}º</th>
+                        {% endfor %}
+                        <th>Carga horária total da disciplina</th>
+                        <th>Sequência Didática (Ordem da disciplina no curso )</th>
+                        <th>Ementa e programa da disciplina</th>
+                        <th>{{ regime }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for dado in form.dados %}
+                        <tr>
+                            <th colspan="{{ questionario_matriz.get_numero_colunas }}">{{ dado.nucleo }}</th>
+                            {% if forloop.first %}
+                                <th rowspan="1000">
+                                    {{ form.avaliacao_regime_credito }}{{ form.parte_2_I_4 }} <a id="icon_avaliacao_regime_credito" class="icon icon-edit" title="Alterar Justificativa" onclick="getJustificativa(this.id.replace('icon_', 'id_'));" href="javascript:" style="display: none"><span class="visually-hidden">Alterar Justificativa</span></a>
+                                    <script>mostrar('id_avaliacao_regime_credito');</script>
+                                </th>
+                            {% endif %}
+                        </tr>
+                        {% for item in dado.itens %}
+                        <tr>
+                            <td>{{ item.disciplina }}</td>
+                            {% for periodo in questionario_matriz.get_periodos %}
+                                {% if periodo == '1' %}
+                                    {% if item.get_aulas_semana_1.1 %}
+                                        <td>{{ item.get_aulas_semana_1.0 }}</td>
+                                        <td>{{ item.get_aulas_semana_1.1 }}</td>
+                                    {% else %}
+                                        <td colspan="2">{{ item.get_aulas_semana_1.0 }}</td>
+                                    {% endif %}
+                                {% endif %}
+                            {% if periodo == '2' %}
+                            {% if item.get_aulas_semana_2.1 %}
+                            <td>{{ item.get_aulas_semana_2.0 }}</td>
+                            <td>{{ item.get_aulas_semana_2.1 }}</td>
+                            {% else %}
+                            <td colspan="2">{{ item.get_aulas_semana_2.0 }}</td>
+                            {% endif %}
+                            {% endif %}
+                            {% if periodo == '3' %}
+                            {% if item.get_aulas_semana_3.1 %}
+                            <td>{{ item.get_aulas_semana_3.0 }}</td>
+                            <td>{{ item.get_aulas_semana_3.1 }}</td>
+                            {% else %}
+                            <td colspan="2">{{ item.get_aulas_semana_3.0 }}</td>
+                            {% endif %}
+                            {% endif %}
+                            {% if periodo == '4' %}
+                            {% if item.get_aulas_semana_4.1 %}
+                            <td>{{ item.get_aulas_semana_4.0 }}</td>
+                            <td>{{ item.get_aulas_semana_4.1 }}</td>
+                            {% else %}
+                            <td colspan="2">{{ item.get_aulas_semana_4.0 }}</td>
+                            {% endif %}
+                            {% endif %}
+                            {% if periodo == '5' %}
+                            {% if item.get_aulas_semana_5.1 %}
+                            <td>{{ item.get_aulas_semana_5.0 }}</td>
+                            <td>{{ item.get_aulas_semana_5.1 }}</td>
+                            {% else %}
+                            <td colspan="2">{{ item.get_aulas_semana_5.0 }}</td>
+                            {% endif %}
+                            {% endif %}
+                            {% if periodo == '6' %}
+                            {% if item.get_aulas_semana_6.1 %}
+                            <td>{{ item.get_aulas_semana_6.0 }}</td>
+                            <td>{{ item.get_aulas_semana_6.1 }}</td>
+                            {% else %}
+                            <td colspan="2">{{ item.get_aulas_semana_6.0 }}</td>
+                            {% endif %}
+                            {% endif %}
+                            {% if periodo == '7' %}
+                            {% if item.get_aulas_semana_7.1 %}
+                            <td>{{ item.get_aulas_semana_7.0 }}</td>
+                            <td>{{ item.get_aulas_semana_7.1 }}</td>
+                            {% else %}
+                            <td colspan="2">{{ item.get_aulas_semana_7.0 }}</td>
+                            {% endif %}
+                            {% endif %}
+                            {% if periodo == '8' %}
+                            {% if item.get_aulas_semana_8.1 %}
+                            <td>{{ item.get_aulas_semana_8.0 }}</td>
+                            <td>{{ item.get_aulas_semana_8.1 }}</td>
+                            {% else %}
+                            <td colspan="2">{{ item.get_aulas_semana_8.0 }}</td>
+                            {% endif %}
+                            {% endif %}
+                            {% endfor %}
+                            {% for fname in item.fields %}
+                            <td> {{ form|getval:fname }} <a id="icon_{{ fname }}" style="display: none" href="javascript:" onclick="getJustificativa(this.id.replace('icon_', 'id_'));" class="icon icon-edit" title="Alterar justificativa"><span class="visually-hidden">Alterar justificativa</span></a>
+                            <script>
+                                mostrar('id_{{ fname }}');
+                            </script></td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    {% endfor %}
+                </tbody>
+            </table>
+            <table class="info">
+                <tr>
+                    <td> {{ form.parte_2_I_5.label }} </td>
+                    <td> {{ form.parte_2_I_5 }} </td>
+                </tr>
+            </table>
+            <script>
+            $("select").change(function() {
+                getJustificativa(this.id, this.value);
+            });
+
+            $("#id_identificacao_8").change(function() {
+                var target = $("#id_identificacao_9");
+                var valorSelecionado = $(this).val();
+
+                if (valorSelecionado == "Não") {
+                    target.attr("disabled", "disabled");
+                    target.val("");
+                } else {
+                    target.removeAttr("disabled");
+                }
+            });
+
+            $('#id_parte_2_I_4').hide();
+            </script>
+        {% endbox %}
+
+        <div class="submit-row">
+            <input class="default" type="submit" value="Continuar">
+        </div>
+
+    </div>
+
+    <div id='box2' {% if passo == 2 %} style="display:none" {% endif %}>
+
+        {% box "Parte II" %}
+
+        <p class="alert alert-info">
+            I. Considerando o compromisso pedagógico de se atingir qualidade no desenvolvimento da proposta
+            pedagógica do curso, <strong>avalie as condições de ensino e a qualidade das práticas pedagógicas
+            desenvolvidas e apresente sugestões para melhoria</strong>.
+            Para balizar o seu julgamento utilize os parâmetros apresentados na escala a seguir:
+            <ul>
+                <li>Ótimo</li>
+                <li>Bom</li>
+                <li>Regular</li>
+                <li>Insuficiente</li>
+                <li>Desconheço</li> 
+            </ul>
+        </p>
+
+        <p class="alert alert-warning">
+            a) Avalie as condições de ensino quanto à:
+        </p>
+
+        <table class="info">
+            <tr>
+                <td> {{ form.parte_2_II_a_1.label }} </td>
+                <td> {{ form.parte_2_II_a_1 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_a_2.label }} </td>
+                <td> {{ form.parte_2_II_a_2 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_a_3.label }} </td>
+                <td> {{ form.parte_2_II_a_3 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_a_4.label }} </td>
+                <td> {{ form.parte_2_II_a_4 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_a_5.label }} </td>
+                <td> {{ form.parte_2_II_a_5 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_a_6.label }} </td>
+                <td> {{ form.parte_2_II_a_6 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_a_7.label }} </td>
+                <td> {{ form.parte_2_II_a_7 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_a_8.label }} </td>
+                <td> {{ form.parte_2_II_a_8 }} </td>
+            </tr>
+        </table>
+
+        <p class="alert alert-warning">
+            b) Avalie o desenvolvimento de atividades didático-pedagógicas para a organização da
+            aprendizagem:
+        </p>
+
+        <table class="info">
+            <tr>
+                <td> {{ form.parte_2_II_b_1.label }} </td>
+                <td> {{ form.parte_2_II_b_1 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_b_2.label }} </td>
+                <td> {{ form.parte_2_II_b_2 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_b_3.label }} </td>
+                <td> {{ form.parte_2_II_b_3 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_b_4.label }} </td>
+                <td> {{ form.parte_2_II_b_4 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_b_5.label }} </td>
+                <td> {{ form.parte_2_II_b_5 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_b_6.label }} </td>
+                <td> {{ form.parte_2_II_b_6 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_b_7.label }} </td>
+                <td> {{ form.parte_2_II_b_7 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_b_8i.label }} </td>
+                <td>
+                <div>
+                    {{ form.parte_2_II_b_8i }}
+                </div> {{ form.parte_2_II_b_8ii }} </td>
+            </tr>
+        </table>
+
+        <p class="alert alert-warning">
+            c) Avalie a realização de projetos de pesquisa e de extensão:
+        </p>
+
+        <table class="info">
+            <tr>
+                <td> {{ form.parte_2_II_c_1.label }} </td>
+                <td> {{ form.parte_2_II_c_1 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_c_2.label }} </td>
+                <td> {{ form.parte_2_II_c_2 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_c_3.label }} </td>
+                <td> {{ form.parte_2_II_c_3 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_c_4.label }} </td>
+                <td> {{ form.parte_2_II_c_4 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_c_5.label }} </td>
+                <td> {{ form.parte_2_II_c_5 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_c_6.label }} </td>
+                <td> {{ form.parte_2_II_c_6 }} </td>
+            </tr>
+        </table>
+        
+        <p class="alert alert-warning">
+            d) Avalie o desenvolvimento da prática profissional e elaboração de TCC:
+        </p>
+
+        <table class="info">
+            <tr>
+                <td> {{ form.parte_2_II_d_1.label }} </td>
+                <td> {{ form.parte_2_II_d_1 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_d_2.label }} </td>
+                <td> {{ form.parte_2_II_d_2 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_d_3.label }} </td>
+                <td> {{ form.parte_2_II_d_3 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_d_4.label }} </td>
+                <td> {{ form.parte_2_II_d_4 }} </td>
+            </tr>
+        </table>
+
+        <p class="alert alert-warning">
+            e) Faça uma avaliação sobre a organização administrativo-­‐pedagógica do curso:
+        </p>
+
+        <table class="info">
+            <tr>
+                <td> {{ form.parte_2_II_e_1.label }} </td>
+                <td> {{ form.parte_2_II_e_1 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_e_2.label }} </td>
+                <td> {{ form.parte_2_II_e_2 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_e_3.label }} </td>
+                <td> {{ form.parte_2_II_e_3 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_e_4.label }} </td>
+                <td> {{ form.parte_2_II_e_4 }} </td>
+            </tr>
+        </table>
+
+        <p class="alert alert-warning">
+            f) Avalie a proposta pedagógica do curso:
+        </p>
+
+        <table class="info">
+            <tr>
+                <td> {{ form.parte_2_II_f_1.label }} </td>
+                <td> {{ form.parte_2_II_f_1 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_f_2.label }} </td>
+                <td> {{ form.parte_2_II_f_2 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_f_3.label }} </td>
+                <td> {{ form.parte_2_II_f_3 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_f_4.label }} </td>
+                <td> {{ form.parte_2_II_f_4 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_f_5.label }} </td>
+                <td> {{ form.parte_2_II_f_5 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_f_6.label }} </td>
+                <td> {{ form.parte_2_II_f_6 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_f_7.label }} </td>
+                <td> {{ form.parte_2_II_f_7 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_f_8.label }} </td>
+                <td> {{ form.parte_2_II_f_8 }} </td>
+            </tr>
+        </table>
+
+        <p class="alert alert-warning">
+            g) Avalie sua postura acadêmica, quanto à:
+        </p>
+
+        <table class="info">
+            <tr>
+                <td> {{ form.parte_2_II_g_1.label }} </td>
+                <td> {{ form.parte_2_II_g_1 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_g_2.label }} </td>
+                <td> {{ form.parte_2_II_g_2 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_g_3.label }} </td>
+                <td> {{ form.parte_2_II_g_3 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_g_4.label }} </td>
+                <td> {{ form.parte_2_II_g_4 }} </td>
+            </tr>
+        </table>
+
+        <p class="alert alert-warning">
+            h) Dos itens abaixo, indique quais os que contribuem para a sua permanência e êxito no curso.
+            <i>(Enumere de 1 a 7, considerando o número 1 para o que mais contribui)</i>
+        </p>
+
+        <table class="info">
+            <tr>
+                <td> {{ form.parte_2_II_h_1.label }} </td>
+                <td> {{ form.parte_2_II_h_1 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_h_2.label }} </td>
+                <td> {{ form.parte_2_II_h_2 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_h_3.label }} </td>
+                <td> {{ form.parte_2_II_h_3 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_h_4.label }} </td>
+                <td> {{ form.parte_2_II_h_4 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_h_5.label }} </td>
+                <td> {{ form.parte_2_II_h_5 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_h_6.label }} </td>
+                <td> {{ form.parte_2_II_h_6 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_h_7i.label }} </td>
+                <td>
+                <div>
+                    {{ form.parte_2_II_h_7i }}
+                </div> {{ form.parte_2_II_h_7ii }} </td>
+            </tr>
+        </table>
+
+        <p class="alert alert-warning">
+            i) Considerando a realidade do {% get_valor_por_chave "comum" "instituicao_sigla" %}, avalie os fatores que contribuem para a
+            reprovação no curso.
+            <i>(Enumere de 1 a 8, atribuindo em uma ordem de prioridade, considerando o
+            número 1 para o que mais contribui)</i>
+        </p>
+
+        <table class="info">
+            <tr>
+                <td> {{ form.parte_2_II_i_1.label }} </td>
+                <td> {{ form.parte_2_II_i_1 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_i_2.label }} </td>
+                <td> {{ form.parte_2_II_i_2 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_i_3.label }} </td>
+                <td> {{ form.parte_2_II_i_3 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_i_4.label }} </td>
+                <td> {{ form.parte_2_II_i_4 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_i_5.label }} </td>
+                <td> {{ form.parte_2_II_i_5 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_i_6.label }} </td>
+                <td> {{ form.parte_2_II_i_6 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_i_7.label }} </td>
+                <td> {{ form.parte_2_II_i_7 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_i_8i.label }} </td>
+                <td>
+                <div>
+                    {{ form.parte_2_II_i_8i }}
+                </div> {{ form.parte_2_II_i_8ii }} </td>
+            </tr>
+        </table>
+
+        <p class="alert alert-warning">
+            j) Dentre os itens abaixo, quais os fatores que contribuem para a evasão dos
+            estudantes?
+            <i>(Enumere de 1 a 7, considerando o número 1 para o que mais contribui)</i>
+        </p>
+
+        <table class="info">
+            <tr>
+                <td> {{ form.parte_2_II_j_1.label }} </td>
+                <td> {{ form.parte_2_II_j_1 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_j_2.label }} </td>
+                <td> {{ form.parte_2_II_j_2 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_j_3.label }} </td>
+                <td> {{ form.parte_2_II_j_3 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_j_4.label }} </td>
+                <td> {{ form.parte_2_II_j_4 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_j_5.label }} </td>
+                <td> {{ form.parte_2_II_j_5 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_j_6.label }} </td>
+                <td> {{ form.parte_2_II_j_6 }} </td>
+            </tr>
+            <tr>
+                <td> {{ form.parte_2_II_j_7i.label }} </td>
+                <td>
+                <div>
+                    {{ form.parte_2_II_j_7i }}
+                </div> {{ form.parte_2_II_j_7ii }} </td>
+            </tr>
+        </table>
+
+        <div class="form-row">
+            <div class="field-box">
+                <p>Caso considere necessário, apresente suas observações ou sugestões de melhorias:</p>
+                <p>{{ form.parte_2_observacoes_sugestoes }}</p>
+            </div>
+        </div>
+
+        {% endbox %}
+
+        <div class="submit-row">
+            <input class="default" type="submit" value="Salvar" />
+        </div>
+
+    </div>
+</form>
+
+<script>
+function validarOpcaoPrioridade(letra, element) {
+    var self = $(element);
+    var valorSelecionado = self.val();
+    var elementosMenosAtual = $("select[name^='parte_2_II_" + letra + "'][id != '" + element.id + "']");
+    elementosMenosAtual.each(function(index) {
+        var valorAtual = $(this).val();
+
+        if ((valorSelecionado != "") && valorSelecionado == valorAtual) {
+            alert('A opção ' + valorSelecionado + ' já foi escolhida anteriormente. Por favor, escolha uma outra opção.');
+            self.val('');
+        }
+    });
+}
+
+$("select[name^='parte_2_II_h']").change(function() {
+    validarOpcaoPrioridade('h', this);
+});
+
+$("select[name^='parte_2_II_i']").change(function() {
+    validarOpcaoPrioridade('i', this);
+});
+
+$("select[name^='parte_2_II_j']").change(function() {
+    validarOpcaoPrioridade('j', this);
+}); 
+</script>
+
+{% endblock %}

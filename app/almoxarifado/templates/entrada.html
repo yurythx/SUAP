@@ -1,0 +1,357 @@
+{% extends super_template %}
+
+{% block action-bar %}
+<ul class="action-bar">
+    {% if entrada.tipo_entrada.nome == "doacao" %}
+        <li><a class="btn success popup" href="/almoxarifado/entrada/{{ entrada.id }}/adicionar_item/">Adicionar Item</a></li>
+    {% endif %}
+    {% if user|in_group:"Operador de Almoxarifado,Coordenador de Almoxarifado,Coordenador de Almoxarifado Sistêmico" %}
+        <li><a class="btn primary" href="/almoxarifado/entrada/{{ entrada.id }}/editar/">Editar</a></li>
+    {% endif %}
+    <li><a href="/almoxarifado/entrada_pdf/{{ entrada.id }}/" class="btn">Gerar PDF da Entrada</a></li>
+    {% if entrada.tipo_material.nome == "permanente" %}
+        <li><a href="/almoxarifado/entrada_inventarios_pdf/{{ entrada.id }}/" class="btn">Gerar PDF de Inventários</a></li>
+    {% endif %}
+    {% if entrada.tipo_entrada.nome == "compra" %}
+        <li><a href="/almoxarifado/capa_pagamento_pdf/{{ entrada.id }}/" class="btn">Capa para Pagamento</a></li>
+    {% endif %}
+    {% if pode_remover_itens %}
+        <li><a class="btn danger" href="/almoxarifado/entrada/{{ entrada.id }}/cancelar_itens/">Remover Itens</a></li>
+    {% endif %}
+    {% if entrada.can_delete %}
+        <li><a class="btn danger" href="/almoxarifado/entrada/{{ entrada.id }}/remover/">Remover</a></li>
+    {% endif %}
+</ul>
+{% endblock %}
+
+{% block content %}
+
+{% box "Dados da Entrada" %}
+    <dl class="definition-list flex">
+        <div class="list-item">
+            <dt>Campus</dt>
+            <dd>{{ entrada.uo }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Data</dt>
+            <dd>{{ entrada.data|date:"d/m/y" }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Tipo</dt>
+            <dd>{{ entrada.tipo_entrada.nome.capitalize }} - {{ entrada.tipo_material.nome.capitalize }}</dd>
+        </div>
+        {% if entrada.tipo_entrada.nome == "compra" or entrada.tipo_entrada.nome == "doacao" %}
+            <div class="list-item">
+                <dt>Nº Nota Fiscal</dt>
+                <dd>{{ entrada.numero_nota_fiscal|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Data da Nota Fiscal</dt>
+                <dd>{{ entrada.get_data_nota_fiscal|format }}</dd>
+            </div>
+            <div class="list-item flex-basis-100">
+                <dt>Processo</dt>
+                <dd>{{ entrada.processo|format }}</dd>
+            </div>
+        {% endif %}
+        <div class="list-item flex-basis-50">
+            <dt>Fornecedor</dt>
+            <dd>
+                {% if entrada.vinculo_fornecedor.relacionamento %}
+                    <a href="{{ entrada.vinculo_fornecedor.relacionamento.get_absolute_url }}">{{ entrada.vinculo_fornecedor.pessoa }}</a>
+                {% else %}
+                    {{ entrada.vinculo_fornecedor }}
+                {% endif %}
+            </dd>
+        </div>
+        <div class="list-item">
+            <dt>Contato</dt>
+            <dd>{{ entrada.vinculo_fornecedor.pessoa.telefones|format }} | {{ entrada.vinculo_fornecedor.email_pessoal|format }}</dd>
+        </div>
+        {% if entrada.tipo_entrada.nome == "compra" %}
+            <div class="list-item">
+                <dt>Empenho</dt>
+                <dd><a href="{{ entrada.get_empenho.get_absolute_url }}">{{ entrada.get_empenho }}</a></dd>
+            </div>
+            {% if entrada.get_empenho.processo %}
+                <div class="list-item">
+                    <dt>Processo do Empenho</dt>
+                    <dd>{{ entrada.get_empenho.processo.numero_processo }}</dd>
+                </div>
+            {% endif %}
+            {% if entrada.get_empenho.observacao %}
+                <div class="list-item">
+                    <dt>Observação</dt>
+                    <dd>{{ entrada.get_empenho.observacao }}</dd>
+                </div>
+            {% endif %}
+            {% if not entrada.get_empenho.vinculo_fornecedor == entrada.vinculo_fornecedor %}
+                <div class="list-item">
+                    <dt>Fornecedor Empenho</dt>
+                    <dd>{{ entrada.get_empenho.vinculo_fornecedor.pessoa|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>CNPJ Fornecedor Empenho</dt>
+                    <dd>{{ entrada.get_empenho.vinculo_fornecedor.pessoa.pessoajuridica.cnpj }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Telefone do Fornecedor Empenho</dt>
+                    <dd>{{ entrada.get_empenho.vinculo_fornecedor.pessoa.telefones|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>E-mail Fornecedor Empenho</dt>
+                    <dd>{{ entrada.get_empenho.vinculo_fornecedor.email_pessoal|format }}</dd>
+                </div>
+            {% endif %}
+        {% endif %}
+    </dl>
+{% endbox %}
+
+<div class="tab-pane" data-title="Itens" data-tab="itens">
+
+{% if resumo_ed %}
+    {% box "Resumo por Elemento de Despesa" %}
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Código</th>
+                        <th>Conta Contábil</th>
+                        <th>Descrição</th>
+                        <th class="text-end">Valor</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for resumo in resumo_ed %}
+                        <tr>
+                            <td>{{ resumo.codigo }}</td>
+                            <td>{{ resumo.planocontas|format }}</td>
+                            <td>{{ resumo.categoria }}</td>
+                            <td class="text-end">{{ resumo.valor }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="3" class="text-end">Total:</td>
+                        <td>{{ total }}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    {% endbox %}
+{% endif %}
+
+{% box "Itens da Entrada" %}
+    {% if entrada.tipo_material.nome == "consumo" %}
+        {# MATERIAL DE CONSUMO #}
+        {% if entrada.get_itens %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Cod.</th>
+                            <th>Material</th>
+                            <th>Cod. ED</th>
+                            <th>Qtd.</th>
+                            <th>Estoque Atual</th>
+                            <th>Valor Unitário</th>
+                            <th>Valor Total</th>
+                            <th class="no-print">Opções</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for i in entrada.get_itens %}
+                            <tr>
+                                <td>{{ forloop.counter }}</td>
+                                <td><a href="/admin/almoxarifado/materialconsumo/?q={{ i.get_material.codigo }}">{{ i.get_material.codigo }}</a></td>
+                                <td>{{ i.get_material }}</td>
+                                <td>{{ i.get_categoria.codigo }}</td>
+                                <td class="text-end">{{ i.qtd|format_quantity }}</td>
+                                <td class="text-end">{{ i.get_material.get_estoque_atual }}</td>
+                                <td class="text-end">{{ i.get_valor_unitario }}</td>
+                                <td class="text-end">{{ i.get_valor }}</td>
+                                <td class="no-print">
+                                    {% if i.can_delete %}
+                                        <a href="/almoxarifado/entrada_item_estornar/{{ entrada.tipo_material.nome }}/{{ i.id }}/" class="btn danger">Remover Item</a>
+                                    {% else %}
+                                    -
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="7">Total</td>
+                            <td>{{ entrada.get_valor }}</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Não há registro.</p>
+        {% endif %}
+
+        {% if entrada.get_requisicoes %}
+            <h4>Requisições</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Tipo</th>
+                        <th>ID</th>
+                        <th>Data</th>
+                        <th>Solicitante</th>
+                        <th>Setor Solicitante</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for i in entrada.get_requisicoes %}
+                        <tr>
+                            <td>{{ i.tipo }}</td>
+                            <td><a href="{{ i.get_absolute_url }}">{{ i.id }}</a></td>
+                            <td>{{ i.data|format }}</td>
+                            <td>{{ i.vinculo_fornecedor }}</td>
+                            <td>{{ i.vinculo_fornecedor.setor }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+    {% else %}
+        {# MATERIAL PERMANENTE #}
+        {% if entrada.get_itens %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Material</th>
+                            <th class="text-center">Cod. ED</th>
+                            <th class="text-end">Qtd.</th>
+                            <th class="text-end">Valor Unitário</th>
+                            <th class="text-end">Valor Total</th>
+                            <th class="no-print">Opções</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for i in entrada.get_itens %}
+                        <tr>
+                            <td>{{ forloop.counter }}</td>
+                            <td>{{ i.get_material }}</td>
+                            <td class="text-center">{{ i.get_categoria.codigo }}</td>
+                            <td class="text-end">{{ i.qtd|format_quantity }}</td>
+                            <td class="text-end">{{ i.get_valor_unitario }}</td>
+                            <td class="text-end">{{ i.get_valor }}</td>
+                            <td class="no-print">
+                                {% if i.can_delete %}
+                                    <a href="/almoxarifado/entrada_item_estornar/{{ entrada.tipo_material.nome }}/{{ i.id }}/" class="btn danger">Remover Item</a>
+                                {% else %}
+                                -
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="5">Total:</td>
+                            <td class="text-end">{{ entrada.get_valor }}</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Não há itens de entrada.</p>
+        {% endif %}
+    {% endif %}
+
+    {% if entrada.get_inventarios %}
+        <h4>Inventários relacionados a esta Entrada</h4>
+        <table>
+            <thead>
+                <tr>
+                    <th>Nº</th>
+                    <th>Status</th>
+                    <th>ED</th>
+                    <th>Descrição</th>
+                    <th>Carga Atual</th>
+                    <th>Valor</th>
+                    <th>Opções</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for i in entrada.get_inventarios %}
+                    <tr>
+                        <td><a href="/patrimonio/inventario/{{ i.numero }}/">{{ i.numero }}</a></td>
+                        <td>{{ i.status }}</td>
+                        <td>{{ i.entrada_permanente.categoria.codigo }}</td>
+                        <td>{{ i.get_descricao }}</td>
+                        {% if i.get_carga_atual %}
+                            <td>{{ i.get_carga_atual.pessoa.nome }}
+                            (<strong>{{ i.get_carga_atual.setor.uo.setor.sigla }}</strong>
+                            {{ i.get_carga_atual.setor.sigla }})
+                            </td>
+                        {% else %}
+                            <td align="center">-</td>
+                        {% endif %}
+                        <td align="right">{{ i.get_valor }}</td>
+                        <td align="right"><a href="/patrimonio/historico_movimentacao_inventario/{{ i.numero }}/" class="btn default">Visualizar Histórico</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+{% endbox %}
+
+</div>
+
+{% if itens_cancelados %}
+    <div class="tab-pane" data-title="Itens Removidos" data-tab="itens_removidos" data-counter="{{ itens_cancelados|length }}">
+        <p class="alert alert-info">
+            Itens removidos desta entrada pela Coordenação de Patrimônio. Os inventários gerados e toda a
+            sua movimentação (carga contábil, transferências, etc.) foram removidos junto. Por preservar
+            este histórico, a entrada não pode mais ser excluída.
+        </p>
+        <div class="table-responsive">
+            <table>
+                <caption>Itens removidos</caption>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Material</th>
+                        <th class="text-center">Cod. ED</th>
+                        <th class="text-end">Qtd.</th>
+                        <th class="text-end">Valor Unitário</th>
+                        <th class="text-end">Valor Total</th>
+                        <th>Inventários Removidos</th>
+                        <th>Justificativa</th>
+                        <th>Removido por</th>
+                        <th>Removido em</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in itens_cancelados %}
+                        <tr>
+                            <td>{{ forloop.counter }}</td>
+                            <td>{{ item.descricao }}</td>
+                            <td class="text-center">{{ item.categoria.codigo|format }}</td>
+                            <td class="text-end">{{ item.qtd|format_quantity }}</td>
+                            <td class="text-end">{{ item.get_valor_unitario }}</td>
+                            <td class="text-end">{{ item.get_valor }}</td>
+                            <td>{{ item.numeros_inventario|format }}</td>
+                            <td>{{ item.justificativa }}</td>
+                            <td>{{ item.cancelado_por|format }}</td>
+                            <td>{{ item.cancelado_em|format }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endif %}
+
+{% endblock %}

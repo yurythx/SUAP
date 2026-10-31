@@ -1,0 +1,373 @@
+{% extends super_template_processo %}
+
+{% block extrahead %}
+    <style>
+        iframe {
+            border-width: 0;
+        }
+        @media print {
+            {#footer {
+                position: fixed;
+                bottom: 0;
+            }#}
+            aside.right,
+            .title-container {
+                display: none;
+            }
+            {% if eh_anonimo %}
+                body.anonima #content {
+                    margin: 0;
+                    padding: 0;
+                }
+                #content h2,
+                #content span.category {
+                    display: none !important;
+                }
+            {% endif %}
+        }
+    </style>
+
+    <script>
+        const URL_DOCUMENTO = "/processo_eletronico/visualizar_processo/{{ processo_id }}/?ajax=true&doc=";
+        let documentos_em_carregamento = [];
+        let dict_documentos = [];
+
+        function add_in_array(array, element, print=true) {
+            if(print) console.log(`Adicionando "${element}" em [${array}]`);
+            array.push(element);
+        }
+
+        function remove_from_array(array, element, print=true) {
+            if(print) console.log(`Removendo "${element}" de [${array}]`);
+            let index = array.indexOf(element);
+            if (index > -1) {
+                array.splice(index, 1);
+            }
+        }
+
+        function scroll_ancora(){
+            let ancora = location.hash.substr(1);
+            if (ancora)  {
+                console.log('scroll_ancora ancora='+ancora);
+                let div_iframe = $("#"+ancora);
+                $('html,body').animate({scrollTop: div_iframe.offset().top}, 'slow');
+                $(window).scroll();
+            }
+        }
+
+        function ajustar_altura_iframe(iframe){
+            // contentDocument é null para iframes cross-origin/bloqueados (ex.: PDFs) ou
+            // ainda não carregados, e o body pode não existir nesse instante. Sem este
+            // guard, a leitura de .body/.scrollHeight estoura (Sentry SUAP-TAC/TAZ/TA8/TC4).
+            let doc = iframe && iframe.contentDocument;
+            if (!doc || !doc.body) {
+                return;
+            }
+            let body = doc.body;
+            let html = doc.documentElement;
+            let height = Math.max( body.scrollHeight, body.offsetHeight, html.clientHeight, html.scrollHeight, html.offsetHeight );
+            $(iframe).css('height', height + 4);
+        }
+
+        function carregar_iframe(iframe='iframe', doc){
+            iframe = $(iframe);
+            let url_pdf = iframe.data('url-pdf');
+            if (url_pdf){
+                pdf_to_canvas(iframe, doc);
+            } else {
+                ajustar_altura_iframe(iframe[0]);
+                encerrar_carregamento_documento(doc);
+            }
+        }
+
+        function encerrar_carregamento_documento(doc){
+            if (documentos_em_carregamento.length >= 0) {
+                remove_from_array(documentos_em_carregamento, doc);
+                if (documentos_em_carregamento.length == 0) {
+                    scroll_ancora();
+                    $('canvas').css("width", "99%");
+                }
+            }
+        }
+
+        function carregar_documento(documento){
+            if (documentos_em_carregamento.indexOf(documento) == -1){
+                add_in_array(documentos_em_carregamento, documento);
+                $(this).animate({'opacity':'1'}, 500);
+                $.get(URL_DOCUMENTO+documento, function(data) {
+                    let iframe = $(data.html);
+                    $(iframe).on("load", function() {
+                        carregar_iframe(this, data.doc);
+                    });
+                    $('#content_doc_'+data.doc).replaceWith(iframe);
+                });
+            }
+        }
+
+        function estah_visivel(elemento){
+            let bottom_of_object = $(elemento).offset().top + $(elemento).outerHeight();
+            let bottom_of_window = $(window).scrollTop() + $(window).height();
+            return bottom_of_window > bottom_of_object;
+        }
+
+        function carregar_capa(){
+            add_in_array(documentos_em_carregamento, 'capa_processo');
+            carregar_iframe($('iframe')[0], 'capa_processo');
+            $('iframe').on("load", function() {
+                carregar_iframe(this, 'capa_processo');
+            });
+        }
+
+        function carregar_tudo(){
+            $('.loader:not(.loading)').each(function(){
+                carregar_documento($(this).data('documento'));
+            });
+        }
+
+        function todos_documentos_carregados() {
+            return $('.loader').length == 0 && documentos_em_carregamento.length == 0;
+        }
+
+        function imprimir() {
+            console.log('imprimir');
+            setTimeout(function() {
+                console.log('setTimeout');
+                if (todos_documentos_carregados()) {
+                    console.log('imprimir documento');
+                    try {
+                        window.print();
+                    } catch (e) {}
+                } else {
+                    imprimir();
+                }
+            }, 500);
+        }
+
+        function imprimir_processo(){
+            console.log('imprimir processo');
+            carregar_tudo();
+            imprimir();
+        }
+
+        $(document).ready(function() {
+            carregar_capa();
+            carregar_tudo();
+            $(".ancoras a").click(function(event) {
+                let ancora = $(this).attr('href');
+                location.hash = ancora;
+                //let ancora = $(this).attr('href');
+                //window.history.replaceState(null, null, ancora);
+                event.preventDefault();
+                event.stopPropagation();
+            });
+
+            $(window).scroll(function () {
+                /* Check the location of each desired element */
+                $('.loader:not(.loading)').each( function(i){
+                    if( estah_visivel(this) ){
+                        let documento = $(this).data('documento');
+                        carregar_documento(documento);
+                    }
+                });
+            });
+
+            jQuery(document).find("#actionPrint, .actionPrint").unbind('click').on('click', function(event) {
+                imprimir_processo();
+                event.preventDefault();
+                event.stopPropagation();
+            });
+
+            $(document).keydown(function(event) {
+                if (event.ctrlKey==true && (event.which == '80')) { //Ctrl + p
+                    imprimir_processo();
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+            });
+
+            const mql = window.matchMedia('print');
+            mql.addEventListener("change", () => {
+                $('iframe').each(function () {
+                    console.log(' ===> iframe ====> '+this);
+                    ajustar_altura_iframe(this);
+                });
+            });
+            /*
+            function ajustar_altura_iframe() {
+                $('iframe').each(function () {
+                    console.log('afterPrint ===> iframe ====> '+this);
+                    ajustar_altura_iframe(this);
+                });
+            }
+            const beforePrint = function() {
+                ajustar_altura_iframe();
+            };
+            const afterPrint = function() {
+                ajustar_altura_iframe();
+            };
+
+            if (window.matchMedia) {
+                var mediaQueryList = window.matchMedia('print');
+                mediaQueryList.addEventListener('change', function(mql) {
+                    console.log('<>>>>>>'+mql.matches);
+                    if (mql.matches) {
+                        beforePrint();
+                    } else {
+                        afterPrint();
+                    }
+                });
+            }
+
+            window.onbeforeprint = beforePrint;
+            window.onafterprint = afterPrint;
+            */
+        });
+    </script>
+    <script src="/static/comum/js/pdf.js"></script>
+    <script>
+        function pdf_to_canvas(iframe, doc){
+            if (!dict_documentos[doc]){
+                dict_documentos[doc] = [];
+            }
+            const url = iframe.data('url-pdf');
+            let id = iframe.parent().prop('id');
+            $('#'+id+' iframe').remove();
+            // Loaded via <script> tag, create shortcut to access PDF.js exports.
+            let pdfjsLib = window['pdfjs-dist/build/pdf'];
+            // The workerSrc property shall be specified.
+            pdfjsLib.GlobalWorkerOptions.workerSrc = '/static/comum/js/pdf.worker.js';
+            let thePDF = null;
+            //This is where you start
+            pdfjsLib.getDocument(url).promise.then(function(pdf) {
+                let currPage = 1; //Pages are 1-based not 0-based
+                let numPages = 0;
+                //Set PDFJS global object (so we can easily access in our page functions
+                thePDF = pdf;
+                //How many pages it has
+                numPages = pdf.numPages;
+                console.log(`doc = ${doc} tem ${numPages} páginas`);
+                //Start with first page
+                pdf.getPage( currPage ).then(function(page) {
+                    handlePages(page, doc, currPage, numPages);
+                });
+            }).catch = function(e){
+                console.log('> > > > > > chamando .catch em %o com argumentos: %o', this, e);
+            };
+
+            function handlePages(page, doc, currPage, numPages) {
+                console.log(`processar página ${currPage} doc ${doc}`);
+                add_in_array(dict_documentos[doc], currPage);
+                dict_documentos.forEach(function(valores, key){console.log(`"${key}" in [${valores}]`)});
+                //This gives us the page's dimensions at full scale
+                let viewport = page.getViewport( {scale: 2.5} );
+                //We'll create a canvas for each page to draw it on
+                let canvas = document.createElement( "canvas" );
+                canvas.style.display = "block";
+                let context = canvas.getContext('2d');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                //Draw it on the canvas
+                page.render({canvasContext: context, viewport: viewport}).promise.then(function(){
+                    console.log(`Renderizando página ${currPage} doc ${doc} array ${dict_documentos[doc]}`);
+                    dict_documentos[doc].pop();
+                    dict_documentos.forEach(function(valores, key){console.log(`"${key}" in [${valores}]`)});
+                    if (dict_documentos[doc].length == 0){
+                        encerrar_carregamento_documento(doc);
+                    }
+                });
+                document.getElementById(id).appendChild( canvas );
+                //Add it to the web page
+                let line = document.createElement("hr");
+                document.getElementById(id).appendChild( line );
+                //Move to next page
+                currPage++;
+                if ( thePDF !== null && currPage <= numPages ) {
+                    thePDF.getPage( currPage ).then(function(page) {
+                        handlePages(page, doc, currPage, numPages);
+                    });
+                }
+            }
+        }
+    </script>
+{% endblock %}
+
+{% block action-bar %}
+    {% if documentos_do_processo %}
+        <ul class="action-bar">
+            {% if eh_anonimo %}
+                <li>
+                    <a href="{{ instance.get_absolute_url }}" class="btn default">
+                        {% icone "lock" %} Acessar processo completo
+                    </a>
+                </li>
+            {% else %}
+                <li>
+                    <a href="/processo_eletronico/linha_tempo/{{ instance.pk }}/" class="btn default">
+                        {% icone "stream" %} Linha do Tempo
+                    </a>
+                </li>
+                <li>
+                    <a href="/processmining/processmining/eletronico/{{ instance.pk }}/" class="btn default">
+                        {% icone "chart-line" %} Process Mining</a>
+                </li>
+            {% endif %}
+            {% if instance.get_status == 'A' %}
+                <li>
+                    <a href="/processo_eletronico/editar_processo/{{ instance.pk }}/" class="btn default">
+                        {% icone "edit" %} Editar Processo
+                    </a>
+                </li>
+            {% endif %}
+            {% if eh_anonimo %}
+                <li>
+                    <a href="/processo_eletronico/baixar_processo_zip/{{ instance.uuid }}/" class="btn default">
+                        {% icone "file-archive" %} Baixar em Zip
+                    </a>
+                </li>
+            {% endif %}
+            <li>
+                <a href="/processo_eletronico/imprimir_processo_celery/{{ instance.uuid }}/" class="btn default">
+                    {% icone "file-pdf" %} Visualizar/Baixar em PDF
+                </a>
+            </li>
+            <li>
+                <a href="/processo_eletronico/baixar_processo_zip_celery/{{ instance.uuid }}/" class="btn default">
+                    {% icone "file-archive" %} Baixar em Zip
+                </a>
+            </li>
+            <li>
+                <a class="btn default actionPrint">{% icone "print" %} Imprimir</a>
+            </li>
+            {% if not eh_anonimo %}
+                <li>
+                    <a class="btn" href="/processo_eletronico/processo/{{ processo_id }}/">
+                        {% icone "undo" %} Voltar para Processo
+                    </a>
+                </li>
+            {% endif %}
+        </ul>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    {% include 'visualizar_processo_conteudo.html' %}
+{% endblock %}
+
+{% block bodyclass %}hasAsideRight{% endblock %}
+
+{% block asideright %}
+    <aside class="right">
+        <ol class="ancoras no-action three-digits">
+            <li>
+                <a href="#capa_processo">Capa do Processo</a>
+            </li>
+            {% for documento in documentos_do_processo %}
+                <li>
+                    <a href="#doc_{{ forloop.counter0 }}" data-documento="{{ forloop.counter0 }}">
+                        {{ documento.get_titulo }}
+                    </a>
+                </li>
+            {% endfor %}
+        </ol>
+    </aside>
+{% endblock %}

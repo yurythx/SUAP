@@ -1,0 +1,333 @@
+{% extends super_template %}
+
+{% block content %}
+
+{{ obj.get_situacao_display|status }}
+
+<table class="info">
+    <tr>
+        <td>Aluno(a):</td>
+        <td>{{ obj.aluno.pessoa_fisica.nome }} (<a href="{{ obj.aluno.get_absolute_url }}">{{ obj.aluno.matricula }}</a>)</td>
+        <td>Situação da Matrícula do Aluno(a):</td>
+        <td>{{ obj.aluno.situacao|format }}</td>
+    </tr>
+    <tr>
+        <td>Orientador(a):</td>
+        <td colspan="3">{{ obj.orientador.vinculo.pessoa.nome }} ({{ obj.orientador.get_matricula }})</td>
+    </tr>
+</table>
+
+<div class="tab-pane ajax-rendered" data-title="Dados gerais" data-tab="informacoes">
+{% if request.GET.tab == "informacoes" or not request.GET.tab %}
+
+    {% box 'Dados gerais' %}
+        <table class="info">
+            <tr>
+                <td>Aluno(a)</td>
+                <td colspan="3">{{ obj.aluno.pessoa_fisica.nome }} (<a href="{{ obj.aluno.get_absolute_url }}">{{ obj.aluno.matricula }}</a>)</td>
+            </tr>
+            <tr>
+                <td>Instituição de Realização da Atividade</td>
+                <td colspan="3">{{ obj.instituicao|format }}</td>
+            </tr>
+            <tr>
+                <td>Razão Social</td>
+                <td colspan="3">{{ obj.razao_social|format }}</td>
+            </tr>
+            <tr>
+                <td>Orientador(a)</td>
+                <td colspan="3">{{ obj.orientador.vinculo.pessoa.nome }} ({{ obj.orientador.get_matricula }})</td>
+            </tr>
+            <tr>
+                <td>Tipo</td>
+                <td colspan="3">{{ obj.get_tipo_display|format }}</td>
+            </tr>
+        </table>
+    {% endbox %}
+
+    {% box 'Carga Horária' %}
+        <table class="info">
+            <tr>
+                <td>Data de Início</td>
+                <td>{{ obj.inicio|format }}</td>
+                <td>Data Prevista para Encerramento</td>
+                <td>{{ obj.data_prevista_encerramento|format }}</td>
+            </tr>
+            <tr>
+                <td>C.H. Semanal</td>
+                <td colspan="3">{{ obj.ch_semanal|format }}</td>
+            </tr>
+        </table>
+    {% endbox %}
+
+    {% box 'Relação de Atividades Planejadas' %}
+        <table class="info">
+            <tr>
+                <td>Atividades Planejadas</td>
+                <td>{{ obj.atividades|safe|linebreaksbr }} </td>
+            </tr>
+        </table>
+    {% endbox %}
+
+{% endif %}
+</div>
+
+<div class="tab-pane ajax-rendered" data-title="Documentação" data-tab="documentacao">
+{% if request.GET.tab == "documentacao" %}
+
+    {% box 'Documentação' %}
+        <table class="info">
+            <tr>
+                <td>Documentação Comprobatória</td>
+                <td><a href="{{ obj.documentacao_comprobatoria.url }}">Documentação Comprobatória</a></td>
+            </tr>
+            <tr>
+                <td>Plano de Atividades</td>
+                <td><a href="{{ obj.plano_atividades.url }}">Plano de Atividades</a></td>
+            </tr>
+        </table>
+    {% endbox %}
+
+{% endif %}
+</div>
+
+{% if perms.estagios.add_atividadeprofissionalefetiva or user|in_group:"Coordenador de Curso" %}
+    <div class="tab-pane ajax-rendered" data-title="Notificações" data-tab="notificacoes" data-counter="{{ obj.notificacaoatividadeprofissionalefetiva_set.count }}">
+    {% if request.GET.tab == "notificacoes" %}
+
+        {% box 'Notificações' %}
+            <ul class="action-bar">
+                <li>
+                    <a class="btn" href="/estagios/enviar_notificacoes_atividade_profissional_efetiva/{{ obj.pk }}/">Enviar Notificações</a>
+                </li>
+            </ul>
+            {% if obj.notificacaoatividadeprofissionalefetiva_set.exists %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Notificador</th>
+                            <th>Data</th>
+                            <th>Tipo</th>
+                            <th>E-mail do Destinatário</th>
+                            <th>Mensagem Enviada</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for notificacao in obj.notificacaoatividadeprofissionalefetiva_set.all %}
+                        <tr>
+                            <td>{{ notificacao.notificador|format }}</td>
+                            <td>{{ notificacao.data }}</td>
+                            <td>{{ notificacao.get_tipo_display|format }}</td>
+                            <td>{{ notificacao.email_destinatario|format }}</td>
+                            <td><p>{{ notificacao.mensagem_enviada|safe|linebreaksbr }}</p></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="alert alert-warning">Nenhuma notificação foi enviada.</p>
+            {% endif %}
+        {% endbox %}
+
+    {% endif %}
+    </div>
+{% endif %}
+
+<div class="tab-pane ajax-rendered" data-title="Orientações" data-tab="reunioes" data-counter="{{ obj.orientacaoatividadeprofissionalefetiva_set.count }}">
+{% if request.GET.tab == "reunioes" %}
+    {% box 'Reuniões de Orientação Agendadas' %}
+        {% if request.user == obj.orientador.vinculo.user and not obj.is_encerrado %}
+            <ul class="action-bar">
+                <li>
+                    <a class="btn popup" href="/estagios/agendar_orientacao_atividade_profissional_efetiva/{{ obj.pk }}/">Registrar/Agendar Orientação</a>
+                </li>
+            </ul>
+        {% endif %}
+
+        <p class="alert alert-info"><b>Aviso ao orientador:</b> As orientações devem ocorrer, preferencialmente, com periodicidade mínima mensal,
+        de acordo com o Art. 40 da Regulamentação de Prática Profissional do {% get_valor_por_chave "comum" "instituicao_sigla" %}.</p>
+
+        {% if obj.orientacaoatividadeprofissionalefetiva_set.exists %}
+            <table>
+                <thead>
+                    <tr>
+                        {% if request.user == obj.orientador.vinculo.user %}
+                            <th class="no-print">Ações</th>
+                        {% endif %}
+                        <th>Mês</th>
+                        <th>Data</th>
+                        <th>Hora de Início</th>
+                        <th>Local</th>
+                        <th>Descrição do Conteúdo da Orientação</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for orientacao in obj.orientacaoatividadeprofissionalefetiva_set.all %}
+                    <tr>
+                        {% if request.user == orientacao.orientador.vinculo.user %}
+                            <td class="no-print">{% icon "edit" "/estagios/agendar_orientacao_atividade_profissional_efetiva/{{ obj.pk }}/{{ orientacao.pk }}/" "Editar" "popup" %}</td>
+                        {% endif %}
+                        <td>{{ orientacao.data|date:"E" }}</td>
+                        <td>{{ orientacao.data|format }}</td>
+                        <td>{{ orientacao.hora_inicio|time:"H:i" }}</td>
+                        <td>{{ orientacao.local|format }}</td>
+                        <td>{{ orientacao.descricao|format }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="alert alert-warning">Nenhuma orientação foi cadastrada pelo(a) orientador(a).</p>
+        {% endif %}
+    {% endbox %}
+{% endif %}
+</div>
+
+<div class="tab-pane ajax-rendered" data-title="Declaração de Realização de Atividade Profissional Efetiva – Aluno" data-tab="relatorio">
+{% if request.GET.tab == "relatorio" %}
+
+    {% box 'Declaração de Realização de Atividade Profissional Efetiva – Aluno' %}
+
+        {% if obj.is_em_andamento and pode_submeter_declaracao %}
+            <ul class="action-bar">
+                <li>
+                    <a class="btn success popup" href="/estagios/submeter_relatorio_atividade_profissional_efetiva/{{ obj.pk }}/">Enviar Declaração de Realização de Atividade Profissional Efetiva</a>
+                </li>
+            </ul>
+        {% endif %}
+
+        {% if obj.relatorio_final_aluno %}
+            <table class="info">
+                <tbody>
+                    {% if obj.data_relatorio %}
+                        <tr>
+                            <td>Data da Declaração</td>
+                            <td>{{ obj.data_relatorio|format }}</td>
+                        </tr>
+                        <tr>
+                            <td>Atividades Planejadas<br/>
+                                <pre>{{ obj.atividades }}</pre>
+                            </td>
+                            <td>
+                                {{ obj.get_avaliacao_atividades_display }}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Comentários sobre o Desenvolvimento das Atividades</td>
+                            <td>{{ obj.comentarios_atividades|format }}</td>
+                        </tr>
+                        <tr>
+                            <td>Descrição de Outras Atividades</td>
+                            <td>{{ obj.outras_atividades|format }}</td>
+                        </tr>
+                        <tr>
+                            <td>Área de Formação</td>
+                            <td>{{ obj.get_area_formacao_display|format }}</td>
+                        </tr>
+                        <tr>
+                            <td>Contribuiu na formação profissional?</td>
+                            <td>{{ obj.get_contribuiu_display|format }}</td>
+                        </tr>
+                        <tr>
+                            <td>O conhecimento adquirido foi aplicado?</td>
+                            <td>{{ obj.get_aplicou_conhecimento_display|format }}</td>
+                        </tr>
+                        <tr>
+                            <td>Conceito desta Atividade Profissional Efetiva</td>
+                            <td>{{ obj.get_avaliacao_conceito_display|format }}</td>
+                        </tr>
+                    {% endif %}
+                    <tr>
+                        <td>Arquivo da Declaração de Realização de Atividade Profissional Efetiva</td>
+                        <td>
+                            <a href="{{ obj.relatorio_final_aluno.url }}">Declaração</a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        {% else %}
+            <p class="alert alert-warning">A declaração ainda não foi entregue.</p>
+        {% endif %}
+
+    {% endbox %}
+
+{% endif %}
+</div>
+
+<div class="tab-pane ajax-rendered" data-title="Dados do Encerramento" data-tab="encerramento">
+{% if request.GET.tab == "encerramento" %}
+
+    {% box 'Dados do Encerramento' %}
+        {% if perms.estagios.add_atividadeprofissionalefetiva %}
+            <ul class="action-bar">
+                {% if obj.is_em_andamento %}
+                    <li>
+                        <a class="btn popup success" href="/estagios/encerrar_atividade_profissional_efetiva/{{ obj.pk }}/">Registrar Encerramento</a>
+                    </li>
+                    <li>
+                        <a class="btn popup warning" href="/estagios/cadastrar_cancelamento_atividade_profissional_efetiva/{{ obj.pk }}/">Cadastrar Cancelamento</a>
+                    </li>
+                {% else %}
+                    {% if obj.is_cancelado %}
+                        <li><a class="btn popup primary" href="/estagios/cadastrar_cancelamento_atividade_profissional_efetiva/{{ obj.pk }}/">Editar Registro de Cancelamento</a></li>
+                    {% else %}
+                        <li><a class="btn popup primary" href="/estagios/encerrar_atividade_profissional_efetiva/{{ obj.pk }}/">Editar Registro de Encerramento</a></li>
+                    {% endif %}
+                {% endif %}
+                {% if obj.is_encerrado and is_coordenador %}
+                    <li>
+                        <a class="btn" href="/estagios/solicitar_cancelar_encerramento_atividade_profissional_efetiva/{{ obj.pk }}/">Solicitar Cancelamento do Encerramento</a>
+                    </li>
+                {% endif %}
+            </ul>
+        {% endif %}
+
+        {% if obj.is_concluida %}
+            <table class="info">
+                <tr>
+                    <td>Data do Encerramento</td>
+                    <td>{{ obj.encerramento|format }}</td>
+                </tr>
+                <tr>
+                    <td>C.H. Final</td>
+                    <td>{{ obj.ch_final|format }}</td>
+                </tr>
+                <tr>
+                    <td>Declaração de Realização de Atividade Profissional Efetiva</td>
+                    <td>
+                        {% if obj.relatorio_final_aluno %}<a href="{{ obj.relatorio_final_aluno.url }}">Relatório</a>{% else %} - {% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <td>Observações</td>
+                    <td>{{ obj.observacoes }}</td>
+                </tr>
+            </table>
+        {% else %}
+            {% if obj.is_nao_concluida %}
+                <table class="info">
+                    <tr>
+                        <td>Data do Cancelamento</td>
+                        <td>{{ obj.cancelamento|format }}</td>
+                    </tr>
+                    <tr>
+                        <td>Motivo do Cancelamento</td>
+                        <td>{{ obj.get_motivo_cancelamento_display|format }}</td>
+                    </tr>
+                    <tr>
+                        <td>Descrição do Cancelamento</td>
+                        <td>
+                            {{ obj.descricao_cancelamento|format }}
+                        </td>
+                    </tr>
+                </table>
+            {% else %}
+                <p class="alert alert-warning">O estágio encontra-se em andamento.</p>
+            {% endif %}
+        {% endif %}
+    {% endbox %}
+
+{% endif %}
+</div>
+
+{% endblock %}

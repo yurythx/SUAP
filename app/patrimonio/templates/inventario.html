@@ -1,0 +1,354 @@
+{% extends super_template %}
+
+{% block action-bar %}
+    {% if inventario.user_pode_editar %}
+        <ul class="action-bar">
+            <li><a class="btn success" href="/patrimonio/adicionar_foto_inventario/{{ inventario.id }}">Adicionar foto</a></li>
+            <li><a class="btn primary" href="/patrimonio/inventario_editar/{{ inventario.id }}/">Editar</a></li>
+        </ul>
+    {% endif %}
+{% endblock %}
+
+{% block object-status %}
+    {{ inventario.status|status }}
+{% endblock %}
+
+{% block content %}
+
+<dl class="definition-list flex">
+    <div class="list-item flex-basis-100">
+        <dt>Descrição</dt>
+        <dd id="inventario_descricao">{{ inventario.get_descricao }}</dd>
+    </div>
+    <div class="list-item">
+        <dt>Nº</dt>
+        <dd>{{ inventario.numero }}</dd>
+    </div>
+    <div class="list-item">
+        <dt>Estado de conservação</dt>
+        <dd>
+            {% if inventario.estado_conservacao %}
+                {{ inventario.get_estado_conservacao_display }}
+            {% else %}
+                -
+            {% endif %}
+        </dd>
+    </div>
+    <div class="list-item">
+        <dt>Percentual residual</dt>
+        <dd>{{ percentual_residual }}%</dd>
+    </div>
+    <div class="list-item">
+        <dt>Elemento de despesa</dt>
+        <dd>{{ inventario.entrada_permanente.categoria.codigo }} - {{ inventario.entrada_permanente.categoria.nome }}</dd>
+    </div>
+    <div class="list-item">
+        <dt>Vida útil em anos</dt>
+        <dd>{{ inventario.entrada_permanente.categoria.vida_util_em_anos }}</dd>
+    </div>
+    <div class="list-item">
+        <dt>Carga atual</dt>
+        <dd>
+        {% if inventario.get_carga_atual %}
+            {{ inventario.get_carga_atual.pessoa.nome }}
+            (<strong>{{ inventario.get_carga_atual.setor.uo.setor.sigla }}</strong>
+            {{ inventario.get_carga_atual.setor.sigla }})
+        {% else %}
+            -
+        {% endif %}
+        </dd>
+    </div>
+    <div class="list-item">
+        <dt>Carga contábil</dt>
+        <dd>{{ inventario.carga_contabil.campus }}</dd>
+    </div>
+    <div class="list-item">
+        <dt>Valor inicial</dt>
+        <dd>{{ inventario.entrada_permanente.valor|format_money_almox }}</dd>
+    </div>
+    <div class="list-item">
+        <dt>Valor líquido contábil</dt>
+        <dd>{{ inventario.valor|format_money_almox }}</dd>
+    </div>
+    <div class="list-item">
+        <dt>Data de entrada</dt>
+        <dd>{{ inventario.entrada_permanente.entrada.data|format }}</dd>
+    </div>
+    <div class="list-item">
+        <dt>Número de série</dt>
+        <dd>{{ inventario.numero_serie|format }}</dd>
+    </div>
+    <div class="list-item">
+        <dt>Sala</dt>
+        <dd>{{ inventario.sala.nome|format }} - {{ inventario.sala.predio.nome|format }}</dd>
+    </div>
+    <div class="list-item">
+        <dt>Categoria</dt>
+        <dd>{{ inventario.categoria.nome|format }} </dd>
+    </div>
+    <div class="list-item">
+        <dt>Rótulos</dt>
+        {% if inventario.rotulos.exists %}
+            {% for rotulo in inventario.rotulos.all %}
+                <dd>{{ rotulo.nome }}</dd>
+            {% endfor %}
+        {% else %}
+            <dd>-</dd>
+        {% endif %}
+    </div>
+    <div class="list-item">
+        <dt>Tipo uso pessoal</dt>
+        <dd>{{ inventario.tipo_uso_pessoal|format }} </dd>
+    </div>
+    <div class="list-item">
+        <dt>Observação</dt>
+        <dd>{{ inventario.observacao|format }} </dd>
+    </div>
+</dl>
+
+{% if inventario.fotos.exists %}
+    <div class="tab-pane" data-title="Fotos" data-counter="{{ inventario.fotos.count }}">
+        <div class="card-container">
+            {% for foto in inventario.fotos.all %}
+                <div class="card">
+                    <a href="/patrimonio/visualizar_foto_inventario/{{ foto.pk }}/">
+                        <img src="{{ foto.foto.url }}" alt="{{ foto.descricao }}" class="img-gallery">
+                    </a>
+                    <dl>
+                        <dt>Descrição</dt>
+                        <dd>{{ foto.descricao }}</dd>
+                        <dt>Data</dt>
+                        <dd>{{ foto.data|date:"d/m/Y" }}</dd>
+                    </dl>
+                    <div class="content">
+                        <ul class="action-bar">
+                            <li><a class="btn danger" href="/patrimonio/remover_foto_inventario/{{ inventario.numero }}/{{ foto.pk }}/">Remover</a></li>
+                        </ul>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+{% endif %}
+
+{% if inventario.conferenciaitem_set.exists %}
+    <div class="tab-pane" data-title="Conferências de sala" data-counter="{{ inventario.conferenciaitem_set.count }}">
+        <div class="table-responsive">
+            <table>
+                <caption>Lista de conferências de sala associadas ao inventário</caption>
+                <thead>
+                    <tr>
+                        {% if perms.patrimonio.change_conferenciasala %}
+                            <th class="no-print">Ações</th>
+                        {% endif %}
+                        <th>Conferência</th>
+                        <th>Data</th>
+                        <th>Sala</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in inventario.conferenciaitem_set.all %}
+                    <tr>
+                        {% if perms.patrimonio.change_conferenciasala %}
+                            <td class="no-print">{% icon "view" "/patrimonio/conferenciasala/{{ item.conferencia.id }}/" %}</td>
+                        {% endif %}
+                        <td>{{ item.conferencia.id }}</td>
+                        <td>{{ item.dh_coleta }}</td>
+                        <td>{{ item.conferencia.sala }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endif %}
+
+{% if historico_requisicao.exists %}
+    <div class="tab-pane" data-title="Requisições de transferências" data-counter="{{ historico_requisicao.count }}">
+        <div class="table-responsive">
+            <table>
+                <caption>Lista de requisições de transferências associadas ao inventário</caption>
+                <thead>
+                    <tr>
+                        <th>Requisição</th>
+                        <th>Tipo</th>
+                        <th>Situação</th>
+                    </tr>
+                </thead>
+                {% for requisicao in historico_requisicao %}
+                    <tr>
+                        <td><a href="/patrimonio/requisicao/{{ requisicao.id }}/">Transferência #{{ requisicao.id|format }}</a></td>
+                        <td>{{ requisicao.get_tipo_display|format }}</td>
+                        <td>{{ requisicao.get_status|safe }}</td>
+                    </tr>
+                {% endfor %}
+            </table>
+        </div>
+    </div>
+{% endif %}
+
+<div class="tab-pane" data-title="Movimentações" data-counter="{{ inventario.movimentopatrim_set.count }}">
+    <ul class="timeline">
+        {% for movimento in inventario.movimentopatrim_set.all %}
+            <li>
+                <div class="timeline-date">{{ movimento.data|format }}</div>
+                <div class="timeline-icon"></div>
+                <div class="timeline-content">
+                    {% if movimento.tipo.nome == "transferência" and movimento.requisicao_item.requisicao.id %}
+                        <h4>
+                            <a href="/patrimonio/requisicao/{{ movimento.requisicao_item.requisicao.id }}/">{{ movimento.tipo.nome.title }} #{{ movimento.requisicao_item.requisicao.id }}</a>
+                        </h4>
+                    {% else %}
+                        <h4>{{ movimento.tipo.nome.title }}</h4>
+                    {% endif %}
+                    <dl>
+                        {% if movimento.requisicao_item.requisicao.vinculo_origem.relacionamento %}
+                            <dt>Solicitante</dt>
+                            <dd>{{ movimento.requisicao_item.requisicao.vinculo_origem.relacionamento|format }}</dd>
+                        {% endif %}
+                        <dt>Origem</dt>
+                        <dd>
+                            {% if movimento.baixa %}
+                                <a href="{{ movimento.baixa.get_absolute_url }}">
+                                    {{ movimento.baixa }}
+                                </a>
+                            {% else %}
+                                {% if movimento.entrada_permanente %}
+                                    <a href="{{ movimento.entrada_permanente.entrada.get_absolute_url }}">
+                                        {{ movimento.entrada_permanente.entrada }}
+                                    </a>
+                                {% else %}
+                                    {% if movimento.requisicao_item %}
+                                        {{ movimento.requisicao_item.requisicao.vinculo_origem.relacionamento|format }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                {% endif %}
+                            {% endif %}
+                        </dd>
+                        <dt>Operador</dt>
+                        <dd>{{ movimento.usuario|default:"Desconhecido"|format }}</dd>
+                        {% if movimento.vinculo.relacionamento %}
+                            <dt>Destino</dt>
+                            <dd>{{ movimento.vinculo.relacionamento|format }}</dd>
+                        {% endif %}
+                    </dl>
+                </div>
+            </li>
+        {% endfor %}
+    </ul>
+</div>
+
+<div class="tab-pane" data-title="Carga contábil" data-counter="{{ inventario.cargas_contabeis.count }}">
+    <div class="table-responsive">
+        <table>
+            <caption>Lista de cargas contábeis associadas ao inventário</caption>
+            <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Usuário</th>
+                    <th>Campus</th>
+                    <th>Tipo</th>
+                    <th>Requisição</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for carga in inventario.cargas_contabeis.all %}
+                    <tr id="tr_{{ carga.id }}">
+                        <td>{{ carga.data }}</td>
+                        <td>{{ carga.usuario|format }}</td>
+                        <td>{{ carga.campus|format }}</td>
+                        <td>{{ carga.get_tipo_display }}</td>
+                        <td>
+                            {% if movimento.requisicao_id %}
+                                <a href="/patrimonio/requisicao/{{ carga.requisicao.id }}/">{{ carga.requisicao_id }}</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if inventario.inventarioreavaliacao_set.exists %}
+    <div class="tab-pane" data-title="Ajuste de exercícios anteriores" data-counter="{{ reavaliacao.count }}">
+        <div class="table-responsive">
+            <table>
+                <caption>Lista de ajustes de exercícios anteriores associados ao inventário</caption>
+                <thead>
+                    <tr>
+                        <th>Data da operação</th>
+                        <th>Data</th>
+                        <th class="text-end">Valor anterior</th>
+                        <th class="text-end">Valor</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for iv in reavaliacao %}
+                        <tr id="tr_{{ iv.id }}">
+                            <td>{{ iv.data_operacao|date:"d/m/Y" }}</td>
+                            <td>{{ iv.data|date:"d/m/Y" }}</td>
+                            <td class="text-end">{{ iv.valor_anterior|format_money_almox }}</td>
+                            <td class="text-end">{{ iv.valor|format_money_almox }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endif %}
+
+{% if inventario.inventariovalor_set.exists %}
+    <div class="tab-pane" data-title="Depreciação" data-counter="{{ depreciacao.count }}">
+        <div class="table-responsive">
+            <table>
+                <caption>Lista de valores de depreciação associados ao inventário</caption>
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th class="text-end">Valor</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for valor in depreciacao %}
+                        <tr id="tr_{{ valor.id }}">
+                            <td>{{ valor.data|date:"d/m/Y" }}</td>
+                            <td class="text-end">{{ valor.valor|format_money_almox }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endif %}
+
+{% if chamados.exists %}
+    <div class="tab-pane" data-title="Chamados relacionados" data-counter="{{ chamados.count }}">
+        {% autopaginate chamados 15 %}
+        <div class="table-responsive">
+            <table>
+                <caption>Lista de chamados relacionados ao inventário</caption>
+                <thead>
+                    <tr>
+                        <th>Número do chamado</th>
+                        <th>Serviço</th>
+                        <th>Descrição</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for chamado in chamados %}
+                        <tr>
+                            <td>{{ chamado.id }}</td>
+                            <td>{{ chamado.servico.nome }}</td>
+                            <td>{{ chamado.descricao|truncatewords:100 }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% paginate %}
+    </div>
+{% endif %}
+
+{% endblock %}

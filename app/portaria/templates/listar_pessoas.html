@@ -1,0 +1,87 @@
+{% extends super_template %}
+
+{% block action-bar %}
+
+<ul class="action-bar">
+    <li><a class="btn success" href="/portaria/cadastrar_pessoa_externa/">Cadastrar Pessoa (Sem Vínculo com o
+        {% get_valor_por_chave "comum" "instituicao_sigla" %})</a></li>
+    <li><a class="btn" href="/portaria/registro_acesso_campus/">Voltar</a></li>
+</ul>
+
+{% endblock %}
+
+{% block content %}
+
+{% render_form form %}
+
+{% if form.is_valid %}
+    {% if tipo_pessoa == '1' %}
+        {% box "Pessoas com Vínculo" %}
+            {% autopaginate vinculos 20 %}
+            {% paginate %}
+            <div class="card-container">
+                {% for vinculo in vinculos %}
+                    <div class="card">
+                        <div class="photo">
+                            <img alt="{{ vinculo.pessoa.nome }}" src="{{ vinculo.get_foto_75x100_url }}">
+                        </div>
+                        <h4>{{ vinculo.pessoa.nome|title }}</h4>
+                        <dl>
+                            <dt>Matrícula:</dt>
+                            <dd>{{ vinculo.relacionamento.matricula }}</dd>
+                            {% if vinculo.email_notificacao %}
+                                <dt>E-mail:</dt>
+                                <dd>{{ vinculo.email_notificacao }}</dd>
+                            {% endif %}
+                            <dt>Vínculo com o {% get_valor_por_chave "comum" "instituicao_sigla" %}:</dt>
+                            {% if vinculo.get_relacionamento_title == 'Pessoa Externa' %}
+                                <dd>Nenhum</dd>
+                            {% else %}
+                                <dd>{{ vinculo.get_relacionamento_title }}</dd>
+                            {% endif %}
+                        </dl>
+                        <div class="content">
+                            <ul class="action-bar">
+                                <li><a class="btn success" href="/portaria/registrar_acesso_pessoa/{{ vinculo.id }}/">Registrar Acesso</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endbox %}
+    {% elif tipo_pessoa == '0' %}
+        {% box "Pessoas sem Vínculo" %}
+            {% autopaginate visitantes 20 %}
+            {% paginate %}
+            <div class="card-container">
+                {% for visitante in visitantes %}
+                    <div class="card">
+                        <div class="photo">
+                            {# ESCALADO S2.3: visitantes são PessoaExterna (fora de escopo) e pessoa é var incorreta (deveria ser visitante); manter como está #}
+                            <img alt="{{ visitante.nome }}" src="{% if visitante.foto %}{{ visitante.foto.url_75x100 }}{% else %}/static/comum/img/default.jpg{% endif %}">
+                        </div>
+                        <h4>{{ visitante.nome|title }}</h4>
+                        <dl>
+                            <dt>RG:</dt>
+                            <dd>{{ visitante.get_rg }}</dd>
+                            {% if pessoa.cpf %}
+                                <dt>CPF:</dt>
+                                <dd>{{ visitante.get_cpf }}</dd>
+                            {% endif %}
+                            <dt>E-mail:</dt>
+                            <dd>{{ visitante.email }}</dd>
+                        </dl>
+                        <div class="content">
+                            <ul class="action-bar">
+                                <li><a class="btn success" href="/portaria/registrar_acesso_pessoa_externa/{{ visitante.id }}/">Registrar Acesso</a></li>
+                                <li><a class="btn primary" href="/portaria/alterar_pessoa_externa/{{ visitante.id }}/">Editar</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endbox %}
+    {% endif %}
+{% endif %}
+
+{% endblock %}

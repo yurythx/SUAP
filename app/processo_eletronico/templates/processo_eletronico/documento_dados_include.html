@@ -1,0 +1,294 @@
+{% load documento_eletronico_templatetags %}
+{% with documento_processo.get_documento as documento %}
+    <div class="primary-info" xmlns="http://www.w3.org/1999/html">
+        <div class="status-info-container">
+            {% if documento_processo.eh_minuta %}
+                <span class="status status-alert">Minuta</span>
+            {% elif documento.eh_documento_texto %}
+                {{ documento.get_status_display|status }}
+            {% endif %}
+            {% if removido %}
+                <span class="status status-error">Removido</span>
+            {% endif %}
+            {% if documento.existe_solicitacoes_nivel_acesso_aberto %}
+                <span class="status status-alert">Solicitações de alteração de nível de acesso em aberto</span>
+            {% endif %}
+        </div>
+        <h4>
+            {% if documento|pode_ler_documento %}
+                {% if documento_processo.eh_minuta %}
+                <a href="{{ documento_processo.minuta.get_absolute_url }}">
+            {% else %}
+                <a href="{{ documento.get_absolute_url }}">
+            {% endif %}
+            {% endif %}
+            <strong>{{ documento.tipo }}:</strong> {{ documento }}<a name="D{{ documento_processo.id }}">.</a>
+            {% if documento|pode_ler_documento %}</a>
+            {% endif %}
+        </h4>
+        <ul class="action-bar">
+             {% if documento_processo.eh_minuta and documento|pode_ler_documento %}
+                 <li>
+                    <a class="btn default" href="{{ documento.get_absolute_url }}">Visualizar Documento</a>
+                 </li>
+             {% endif %}
+            {% if not documento.status and documento|method:"pode_editar"|call:request.user and processo_pode_editar %}
+                <li>
+                    <a href="{% url 'editar_informacoes_upload' documentoprocesso_id=documento_processo.id %}" class="btn primary" title="Editar">
+                        <i class="fas fa-pencil-alt" aria-hidden="true"></i><span class="visually-hidden">Editar</span>
+                    </a>
+                </li>
+            {% endif %}
+            {% if documento_visualizar_botao_verificar_integridade %}
+                <li>
+                    <a class="btn" href="/processo_eletronico/{{ documento_processo.get_cname }}/verificar_integridade/{{ documento_processo.id }}">
+                        Verificar integridade
+                    </a>
+                </li>
+            {% endif %}
+            {% if documento.eh_documento_digitalizado and documento.eh_privado and not documento.pode_ler and processo_pode_editar and not documento.tem_solicitacao_pendente_compartilhamento %}
+                <li>
+                    <a class="btn popup" href="/documento_eletronico/solicitar_compartilhamento_documento_digitalizado/{{ processo.id }}/{{ documento.id }}/">Solicitar visualização do documento</a>
+                </li>
+            {% endif %}
+            <li class="has-child">
+                <a class="btn" href="#">Nível de Acesso</a>
+                <ul>
+                    {% if documento.pode_alterar_nivel_acesso %}
+                        {% if documento.eh_documento_texto %}
+                            {% if not documento.existe_solicitacoes_nivel_acesso_aberto %}
+                                <li>
+                                    <a href="/documento_eletronico/alterar_nivel_acesso_documento_texto/{{ documento.id }}/?processo={{ documento_processo.processo.id }}">
+                                        Editar nível de acesso
+                                    </a>
+                                </li>
+                            {% else %}
+                                <li>
+                                    <a href="{% url 'solicitacoes_alteracao_nivel_acesso_documento' documento.id %}">
+                                        Visualizar Solicitações de Alteração de Nível de Acesso
+                                    </a>
+                                </li>
+                            {% endif %}
+                        {% endif %}
+
+                        {% if documento.eh_documento_digitalizado %}
+                            {% if not documento.existe_solicitacoes_nivel_acesso_aberto %}
+                            <li>
+                                <a href="/documento_eletronico/alterar_nivel_acesso_documento_digitalizado/{{ documento.id }}">
+                                    Editar nível de acesso
+                                </a>
+                            </li>
+                            {% endif %}
+                            <li><a href="{% url 'solicitacoes_alteracao_nivel_acesso_documento' documento.id %}">
+                                Visualizar Solicitações de Alteração de Nível de Acesso
+                            </a></li>
+                        {% endif %}
+                    {% endif %}
+
+                    {% if documento.pode_solicitar_alteracao_nivel_acesso %}
+                        {% if documento.eh_documento_digitalizado %}
+                            <li>
+                                <a href="{% url 'solicita_alteracao_nivel_acesso_documento_digitalizado' documento.id %}">
+                                    Solicitar Alteração de Nível de Acesso
+                                </a>
+                            </li>
+                        {% endif %}
+                        {% if documento.eh_documento_texto %}
+                            <li>
+                                <a href="{% url 'solicita_alteracao_nivel_acesso_documento_texto' documento.id %}?processo={{ documento_processo.processo.id }}">
+                                    Solicitar Alteração de Nível de Acesso
+                                </a>
+                            </li>
+                        {% endif %}
+                    {% endif %}
+                </ul>
+            </li>
+            {% if documento|pode_ler_documento and not documento.interno %}
+                <li>
+                    <a class="btn default" href="{{ documento.get_absolute_url }}?original=sim" title="Visualizar Documento Original">
+                        {% icone "file-signature" %}<span class="visually-hidden">Visualizar Documento Original</span></a>
+                </li>
+            {% endif %}
+            {% if not documento_processo.data_hora_remocao %}
+                {% if processo_pode_editar and not processo.tem_tramite_externo %}
+                    <li>
+                        <a href="/processo_eletronico/{{ documento_processo.get_cname }}/remover_documento/{{ documento_processo.id }}"
+                           class="btn danger popup" title="Remover do Processo">{% icone "minus" %}<span class="visually-hidden">Remover do Processo</span></a>
+                    </li>
+                {% endif %}
+            {% else %}
+                <li>
+                    <a href="/processo_eletronico/processo/documento/ver_justificativa_remocao/{{ documento_processo.id }}"
+                           class="btn popup default">Justificativa de remoção</a>
+                </li>
+            {% endif %}
+        </ul>
+
+        <div class="extra-info">
+            <p>{{ documento.assunto }}</p>
+            {{ documento.documento.conteudo }}
+            {% if documento.tem_permissao_editar and documento.tem_solicitacao_compartilhamento_pessoa_documento_digitalizado_pendentes %}
+                <h5>Solicitações de Visualização</h5>
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Solicitado por</th>
+                                <th>Situação</th>
+                                <th class="no-print">Opções</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for solicitacao in documento.solicitacoes_compartilhamento_pessoa_documento_digitalizado_pendentes %}
+                                <tr>
+                                    <td>{{ solicitacao.solicitante|format }}</td>
+                                    <td>{{ solicitacao.get_status_solicitacao_display|status }}</td>
+                                    <td class="no-print">
+                                        <a class="btn popup" href="/documento_eletronico/avaliar_solicitacao_compartilhamento_documento_digitalizado/{{ processo.id }}/{{ solicitacao.id }}/"
+                                        title="Avaliar Solicitação">Avaliar Solicitação</a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
+            {% if documento.possui_anexos %}
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Documentos anexados</th>
+                                <th>Nível de acesso</th>
+                                <th>Anexado em</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for d in documento.get_todos_anexos %}
+                                <tr>
+                                    <td>
+                                        {% if d.documento_anexado.eh_documento_texto %}
+                                        {% icon "view" "/documento_eletronico/visualizar_documento/{{ d.documento_anexado.id }}/" "Ver {{ d }}" %}
+                                        {% else %}
+                                        {% if d.documento_anexado.eh_documento_pessoal %}
+                                                {% icon "view" "/documento_eletronico/visualizar_documento_digitalizado_pessoal/{{ d.documento_anexado.id }}/" "Ver {{ d }}" %}
+                                            {% else %}
+                                                {% icon "view" "/documento_eletronico/visualizar_documento_digitalizado_anexo_simples/{{ d.documento_anexado.id }}/" "Ver {{ d }}" %}
+                                            {% endif %}
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ d.documento_anexado }}</td>
+                                    <td>{{ d.documento_anexado.get_nivel_acesso_display|status }}</td>
+                                    <td>
+                                        {{ d.data_hora_inclusao|format }}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    {% if not documento_processo.eh_minuta %}
+    <dl class="secondary-info">
+        {% if documento.numero %}
+            <div class="list-item">
+                <dt>{% icone "square" %} Número:</dt>
+                <dd>{{ documento.numero }}</dd>
+            </div>
+        {% endif %}
+        {% if not documento_processo.tem_motivo_entrada_default %}
+            <div class="list-item">
+                <dt>{% icone "paragraph" %} Motivo de entrada:</dt>
+                <dd>{{ documento_processo.get_motivo_entrada_display }}</dd>
+            </div>
+        {% endif %}
+        <div class="list-item">
+            <dt>{% icone "square" %} Nível de Acesso:</dt>
+            <dd>{{ documento.get_nivel_acesso_display|status }}</dd>
+        </div>
+        {% if documento.hipotese_legal %}
+            <div class="list-item">
+                <dt>{% icone "square" %} Hipótese Legal:</dt>
+                <dd>{{ documento.hipotese_legal }}</dd>
+            </div>
+        {% endif %}
+        <div class="list-item">
+            {% if documento_processo.usuario_inclusao %}
+                <dt>{% icone "user-plus" %} Incluído por:</dt>
+                <dd>{{ documento_processo.usuario_inclusao|format }} em {{ documento_processo.data_hora_inclusao|format }}</dd>
+            {% else %}
+                <dt>{% icone "user-plus" %} Inclusão em:</dt>
+                <dd>{{ documento_processo.data_hora_inclusao|format }}</dd>
+            {% endif %}
+        </div>
+        {% if documento.eh_documento_texto %}
+            <div class="list-item">
+                <dt>{% icone "user" %} Assinado por:</dt>
+                <dd>{{ documento.get_assinado_por|safe }}</dd>
+            </div>
+        {% endif %}
+        {% if documento.tipo_conferencia and documento.assinado_por %}
+            <div class="list-item">
+                <dt>{% icone "square" %} Tipo do Conferência:</dt>
+                <dd>{{ documento.tipo_conferencia }} feita por {{ documento.assinado_por|format|safe }}</dd>
+            </div>
+        {% endif %}
+        {% if documento.compartilhamento_pessoa_documento_digitalizado.exists %}
+            <div class="list-item">
+                <dt>{% icone "eye" %} Pode visualizar:</dt>
+                <dd>
+                    <ul>
+                        {% for pessoa in documento.compartilhamento_pessoa_documento_digitalizado.all %}
+                            <li>{{ pessoa.vinculo_permitido|format }}</li>
+                        {% endfor %}
+                    </ul>
+                </dd>
+            </div>
+        {% endif %}
+        {% if documento.tem_solicitacao_compartilhamento_pessoa_documento_digitalizado_pendentes %}
+            <div class="list-item">
+                <dt>{% icone "exclamation-triangle" %} Solicitações de Visualização Pendentes:</dt>
+                <dd>
+                    <ul>
+                        {% for solicitacao in documento.solicitacoes_compartilhamento_pessoa_documento_digitalizado_pendentes %}
+                            <li>{{ solicitacao.solicitante|format }}</li>
+                        {% endfor %}
+                    </ul>
+                </dd>
+            </div>
+        {% endif %}
+        {% if documento_processo.data_hora_remocao %}
+            <div class="list-item">
+                <dt>{% icone "user" %} Removido por:</dt>
+                <dd>{{ documento_processo.usuario_remocao.get_profile.nome_usual }}
+                    em {{ documento_processo.data_hora_remocao|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>{% icone "paragraph" %} Motivo da Remoção:</dt>
+                <dd>{{ documento_processo.get_motivo_vinculo_documento_processo_remocao_display }}</dd>
+            </div>
+        {% endif %}
+        {% if is_superuser %}
+            <div class="list-item">
+                <dt>{% icone "square" %} Tamanho:</dt>
+                <dd>{{ documento.tamanho_em_kb }} KB</dd>
+            </div>
+        {% endif %}
+        {% if documento_processo.foi_adicionado_novamente %}
+            <div class="list-item">
+                <dt>{% icone "square" %} Adicionado novamente:</dt>
+                <dd>Por
+                    {{ documento_processo.documento_adicionado_novamente.usuario_inclusao|format }}
+                    em
+                    {{ documento_processo.documento_adicionado_novamente.data_hora_inclusao|format }}
+                    (<a href="#D{{ documento_processo.documento_adicionado_novamente.id }}">Visualizar o documento</a>)
+                </dd>
+            </div>
+        {% endif %}
+    </dl>
+    {% endif %}
+
+{% endwith %}

@@ -1,0 +1,59 @@
+{% extends super_template %}
+
+{% block action-bar %}
+    {% if perms.ae.view_programa %}
+        <ul class="action-bar">
+            <li><a href="/ae/programa/{{ programa.pk }}/" class="btn">Retornar ao Programa</a></li>
+        </ul>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+
+    <div class="search-and-filters">
+        {% render_form form %}
+    </div>
+
+    {% box 'Participações Suspensas' %}
+        {% if participacoes_suspensas.exists %}
+            <p class="alert alert-info">Um aluno participante do programa de Alimentação é suspenso quando recebe 3 ou mais faltas dentro do mesmo mês. Caso o aluno já tenha sido suspenso no mês, só serão consideradas as faltas com datas posteriores à liberação da suspensão do mesmo.</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Aluno</th>
+                        <th>Categoria</th>
+                        <th class="text-end">Data da Suspensão</th>
+                        <th class="text-end">Data da Liberação Automática</th>
+                        <th class="no-print">Opções</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% autopaginate participacoes_suspensas 25 %}
+                    {% paginate %}
+                    {% for participacao in participacoes_suspensas %}
+                        <tr>
+                            <td><a href="/edu/aluno/{{ participacao.participacao.aluno.matricula }}/">{{ participacao.participacao.aluno }}</a></td>
+                            <td>{{ participacao.categoria }}</td>
+                            <td class="text-end">{{ participacao.suspensa_em }}</td>
+                            <td class="text-end">{{ participacao.liberar_em|format }}</td>
+                            <td class="no-print">
+                                <ul class="action-bar">
+                                    {% if perms.ae.add_historicofaltasalimentacao %}
+                                        <li><a class="btn success confirm" href="/ae/liberar_participacao_alimentacao/{{ participacao.participacao.programa.id }}/?libera={{ participacao.id }}" data-confirm="Você tem certeza que deseja remover a Suspensão desse aluno?">Liberar Participação</a></li>
+                                        <li><a class="btn success" href="/ae/agendar_desbloqueio_alimentacao/{{ participacao.id }}/{{ participacao.participacao.programa.id }}/">Agendar Desbloqueio</a></li>
+                                    {% endif %}
+                                    {% if perms.ae.pode_revogar_participacao and not participacao.data_termino %}
+                                        <li><a class="btn danger popup" href="/ae/revogar_participacao/{{ participacao.participacao.id }}/">Finalizar Participação</a></li>
+                                    {% endif %}
+                                </ul>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="alert alert-warning">Nenhuma participação passível de liberação.</p>
+        {% endif %}
+    {% endbox %}
+
+{% endblock %}

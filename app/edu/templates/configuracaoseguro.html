@@ -1,0 +1,217 @@
+{% extends super_template %}
+{% load l10n %}
+
+
+{% block content %}
+    {% if usuario_is_administrador %}
+        <ul class="action-bar">
+            <li>
+                <a href="/edu/enviar_planilha_mensal_aula_campo/{{ obj.pk }}/" class="btn success">Enviar Planilha Mensal
+                    das Aulas de Campo à Seguradora</a>
+            </li>
+        </ul>
+    {% endif %}
+
+    {% box 'Dados gerais' %}
+        <table class="info">
+            <tr>
+                <td>Seguradora:</td>
+                <td colspan="3">{{ obj.seguradora }}</td>
+            </tr>
+            <tr>
+                <td>Valor do Contrato:</td>
+                <td>R$ {{ obj.valor_contrato|mascara_dinheiro }}</td>
+
+                <td>Valor do Repasse por Pessoa:</td>
+                <td>R$ {{ obj.valor_repasse_pessoa|localize }}</td>
+            </tr>
+            <tr>
+                <td>Data de Início do Contrato:</td>
+                <td>{{ obj.data_inicio_contrato }}</td>
+
+                <td>Data de Término do Contrato:</td>
+                <td>{{ obj.data_fim_contrato }}</td>
+            </tr>
+            <tr>
+                <td>Fiscais:</td>
+                <td colspan="3">
+                    <ul>
+                        {% for fiscal in obj.fiscais.all %}
+                            <li>{{ fiscal }}</li>
+                        {% endfor %}
+                    </ul>
+                </td>
+            </tr>
+            <tr>
+                <td>Ativa:</td>
+                <td colspan="3">{{ obj.ativa|format }}</td>
+            </tr>
+        </table>
+    {% endbox %}
+
+    {% box 'Dados para Envio da Panilha à Seguradora' %}
+        <table class="info">
+            <tr>
+                <td>E-mail para Envio da Planilha:</td>
+                <td>{{ obj.email_disparo_planilha }}</td>
+            </tr>
+        </table>
+    {% endbox %}
+
+    {% box 'Resumo de Utilização Real do Recurso Contratado' %}
+        <div class="grafico_valor_executado">
+            <p class="negrito">Valor Executado:</p>
+
+            <div class="progress">
+                <p>{{ obj.get_porcentagem_utilizacao_real_recurso }}%</p>
+            </div>
+            <div class="float-start">
+                <strong>R$ 0,00</strong>
+            </div>
+            <div class="float-end">
+                <strong>R$ {{ obj.valor_contrato|mascara_dinheiro }}</strong>
+            </div>
+            <div class="text-center italico">
+                Total Gasto: R$ {{ obj.get_valor_utilizacao_real_recurso|floatformat:2|mascara_dinheiro }} de
+                R$ {{ obj.valor_contrato|mascara_dinheiro }}
+            </div>
+            <br/>
+            <br/>
+            {% box 'Relatório de Utilização Real por Mês' class='collapsed' %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Mês</th>
+                            <th>Valor</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for item in obj.get_utilizacao_real_por_mes_recurso %}
+                        <tr>
+                            <td>{{ item.0|date:'F' }}</td>
+                            <td>R$ {{ item.1|mascara_dinheiro }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% endbox %}
+        </div>
+    {% endbox %}
+
+    {% box 'Resumo de Utilização Planejada do Recurso Contratado' %}
+        <div class="grafico_valor_previsto">
+            <p class="negrito">Valor Previsto:</p>
+
+            <div class="progress">
+                <p>{{ obj.get_porcentagem_utilizacao_planejada_recurso }}%</p>
+            </div>
+            <div class="float-start">
+                <strong>R$ 0,00</strong>
+            </div>
+            <div class="float-end">
+                <strong>R$ {{ obj.valor_contrato|mascara_dinheiro }}</strong>
+            </div>
+            <div class="text-center italico">
+                Total previsto à ser Gasto: R$
+                {{ obj.get_valor_utilizacao_planejada_recurso|floatformat:2|mascara_dinheiro }} de
+                R$ {{ obj.valor_contrato|mascara_dinheiro }}
+            </div>
+            <br/>
+            <br/>
+            {% box 'Relatório de Utilização Planejada por Mês' class='collapsed' %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Mês</th>
+                            <th>Valor</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for item in obj.get_utilizacao_planejada_por_mes_recurso %}
+                        <tr>
+                            <td>{{ item.0|date:'F' }}</td>
+                            <td>R$ {{ item.1|mascara_dinheiro }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% endbox %}
+        </div>
+    {% endbox %}
+
+    {% box 'Período Executado do Contrato' %}
+        <div class="grafico_periodo_executado">
+            <p class="negrito">Período Executado:</p>
+
+            <div class="progress">
+                <p>{{ obj.get_porcentagem_periodo_executado }}%</p>
+            </div>
+            <div class="float-start">
+                <strong>{{ obj.data_inicio_contrato }}</strong>
+            </div>
+            <div class="float-end">
+                <strong>{{ obj.data_fim_contrato }}</strong>
+            </div>
+        </div>
+    {% endbox %}
+
+    {% box 'Aulas de Campo' %}
+        {% if perms.edu.add_aulacampo %}
+            <ul class="action-bar">
+                <li><a class="btn success" href="/admin/edu/aulacampo/add/">Adicionar Aula de Campo</a></li>
+            </ul>
+        {% endif %}
+
+        {% if aulas_campo.exists %}
+            {% if eh_secretario %}
+                <p class="alert alert-info">OBS: Serão listadas abaixo apenas as aulas de campo cadastradas para o Campus ao
+                    qual você está vinculado. <strong>Os valores executados e previstos, exibidos nos gráficos acima,
+                        levam em consideração todas as aulas de campo cadastradas para esta Configuração de
+                        Seguro.</strong></p>
+            {% endif %}
+
+            <table>
+                <thead>
+                <th>Ações</th>
+                <th>Campus</th>
+                <th>Descrição</th>
+                <th>Roteiro</th>
+                <th>Data de Partida</th>
+                <th>Data de Chegada</th>
+                <th>Responsáveis</th>
+                <th>Situação</th>
+                <th>Valor do Seguro</th>
+                </thead>
+                <tbody>
+                {% autopaginate aulas_campo 25 %}
+                {% for aula_campo in aulas_campo %}
+                    <tr>
+                        <th>
+                            {% icon "view" "/edu/aulacampo/{{ aula_campo.pk }}/" %}
+                        </th>
+                        <td>{{ aula_campo.uo }}</td>
+                        <td>{{ aula_campo.descricao }}</td>
+                        <td>{{ aula_campo.roteiro }}</td>
+                        <td>{{ aula_campo.data_partida }}</td>
+                        <td>{{ aula_campo.data_chegada }}</td>
+                        <td>
+                            <ul>
+                                {% for responsavel in aula_campo.responsaveis.all %}
+                                    <li>{{ responsavel }}</li>
+                                {% endfor %}
+                            </ul>
+                        </td>
+                        <td>{{ aula_campo.get_situacao_display }}</td>
+                        <td>R$ {{ aula_campo.get_valor_seguro|mascara_dinheiro }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+
+            {% paginate %}
+        {% else %}
+            <p class="alert alert-info">Nenhuma Aula de Campo cadastrada para esta Configuração de Seguro.</p>
+        {% endif %}
+    {% endbox %}
+
+{% endblock %}

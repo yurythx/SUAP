@@ -1,0 +1,391 @@
+{% load eventos_tags %}
+<div class="tab-pane"
+     data-title="Submissão de trabalhos"
+     data-tab="submissao_trabalhos"
+     data-checked="{{ evento.atingiu_configuracoes_minimas_para_submissao_trabalhos }}">
+    {% box "Checklist" %}
+        {% if not evento.atingiu_configuracoes_minimas_para_submissao_trabalhos %}
+            <p class="alert alert-warning">
+                <strong>Atenção:</strong> para permitir que este Evento tenha Submissão de trabalhos é imprescindível realizar todas as ações desta seção.
+            </p>
+        {% endif %}
+        {% with evento.possui_tipo_participante_avaliador as condicao %}
+            <p class="checklist {{ condicao|yesno:'success,error' }}">
+                Adição de Tipo de participante: Avaliador de trabalho <strong>{{ condicao|yesno:'Concluído,Não concluído' }}</strong>
+            </p>
+        {% endwith %}
+        {% with evento.possui_fluxo_minimo_submissao as condicao %}
+            <p class="checklist {{ condicao|yesno:'success,error' }}">
+                Definição do Fluxo de submissão <strong>{{ condicao|yesno:'Concluído,Não concluído' }}</strong>
+            </p>
+        {% endwith %}
+        {% if evento.configuracao %}
+            <p class="checklist success">
+                Registro de Configurações <strong>Concluído</strong>
+            </p>
+        {% else %}
+            <p class="checklist error">
+                Registro de Configurações <strong>Não concluído</strong>
+            </p>
+        {% endif %}
+        {% if evento.areas_tematicas.exists %}
+            <p class="checklist success">
+                Vinculação de áreas temáticas ao evento <strong>Concluído</strong>
+            </p>
+        {% else %}
+            <p class="checklist error">
+                Vinculação de áreas temáticas ao evento <strong>Não concluído</strong>
+            </p>
+        {% endif %}
+        {% if tem_modalidades %}
+            <p class="checklist success">
+                Registro de Modalidades <strong>Concluído</strong>
+            </p>
+        {% else %}
+            <p class="checklist error">
+                Registro de Modalidades <strong>Não concluído</strong>
+            </p>
+        {% endif %}
+        {% if configurou_criterios_avaliacao %}
+            <p class="checklist success">
+                Critérios de Avaliação das modalidades <strong>Concluído</strong>
+            </p>
+        {% else %}
+            <p class="checklist error">
+                Critérios de Avaliação das modalidades <strong>Não concluído</strong>
+            </p>
+        {% endif %}
+        {% if evento.possui_area_tematica_pendente %}
+            <p class="checklist error">
+                Vinculação de Áreas temáticas à modalidade <strong>Não concluído</strong>
+            </p>
+        {% else %}
+            <p class="checklist success">
+                Vinculação de Áreas temáticas à modalidade <strong>Concluído</strong>
+            </p>
+        {% endif %}
+    {% endbox %}
+    {% box "Fluxo de submissão" %}
+        {% if pode_gerenciar %}
+            <ul class="action-bar">
+                <li>
+                    <a class="btn popup success"
+                       href="{% url 'adicionar_fluxo_submissao' evento.id %}">{% icone "plus" %} Adicionar fluxo</a>
+                </li>
+                <li>
+                    <a class="btn default"
+                       href="{% url 'listar_log_processamento_submissao' evento.id %}">{% icone "eye" %} Listar logs</a>
+                </li>
+            </ul>
+        {% endif %}
+        <div class="alert alert-info">
+            <p>Os fluxos de submissão são utilizados para organizar as etapas de avaliação dos trabalhos submetidos.</p>
+            <p>Para o correto funcionamento do sistema, é necessário que o evento possua ao menos os seguintes fluxos:</p>
+            <ul>
+                <li>Submissão</li>
+                <li>Avaliação</li>
+                <li>Resultado final</li>
+            </ul>
+            {% if evento.possui_avaliacao_pendente %}
+                <p>Enquanto houver avaliações pendentes, não será possível processar os resultados.</p>
+            {% endif %}
+        </div>
+        {% if evento.fluxos_submissao.exists %}
+            <div class="legenda">
+                <p>Legenda:</p>
+                <ul>
+                    <li class="warning">Etapa atual</li>
+                </ul>
+            </div>
+            <div class="table-responsive">
+                <table>
+                    <caption>Fluxos de submissão cadastrados</caption>
+                    <thead>
+                        <tr>
+                            <th class="no-print">Ações</th>
+                            <th>Etapa</th>
+                            <th>Período</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for fluxo in evento.fluxos_submissao.all %}
+                            <tr {% if fluxo.etapa == evento.get_fluxo_atual.etapa %}class="highlight"{% endif %}>
+                                <td class="list-display-icons no-print">
+                                    {% if pode_gerenciar %}
+                                        {# and fluxo.pode_editar_ou_remover #}
+                                        <a href="{% url 'editar_fluxo_submissao' fluxo.id %}"
+                                           class="icon icon-edit popup"
+                                           title="Editar Fluxo de Submissão"><span class="visually-hidden">Editar Fluxo de Submissão</span></a>
+                                        <a href="{% url 'remover_fluxo_submissao' fluxo.id %}"
+                                           class="icon icon-delete confirm"
+                                           title="Remover Fluxo de Submissão"><span class="visually-hidden">Remover Fluxo de Submissão</span></a>
+                                    {% endif %}
+                                </td>
+                                <td>{{ fluxo.get_etapa_display }}</td>
+                                <td>{{ fluxo.get_periodo }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Nenhum fluxo de submissão cadastrado.</p>
+        {% endif %}
+    {% endbox %}
+    {% box "Configurações" %}
+        {% if pode_gerenciar %}
+            <ul class="action-bar">
+                <li>
+                    <a class="btn popup primary"
+                       href="{% url 'configurar_evento' evento.id %}">{% icone "cogs" %} Gerenciar configurações</a>
+                </li>
+            </ul>
+        {% endif %}
+        {% if evento.configuracao %}
+            <dl class="definition-list flex compact">
+                <div class="list-item">
+                    <dt>Limite de autores na submissão</dt>
+                    <dd>
+                        {{ evento.configuracao.submissao_limite_autores }}
+                    </dd>
+                </div>
+                <div class="list-item">
+                    <dt>Limite de submissões de trabalhos por pessoa</dt>
+                    <dd>
+                        {{ evento.configuracao.submissao_limite_trabalhos_pessoa }}
+                    </dd>
+                </div>
+                <div class="list-item">
+                    <dt>Nota mínima para aprovação</dt>
+                    <dd>
+                        {{ evento.configuracao.avaliacao_nota_aprovacao }}
+                    </dd>
+                </div>
+                <div class="list-item">
+                    <dt>Limite de avaliadores por trabalho</dt>
+                    <dd>
+                        {{ evento.configuracao.limite_avaliadores }}
+                    </dd>
+                </div>
+                <div class="list-item">
+                    <dt>Notificar autores automaticamente após avaliação?</dt>
+                    <dd>
+                        {{ evento.configuracao.notificar_resultados_automaticamente|format }}
+                    </dd>
+                </div>
+                {% if evento.configuracao.notificacao_realizada_em %}
+                    <div class="list-item">
+                        <dt>Notificação</dt>
+                        <dd>
+                            Realizada
+                            {% if evento.configuracao.notificacao_realizada_automaticamente %}
+                                automaticamente pelo Sistema
+                            {% else %}
+                                por {{ evento.configuracao.get_notificacao_realizada_por }}
+                            {% endif %}
+                            em {{ evento.configuracao.notificacao_realizada_em|format }}
+                        </dd>
+                    </div>
+                {% endif %}
+            </dl>
+            <p class="obs mt-5">
+                Última atualização por {{ evento.configuracao.ultima_atualizacao_por }} em {{ evento.configuracao.ultima_atualizacao_em|format }}
+            </p>
+        {% else %}
+            <p class="alert alert-warning">Evento sem configuração de submissão e avaliação de trabalhos.</p>
+        {% endif %}
+    {% endbox %}
+    {% box "Áreas temáticas" %}
+        {% if pode_gerenciar %}
+            <ul class="action-bar">
+                <li>
+                    <a class="btn popup success"
+                       href="{% url 'vincular_area_tematica_ao_evento' evento.id %}">{% icone "plus" %} Vincular área temática</a>
+                </li>
+                <li>
+                    <a class="btn primary" href="{% url 'listar_area_tematica' evento.id %}">Gerenciar áreas temáticas exclusivas</a>
+                </li>
+            </ul>
+        {% endif %}
+        <dl class="definition-list">
+            <dt>Áreas temáticas vinculadas</dt>
+            <dd>
+                {% if evento.areas_tematicas.exists %}
+                    <ul class="tags">
+                        {% for area_tematica in evento.areas_tematicas.all %}<li>{{ area_tematica }}</li>{% endfor %}
+                    </ul>
+                {% else %}
+                    <span class="status status-alert">Sem vinculação</span>
+                {% endif %}
+            </dd>
+        </dl>
+    {% endbox %}
+    {% box "Modalidades" %}
+        {% if pode_gerenciar and evento.areas_tematicas.exists %}
+            <ul class="action-bar">
+                <li>
+                    <a class="btn popup success"
+                       href="{% url 'adicionar_modalidade' evento.id %}">{% icone "plus" %} Adicionar modalidade</a>
+                </li>
+                <li>
+                    <a class="btn primary"
+                       href="{% url 'listar_tipo_modalidade' evento.id %}">Gerenciar tipos de modalidade exclusivos</a>
+                </li>
+            </ul>
+        {% endif %}
+        {% if alerta_criterio_faltante %}
+            <div class="alert alert-danger">
+                <p>{{ alerta_criterio_faltante }}</p>
+            </div>
+        {% endif %}
+        {% if alerta_criterios_desbalanceados %}
+            <div class="alert alert-danger">
+                <p>{{ alerta_criterios_desbalanceados }}</p>
+            </div>
+        {% endif %}
+        {% for modalidade in modalidades %}
+            <div class="general-box">
+                <div class="primary-info">
+                    <h4 class="title">
+                        <small>{{ modalidade.id }}</small> {{ modalidade.tipo.titulo }}
+                    </h4>
+                    {% if pode_gerenciar %}
+                        <ul class="action-bar">
+                            <li>
+                                <a href="{% url 'editar_modalidade' modalidade.id %}"
+                                   class="btn primary popup"
+                                   title="Editar Modalidade">{% icone "edit" %}<span class="visually-hidden">Editar modalidade</span></a>
+                            </li>
+                            <li>
+                                <a href="{% url 'adicionar_criterio_avaliacao' modalidade.id %}"
+                                   class="btn success popup">Adicionar critério de avaliação</a>
+                            </li>
+                            <li>
+                                <a href="{% url 'vincular_area_tematica_a_modalidade' modalidade.id %}"
+                                   class="btn primary popup">Vincular área temática à modalidade</a>
+                            </li>
+                            <li>
+                                <a href="{% url 'remover_modalidade' modalidade.id %}"
+                                   class="btn danger"
+                                   title="Remover Modalidade">{% icone "trash" %}<span class="visually-hidden">Remover modalidade</span></a>
+                            </li>
+                        </ul>
+                    {% endif %}
+                    <div class="extra-info">
+                        {% if modalidade.criterioavaliacao_set.exists %}
+                            <h5>Critérios de Avaliação:</h5>
+                            <div class="table-responsive">
+                                <table>
+                                    <caption>Critérios de avaliação da modalidade</caption>
+                                    <thead>
+                                        <tr>
+                                            <th class="no-print">Ações</th>
+                                            <th>Etapa</th>
+                                            <th>Critério de Avaliação</th>
+                                            <th>Nota Mín.</th>
+                                            <th>Nota Máx.</th>
+                                            <th>Ordem Desempate</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for criterio in modalidade.criterioavaliacao_set.all %}
+                                            <tr>
+                                                <td class="list-display-icons no-print">
+                                                    {% if pode_gerenciar and not criterio.possui_itens_avaliados %}
+                                                        <a href="{% url 'editar_criterio_avaliacao' criterio.id %}"
+                                                           class="icon icon-edit popup"
+                                                           title="Editar Critério de Avaliação"><span class="visually-hidden">Editar Critério de Avaliação</span></a>
+                                                        <a href="{% url 'remover_criterio_avaliacao' criterio.id %}"
+                                                           class="icon icon-delete confirm"
+                                                           title="Remover Critério de Avaliação"><span class="visually-hidden">Remover Critério de Avaliação</span></a>
+                                                    {% else %}
+                                                        -
+                                                    {% endif %}
+                                                </td>
+                                                <td>{{ criterio.get_etapa_display }}</td>
+                                                <td>{{ criterio.descricao }}</td>
+                                                <td>{{ criterio.nota_minima|format }}</td>
+                                                <td>{{ criterio.nota_maxima|format }}</td>
+                                                <td>{{ criterio.ordem_desempate }}</td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% endif %}
+                        {% if modalidade.areas_tematicas.exists %}
+                            <h5>Áreas temáticas:</h5>
+                            <div class="table-responsive">
+                                <table>
+                                    <caption>Áreas temáticas vinculadas à modalidade</caption>
+                                    <thead>
+                                        <tr>
+                                            <th>Área temática</th>
+                                            <th>Limite de aprovados</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for item in modalidade.areatematicamodalidade_set.all %}
+                                            <tr>
+                                                <td>#{{ item.id }} - {{ item.area_tematica }}</td>
+                                                <td>{{ item.limite_aprovados|format }}</td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                <dl class="secondary-info">
+                    <div class="list-item">
+                        <dt>{% icone "square" %} Limite de submissões:</dt>
+                        <dd>
+                            {{ modalidade.limite_submissoes }}
+                        </dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>{% icone "square" %} Tipo de submissão:</dt>
+                        <dd>
+                            {{ modalidade.get_tipo_submissao_formatado }}
+                        </dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>{% icone "square" %} Regras de submissão:</dt>
+                        <dd>
+                            {% if modalidade.regras_submissao %}
+                                <a href="{{ modalidade.regras_submissao.url }}" class="btn default">{% icone "download" %} Regras de submissão</a>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </dd>
+                    </div>
+                    {% if modalidade.regras_avaliacao %}
+                        <div class="list-item">
+                            <dt>{% icone "square" %} Regras de avaliação:</dt>
+                            <dd>
+                                <a href="{{ modalidade.regras_avaliacao.url }}" class="btn default">{% icone "download" %} Regras de avaliação</a>
+                            </dd>
+                        </div>
+                    {% endif %}
+                    {% if modalidade.template %}
+                        <div class="list-item">
+                            <dt>{% icone "square" %} Template:</dt>
+                            <dd>
+                                <a href="{{ modalidade.template.url }}" class="btn default">{% icone "download" %} Template</a>
+                            </dd>
+                        </div>
+                    {% endif %}
+                    <div class="list-item">
+                        <dt>{% icone "square" %} Última atualização por:</dt>
+                        <dd>
+                            {{ modalidade.ultima_atualizacao_por }} em {{ modalidade.ultima_atualizacao_em|format }}
+                        </dd>
+                    </div>
+                </dl>
+            </div>
+        {% empty %}
+            <p class="alert alert-warning">Nenhuma modalidade adicionada a este evento.</p>
+        {% endfor %}
+    {% endbox %}
+</div>

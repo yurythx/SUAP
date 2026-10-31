@@ -1,0 +1,70 @@
+{% load ppc_tags %}
+
+{% for matrizppc in matrizes %}
+    <h1>{{ matrizppc.nome }}</h1>
+
+    {% for nd in nucleos_matriz %}
+        {% with planos=matrizppc|method:"get_planos_disciplinappc_optativos"|call:nd.nucleo_id %}
+        {% if planos.exists %}
+            <h2>Núcleo {{ nd.nucleo.descricao }}</h2>
+            <table class="bordered">
+                <thead>
+                    <tr>
+                        <th rowspan="2">Disciplina optativa</th>
+                        <th colspan="{% if projeto.is_curso_anual %}{{ matrizppc.quantidade_periodos|add:1|multiply:2 }}{% else %}{{ matrizppc.quantidade_periodos|add:1 }}{% endif %}">Aulas semanais por período</th>
+                        <th colspan="{% if matrizppc.possui_ch_ead %}3{% else %}2{% endif %}">Carga horária</th>
+                    </tr>
+                    <tr>
+                        <th>-</th>
+                        {% for periodo in matrizppc.get_periodos %}
+                            <th colspan="{% if projeto.is_curso_anual %}2{% endif %}">{{ periodo }}</th>
+                        {% endfor %}
+                        <th>Hora/Relógio</th>
+                        <th>Hora/Aula</th>
+                        {% if matrizppc.possui_ch_ead %}
+                            <th>EAD</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for plano in planos %}
+                        <tr>
+                            <td>{{ plano.plano_disciplina.nome_disciplina }}</td>
+                            <td>
+                                {% if not plano.periodo_oferta %} {{ plano.get_qtd_creditos|format }} {% endif %}  
+                            </td>
+                            {% for periodo in matrizppc.get_periodos %}
+                                {% if projeto.is_curso_anual and plano.periodo_oferta == periodo %}
+                                    <td class="text-center">
+                                        {{ plano.get_qtd_aulas_1s|format }}
+                                    </td>
+                                    <td class="text-center">
+                                        {{ plano.get_qtd_aulas_2s|format }}
+                                    </td>
+                                {% else %}
+                                    <td colspan="{% if projeto.is_curso_anual %}2{% endif %}" class="text-center">
+                                        {% if plano.periodo_oferta == periodo %}
+                                            {{ plano.get_qtd_creditos|format }}
+                                        {% endif %}
+                                    </td>
+                                {% endif %}
+                            {% endfor %}
+                            <td class="text-center">{{ plano.get_hora_relogio|format }}h</td>
+                            <td class="text-center">{{ plano.get_hora_aula|format }}h</td>
+                            {% if matrizppc.possui_ch_ead %}
+                                <td class="text-center">
+                                    {% if plano.qtd_aulas_ead %}
+                                        {{ plano.get_info_hora_relogio_ead }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                            {% endif %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+        {% endwith %}
+    {% endfor %}
+{% endfor %}

@@ -1,0 +1,154 @@
+{% extends super_template %}
+
+{% block content %}
+    {% if perms.avaliacao_cursos.add_avaliacao %}
+    <ul class="action-bar">
+        <li class="has-child">
+            <a class="btn default" href="#">Respondentes</a>
+            <ul>
+                <li><a href="?identificar_respondentes=Sim" class="confirm" data-confirm="Você deseja processar isso?">Identificar</a></li>
+                <li><a href="?reprocessar_respondentes=Sim">Reprocessar</a></li>
+                <li><a class="default inverse" href="/avaliacao_cursos/questionario/{{ obj.pk }}/visualizar_respondentes/">Visualizar</a></li>
+            </ul>
+        </li>
+        <li class="has-child">
+            <a class="btn default" href="#">Exportar Respostas Subjetivas</a>
+            <ul>
+                <li><a class="default inverse" href="/avaliacao_cursos/respostas_subjetivas_xls/{{ obj.pk }}/">Avaliação Geral</a></li>
+                <li><a class="default inverse" href="/avaliacao_cursos/respostas_subjetivas_componentes_xls/{{ obj.pk }}/">Avaliação das Matrizes</a></li>
+            </ul>
+        </li>
+    </ul>
+    {% endif %}
+
+    {% box "Dados gerais" %}
+        <table class="info">
+            <tr>
+                <td>Ano</td>
+                <td>{{ obj.avaliacao.ano }}</td>
+                <td>Total de Respondentes</td>
+                <td>{{ qtd_respondentes }}</td>
+                <td>Questionários Iniciados</td>
+                <td>{{ qtd_iniciado }}</td>
+                <td>Questionários Finalizados</td>
+                <td>{{ qtd_finalizados }}</td>
+            </tr>
+            <tr>
+                <td>Segmentos</td>
+                <td colspan="7">{{ obj.get_segmentos }}</td>
+            </tr>
+            <tr>
+                <td>Modalidades</td>
+                <td colspan="7">{{ obj.get_modalidades }}</td>
+            </tr>
+        </table>
+    {% endbox %}
+
+    {% if tabela_resumo.registros|length >= 1 %}
+        {{ tabela_resumo }}
+    {% else %}
+        <p class="alert alert-warning">Respondentes ainda não identificados.</p>
+    {% endif %}
+
+    {% box "Grupos de Perguntas" %}
+        {% if perms.avaliacao_cursos.add_avaliacao %}
+        <ul class="action-bar">
+            <li><a class="btn success popup" href="/avaliacao_cursos/adicionar_grupo_pergunta/{{ obj.pk }}/">Adicionar Grupo
+                de Pergunta</a></li>
+        </ul>
+        {% endif %}
+
+        {% if obj.grupopergunta_set.exists %}
+            {% for grupo_pergunta in obj.grupopergunta_set.all %}
+                <div class="tab-pane" data-title="Grupo {{ forloop.counter }}">
+                    <h4>{{ grupo_pergunta.descricao }}</h4>
+
+                    <ul class="action-bar">
+                        {% if perms.avaliacao_cursos.add_avaliacao %}
+                            <li><a class="btn success popup" href="/avaliacao_cursos/adicionar_pergunta/{{ grupo_pergunta.pk }}/">Adicionar
+                                Pergunta</a></li>
+                            <li><a class="btn primary popup"
+                                   href="/avaliacao_cursos/adicionar_grupo_pergunta/{{ obj.pk }}/{{ grupo_pergunta.pk }}/"
+                                   title="Editar Pergunta">Editar Grupo</a></li>
+                            <li><a class="btn danger" href="?grupo_pergunta_id={{ grupo_pergunta.pk }}"
+                                   title="Excluir Pergunta">Remover Grupo</a></li>
+                        {% endif %}
+                        {% if perms.avaliacao_cursos.view_avaliacao %}
+                            <li><a class="btn default" href="/avaliacao_cursos/estatistica_grupo_resposta/{{ grupo_pergunta.pk }}/">Estatísticas das Respostas</a></li>
+                        {% endif %}
+                    </ul>
+
+                    {% if grupo_pergunta.pergunta_set.exists %}
+                        <table>
+                            <caption>Perguntas</caption>
+                            <thead>
+                                <tr>
+                                    <th>Enunciado</th>
+                                    <th>Tipo de Resposta</th>
+                                    <th>Opções de Resposta</th>
+                                    <th class="no-print">Opções</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            {% for pergunta in grupo_pergunta.pergunta_set.all|order:request %}
+                                <tr>
+                                    <td>{{ pergunta.enunciado|format }}</td>
+                                    <td>{{ pergunta.get_tipo_resposta_display|format }}</td>
+                                    <td>
+                                        {% if pergunta.tipo_resposta == 4 %}
+                                            <ul class="action-bar">
+                                                <li><a class="btn success popup" href="/avaliacao_cursos/adicionar_opcao_resposta/{{ pergunta.pk }}/">Adicionar Opção de Resposta</a></li>
+                                            </ul>
+                                            {% if pergunta.opcaorespostapergunta_set.exists %}
+                                                <table>
+                                                    <thead>
+                                                        <tr>
+                                                            <th class="no-print">Ações</th>
+                                                            <th>Descrição</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {% for opcao_resposta in pergunta.opcaorespostapergunta_set.all %}
+                                                            <tr>
+                                                                <td class="no-print">
+                                                                    {% icon "edit" "/avaliacao_cursos/adicionar_opcao_resposta/{{ pergunta.pk }}/{{ opcao_resposta.pk }}/" "Editar Opção de Resposta" "popup" %}
+                                                                    {% icon "delete" "?opcao_resposta_id={{ opcao_resposta.pk }}" "Remover Opção de Resposta" "no-confirm" %}
+                                                                </td>
+                                                                <td>{{ opcao_resposta.valor }}</td>
+                                                            </tr>
+                                                        {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                            {% endif %}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td class="no-print">
+                                        <ul class="action-bar">
+                                            {% if perms.avaliacao_cursos.change_avaliacao %}
+                                                <li><a class="btn primary" href="/avaliacao_cursos/adicionar_pergunta/{{ grupo_pergunta.pk }}/{{ pergunta.pk }}/">Editar Pergunta</a></li>
+                                            {% endif %}
+                                            {% if perms.avaliacao_cursos.delete_avaliacao %}
+                                                <li><a class="btn danger no-confirm" href="?pergunta_id={{ pergunta.pk }}">Remover Pergunta</a></li>
+                                            {% endif %}
+                                            {% if not pergunta.tipo_resposta == 2 %}
+                                                <li><a class="btn default" href="/avaliacao_cursos/estatistica_resposta/{{ pergunta.pk }}/">Estatísticas das Respostas</a></li>
+                                            {% endif %}
+                                        </ul>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    {% else %}
+                        <p class="alert alert-warning">Nenhuma pergunta cadastrada.</p>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        {% else %}
+            <p class="alert alert-warning">Nenhum grupo cadastrado.</p>
+        {% endif %}
+    {% endbox %}
+
+{% endblock %}

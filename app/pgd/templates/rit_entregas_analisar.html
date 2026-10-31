@@ -1,0 +1,261 @@
+{% extends "djtools/templates/adminutils/change_list.html" %}
+
+{% block object-status %}
+    {% if rit.entregue %}
+        <span class="status status-success">Entregue</span>
+    {% else %}
+        <span class="status status-error">Não entregue</span>
+    {% endif %}
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if pode_homologar_rit %}
+            <li>
+                <a href="{% url 'homologar_rit' rit.id %}" class="btn success">Homologar RIT</a>
+            </li>
+        {% endif %}
+        {% if pode_reabrir_rit %}
+            <li>
+                <a href="{% url 'devolver_rit_servidor' rit.id %}" class="btn success"> Devolver RIT</a>
+            </li>
+        {% endif %}
+
+        {% if parametros_botao_editar_em_lote %}
+            <li>
+                <a href="/admin/pgd/relatorioindividualtrabalhoatividadeentregaavaliar/?{{ parametros_botao_editar_em_lote }}" class="btn success">Avaliar em lote</a>
+            </li>
+        {% endif %}
+
+        {% if pode_avaliar_entregas_rit %}
+            <li>
+                <a href="/pgd/avaliar_entregas_nao_avaliadas_rit/{{ rit.id }}" class="btn success">Avaliar todas as não avaliadas</a>
+            </li>
+        {% endif %}
+        {% if pode_recalcular_pit_rit %}
+            <li>
+                <a href="{% url 'recalcular_pit_rit' rit.pit.id %}" class="btn confirm" data-confirm="Essa funcionalidade irá recalcular as horas informadas e devidas no seu PIT/RIT.">Recalcular Horas</a>
+            </li>
+        {% endif %}
+
+        <li>
+            <a href="/pgd/visualizar_pit_completo/{{ rit.pit.id }} " class="btn primary">Visualizar PIT/RITs Completo</a>
+        </li>
+
+        <li>
+            <a href="/admin/pgd/relatorioindividualtrabalho/" class="btn">{% icone "arrow-left" %} Voltar</a>
+        </li>
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+    {% include "includes/msg_adesao_pgd.html" %}
+
+    {% include "includes/dados_servidor.html" %}
+
+    {% box 'Dados gerais' class="collapsed" %}
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>PIT</dt>
+                <dd>{{ pit.periodo_pit_rit|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>RIT</dt>
+                <dd>{{ rit.get_verbose_rit|format }}</dd>
+            </div>
+        </dl>
+    {% endbox %}
+
+    {% box 'Resumo' class="collapsed" %}
+        <h3>Previsto/Planejado</h3>
+        <ul class="flex-container boxes infos">
+            <li class="box-item">
+                <p class="stat">{{ rit.tempo_previsto|format_hours }}</p>
+                <p class="title">{{ rit|verbose:'tempo_previsto' }}</p>
+            </li>
+            <li class="box-item">
+                <p class="stat">{{ rit.tempo_planejado|format_hours }}</p>
+                <p class="title">{{ rit|verbose:'tempo_planejado' }}</p>
+            </li>
+        </ul>
+
+        <h3>Execução</h3>
+        <ul class="flex-container boxes infos">
+            <li class="box-item">
+                <p class="stat">{{ rit.tempo_executado_entregue|format_hours }}</p>
+                <p class="title">{{ rit|verbose:'tempo_executado_entregue' }}</p>
+            </li>
+            <li class="box-item">
+                <p class="stat">{{ rit.tempo_executado_nao_entregue|format_hours }}</p>
+                <p class="title">{{ rit|verbose:'tempo_executado_nao_entregue' }}</p>
+            </li>
+            <li class="box-item">
+                <p class="stat">{{ rit.tempo_executado|format_hours }}</p>
+                <p class="title">{{ rit|verbose:'tempo_executado' }}</p>
+            </li>
+            {% if pit.pode_mostrar_ajustado %}
+                <li class="box-item info">
+                    <p class="stat">{{ rit.tempo_executado_ajustado_pela_faixa_complexidade|format_hours }}</p>
+                    <p class="title">{{ rit|verbose:'tempo_executado_ajustado_pela_faixa_complexidade' }}</p>
+                </li>
+            {% endif %}
+        </ul>
+
+        <h3>Avaliação</h3>
+        <ul class="flex-container boxes infos">
+            <li class="box-item">
+                <p class="stat">{{ rit.tempo_executado_homologado|format_hours }}</p>
+                <p class="title">{{ rit|verbose:'tempo_executado_homologado' }}</p>
+            </li>
+            {% if rit.pode_mostrar_ajustado %}
+                <li class="box-item info">
+                    <p class="stat">{{ rit.tempo_executado_homologado_ajustado_pela_faixa_complexidade|format_hours }}</p>
+                    <p class="title">{{ rit|verbose:'tempo_executado_homologado_ajustado_pela_faixa_complexidade' }}</p>
+                </li>
+            {% endif %}
+        </ul>
+    {% endbox %}
+
+    {% if quem_deve_homologar_rit or quem_deve_avaliar_entregas %}
+        {% box 'Pendências para Avaliação de Entregas e Homologação do RIT' class='collapsed' %}
+            <p class="alert alert-info">Considerando as características atuais deste RIT e das suas Entregas.</p>
+            {% if rit.foi_entregue_mas_nao_avaliado %}
+                <p class="checklist success">Este RIT foi entregue e por isso pode ser homologado <strong>Concluído</strong></p>
+            {% endif %}
+            {% if not rit.foi_entregue_mas_nao_avaliado %}
+                <p class="checklist error">Este RIT não foi entregue e por isso não pode ser homologado <strong>Não concluído</strong></p>
+            {% endif %}
+            {% if rit.existe_entregas_nao_entregues %}
+                <p class="checklist error">Nenhuma entrega deste RIT foi entregue e por isso as entregas não podem ser avaliadas <strong>Não concluído</strong></p>
+            {% endif %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Setor</th>
+                            <th>Deve</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if quem_deve_homologar_rit %}
+                            <tr>
+                                <td>{{ quem_deve_homologar_rit }} (chefia)</td>
+                                <td>Homologar RIT após a entrega do RIT e todas as entregas serem entregues e avaliadas</td>
+                            </tr>
+                        {% endif %}
+                        {% for aa in quem_deve_avaliar_entregas %}
+                            <tr>
+                                <td>{{ aa }} (chefia)</td>
+                                <td>Avaliar as entregas relacionadas ao PTS deste setor antes da homologação do RIT</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endbox %}
+    {% endif %}
+
+    {% box 'Planejamento' class="collapsed" %}
+        {% if atividades_pode_receber_entregas %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th rowspan="2" class="no-print">Ações</th>
+                            <th colspan="7">Planejamento</th>
+
+                            {% if pit.pode_mostrar_ajustado %}
+                                <th colspan="4">Execução</th>
+                            {% else %}
+                                <th colspan="3">Execução</th>
+                            {% endif %}
+
+                            {% if pit.pode_mostrar_ajustado %}
+                                <th colspan="2">Avaliação</th>
+                            {% else %}
+                                <th colspan="1">Avaliação</th>
+                            {% endif %}
+                        </tr>
+                        <tr>
+                            <th>PTS</th>
+                            <th>Atividade</th>
+                            <th>Prazo</th>
+                            <th>Descrição</th>
+                            <th>Entregas</th>
+                            <th>Situação</th>
+                            <th>Tempo Planejado</th>
+
+                            <th>{{ atividades_pode_receber_entregas.0|verbose:'total_tempo_executado' }}</th>
+                            <th>{{ atividades_pode_receber_entregas.0|verbose:'total_tempo_executado_entregue' }}</th>
+                            <th>{{ atividades_pode_receber_entregas.0|verbose:'total_tempo_executado_nao_entregue' }}</th>
+                            {% if pit.pode_mostrar_ajustado %}
+                                <th>{{ atividades_pode_receber_entregas.0|verbose:'total_tempo_executado_ajustado_pela_faixa_complexidade' }}</th>
+                            {% endif %}
+
+                            <th>{{ atividades_pode_receber_entregas.0|verbose:'total_tempo_executado_homologado' }}</th>
+                            {% if pit.pode_mostrar_ajustado %}
+                                <th>{{ atividades_pode_receber_entregas.0|verbose:'total_tempo_executado_homologado_ajustado_fx_comp' }}</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for atividade_rit in atividades_pode_receber_entregas %}
+                            <tr>
+                                <td class="no-print">
+                                    {% icon "view" "/pgd/visualizar_atividade/{{ atividade_rit.atividade_pts.atividade_id }}" "Visualizar" "popup" %}
+                                </td>
+                                <td>{{ atividade_rit.atividade_pts.plano_trabalho_setorial }}</td>
+                                <td>{{ atividade_rit.atividade_pts }}</td>
+                                <td>{{ atividade_rit.data_prazo|format }}</td>
+                                <td>{{ atividade_rit.descricao|format }}</td>
+                                <td>{{ atividade_rit.atividade_pts.atividade.descricao_entregas|format }}</td>
+                                <td>{{ atividade_rit.get_situacao_display|status }}</td>
+                                <td>{{ atividade_rit.tempo_planejado|format_hours }}</td>
+
+                                <td>{{ atividade_rit.total_tempo_executado|format_hours }}</td>
+                                <td>{{ atividade_rit.total_tempo_executado_entregue|format_hours }}</td>
+                                <td>{{ atividade_rit.total_tempo_executado_nao_entregue|format_hours }}</td>
+                                {% if rit.pode_mostrar_ajustado %}
+                                    <td>{{ atividade_rit.total_tempo_executado_ajustado_pela_faixa_complexidade|format_hours }}</td>
+                                {% endif %}
+
+                                <td>{{ atividade_rit.total_tempo_executado_homologado|format_hours }}</td>
+                                {% if rit.pode_mostrar_ajustado %}
+                                    <td>{{ atividade_rit.total_tempo_executado_homologado_ajustado_fx_comp|format_hours }}</td>
+                                {% endif %}
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Nenhuma atividade foi cadastrada.</p>
+        {% endif %}
+    {% endbox %}
+
+    {% box 'Execução (Avaliar)' %}
+        <ul class="action-bar">
+            {% if parametros_botao_editar_em_lote %}
+                <li>
+                    <a href="/admin/pgd/relatorioindividualtrabalhoatividadeentregaavaliar/?{{ parametros_botao_editar_em_lote }}" class="btn success">Avaliar em lote</a>
+                </li>
+            {% endif %}
+
+            {% if pode_avaliar_entregas_rit %}
+                <li>
+                    <a href="/pgd/avaliar_entregas_nao_avaliadas_rit/{{ rit.id }}" class="btn success">Avaliar todas as não avaliadas</a>
+                </li>
+            {% endif %}
+        </ul>
+
+        <p class="alert alert-info">Serão listadas apenas as entregas já entregues passíveis de serem avaliadas.</p>
+
+        {{ block.super }}
+    {% endbox %}
+
+    <script>
+        $("#result_list > thead > tr > th.column-get_pts_atividade").css("width", "5%");
+    </script>
+
+{% endblock %}

@@ -1,0 +1,87 @@
+{% extends super_template %}
+
+
+
+{% block extrahead %}
+<script src="/static/djtools/graficos/highcharts.js"></script>
+<script src="/static/djtools/graficos/exporting.js"></script>
+{% endblock %}
+
+{% block content %}
+
+<p class="alert alert-warning">
+	<strong>Atenção:</strong> Após filtrar por programa, é possível visualizar a lista de alunos inscritos.
+</p>
+
+<div class="search-and-filters">
+	<form id="filtro" method="post">
+		{% csrf_token %}
+		{% if campi %}
+			<div class="filter">
+				<label>Campus:</label>
+				<select name="campus" onchange="$('#filtro').submit();">
+					<option value="" {% if not campus %}selected="selected"{% endif %}>Todos</option>
+					{% for item in campi %}
+						<option value="{{ item.id }}" {% if campus == item.id %}selected="selected"{% endif %}>{{ item.setor.sigla }}</option>
+					{% endfor %}
+				</select>
+			</div>
+		{% endif %}
+		<div class="filter">
+			<label>Programa:</label>
+			<select name="programa" onchange="$('#filtro').submit();">
+				{% if not campus %}
+					<option value="" {% if not programa_id %}selected="selected"{% endif %}>Selecione o campus</option>
+				{% else %}
+					<option value="" {% if not programa_id %}selected="selected"{% endif %}>Todos</option>
+					{% for item in programas %}
+						<option value="{{ item.id }}" {% if programa_id == item.id %}selected="selected"{% endif %}>{{ item.titulo }}</option>
+					{% endfor %}
+				{% endif %}
+			</select>
+		</div>
+	</form>
+</div>
+
+<script>
+{% for grafico in graficos %}
+	{{ grafico|safe }}
+{% endfor %}
+</script>
+
+{% box 'Gráficos' %}
+	{% for grafico in graficos %}
+		<div class="grafico-item" id="{{ grafico.id }}"></div>
+	{% endfor %}
+{% endbox %}
+
+{% if inscricoes %}
+	{% box 'Alunos inscritos' %}
+		<table>
+			<thead>
+		        <tr>
+		            <th>Matrícula</th>
+		            <th>Aluno</th>
+		            <th>Inscrito em</th>
+		            {% if perms.ae.pode_ver_motivo_solicitacao %}
+		            	<th>Motivo da Solicitação</th>
+		            {% endif %}
+		        </tr>
+		    </thead>
+		    <tbody>
+			{% for inscricao in inscricoes %}
+				<tr>
+					<td><a href="{{ inscricao.aluno.get_absolute_url }}">{{ inscricao.aluno.matricula }}</a></td>
+					<td>{{ inscricao.aluno.pessoa_fisica.nome }}</td>
+					<td>{{ inscricao.data_cadastro|date:"d/m/y" }}</td>
+					{% if perms.ae.pode_ver_motivo_solicitacao %}
+						<td>{{ inscricao.motivo|linebreaks }}</td>
+					{% endif %}
+				</tr>
+			{% endfor %}
+			</tbody>
+		</table>
+	{% endbox %}
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,336 @@
+{% extends super_template %}
+
+{% block extracss %}
+<style type="text/css">
+    .calendario ul.errorlist li {
+        color: #CC0000;
+        background-color: #ffffff;
+        border-radius: 4px;
+    }
+
+    .calendario ul li.info a {
+        color: #31708f;
+    }
+
+    #saldo-totais-fixado {
+        position: fixed;
+        right: 4px;
+        top: 50%;
+        width: 40%;
+        font-weight: bold;
+        background-color: rgba(52, 152, 219, 0.3);
+        border-radius: 0 10px 10px 0;
+    }
+
+    #saldo-totais-fixado table.info.saldo-totais {
+        background-color: #fff;
+        margin: 0;
+        border-radius: 0 10px 10px 0;
+    }
+
+    .saldo-arrastavel:hover {
+        cursor: move !important;
+    }
+
+    .saldo-nao-pode-ser-utilizado-pelo-debito:hover {
+        cursor: not-allowed !important;
+    }
+
+    .debito-pode-utilizar-o-saldo {
+        border: 2px dashed #ff0000 !important;
+    }
+
+    .calendario-mensal strong {
+        display: inline;
+        margin: 0 4px 0 0;
+    }
+
+    .remover-saldo-utilizado {
+        cursor: pointer;
+    }
+
+    .saldo-externo-arrastando, .saldo-arrastando {
+        padding: 8px;
+        border-radius: 5px;
+    }
+</style>
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        <li>
+            <a href="/ponto/compensacao_horario_corrigir_debitos/?next_url={{ full_url }}" class="btn warning confirm">
+                Corrigir inconsistências nos meus débitos
+            </a>
+        </li>
+        {% if form.tem_saldos and form.debitos %}
+            <li class="has-child">
+                <a class="btn success" href="#">Distribuir saldos</a>
+                <ul>
+                    <li><a href="{{ full_url }}">Sugerir de forma <strong>Automática</strong></a></li>
+                    <li><a href="#" class="redistribuir-saldo sem-aproveitar-distribuicao">Informar de forma <strong>Manual, sem aproveitar</strong> a distribuição atual</a></li>
+                    <li><a href="#" class="redistribuir-saldo aproveitar-distribuicao">Informar de forma <strong>Manual, aproveitando</strong> a distribuição atual</a></li>
+                </ul>
+            </li>
+        {% endif %}        
+        <li class="has-child">
+            <a class="btn default">Filtrar saldos</a>
+            <ul>
+                {% if form.saldos_externos %}
+                    <li>
+                        <a href="{{ base_url_debitos }}&omite_saldos_externos=1">
+                            <strong>Omitir</strong> os Saldos Externos
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ base_url_debitos }}&abrange_apenas_saldos_externos=1">
+                            <strong>Visualizar apenas</strong> os Saldos Externos
+                        </a>
+                    </li>                    
+                {% endif %}
+
+                {% for saldo_externo in form.saldos_externos %}
+                    <li>
+                        <a href="{{ base_url_debitos }}&abrange_apenas_esses_saldos_externos_ids={{ saldo_externo.id }}">
+                            Visualizar apenas o Saldo Externo <strong>"{{ saldo_externo }}"</strong>
+                        </a>
+                    </li>
+                {% endfor %}
+
+                <li>
+                    <a href="{{ base_url_debitos }}">
+                        Visualizar <strong>todos os Saldos envolvidos</strong>
+                    </a>
+                </li>
+            </ul>
+        </li>
+        <li class="has-child">
+            <a class="btn default">Filtrar débitos</a>
+            <ul>
+                {% if form.compensacoes_especificas %}
+                    <li>
+                        <a href="{{ base_url_saldos }}&omite_debitos_de_compensacoes_especificas=1">
+                            <strong>Omitir</strong> os Débitos de Compensações Específicas
+                        </a>
+                    </li>
+                {% endif %}
+
+                {% for recesso_escolhido in form.compensacoes_especificas %}
+                    <li>
+                        <a href="{{ base_url_saldos }}&abrange_apenas_debitos_dessas_compensacoes_especificas_ids={{ recesso_escolhido.id }}">
+                            Visualizar apenas os Débitos de <strong>"{{ recesso_escolhido.recesso_opcao }}"</strong>
+                        </a>
+                    </li>
+                {% endfor %}
+
+                <li>
+                    <a href="{{ base_url_saldos }}">
+                        Visualizar <strong>todos os Débitos envolvidos</strong>
+                    </a>
+                </li>
+            </ul>
+        </li>
+        <li class="has-child">
+            <a class="btn default">Outras opções</a>
+            <ul>
+                <li>
+                    <a href="{{ outro_periodo_url }}">
+                        Selecionar Outro Período
+                    </a>
+                </li>
+            </ul>
+        </li>
+    </ul>
+{% endblock %}
+
+{% block content %}
+    {% if not form.tem_saldos %}
+        <p class="alert alert-warning">Nenhum <strong>saldo</strong>.</p>
+    {% endif %}
+
+    {% if not form.debitos %}
+        <p class="alert alert-warning">Nenhum <strong>débito</strong>.</p>
+        {% if form.tem_saldos %}
+            <p class="alert alert-warning">Os saldos encontrados <strong>não poderão ser utilizados</strong> pois não há débitos a compensar.</p>
+        {% endif %}
+    {% endif %}
+
+    {% if omite_debitos_de_compensacoes_especificas %}
+        <p class="alert alert-warning">Os débitos de compensações específicas foram omitidos.</p>
+    {% endif %}
+
+    {% if form.tem_saldos and form.debitos %}
+        <div class="alert alert-info help-auto-distribuicao">
+            {% if form.tem_saldos_utilizados %}
+                <p>
+                    Os <strong>saldos</strong> encontrados foram distribuídos, como <strong>sugestão</strong>, conforme os <strong>débitos</strong>.
+                    Para confirmar as compensações sugeridas, pressione o botão 'Salvar', localizado no final da página.
+                </p>
+                <p>
+                    Caso não concorde com a distribuição atual, é possível redistribuir os saldos manualmente através da opção 'Distribuir saldos' e
+                    então informar as compensações de acordo com a sua necessidade.
+                </p>
+            {% else %}
+                <p>
+                    Os <strong>saldos</strong> encontrados não podem ser utilizados pelos <strong>débitos</strong>. 
+                    Provavelmente estão fora do escopo dos saldos válidos para os débitos.
+                </p>
+            {% endif %}
+        </div>
+    {% endif %}
+
+    <div class="alert alert-info help-situacao-inicial" hidden="hidden">
+        <p>
+            Visualização dos <strong>saldos</strong> e <strong>débitos</strong> antes das <strong>compensações</strong>.
+        </p>
+    </div>
+
+    <div class="alert alert-warning help-redistribuicao-saldos" hidden="hidden">
+        <p>
+            Para fazer a distribuição manual dos saldos, clique sobre um Saldo mantendo o botão do mouse pressionado,
+            então mova-o e solte-o sobre o Débito desejado. Para confirmar as compensações, pressione o botão 'Salvar',
+            localizado no final da página.
+        </p>
+    </div>
+
+    {% if apenas_debitos_dessas_compensacoes_especificas.exists %}
+        <dl class="definition-list">
+            <dt>Apenas débitos das compensações específicas</dt>
+            <dd>
+                {% for compensacao_especifica in apenas_debitos_dessas_compensacoes_especificas %}
+                    {% if apenas_debitos_dessas_compensacoes_especificas.count > 1 %}
+                        {% if forloop.counter == apenas_debitos_dessas_compensacoes_especificas.count %}
+                            &nbsp;e&nbsp;
+                        {% elif forloop.counter > 1 %}
+                            ,&nbsp;
+                        {% endif %}
+                    {% endif %}
+                    <a class="popup" href="/ponto/abrir_recesso_escolhido/{{ compensacao_especifica.id }}/">
+                        {{ compensacao_especifica.recesso_opcao }}
+                    </a>
+                {% endfor %}
+            </dd>
+        </dl>
+    {% endif %}
+
+    <ul class="flex-container boxes services saldo-totais">
+        <li class="box-item">
+            {% icone "thumbs-up" %}
+            <h4>Saldos</h4>
+            <dl>
+                {% if form.periodo_envolvido_eh_dos_saldos %}
+                    <dt>Período de abrangência dos saldos:</dt>
+                    <dd>
+                        {% if form.periodo_envolvido_eh_valido %}
+                            {{ form.periodo_envolvido_data_inicial|format }} a {{ form.periodo_envolvido_data_final|format }}
+                        {% else %}
+                            <span>Nenhum saldo utilizável.</span>
+                        {% endif %}        
+                    </dd>
+                {% else %}
+                    <dt>Período consultado dos saldos:</dt>
+                    <dd>{{ form.periodo_data_inicial|format }} a {{ form.periodo_data_final|format }}</dd>
+                {% endif %}
+            </dl>
+            <div class="clear"></div>
+            <p class="note"><strong class="saldo-total-view">{{ form.saldo_total_view }}</strong> Total de saldo</p>
+            <p class="note"><strong class="saldo-total-a-distribuir-view">{{ form.saldo_total_a_distribuir_view }}</strong> Total de saldo ainda disponível</p>
+        </li>
+        <li class="box-item">
+            {% icone "thumbs-down" %}
+            <h4>Débitos</h4>
+            <dl>
+                {% if form.periodo_envolvido_eh_dos_debitos %}
+                    <dt>Período de abrangência dos débitos:</dt>
+                    <dd>
+                        {% if form.periodo_envolvido_eh_valido %}
+                            {{ form.periodo_envolvido_data_inicial|format }} a {{ form.periodo_envolvido_data_final|format }}
+                        {% else %}
+                            <span>Nenhum débito aplicável.</span>
+                        {% endif %}        
+                    </dd>
+                {% else %}
+                    <dt>Período consultado dos débitos:</dt>
+                    <dd>{{ form.periodo_data_inicial|format }} a {{ form.periodo_data_final|format }}</dd>
+                {% endif %}
+                {% if not omite_debitos_de_compensacoes_especificas and not apenas_debitos_dessas_compensacoes_especificas.exists and form.compensacoes_especificas %}
+                    <dt>Compensações específicas:</dt>
+                    <dd>
+                        {% for recesso_escolhido in form.compensacoes_especificas %}
+                            {% if form.compensacoes_especificas.count > 1 %}
+                                {% if forloop.counter == form.compensacoes_especificas.count %}
+                                    &nbsp;e&nbsp;
+                                {% elif forloop.counter > 1 %}
+                                    ,&nbsp;
+                                {% endif %}
+                            {% endif %}
+                            <a class="popup" href="/ponto/abrir_recesso_escolhido/{{ recesso_escolhido.id }}/">
+                                {{ recesso_escolhido.recesso_opcao }}
+                            </a>
+                        {% endfor %}
+                    </dd>
+                {% endif %}
+            </dl>
+            <div class="clear"></div>
+            <p class="note"><strong><span class="debito-total-view">{{ form.debito_total_view }}</span></strong> Total de débito</p>
+            <p class="note"><strong><span class="saldo-total-distribuido-view">{{ form.saldo_total_distribuido_view }}</span></strong> Total de débito compensando</p>
+            <p class="note"><strong><span class="debito-total-restante-view">{{ form.debito_total_restante_view }}</span></strong> Total de débito ainda em aberto</p>
+        </li>
+    </ul>
+
+    <div id="saldo-totais-fixado" class="alert alert-info saldo-totais no-print" hidden="hidden">
+        <!-- preenchido via javascript -->
+    </div>
+
+    <div class="alert alert-info">
+        <p>
+            O período total de abrangência é de <strong>{{ form.periodo_total_data_inicial|format }}</strong> a <strong>{{ form.periodo_total_data_final|format }}</strong>.
+            Um ou mais meses podem ter sido omitidos por não haver saldos e/ou débitos a exibir.
+        </p>
+    </div>
+
+    {% if form.tem_saldos or form.debitos %}
+        <div class="legenda mt-4">
+            <p>Legenda:</p>
+            <ul>
+                <li class="danger">Débito a compensar</li>
+                <li class="warning">Saldo a distribuir</li>
+                <li class="success">Débito compensado/Saldo distribuído</li>
+                <li class="extra">Saldo utilizado pelo Débito (Informe de compensação)</li>
+                <li class="info">Observações</li>
+            </ul>
+        </div>
+        
+        {% if form.saldos_externos %}
+            <div class="flex-container boxes texts saldos-externos">
+                {% for info_saldo_externo in form.infos_saldos_externos.values %}
+                    <div class="box-item warning">
+                        {{ info_saldo_externo|safe }}
+                    </div>                            
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endif %}
+
+    {% if form.tem_saldos and form.debitos %}
+        {% render_form form %}
+    {% else %}
+        {% render_form form render_full=False submit_label=False %}
+    {% endif %}
+
+    <script>
+        $(document).ready(function(){
+            $("#saldo-totais-fixado").html($("table.info.saldo-totais").clone());
+            //
+            {% if request.POST %}
+                // função em /static/js/informar-compensacao-v2
+                redistribuir_saldos(true);  // continuar redistribuição manual
+            {% else %}
+                // função em /static/js/informar-compensacao-v2
+                update_totais_saldos_debitos();
+            {% endif %}
+            //
+            input_submit_on_click();  // em comum/templates/admin/base.html (em popup's o input submit não era desativado ao submeter o form)
+        });
+    </script>
+{% endblock %}

@@ -1,0 +1,289 @@
+{% extends super_template %}
+
+{% block object-status %}
+    {{ edital.situacao_atual_str|status }}
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if pode_cadastrar_pedido %}
+            <li><a class="btn success" href="{% url 'admin:licenca_capacitacao_pedidoliccapacitacaoservidor_add' %}?edital={{ edital.id }}" class="success">Cadastrar Pedido</a></li>
+        {% endif %}
+        {% if pode_solicitar_alteracao_dt_ini_exercicio or pode_solicitar_alteracao_dados %}
+            <li class="has-child">
+                <a class="btn primary" href="#">Solicitar Alteração de Dados</a>
+                <ul>
+                    {% if pode_solicitar_alteracao_dt_ini_exercicio %}
+                        <li>
+                            <a href="{% url 'admin:licenca_capacitacao_solicitacaoalteracaodatainicioexercicioadicionar_add' %}?edital={{ edital.id }}">
+                                Data de Início de Exercício
+                            </a>
+                        </li>
+                    {% endif %}
+                    {% if pode_solicitar_alteracao_dados %}
+                        <li>
+                            <a href="{% url 'admin:licenca_capacitacao_solicitacaoalteracaodadosadicionar_add' %}?edital={{ edital.id }}">
+                                Dados gerais
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </li>
+        {% endif %}
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+    {% if not estah_finalizado %}
+        <div class="alert alert-info">
+            <p><strong>Orientações</strong>:</p>
+            <ol>
+                <li>
+                    Se algum dado constante nos "Parâmetros utilizados pelo checklist de submissão"
+                    estiver incorreto, você pode:
+                    <ul>
+                        <li>
+                            Abrir um chamado (conforme a orientação 2) <strong>OU</strong>
+                        </li>
+                        <li>
+                            Acessar a aba "Solicitações de alteração de dados" para entender
+                            como se pode realizar uma solicitação de alteração de dados
+                            por este módulo.
+                        </li>
+                    </ul>
+                </li>
+                <li>
+                    Para abrir um chamado com dúvidas, para informar algum erro
+                    (nos casos em que não se deseja optar pelas
+                    "Solicitações de alteração de dados" disponibilizadas por este módulo),
+                    ou para solicitar desistência de pedido submetido
+                    <a href="/centralservicos/selecionar_servico_abertura/gestao-de-pessoas/">
+                        abra um chamado 
+                    </a>
+                    para a seção "Desenvolvimento de Pessoal > Licença para Capacitação".
+                </li>
+            </ol>
+        </div>
+    {% endif %}
+
+    {% if lista_msgs_geral %}
+        <div class="alert alert-warning">
+            <p><strong>Importante</strong>:</p>
+            <ol>
+                {% for m in lista_msgs_geral %}
+                    <li>{{ m }}</li>
+                {% endfor %}
+            </ol>
+        </div>
+    {% endif %}
+
+    {% if not pode_mostrar_todas_abas and not servidor_estah_apto_no_edital and estah_em_aberto %}
+        <div class="alert alert-danger">
+            <strong>Importante</strong>: Servidor não está apto a submeter pedido neste edital.
+        </div>
+    {% endif %}
+
+    <div class="tab-pane" data-title="Edital" data-tab-info="true">
+        {% include "include_dados_edital.html" %}
+    </div>
+
+    {% if pode_mostrar_todas_abas %}
+        <div class="tab-pane" data-title="Parâmetros utilizados pelo Checklist de Submissão" data-tab-info="true">
+            <div class="alert alert-warning">
+                <p><strong>Importante</strong>:</p>
+                <ol>
+                    {% for m in lista_msgs_parametros_checklist %}
+                        <li>{{ m }}</li>
+                    {% endfor %}
+                </ol>
+            </div>
+            {% if calculos_exercicio or calculos_quinquenios or licencas_capacitacao_servidor %}
+                {% include "include_dados_calculos_servidor.html" %}
+            {% else %}
+                <p class="alert alert-warning">Nenhum cálculo foi realizado.</p>
+            {% endif %}
+        </div>
+
+        <div class="tab-pane" data-title="Meus Pedidos" data-counter="{{ meus_pedidos.count }}">
+            {% if meus_pedidos %}
+                {% include "include_meus_pedidos.html" %}
+            {% else %}
+                <p class="alert alert-warning">Nenhum pedido foi cadastrado.</p>
+            {% endif %}
+        </div>
+
+        <div class="tab-pane" data-title="Solicitações de Alteração de Dados" data-counter="{{ solicitacoes_alteracao_dt_ini_efet_execicio_servidor_no_edital.count }}">
+            {% if lista_msgs_solicitacoes_alteracao_de_dados %}
+                <div class="alert alert-warning">
+                    <p><strong>Importante</strong>:</p>
+                    <ol>
+                        {% for m in lista_msgs_solicitacoes_alteracao_de_dados %}
+                            <li>{{ m }}</li>
+                        {% endfor %}
+                    </ol>
+                </div>
+            {% endif %}
+            <h4>Solicitação de Alteração de Data de início de exercício</h4>
+            {% if solicitacoes_alteracao_dt_ini_efet_execicio_servidor_no_edital %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th colspan="3">Solicitação</th>
+
+                            <th rowspan="2">Situação</th>
+                            <th rowspan="2">Data de cadastro</th>
+                            
+                            <th colspan="4">Parecer da Gestão</th>
+                            {% if pode_excluir_solicitacao_alteracao_dt_ini_exercicio %}
+                                <th rowspan="2" class="no-print">Opções</th>
+                            {% endif %}
+                        </tr>
+                        <tr>
+                            <th>Justificativa da Solicitação</th>
+                            <th>Data obtida no SUAP pelo módulo de licença capacitação</th>
+                            <th>Data solicitada</th>
+
+                            <th>Parecer/observações da gestão</th>
+                            <th>Data/hora do parecer</th>
+                            <th>Usuário do parecer</th>
+                            <th>Data de início de exercício informada pela gestão</th>
+                        </tr>
+                    </thead>
+                    <body>
+                        {% for cal in solicitacoes_alteracao_dt_ini_efet_execicio_servidor_no_edital %}
+                            <tr>
+                                <td>{{ cal.justificativa|format|linebreaksbr }}</td>
+                                <td>{{ cal.data_suap|format }}</td>
+                                <td>{{ cal.data_solicitada|format }}</td>
+
+                                <td>{{ cal.get_situacao_html|format }}</td>
+                                <td>{{ cal.data_cadastro|format }}</td>
+
+                                <td>{{ cal.parecer_gestao|format|linebreaksbr }}</td>
+                                <td>{{ cal.data_hora_parecer|format }}</td>
+                                <td>{{ cal.usuario_parecer|format }}</td>
+                                <td>{{ cal.data_informada_parecer|format }}</td>
+
+                                {% if pode_excluir_solicitacao_alteracao_dt_ini_exercicio %}
+                                    <td class="no-print">
+                                        <a class="btn danger" href="/licenca_capacitacao/excluir_solicitacao_alteracao_dt_inicio_exercicicio_servidor/{{ cal.id }}/">Remover</a>
+                                    </td>
+                                {% endif %}
+                            </tr>
+                        {% endfor %}
+                    </body>
+                </table>
+            {% else %}
+                <p class="alert alert-warning">Nenhuma solicitação foi cadastrada.</p>
+            {% endif %}
+
+            <h4>Solicitações de Alteração de Dados</h4>
+            {% if solicitacoes_alteracao_dados_servidor_no_edital %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th rowspan="2">Situação</th>
+                            <th rowspan="2">Data de cadastro</th>
+
+                            <th colspan="1">Solicitação</th>
+                            <th colspan="3">Parecer da Gestão</th>
+
+                            {% if pode_excluir_alteracao_dados %}
+                                <th rowspan="2">-</th>
+                            {% endif %}
+                        </tr>
+                        <tr>
+                            <th>Justificativa da solicitação</th>
+
+                            <th>Parecer/observações da gestão</th>
+                            <th>Data/hora do parecer</th>
+                            <th>Usuário do parecer</th>
+                        </tr>
+                    </thead>
+                    <body>
+                        {% for cal in solicitacoes_alteracao_dados_servidor_no_edital %}
+                            <tr>
+                                <td>{{ cal.get_situacao_html|format }}</td>
+                                <td>{{ cal.data_cadastro|format }}</td>
+
+                                <td>{{ cal.justificativa|format|linebreaksbr }}</td>
+
+                                <td>{{ cal.parecer_gestao|format|linebreaksbr }}</td>
+                                <td>{{ cal.data_hora_parecer|format }}</td>
+                                <td>{{ cal.usuario_parecer|format }}</td>
+
+                                {% if pode_excluir_alteracao_dados %}
+                                    <td>
+                                        <ul class="action-bar">
+                                            <li><a class="btn confirm danger"
+                                                   href="/licenca_capacitacao/excluir_solicitacao_alteracao_dados_servidor/{{ cal.id }}/">Excluir</a></li>
+                                        </ul>
+                                    </td>
+                                {% endif %}
+                            </tr>
+                        {% endfor %}
+                    </body>
+                </table>
+            {% else %}
+                <p class="alert alert-warning">Nenhuma solicitação foi cadastrada.</p>
+            {% endif %}
+        </div>
+
+        {% if not edital.processamento_externo %}
+            <div class="tab-pane" data-title="Resultados">
+                <div class="alert alert-warning">
+                    <p><strong>Importante</strong>:</p>
+                    <ol>
+                        <li>Para maiores informações consulte o Resultado Geral</li>
+                    </ol>
+                </div>
+
+                <h3>Meu Resultado</h3>
+                {% if processamentos_do_edital %}
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Processamento</th>
+                                <th>Resultado</th>
+                            </tr>
+                        </thead>
+                        <body>
+                            {% for mr in meus_resultados %}
+                                <tr>
+                                    <td>{{ mr.processamento.get_tipo_processamento_display }} - {{ mr.processamento.titulo }}</td>
+                                    <td>
+                                        {% if mr.processamento.tipo_processamento == 1 %}
+                                            {{ mr.aprovado_resultado_parcial|format }}
+                                        {% else %}
+                                            {{ mr.aprovado_resultado_final|format }}
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </body>
+                    </table>
+                {% else %}
+                    <p class="alert alert-warning">Nenhum resultado foi gerado.</p>
+                {% endif %}
+
+                <h3>Resultado Geral</h3>
+                {% if processamentos_do_edital %}
+                    {% include "include_lista_processamentos.html" %}
+                {% else %}
+                    <p class="alert alert-warning">Nenhum resultado foi gerado.</p>
+                {% endif %}
+            </div>
+        {% endif %}
+
+    {% endif %}
+
+    <div class="tab-pane" data-title="Publicações" data-counter="{{ arquivos_do_edital.count }}">
+        {% if arquivos_do_edital %}
+            {% include "include_lista_anexos_edital.html" %}
+        {% else %}
+            <p class="alert alert-warning">Nenhuma publicação foi realizada.</p>
+        {% endif %}
+    </div>
+
+{% endblock %}

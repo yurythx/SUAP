@@ -1,0 +1,99 @@
+{% extends super_template %}
+
+{% block extracss %}
+<link rel="stylesheet" href="/static/planejamento/css/planejamento.css" />
+<link rel="stylesheet" href="/static/planejamento/css/relatorio.css" />
+<link rel="stylesheet" href="/static/planejamento/css/relatorio_imp.css" media="print">
+{% endblock %}
+
+{% block extrahead %}
+<script src="/static/planejamento/js/RelatorioDetalhamentoGastos.js"></script>
+{% media_filter_box %}
+{% endblock %}
+
+{% block content %}
+
+	<div class="search-and-filters">
+		<div class="filter">
+			<form method="post">
+				{% csrf_token %}
+				{{ configuracao_form.as_ul }}
+				{{ campus_form.as_ul }}
+				{{ origem_form.as_ul }}
+				{{ dimensao_form.as_ul }}
+				{{ acao_orcamento_form.as_ul }}
+			</form>
+		</div>
+    </div>
+
+	{% if mensagem %}
+	<p class="alert alert-warning">{{ mensagem }}</p>
+	{% else %}
+
+	<fieldset id="dados_gerais" class="cabecalho_impressao">
+	    <ul class="cx_dados">
+	    	<li class="bck_linha_padrao"><span>Ação do Orç.:</span>{{ acao_orcamento|default:"Todas" }}</li>
+	        <li><span>Dimensão:</span>{{ dimensao|default:"Todas" }}</li>
+	        <li class="bck_linha_padrao"><span>Unidade Adm.:</span>{{ unidade_administrativa|default:"Todas" }}</li>
+			<li><span>Data e Hora:</span>{{ data_hora|date:"j \de F \de Y à\s H:i:s (l)"|format }}</li>
+			<li class="bck_linha_padrao"><span>Obs.:</span>Este relatório não considera os valores das ações indeferidas.</li>
+	    </ul>
+	</fieldset>
+
+	<div class="cx_tabela_plus" style="margin-top:15px;">
+		<div class="cx_colunas_fixas">
+			<table class="tbl_colunas_fixas" style="width:150px;">
+				<thead>
+					<tr>
+						<th>Unid. Admin.</th>
+					</tr>
+				</thead>
+				<tbody>
+					{% for unidade, naturezas in relatorio.items %}
+					<tr>
+						<td>{{ unidade }}</td>
+					</tr>
+					{% endfor %}
+				</tbody>
+				<tfoot>
+					<tr>
+						<td class="text-end">Total</td>
+					</tr>
+				</tfoot>
+			</table>
+		</div>
+		<div class="cx_conteudo">
+			<table class="tbl_conteudo">
+				<thead>
+					<tr>
+						{% for desp in despesas %}
+						<th style="text-align:center;min-width:100px;" title="{{desp.descricao }}">{{ desp.codigo }}</th>
+						{% endfor %}
+						<th style="text-align:center;min-width:100px;">Total</th>
+					</tr>
+				</thead>
+				<tbody>
+					{% for unidade, naturezas in relatorio.items %}
+					<tr>
+						{% for codigo, valor in naturezas.items %}
+						<td class="text-end"><a href="/planejamento/relatorio/despesas/acoes/naturezadespesa/?c={{ configuracao.id }}&o={{ acao_orcam.id|default:"" }}&d={{ dimensao.id|default:"" }}&u={{ unidade }}&n={{ codigo }}&r={{ origem.id|default:"" }}" title="{% for desp in despesas %}{% if desp.codigo == codigo %} {{ desp.descricao }} {% endif %}{% endfor%}">{{ valor|default:"0"|mascara_dinheiro }}</a></td>
+						{% endfor %}
+						<td class="text-end">{{ naturezas|sum_all_dict_values|mascara_dinheiro }}</td>
+					</tr>
+					{% endfor %}
+				</tbody>
+				<tfoot>
+					<tr>
+						{% for nat in naturezas %}
+						<td class="text-end">{{ relatorio|sum_values_by_key:nat|mascara_dinheiro }}</td>
+						{% endfor %}
+						<td class="text-end">{{ relatorio|sum_all_dict_values|mascara_dinheiro }}</td>
+					</tr>
+				</tfoot>
+			</table>
+		</div>
+	</div>
+
+	{% endif %}
+
+{% endblock %}

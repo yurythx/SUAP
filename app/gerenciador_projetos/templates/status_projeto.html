@@ -1,0 +1,68 @@
+{% extends super_template %}
+{% load gerenciador_projetos_templatetags %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if pode_adicionar_tarefas %}
+            <li><a class="btn success" href="{% url 'adicionar_tarefa' projeto.id %}">{% icone "plus" %} <span class="visually-hidden">Adicionar</span> Tarefa</a></li>
+        {% endif %}
+        {% include "includes/acoes_visualizacao.html" %}
+    </ul>
+{% endblock %}
+
+{% block object-status %}
+    {% include "includes/situacoes_projeto.html" %}
+{% endblock %}
+
+{% block content %}
+
+    {% include "includes/dados_gerais.html" %}
+
+    {% if lista_tarefas %}
+        {% if projeto.tag_set.exists %}
+            <ul class="pills">
+                <li><button type="button" class="active" data-tag-id="">Todas as tags</button></li>
+                {% for tag in projeto.tag_set.all %}
+                    <li><button type="button" data-tag-id="{{ tag.pk }}">{{ tag.nome }}</button></li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+        <div class="flex-container boards flex-nowrap mt-5">
+            {% for situacao_codigo, situacao_rotulo, tarefas in tarefas_por_situacao %}
+                {% if tarefas %}
+                    <div class="board-container" data-situacao="{{ situacao_codigo }}">
+                        <h3 class="title">{{ situacao_rotulo }}</h3>
+                        {% tarefas_para_dashboard tarefas user projeto show_status=False %}
+                    </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="alert alert-warning">Não há tarefas cadastradas para esse projeto.</p>
+    {% endif %}
+
+{% endblock %}
+
+{% block extrascripts %}
+    <script>
+        $(function () {
+            $('.pills button').on('click', function () {
+                var $botao = $(this);
+                var tagId = String($botao.data('tag-id'));
+
+                $('.pills button').removeClass('active');
+                $('.board-container').show();
+                $botao.addClass('active');
+
+                $('.tarefa-dashboard').each(function () {
+                    var tags = String($(this).attr('data-tags') || '').split(',');
+                    $(this).toggle(!tagId || tags.indexOf(tagId) !== -1);
+                });
+
+                $('.board-container').each(function () {
+                    $(this).toggle($(this).find('.tarefa-dashboard:visible').length > 0);
+                });
+            });
+        });
+    </script>
+{% endblock %}

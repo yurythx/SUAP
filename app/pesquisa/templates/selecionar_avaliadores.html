@@ -1,0 +1,95 @@
+{% extends super_template %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        <li><a class="btn confirm danger" data-confirm="Tem certeza que deseja remover todas as indicações rejeitadas (inclusive as rejeitadas automaticamente)?" href="/pesquisa/remover_indicacoes_rejeitadas/{{ edital.pk }}/">Remover indicações rejeitadas</a></li>
+    </ul>
+{% endblock %}
+
+{% block content %}
+    <div class="search-and-filters">
+        {% render_form form %}
+    </div>
+    {% if form.is_bound %}
+        {% if projetos.exists %}
+            <h3>Editais em avaliação</h3>
+            <div class="legenda">
+                <p>Legenda:</p>
+                <ul>
+                    <li class="success">{% icone "circle" %} Já realizou avaliação</li>
+                    <li class="warning">{% icone "circle" %} Não realizou avaliação</li>
+                    <li class="danger">{% icone "circle" %} Avaliador rejeitou a indicação</li>
+                    <li class="info">{% icone "circle" %} Avaliador aceitou a indicação</li>
+                </ul>
+            </div>
+            {% for projeto in projetos %}
+                <div class="general-box" id="projeto-{{ projeto.id }}">
+                    <div class="primary-info">
+                        <h4 class="title"><small>{{ forloop.counter }}</small><a href="/pesquisa/projeto/{{ projeto.id }}/">{{ projeto.titulo }}</a></h4>
+                        <ul class="action-bar">
+                            <li><a class="btn success" href="/pesquisa/selecionar_avaliadores_do_projeto/{{ projeto.id }}/?url={{ request.get_full_path }}">Selecionar avaliadores</a></li>
+                            <li><a class="btn primary" href="/pesquisa/selecionar_avaliadores_do_projeto/{{ projeto.id }}/?sorteio=True&url={{ request.get_full_path }}">Gerar sorteio dos avaliadores</a></li>
+                        </ul>
+                        <div class="extra-info">
+                            <h5 class="pb-3">Avaliadores:</h5>
+                            {% for avaliador in projeto.get_avaliadores_indicados %}
+                                {% if avaliador.ja_avaliou %}
+                                    <div class="farol sm success">
+                                {% elif avaliador.rejeitado %}
+                                    <div class="farol sm danger">
+                                {% elif avaliador.aceito_em %}
+                                    <div class="farol sm info">
+                                {% else %}
+                                    <div class="farol sm warning">
+                                {% endif %}
+                                    <span class="fas fa-circle farol-status" aria-hidden="true"></span>
+                                    <h6 class="title">
+                                        <strong>{{ avaliador.vinculo.pessoa.nome }}</strong>{% if avaliador.vinculo.eh_servidor %} ({{ avaliador.vinculo.relacionamento.matricula }}){% else %} (externo){% endif %}
+                                    </h6>
+                                    <p class="description">Indicações: <span class="badge">{{ avaliador.qtd_indicacoes_no_edital }} neste edital</span> <span class="badge">{{ avaliador.qtd_indicacoes_editais_abertos }} em editais abertos</span></p>
+                                    {% if avaliador.rejeitado_automaticamente and not avaliador.ja_avaliou %}
+                                        <span class="status status-error">Rejeitado automaticamente</span>
+                                    {% endif %}
+                                    <ul class="action-bar ms-auto">
+                                        {% if avaliador.rejeitado_automaticamente and not avaliador.ja_avaliou %}
+                                            <li>
+                                                <a href="/pesquisa/reenviar_convite_avaliador/{{ avaliador.id }}/" class="btn sm confirm" data-confirm="Tem certeza que deseja reenviar o convite?" title="Reenviar convite">
+                                                    {% icone "paper-plane" %}
+                                                    <span class="visually-hidden">Reenviar convite</span>
+                                                </a>
+                                            </li>
+                                        {% endif %}
+                                        <li>
+                                            <a href="/pesquisa/remover_indicacao_avaliador/{{ avaliador.id }}/" class="btn danger sm" data-confirm="Tem certeza que deseja remover a indicação deste avaliador?" title="Remover indicação">
+                                                {% icone "trash" %}
+                                                <span class="visually-hidden">Remover indicação</span>
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <dl class="secondary-info">
+                        <div class="list-item">
+                            <dt>{% icone "user" %} Coordenador</dt>
+                            <dd>{{ projeto.vinculo_coordenador.pessoa.nome }}</dd>
+                        </div>
+                        <div class="list-item">
+                            <dt>{% icone "building" %} Campus</dt>
+                            <dd>{{ projeto.uo }}</dd>
+                        </div>
+                        <div class="list-item">
+                            <dt>{% icone "th" %} Área de conhecimento</dt>
+                            <dd>{{ projeto.area_conhecimento|format }}</dd>
+                        </div>
+                    </dl>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p class="alert alert-warning">Nenhum projeto pré-aprovado.</p>
+        {% endif %}
+    {% else %}
+        <p class="alert alert-warning">Utilize os filtros para exibir os projetos.</p>
+    {% endif %}
+{% endblock %}

@@ -1,0 +1,91 @@
+{% extends super_template %}
+
+
+
+{% block content %}
+
+    <div id="formbox">
+
+        {% render_form form %}
+
+    </div>
+
+    <div id="resultadobox">
+        {% if polos.exists %}
+            <script>
+                $('#formbox').hide();
+            </script>
+            {% box "Filtros" %}
+
+                <ul class="action-bar">
+                    <li><a class="btn" href="/edu/horario_atendimento_polo/">Limpar Filtros</a></li>
+                    <li><a class="btn" href="#"
+                           onclick="javascript:$('#formbox').toggle();$('#resultadobox').toggle();return false;">Alterar
+                        Filtros</a></li>
+                </ul>
+
+                <table class="info">
+                    {% for filtro in polos.filtros %}
+                        <tr>
+                            <td>{{ filtro.chave }}</td>
+                            <td>{{ filtro.valor }}</td>
+                        </tr>
+                    {% endfor %}
+                </table>
+            {% endbox %}
+
+            {% box "Resultado da Pesquisa ({{ polos.count }} polos)" %}
+                <ul class="action-bar">
+                    <li><a class="btn" href="/edu/horario_atendimento_polo/?{{ request.META.QUERY_STRING }}&imprimir=1">Imprimir em
+                        PDF</a></li>
+                    <li><a class="btn" href="/edu/horario_atendimento_polo/?{{ request.META.QUERY_STRING }}&xls=1">Exportar para
+                        XLS</a></li>
+                </ul>
+
+                {% autopaginate polos 25 %}
+                {% for polo in polos %}
+                    <h4>{{ polo.descricao }}</h4>
+                    {% for turno in polo.get_horarios_por_turno %}
+                        {% if not turno.vazio %}
+                            <table>
+                                <thead>
+                                <tr>
+                                    <th>{{ turno }}</th>
+                                    {% for dia_semana in turno.dias_semana %}
+                                        <th class="text-center">{{ dia_semana.1 }}</th>
+                                    {% endfor %}
+                                </tr>
+                                </thead>
+                                <tbody>
+                                {% for horario_aula in turno.horarios %}
+                                    {% if not horario_aula.vazio %}
+                                        <tr>
+                                            <td><strong>{{ horario_aula }}</strong></td>
+                                            {% for dia_semana in horario_aula.dias_semana %}
+                                                <td class='text-center'>
+                                                    <ul>
+                                                        {% for tutor in dia_semana.tutores %}
+                                                            <li>{{ tutor }}</li>
+                                                        {% endfor %}
+                                                    </ul>
+                                                </td>
+                                            {% endfor %}
+                                        </tr>
+                                    {% endif %}
+                                {% endfor %}
+                                </tbody>
+                            </table>
+                        {% endif %}
+                        {% empty %}
+                        <p class='alert alert-warning'>Nenhum horário cadastrado.</p>
+                    {% endfor %}
+                {% endfor %}
+                {% paginate %}
+
+            {% endbox %}
+
+        {% elif polos.filtros %}
+            <p class='alert alert-warning'>Nenhum polo encontrado.</p>
+        {% endif %}
+    </div>
+{% endblock %}

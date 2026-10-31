@@ -1,0 +1,128 @@
+<div id="{{ id }}"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+<script>
+$(function(){
+    var uploader = new qq.FileUploader({
+        action: "{{ url }}",
+        element: $('#{{ id }}')[0],
+        multiple: {% if multiple %}true{% else %}false{% endif %},
+        maxConnections: 3,
+        uploadButtonText: "Selecione os Arquivos",
+        allowedExtensions: {{ allowedExtensions|safe }},
+        // each file size limit in bytes
+        // this option isn't supported in all browsers
+        sizeLimit: {{ sizeLimit }}, // max size
+        minSizeLimit: 0, // min size
+        template: '<form action=""><fieldset>' +
+            '<div class="qq-uploader form-row">' +
+            '<div class="qq-upload-drop-area"><span>Drop files here to upload</span></div>' +
+            '<div class="filter"><label>{% if multiple %}Adicionar arquivo(s){% else %}Adicionar arquivo{% endif %}:</label><div class="qq-upload-button">Procurar</div></div>' +
+            '</div></fieldset></form>' +
+            '<div class="qq-uploads-wrap"><ul class="qq-upload-list"></ul></div>',
+        fileTemplate: '<li>' +
+            '<span class="qq-upload-spinner"></span>' +
+            '<span class="qq-upload-file"></span>' +
+            '<span class="qq-upload-size"></span>' +
+            '<a class="qq-upload-cancel btn danger" href="#">Cancelar</a>' +
+            '<span class="qq-upload-result"></span>' +
+            '<div class="qq-progress-bar-container-selector">' +
+            '<div class="qq-progress-bar-selector qq-progress-bar"></div>' +
+            '<div class="qq-progress"><span>&nbsp;</span></div>' +
+            '<div class="qq-total-progress-bar-container-selector qq-total-progress-bar-container">' +
+            '<div class="qq-total-progress-bar-selector qq-progress-bar qq-total-progress-bar"></div>' +
+            '</div>' +
+            '</li>',
+onComplete: function(id, fileName, responseJSON) {
+    var file = uploader._handler._files[id];
+
+    if (!file) {
+        alert("Arquivo não encontrado.");
+        return;
+    }
+
+    validatePdf(file)
+        .then(() => {
+            {{ onCompleteUploadFunction }}(uploader, id, fileName, responseJSON);
+        })
+        .catch((errorMsg) => {
+            alert(errorMsg);
+        });
+},
+        onCancel: function(id, fileName) {
+        },
+        onProgress: function(id, fileName, loaded, total) {
+            //var el = uploader._getItemByFileId(id);
+            //console.log($(el).find('.qq-progress span')[0]);
+            //$($(el).find('.qq-progress span')[0]).setStyle('width', (loaded/total*300).round() + 'px');
+        },
+        onAllComplete: function(uploads) {
+            // uploads is an array of maps
+            // the maps look like this: {file: FileObject, response: JSONServerResponse}
+        },
+        params: {{ params|safe }},
+        messages: {
+            typeError : "{file} não é um tipo de arquivo válido. Os tipos aceitos pelo SUAP são: {extensions}.",
+            sizeError: "{file} é muito grande, o tamanho máximo permitido é {sizeLimit}.",
+            minSizeError: "{file} é muito pequeno, o tamanho mínimo aceitável é {minSizeLimit}.",
+            emptyError: "{file} é vazio, por favor selecione os arquivos novamente sem ele.",
+            onLeave: "Existem arquivos sendo enviados para o SUAP, se você deixar a página agora o processo será cancelado.",
+        },
+        showMessage: function(message)
+        {
+            alert(message);
+        }
+    });
+});
+
+/**
+ * Valida se um PDF está corrompido, protegido por senha ou ilegível.
+ * @param {File} file - O arquivo PDF a ser validado.
+ * @returns {Promise} - Resolve se válido, rejeita com mensagem de erro se inválido.
+ */
+function validatePdf(file) {
+    return new Promise((resolve, reject) => {
+        // Verifica se é um arquivo PDF
+        if (!file || file.type !== "application/pdf") {
+            reject("O arquivo não é um PDF válido.");
+            return;
+        }
+
+        var reader = new FileReader();
+
+        reader.onload = function(event) {
+            var arrayBuffer = event.target.result;
+
+            pdfjsLib.getDocument({ data: arrayBuffer }).promise
+                .then((pdf) => {
+                    // O PDF foi carregado com sucesso
+                    console.log("PDF carregado, número de páginas:", pdf.numPages);
+
+                    if (pdf.numPages === 0) {
+                        reject("O PDF não contém páginas válidas.");
+                    } else {
+                        resolve(); // PDF válido
+                    }
+                })
+                .catch((error) => {
+                    console.error("Erro ao carregar PDF:", error);
+
+                    if (error.name === "PasswordException") {
+                        reject("O PDF está protegido com senha. Utilize uma ferramenta de desbloqueio: https://www.ilovepdf.com/pt/desbloquear_pdf");
+                    } else if (error.message.includes("Invalid PDF structure") || error.message.includes("Unexpected end of file")) {
+                        reject("Arquivo corrompido. Tente reparar o PDF: https://www.ilovepdf.com/pt/reparar-pdf");
+                    } else {
+                        reject("Erro ao processar o PDF. O arquivo pode estar corrompido ou mal formado.");
+                    }
+                });
+        };
+
+        reader.onerror = function() {
+            reject("Erro ao ler o arquivo. O PDF pode estar corrompido.");
+        };
+
+        reader.readAsArrayBuffer(file);
+    });
+}
+
+
+</script>

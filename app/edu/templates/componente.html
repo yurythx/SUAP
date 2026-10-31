@@ -1,0 +1,180 @@
+{% extends super_template %}
+
+{% block action-bar %}
+    {% if perms.edu.add_componente %}
+        <ul class="action-bar">
+            <li>
+                <a href="/edu/editar_abreviatura_componente/{{ obj.pk }}/" class="btn primary">Editar Abreviatura</a>
+            </li>
+        </ul>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+
+    {% if possui_planodisciplina %}
+        <p class="alert alert-info">Componente gerado automaticamente.</p>
+    {% endif %}
+
+    <dl class="definition-list flex">
+        <div class="list-item">
+            <dt>Hora/relógio</dt>
+            <dd>{{ obj.get_ch_hora_relogio }}h</dd>
+        </div>
+        <div class="list-item">
+            <dt>Hora/aula</dt>
+            <dd>{{ obj.get_ch_hora_aula }}h</dd>
+        </div>
+        <div class="list-item">
+            <dt>
+                {% if possui_planodisciplina %}
+                Total de créditos <span class="hint hint-top" aria-label="A distribuição semestral da quantidade de créditos é definida no componente curricular da matriz"><span class="fas fa-question-circle"></span></span> 
+                {% else %}
+                Créditos
+                {% endif %}
+            </dt>
+            <dd>{{ obj.ch_qtd_creditos }}</dd>
+        </div>
+        <div class="list-item flex-basis-100">
+            <dt>Observação</dt>
+            <dd>{{ obj.observacao|format }}</dd>
+        </div>
+    </dl>
+
+    <div class="tab-pane" data-title="Dados gerais" data-tab="dados">
+        <dl class="definition-list flex">
+            <div class="list-item flex-basis-100">
+                <dt>Descrição</dt>
+                <dd>{{ obj.descricao }}</dd>
+            </div>
+            <div class="list-item flex-basis-100">
+                <dt>Descrição no diploma e histórico</dt>
+                <dd>{{ obj.descricao_historico }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Abreviatura</dt>
+                <dd>{{ obj.abreviatura|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Sigla</dt>
+                <dd>{{ obj.sigla }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Tipo</dt>
+                <dd><a href='{{ obj.tipo.get_absolute_url }}'>{{ obj.tipo }}</a></dd>
+            </div>
+            <div class="list-item">
+                <dt>Diretoria</dt>
+                <dd>{{ obj.diretoria }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Nível de ensino</dt>
+                <dd>{{ obj.nivel_ensino }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Ativo</dt>
+                <dd>{{ obj.ativo|format }}</dd>
+            </div>
+            {% if obj.sigla_qacademico %}
+            <div class="list-item">
+                <dt>Sigla Q-Acadêmico</dt>
+                <dd>{{ obj.sigla_qacademico|format }}</dd>
+            </div>
+            {% endif %}
+            {% if possui_planodisciplina %}
+            <div class="list-item">
+                <dt>Plano de disciplina</dt>
+                <dd><a href="{{ planodisciplina.get_absolute_url }}">{{ planodisciplina|format }}</a></dd>
+            </div>
+            {% endif %}
+        </dl>
+    </div>
+
+    <div class="tab-pane ajax-rendered" data-title="Matrizes" data-tab="matriz">
+        {% if request.GET.tab == "matriz" %}
+            <ol>
+                {% for matriz in matrizes %}
+                    <li><a href="/edu/matriz/{{ matriz.pk }}/">{{ matriz }}</a></li>
+                {% endfor %}
+            </ol>
+        {% endif %}
+    </div>
+
+    <div class="tab-pane ajax-rendered" data-title="Equivalências" data-tab="equivalencias">
+        {% if request.GET.tab == "equivalencias" %}
+            {% if equivalencias.exists %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Equivalências deste componente</caption>
+                    <tr>
+                        <td>#</td>
+                        <td>Componente(s)</td>
+                        <td>Equivalência</td>
+                        <td>Ativa</td>
+                        <td>Matrizes</td>
+                        <td>Avaliadores</td>
+                    </tr>
+                {% for equivalencia in equivalencias %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td>
+                            <ul>
+                            {% for componente in equivalencia.componentes.all %}
+                                <li>{{ componente }}</li>
+                            {% endfor %}
+                            </ul>
+                        </td>
+                        <td>
+                            <ul>
+                            {% for componente in equivalencia.equivalentes.all %}
+                                <li>{{ componente }}</li>
+                            {% endfor %}
+                            </ul>
+                        </td>
+                        <td>{{ equivalencia.ativa|format }}</td>
+                        <td>
+                            <ul>
+                            {% for item in equivalencia.equivalenciacomponentematriz_set.all %}
+                                <li>{{ item.matriz_origem }} -> {{ item.matriz_destino }} </li>
+                            {% endfor %}
+                            </ul>
+                        </td>
+                        <td>
+                            <ul>
+                                {% for item in equivalencia.avaliadorequivalenciacomponente_set.all %}
+                                    <li>{{ item.vinculo|format }} </li>
+                                {% endfor %}
+                            </ul>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </table>
+            </div>
+            {% else %}
+                <p class="alert alert-warning">Nenhuma equivalência cadastrada para esse componente.</p>
+            {% endif %}
+        {% endif %}
+    </div>
+
+    {% if possui_planodisciplina %}
+        <div class="tab-pane" data-title="Plano de disciplina" data-tab="pd">
+            <ul class="action-bar">
+                <li>
+                    <a href="{% url 'imprimir_planodisciplina' planodisciplina.id %}" class="btn">{% icone "file-pdf" %} Baixar PDF</a>
+                </li>
+            </ul>
+            {% include "../../ppc/templates/includes/planodisciplina_ementa_programa.html" with plano=planodisciplina secoes=planodisciplina.get_secoes %}
+        </div>
+        {% if possui_secao_ead %}
+            <div class="tab-pane" data-title="Plano de disciplina EAD" data-tab="pd_ead">
+                <ul class="action-bar">
+                    <li>
+                        <a href="{% url 'imprimir_planodisciplina' planodisciplina.id %}?ead=1" class="btn">{% icone "file-pdf" %} Baixar PDF</a>
+                    </li>
+                </ul>
+                {% include "../../ppc/templates/includes/planodisciplina_ementa_programa.html" with plano=planodisciplina secoes=planodisciplina.get_secoes_ead %}
+            </div>
+        {% endif %}
+    {% endif %}
+
+{% endblock %}

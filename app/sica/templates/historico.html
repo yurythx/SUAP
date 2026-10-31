@@ -1,0 +1,253 @@
+{% extends super_template %}
+
+{% block object-status %}
+    {% if obj.integralizou_ensino_medio %}
+        <span class="status status-success">Integralizado Fase Escolar</span>
+    {% endif %}
+    {% if obj.aluno.situacao.pk == 100 %}
+        <span class="status status-error">{{ obj.aluno.situacao|format }}</span>
+    {% else %}
+        {% if obj.aluno.situacao.pk == 6 %}
+            <span class="status status-success">{{ obj.aluno.situacao|format }}</span>
+        {% else %}
+            <span class="status status-info">{{ obj.aluno.situacao|format }}</span>
+        {% endif %}
+    {% endif %}
+    {% if obj.possui_certificacao_parcial %}
+        <span class="status status-info">Possui certificação parcial</span>
+    {% endif %}
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if obj.concluiu_estagio and obj.concluiu_todos_periodos and obj.aluno.dt_conclusao_curso %}
+            <li><a class="btn success" href="/edu/emitir_diploma/?aluno={{ obj.aluno.id }}">Emitir diploma</a></li>
+        {% endif %}
+    	{% if not tem_registro_emissao %}
+        	<li><a class="btn primary popup" href="/sica/editar_aluno/{{ obj.id }}/">Editar aluno</a></li>
+        {% endif %}
+    </ul>
+{% endblock %}
+
+{% block content %}
+    {% if tem_registro_emissao %}
+    	<p class="alert alert-warning">Os dados deste aluno não podem ser alterados pois o Histórico e/ou Certificado está emitido.</p>
+    {% endif %}
+
+    {% if pendencias %}
+        <div class="alert alert-warning">
+            <p>As seguintes informações ainda não foram fornecidas:</p>
+            <ul>
+                {% for pendencia in pendencias %}<li>{{ pendencia }}</li>{% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+
+    {% box "Dados gerais" %}
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>Matrícula</dt>
+                <dd>{{ obj.aluno.matricula }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Nome</dt>
+                <dd>{{ obj.aluno.pessoa_fisica.nome }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Ano de Ingresso</dt>
+                <dd>{{ ano_inicio }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Conclusão das Disciplinas</dt>
+                <dd>{{ ano_fim }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Curso</dt>
+                <dd>{{ obj.aluno.curso_campus }}</dd>
+            </div>
+        </dl>
+    {% endbox %}
+
+    {% box "Dados da Matriz" %}
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>Código</dt>
+                <dd>{{ obj.matriz.codigo }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Nome</dt>
+                <dd>{{ obj.matriz.nome }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>C.H. Teórica</dt>
+                <dd>{{ obj.matriz.carga_horaria|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>C.H. de Estágio</dt>
+                <dd>{{ obj.matriz.carga_horaria_estagio|format }}</dd>
+            </div>
+            <div class="list-item flex-basis-100">
+                <dt>Reconhecimento</dt>
+                <dd>{{ obj.matriz.reconhecimento }}</dd>
+            </div>
+        </dl>
+    {% endbox %}
+
+    {% box "Requisitos de conclusão" %}
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>Disciplinas de Auxiliar Técnico</dt>
+                <dd>{{ obj.concluiu_sexto_periodo|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Disciplinas Obrigatórias</dt>
+                <dd>{{ obj.concluiu_todos_periodos|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Atividade Profissional / Estágio</dt>
+                <dd>{{ obj.concluiu_estagio|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Data de Conclusao</dt>
+                <dd>{{ obj.aluno.dt_conclusao_curso|format }}</dd>
+            </div>
+        </dl>
+    {% endbox %}
+
+    {% box 'Histórico de Emissão de Diploma' %}
+        {% if registros_emissao.exists %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Registros de Emissão de Diploma</caption>
+                    <thead>
+                        <tr>
+                            <th class="no-print">Ações</th>
+                            <th>Via</th>
+                            <th>Registro</th>
+                            <th>Livro</th>
+                            <th>Folha</th>
+                            <th>Data de Expedição</th>
+                            <th>Processo</th>
+                            <th>Nº do Formulário</th>
+                            <th class="no-print">Opções</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for registro in registros_emissao %}
+                        <tr>
+                            <td class="no-print">{% icon "view" "/edu/registroemissaodiploma/{{ registro.pk }}/" %}</td>
+                            <td><strong>{{ registro.via }}</strong></td>
+                            <td>{{ registro.numero_registro }}</td>
+                            <td>{{ registro.get_livro }}</td>
+                            <td>{{ registro.folha }}</td>
+                            <td>{{ registro.data_expedicao|format }}</td>
+                            <td>{{ registro.processo }}</td>
+                            <td>{{ registro.numero_formulario|format }}</td>
+                            <td class="no-print">
+                                <ul class="action-bar">
+                                    {% if registro.data_expedicao %}
+                                        <li><a href="/edu/registroemissaodiploma_pdf/{{ registro.pk }}/" class="btn">Imprimir Registro</a></li>
+                                    {% endif %}
+                                    <li><a href="/edu/imprimir_diploma/{{ registro.pk }}/" class="btn">Imprimir Diploma</a></li>
+                                    {% if registro.eh_ultima_via %}
+                                        <li><a href="/edu/emitir_segunda_via_diploma/{{ registro.pk }}/" class="btn primary popup">Emitir Nova Via</a></li>
+                                    {% endif %}
+                                </ul>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Nenhum diploma/certificado foi emitido ainda.</p>
+        {% endif %}
+    {% endbox %}
+
+    {% box "Histórico Escolar" %}
+
+        <ul class="action-bar">
+            <li><a class="btn default popup" href="/sica/matriz/{{ obj.matriz.id }}/{{ ano_inicio }}/{{ ano_fim }}/">Visualizar Matriz ({{ ano_inicio }} - {{ ano_fim }})</a></li>
+        	{% if not tem_registro_emissao %}
+	            {% if request.user.is_superuser %}
+    	            <li><a class="btn primary" href="?reprocessar=1/">Reprocessar Histórico</a></li>
+        	    {% endif %}
+	            <li><a class="btn primary" href="/sica/matriz/{{ obj.matriz.id }}">Editar Matriz</a></li>
+    	        <li><a class="btn success popup" href="/sica/atualizar_registro/{{ obj.pk }}/">Adicionar Registro</a></li>
+   	       	{% endif %}
+            {% if not pendencias %}
+            	<li><a class="btn" href="/sica/historico_sica_pdf/{{ obj.id }}/">Imprimir Histórico</a></li>
+            	{% if obj.concluiu_sexto_periodo and obj.aluno.is_concluido %}
+            		<li><a class="btn" href="/sica/declaracao_sica_pdf/{{ obj.id }}/">Imprimir Certificado</a></li>
+            	{% endif %}
+            {% endif %}
+            {% if tem_registro_emissao %}
+            	<li><a class="btn danger" href="/sica/invalidar_registros_emissao/{{ obj.id }}/">Invalidar Histórico e Certificado Emitido</a></li>
+            {% endif %}
+        </ul>
+
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>C.H. Total</dt>
+                <dd>{{ obj.get_ch_cumprida }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>C.H. Geral</dt>
+                <dd>{{ obj.get_ch_geral }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>C.H. Especial</dt>
+                <dd>{{ obj.get_ch_especial }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>C.H. de Estágio</dt>
+                <dd>{{ obj.matriz.carga_horaria_estagio|format }}</dd>
+            </div>
+        </dl>        
+
+        {% for tipo, registros in obj.get_registros %}
+            {% if registros %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Disciplinas {{ tipo }}</caption>
+                    <thead>
+                        <tr>
+                            <th class="no-print">Ações</th>
+                            <th class="text-center">Nível</th>
+                            <th class="text-center">Ano/Semestre</th>
+                            <th>Código</th>
+                            <th>Disciplina</th>
+                            <th class="text-center">Opcional</th>
+                            <th class="text-center">Carga<br>Horária</th>
+                            <th class="text-center">Nota</th>
+                            <th class="text-center">Faltas</th>
+                            <th class="text-center">Freq. (%)</th>
+                            <th class="text-center">Situação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for registro in registros %}
+                        <tr>
+                            <td class="no-print">
+                                {% icon "edit" "/sica/atualizar_registro/{{ obj.pk }}/{{ registro.pk }}/" "Editar Vínculo" "popup" %}
+                                {% icon "delete" "/comum/excluir/sica/registrohistorico/{{ registro.pk }}/" "Remover" "popup" %}
+                            </td>
+                            <td class="text-center">{{ registro.periodo_matriz|format }}</td>
+                            <td class="text-center">{% if registro.ano and registro.periodo %}{{ registro.ano }}/{{ registro.periodo }}{% else %}-{% endif %}</td>
+                            <td>{{ registro.componente.codigo }}</td>
+                            <td>{{ registro.componente.nome|normalizar }}</td>
+                            <td class="text-center">{{ registro.opcional|format }}</td>
+                            <td class="text-center">{{ registro.get_carga_horaria|format }}</td>
+                            <td class="text-center">{{ registro.get_nota|format }}</td>
+                            <td class="text-center">{{ registro.qtd_faltas|format }}</td>
+                            <td class="text-center">{{ registro.get_frequencia|format }}</td>
+                            <td class="text-center">{{ registro.get_situacao|status }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+        {% endfor %}
+    {% endbox %}
+{% endblock %}

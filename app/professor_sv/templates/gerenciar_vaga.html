@@ -1,0 +1,200 @@
+{% extends super_template %}
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if pode_emprestar_vaga.0 %}
+            <li>
+                <a href="{% url 'emprestar_vaga' vaga.id %}" class="btn success">Emprestar</a>
+            </li>
+        {% endif %}
+        {% if pode_desfazer_emprestimo_vaga.0 %}
+            <li>
+                <a href="{% url 'desfazer_emprestimo_vaga' vaga.id %}"
+                   class="btn success confirm">Desfazer empréstimo</a>
+            </li>
+        {% endif %}
+        {% if pode_devolver_emprestimo_vaga.0 %}
+            <li>
+                <a href="{% url 'devolver_emprestimo_vaga' vaga.id %}"
+                   class="btn success confirm">Devolver empréstimo</a>
+            </li>
+        {% endif %}
+        {% if pode_iniciar_cadastro_contrato.0 %}
+            <li>
+                <a href="{% url 'cadastrar_contrato' vaga.id %}" class="btn success">Cadastrar Contrato</a>
+            </li>
+        {% endif %}
+        {% if pode_ativar_vaga.0 %}
+            <li>
+                <a href="{% url 'ativar_vaga' vaga.id %}" class="btn success">Ativar</a>
+            </li>
+        {% endif %}
+        {% if pode_desativar_vaga.0 %}
+            <li>
+                <a href="{% url 'desativar_vaga' vaga.id %}" class="btn danger">Desativar</a>
+            </li>
+        {% endif %}
+        {% if pode_excluir_vaga.0 %}
+            <li>
+                <a href="{% url 'remover_vaga' vaga.id %}" class="btn danger">Remover</a>
+            </li>
+        {% endif %}
+    </ul>
+{% endblock %}
+{% block content %}
+    {% include "includes/dados_vaga.html" with exibir_cod_vaga=False %}
+    <div class="tab-pane"
+         data-title="Histórico de Movimentação da Vaga"
+         data-tab="tab1">
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Grupo Dono/Tomador</th>
+                        <th>Tipo de Movimentação</th>
+                        <th>Data de cadastro</th>
+                        <th>Data inicial</th>
+                        <th>Data final</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for historico in historico_dono_vaga %}
+                        <tr>
+                            <td>{{ historico.grupo_tomador|format }}</td>
+                            <td>{{ historico.get_tipo_movimentacao_display|format }}</td>
+                            <td>
+                                {{ historico.data_cadastro|format }}
+                                {% if historico.usuario_cadastro %}por {{ historico.usuario_cadastro|format }}{% endif %}
+                            </td>
+                            <td>{{ historico.data_inicio|format }}</td>
+                            <td>
+                                {% if historico.data_fim %}
+                                    {{ historico.data_fim|format }}
+                                {% else %}
+                                    <span class="status status-info">Indefinido</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="tab-pane" data-title="Empréstimos da Vaga" data-tab="tab2">
+        <div class="table-responsive">
+            {% if not solicitacoes_emprestimo %}
+                <p class="alert alert-warning">Não há solicitações.</p>
+            {% else %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Grupo Tomador</th>
+                            <th>Processo</th>
+                            <th>Empréstimo até</th>
+                            <th>Justificativa</th>
+                            <th>Data de cadastro</th>
+                            <th>Aprovação Gestão de Pessoas</th>
+                            <th>Aprovação DG</th>
+                            <th>Finalizado</th>
+                            <th>Cancelada</th>
+                            <th class="no-print">Opções</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sol in solicitacoes_emprestimo %}
+                            <tr>
+                                <td>{{ sol.grupo_tomador|format }}</td>
+                                <td>{{ sol.processo|format }}</td>
+                                <td>
+                                    {% if sol.emprestimo_ate %}
+                                        {{ sol.emprestimo_ate|format }}
+                                    {% else %}
+                                        <span class="status status-info">Indefinido</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ sol.justificativa|format }}</td>
+                                <td>
+                                    {{ sol.data_cadastro|format }}
+                                    {% if sol.usuario_cadastro %}por {{ sol.usuario_cadastro }}{% endif %}
+                                </td>
+                                <td>
+                                    {% if not sol.grupo_dono_eh_re %}
+                                        {% if sol.setor_cogpe_parecer %}
+                                            {{ sol.get_setor_cogpe_parecer_display|status }} {{ sol.setor_cogpe }}
+                                            por {{ sol.setor_cogpe_parecer_usuario|format }} em {{ sol.setor_cogpe_parecer_data|format }}
+                                        {% else %}
+                                            {% if not sol.finalizado %}
+                                                {% if not sol.cancelada %}<span class="status status-alert">Pendente</span>{% endif %}
+                                                {{ sol.get_setores_cogpe_para_aprovar_emprestimo_display }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        {% endif %}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if not sol.grupo_dono_eh_re %}
+                                        {% if sol.setor_dg_parecer %}
+                                            {{ sol.get_setor_dg_parecer_display|status }} {{ sol.setor_dg }}
+                                            por {{ sol.setor_dg_parecer_usuario|format }} em {{ sol.setor_dg_parecer_data|format }}
+                                        {% else %}
+                                            {% if not sol.finalizado %}
+                                                {% if not sol.cancelada %}<span class="status status-alert">Pendente</span>{% endif %}
+                                                {{ sol.get_setor_dg_para_aprovar_emprestimo }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        {% endif %}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>{{ sol.finalizado|format }}</td>
+                                <td>{{ sol.cancelada|format }}</td>
+                                <td>
+                                    <ul class="action-bar">
+                                        {% if sol|method:'pode_cancelar_solicitacao'|call:request.user %}
+                                            <li>
+                                                <a class="btn danger"
+                                                   href="/professor_sv/cancelar_solicitacao_emprestimo/{{ sol.id }}">
+                                                    Cancelar
+                                                </a>
+                                            </li>
+                                        {% endif %}
+                                    </ul>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% endif %}
+        </div>
+    </div>
+    <div class="tab-pane" data-title="Contratos" data-tab="tab3">
+        {% if not contratos %}
+            <p class="alert alert-warning">Não há contratos.</p>
+        {% else %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="no-print">Ações</th>
+                            <th>Professor Substituto/Visitante</th>
+                            <th>Situação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for contrato in contratos %}
+                            <tr>
+                                <td class="no-print">{% icon "view" "/professor_sv/gerenciar_contrato/{{ contrato.id }}/" %}</td>
+                                <td>{{ contrato.servidor_docente|format }}</td>
+                                <td>{{ contrato.get_situacao_display }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}

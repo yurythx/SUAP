@@ -1,0 +1,273 @@
+{% extends super_template %}
+
+{% block content %}
+    <ul class="action-bar">
+        {% if recesso_opcao.is_aberto_para_escolhas_de_datas or not recesso_opcao.is_permite_escolha_pelos_servidores %}
+            {% if not recesso_opcao.is_concluido_cadastro_e_escolhas_de_datas %}
+                <li><a class="btn success confirm" href="/ponto/fechar_cadastro_e_escolha/{{ recesso_opcao.id }}/">Concluir</a></li>
+            {% endif %}
+        {% endif %}
+        {% if recesso_opcao.is_em_fase_de_cadastro %}
+            <li><a class="btn primary" href="/admin/ponto/recessoopcao/{{ recesso_opcao.id }}/">Editar Dados gerais</a></li>
+            {% if recesso_opcao.is_definido_dias_do_recesso or recesso_opcao.is_definido_periodos_do_recesso %}
+                {% if recesso_opcao.is_definido_periodo_de_escolha %}
+                    <li><a class="btn primary confirm" href="/ponto/liberar_escolha_recesso/{{ recesso_opcao.id }}/">Liberar para Escolha dos Dias/Períodos a Compensar</a></li>
+                {% endif %}
+            {% endif %}
+        {% else %}
+            <li><a class="btn primary confirm" href="/ponto/retornar_a_fase_de_cadastro/{{ recesso_opcao.id }}/">Retornar à Fase de Cadastro</a></li>
+        {% endif %}
+        <li><a class="btn danger" href="/ponto/excluir_opcao_recesso/{{ recesso_opcao.id }}/">Remover</a></li>
+    </ul>
+
+    {% if recesso_opcao_periodo_escolhas_aberto_e_expirado %}
+        <p class="alert alert-warning">
+            O período de Escolhas dos Dias/Períodos expirou.
+            {% if recesso_opcao_com_pendencias_de_validacao_remarcacao %}
+                <strong>Ainda há Validações e/ou Remarcações Pendentes.</strong>
+                {% endif %}
+            Se deseja modificar, retorne à Fase de Cadastro.
+        </p>
+    {% endif %}
+
+    {% box 'Dados gerais' %}
+        <div class="table-responsive">
+            <table class="info">
+                <caption>&nbsp;</caption>
+                <tr>
+                    <td>Descrição</td>
+                    <td colspan="3">{{ recesso_opcao.descricao }}</td>
+                </tr>
+                {% if recesso_opcao.origem %}
+                    <tr>
+                        <td>Origem da Informação</td>
+                        <td>
+                            <a class="popup" href="{{ recesso_opcao.origem.get_absolute_url }}">
+                                {{ recesso_opcao.get_origem_display }}
+                            </a>
+                        </td>
+                    </tr>
+                {% endif %}
+                <tr>
+                    <td>Tipo</td>
+                    <td>{{ recesso_opcao.get_tipo_display }}</td>
+                </tr>
+                {% if recesso_opcao.is_permite_escolha_pelos_servidores %}
+                    <tr>
+                        <td>Quantidade Máxima de Dias que podem ser escolhidos</td>
+                        <td colspan="3">
+                            {% if recesso_opcao.qtde_max_dias_escolhidos %}
+                                {{ recesso_opcao.qtde_max_dias_escolhidos }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Quantidade Máxima de Períodos que podem ser escolhidos</td>
+                        <td colspan="3">
+                            {% if recesso_opcao.qtde_max_periodos_escolhidos %}
+                                {{ recesso_opcao.qtde_max_periodos_escolhidos }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endif %}
+                <tr>
+                    <td>Situação</td>
+                    <td colspan="3">
+                        {% if recesso_opcao.is_em_fase_de_cadastro %}
+                            <span class="status status-em-tramite">{{ recesso_opcao.get_situacao_display }}</span>
+                        {% elif recesso_opcao.is_aberto_para_escolhas_de_datas %}
+                            <span class="status status-em-tramite">{{ recesso_opcao.get_situacao_display }}</span>
+                        {% else %}
+                            <span class="status status-finalizado">{{ recesso_opcao.get_situacao_display }}</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <td>Público Alvo</td>
+                    <td colspan="3">
+                        {% if recesso_opcao.is_publico_alvo_definido %}
+                            {{ recesso_opcao.get_servidores_display }}
+                        {% else %}
+                            <span class="status status-error">Você precisa informar o público alvo</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% if recesso_opcao.is_permite_escolha_pelos_servidores %}
+                    <tr>
+                        <td>Período de Escolha</td>
+                        <td colspan="3">
+                            {% if recesso_opcao.is_definido_periodo_de_escolha %}
+                                {{ recesso_opcao.periodo_de_escolha_data_inicial|format }}
+                                a
+                                {{ recesso_opcao.periodo_de_escolha_data_final|format }}
+                            {% else %}
+                                <span class="status status-error">Você precisa informar o período de escolhas</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endif %}
+                <tr>
+                    <td>Responsável pelo cadastro</td>
+                    <td>{{ recesso_opcao.responsavel|format }}</td>
+                </tr>
+            </table>
+        </div>
+    {% endbox %}
+
+    {% box 'Dias a Compensar / Dias dos Débitos' badge=recesso_opcao.dias_do_recesso.all|length %}
+        {% if recesso_opcao.is_em_fase_de_cadastro %}
+            <ul class="action-bar">
+                <li><a class="btn success popup" href="/ponto/adicionar_dia_de_recesso/{{ recesso_opcao.id }}/">Adicionar</a></li>
+            </ul>
+        {% endif %}
+        
+        <p class="alert alert-info">
+            Quando há a necessidade de se cadastrar <strong>dias isolados</strong>. 
+            É um cadastro <strong>opcional</strong>.
+        </p>
+        
+        {% if recesso_opcao.dias_do_recesso.all %}
+            <div class="table-responsive">
+                <table>
+                    <caption>&nbsp;</caption>
+                    <thead>
+                        <tr>
+                            <th>Dia</th>
+                            {% if recesso_opcao.is_em_fase_de_cadastro %}
+                                <th class="no-print">Opções</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for recesso_dia in recesso_opcao.dias_do_recesso.all %}
+                            <tr>
+                                <td>{{ recesso_dia.data|format }} ({{ recesso_dia.data|date:"D" }})</td>
+                                {% if recesso_opcao.is_em_fase_de_cadastro %}
+                                    <td class="no-print">
+                                        <a class="btn danger" href="/ponto/excluir_dia_de_recesso/{{ recesso_dia.id }}/">Remover</a>
+                                    </td>
+                                {% endif %}
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            {% if recesso_opcao.qtde_max_dias_escolhidos %}
+                <p class="alert alert-danger">A <strong>Quantidade Máxima de Dias que podem ser escolhidos</strong> foi informada. Logo, esta seção deixa de ser opcional e <strong>deverá ser cadastrada</strong>.</p>
+            {% else %}
+                -
+            {% endif %}
+        {% endif %}
+    {% endbox %}
+
+    {% box 'Períodos a Compensar / Períodos dos Débitos' badge=recesso_opcao.periodos_do_recesso.all|length %}            
+        {% if recesso_opcao.is_em_fase_de_cadastro %}
+            <ul class="action-bar">
+                <li><a class="btn success popup" href="/ponto/adicionar_periodo_de_recesso/{{ recesso_opcao.id }}/">Adicionar</a></li>
+            </ul>
+        {% endif %}
+
+        <p class="alert alert-info">
+            Quando há a necessidade de se cadastrar períodos 
+            com <strong>início</strong> e <strong>fim</strong> determinados, 
+            incluindo a possibilidade de desconsiderar um ou mais dias de um período.
+            É um cadastro <strong>opcional</strong>.
+        </p>
+
+        {% if recesso_opcao.periodos_do_recesso.all %}
+            <div class="table-responsive">
+                <table>
+                    <caption>&nbsp;</caption>
+                    <thead>
+                        <tr>
+                            <th>Período</th>
+                            <th>Descrição</th>
+                            <th>Quantidade máxima de dias que podem ser escolhidos no período</th>
+                            <th>Dias excluídos/desconsiderados do período</th>
+                            {% if recesso_opcao.is_em_fase_de_cadastro %}
+                                <th class="no-print">Opções</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for recesso_periodo in recesso_opcao.periodos_do_recesso.all %}
+                            <tr>
+                                <td>
+                                    {{ recesso_periodo.data_inicio|format }} ({{ recesso_periodo.data_inicio|date:"D" }}) a
+                                    {{ recesso_periodo.data_fim|format }} ({{ recesso_periodo.data_fim|date:"D" }})
+                                </td>
+                                <td>{{ recesso_periodo.descricao|format }}</td>
+                                <td>
+                                    {% if recesso_periodo.qtde_max_dias_a_escolher %}
+                                        {{ recesso_periodo.qtde_max_dias_a_escolher }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {{ recesso_periodo.dias_excluidos_as_date|format }}
+                                </td>
+                                {% if recesso_opcao.is_em_fase_de_cadastro %}
+                                    <td class="no-print">
+                                        <a class="btn danger" href="/ponto/excluir_periodo_de_recesso/{{ recesso_periodo.id }}/">Remover</a>
+                                    </td>
+                                {% endif %}
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            {% if recesso_opcao.qtde_max_periodos_escolhidos %}
+                <p class="alert alert-danger">A <strong>Quantidade Máxima de Períodos que podem ser escolhidos</strong> foi informada. Logo, esta seção deixa de ser opcional e <strong>deverá ser cadastrada</strong>.</p>
+            {% else %}
+                -
+            {% endif %}
+        {% endif %}
+    {% endbox %}
+
+    {% box 'Períodos de Compensação / Períodos dos Saldos' badge=recesso_opcao.periodos_de_compensacao.all|length %}
+        {% if recesso_opcao.is_em_fase_de_cadastro %}
+            <ul class="action-bar">
+                <li><a class="btn success popup" href="/ponto/adicionar_periodo_de_compensacao/{{ recesso_opcao.id }}/">Adicionar</a></li>
+            </ul>
+        {% endif %}
+        {% if recesso_opcao.periodos_de_compensacao.all %}
+            <div class="table-responsive">
+                <table>
+                    <caption>&nbsp;</caption>
+                    <thead>
+                        <tr>
+                            <th>Período</th>
+                            {% if recesso_opcao.is_em_fase_de_cadastro %}
+                                <th class="no-print">Opções</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for periodo_de_compensacao in recesso_opcao.periodos_de_compensacao.all %}
+                            <tr>
+                                <td>
+                                    {{ periodo_de_compensacao.data_inicial|format }} ({{ periodo_de_compensacao.data_inicial|date:"D" }}) a
+                                    {{ periodo_de_compensacao.data_final|format }} ({{ periodo_de_compensacao.data_final|date:"D" }})
+                                </td>
+                                {% if recesso_opcao.is_em_fase_de_cadastro %}
+                                    <td class="no-print">
+                                        <a class="btn danger" href="/ponto/excluir_periodo_de_compensacao/{{ periodo_de_compensacao.id }}/">Remover</a>
+                                    </td>
+                                {% endif %}
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-danger">Nenhum período de compensação foi definido.</p>
+        {% endif %}
+    {% endbox %}
+{% endblock %}

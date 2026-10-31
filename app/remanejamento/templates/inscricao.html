@@ -1,0 +1,220 @@
+{% extends super_template %}
+
+{% block object-status %}
+    {% if inscricao.confirmada %}
+        <span class="status status-success">Confirmada</span>
+    {% else %}
+        {% if inscricao.data_desistencia %}
+            <span class="status status-alert">Desistência em {{ inscricao.data_desistencia|format }}</span>
+        {% else %}
+            <span class="status status-error">Cancelada</span>
+        {% endif %}
+    {% endif %}
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if inscricao.confirmada and pode_desistir %}
+            <li><a class="btn warning confirm" href="./desistir/">Cancelar inscrição (Desistir)</a></li>
+        {% endif %}
+
+        {% if inscricao.disciplina %}
+            {% if eh_coordenador or eh_avaliador %}
+                <li><a class="btn default" href="./imprimir/">Avaliação por assunto (Impressão)</a></li>
+            {% endif %}
+        {% endif %}
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+    {% box 'Dados gerais' %}
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>Edital</dt>
+                <dd>{{ inscricao.edital.titulo }} {% if inscricao.edital.url %} (
+                    <a target="_blank" href="{{ inscricao.edital.url }}">mais informações</a>){% endif %}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Descrição</dt>
+                <dd>{{ inscricao.edital.descricao }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Servidor</dt>
+                <dd>{{ inscricao.servidor }}</dd>
+                <dt>Data de Nascimento:</dt>
+                <dd>{{ inscricao.servidor.pessoa_fisica.nascimento_data|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Cargo:</dt>
+                <dd>{{ inscricao.servidor.cargo_emprego }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Campus de lotação atual:</dt>
+                <dd>{{ inscricao.servidor.setor_lotacao.uo.equivalente }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Jornada de trabalho:</dt>
+                <dd>{{ inscricao.jornada_trabalho }}</dd>
+                <dt>Início de serviço na instituição:</dt>
+                <dd>{{ inscricao.inicio_exercicio }}</dd>
+            </div>
+            {% if inscricao.vaga_edital.disciplina %}
+                <div class="list-item">
+                    <dt>Disciplina</dt>
+                    <dd>{{ inscricao.vaga_edital.disciplina }}</dd>
+                </div>
+            {% endif %}
+            {% if inscricao.edital.tem_anexo %}
+                <div class="list-item">
+                    <dt>Anexo</dt>
+                    {% if inscricao.anexo %}
+                        <dd><a href="{{ inscricao.anexo.url }}">{{ inscricao.anexo|cut:"remanejamento/anexos/" }}</a>
+                        </dd>
+                    {% else %}
+                        <dd>Sem anexo.</td>
+                    {% endif %}
+                </div>
+            {% endif %}
+            {% if inscricao.data_inapta %}
+                <div class="list-item">
+                    <dt>Inabilitada:</dt>
+                    <dd>
+                        {% if inscricao.data_inapta %}
+                            <span class="status status-success">Sim</span>
+                        {% else %}
+                            <span class="status status-error">Não</span>
+                        {% endif %}
+                    </dd>
+                </div>
+                <div class="list-item">
+                    <dt>Inabilitada por</dt>
+                    <dd>{{ inscricao.atualizado_inapta_por }} em {{ inscricao.data_inapta }} pelo
+                        motivo: {{ inscricao.motivo_inapta }}</dd>
+                </div>
+            {% endif %}
+        </dl>
+    {% endbox %}
+
+    {% box 'Ordens de preferência por campus' %}
+        <dl>
+            {% for item in inscricao.inscricaoitem_set.all %}
+                <dt>{{ item.campus.nome|upper }}:</dt>
+                <dd>{{ item.preferencia }}</dd>
+            {% endfor %}
+        </dl>
+    {% endbox %}
+
+    {% if inscricao.recurso_texto %}
+        {% box 'Recurso cadastrado' %}
+            <dl class="definition-list flex">
+                <div class="list-item">
+                    <dt>Situação:</dt>
+                    <dd>
+      <span class="status
+          {% if inscricao.situacao_recurso == 'PENDENTE_DE_ANALISE' %}status-pending{% elif inscricao.situacao_recurso == 'DEFERIDO' %}status-success{% elif inscricao.situacao_recurso == 'DEFERIDO_PARCIALMENTE' %}status-warning{% elif inscricao.situacao_recurso == 'INDEFERIDO' %}status-error{% endif %}">
+          {{ inscricao.get_situacao_recurso_display|format }}
+      </span>
+                    </dd>
+                </div>
+                <div class="list-item">
+                    <dt>Recurso:</dt>
+                    <dd>{{ inscricao.recurso_texto|linebreaks }}</dd>
+                </div>
+             </dl>
+            {% if pode_ver_resultado_recurso %}
+                <dl class="definition-list flex">
+                <div class="list-item">
+                <dt>Resposta ao recurso:</dt>
+                <dd>{{ inscricao.avaliacao_recurso|linebreaks }}</dd>
+                </div>
+                </dl>
+            {% endif %}
+
+        {% endbox %}
+    {% endif %}
+
+    {% if pode_ver_parecer %}
+        {% box 'Parecer da Comissão de Avaliação' %}
+            <p>Após análise da documentação apresentada, anexada ao SUAP no ato da inscrição,
+                pelo requerente neste processo e considerando o conteúdo exigido para a
+                matéria/disciplina alvo do seu pleito, esta Comissão é de entendimento que o
+                Professor {{ inscricao.servidor.pessoa_fisica.nome }},
+                Matrícula {{ inscricao.servidor.matricula }},
+
+                <span class="false">{% if inscricao.is_habilitado %}ESTÁ{% else %}NÃO ESTÁ{% endif %}
+                    HABILITADO</span>, com base nas comprovações apresentadas e tendo
+                por referência a HABILITAÇÃO / REQUISITO MÍNIMO constante do Anexo I do Edital
+                e os conteúdos previsto para matéria/disciplina em pauta.</p>
+
+            {% if inscricao.is_habilitado %}
+                <p><span class="false">{% if inscricao.is_apto %}ESTÁ{% else %}NÃO ESTÁ{% endif %} APTO</span>,
+                    com base nas comprovações apresentadas e tendo por
+                    referência o modelo de currículo constante do Anexo II do Edital.</p>
+            {% endif %}
+
+            {% if not inscricao.is_habilitado %}
+                <p>A NÃO HABILITAÇÃO do candidato se deve à não apresentação de documentação
+                    de que comprove o atendimento à HABILITAÇÃO / REQUISITO MÍNIMO constante
+                    do Anexo I do Edital para a matéria/disciplina em pauta.</p>
+            {% endif %}
+
+            {% if inscricao.is_habilitado %}
+
+                {% if not inscricao.is_apto %}
+                    <p>A NÃO APTIDÃO do candidato se deve à não apresentação de documentação de
+                        que comprove o atendimento de, no mínimo, 70% do(s)
+                        seguinte(s) pontos constantes do programa / conteúdos específicos para
+                        a matédia/disciplina em pauta:</p>
+
+                    <ul>
+                        {% for i in inscricao.get_itens %}
+                            <li class="false">{{ i.disciplina_item.descricao }} - {{ i.apto_percentual }}%</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+
+            {% endif %}
+
+            <br>
+            <p>Comissão:</p>
+            <ul>
+                {% for c in inscricao.edital.coordenadores.all|dictsort:"get_profile.nome" %}
+                    <li>{{ c.get_profile.nome }}</li>
+                {% endfor %}
+            </ul>
+
+            {% if inscricao.disciplina.avaliadores.exists %}
+                <br>
+                <p>Avaliadores:</p>
+                <ul>
+                    {% for a in inscricao.disciplina.avaliadores.all|dictsort:"get_profile.nome" %}
+                        <li>{{ a.get_profile.nome }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        {% endbox %}
+    {% endif %}
+
+    {% if pode_cadastrar_recurso %}
+        {% box 'Cadastrar recurso' %}
+            {% render_form form_recurso %}
+        {% endbox %}
+    {% endif %}
+
+    {% if form_recurso_resposta %}
+        {% box 'Resposta ao recurso' %}
+            {% render_form form_recurso_resposta %}
+        {% endbox %}
+    {% endif %}
+
+    {% box 'Autenticidade da inscrição' %}
+        <dl class="definition-list">
+            <dt>Texto:</dt>
+            <dd>{{ inscricao.frase_pura }}</dd>
+            <dt>Chave:</dt>
+            <dd>{{ inscricao.frase_hash }}</dd>
+        </dl>
+    {% endbox %}
+
+{% endblock %}

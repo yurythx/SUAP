@@ -1,0 +1,123 @@
+{% load i18n %}
+
+<h3>
+    Sincronização com o CKAN
+    {% if ckan_configurado %}<span class="status status-success">API ativa</span>{% else %}<span class="status status-error">API inativa</span>{% endif %}
+</h3>
+
+{% if not ckan_configurado %}
+<p class="alert alert-warning"><strong>Atenção:</strong> a API externa do CKAN não está configurada ou está inativa. Nenhuma base pode ser sincronizada até que ela seja configurada.</p>
+{% elif not usuario_pode_sincronizar_ckan %}
+<p class="alert alert-info"><strong>Informação:</strong> você pode acompanhar a situação das bases, mas não tem permissão para sincronizá-las.</p>
+{% endif %}
+
+<ul class="flex-container boxes infos sm mb-4">
+    <li class="box-item with-icon">
+        {% icone "database" %}
+        <p class="stat">{{ bases_relacionadas|length }}</p>
+        <h4 class="title">Bases no plano</h4>
+    </li>
+    <li class="box-item with-icon{% if bases_relacionadas and ckan_resumo.bases_sincronizadas == bases_relacionadas|length %} success{% endif %}">
+        {% icone "check-circle" %}
+        <p class="stat">{{ ckan_resumo.bases_sincronizadas }} <small>de {{ bases_relacionadas|length }}</small></p>
+        <h4 class="title">Sincronizadas</h4>
+    </li>
+    <li class="box-item with-icon{% if ckan_resumo.bases_atrasadas %} error{% endif %}">
+        {% icone "clock" %}
+        <p class="stat">{{ ckan_resumo.bases_atrasadas }}</p>
+        <h4 class="title">Periodicidade atrasada</h4>
+    </li>
+    <li class="box-item with-icon{% if ckan_resumo.bases_com_falha %} error{% endif %}">
+        {% icone "times-circle" %}
+        <p class="stat">{{ ckan_resumo.bases_com_falha }}</p>
+        <h4 class="title">Em falha na rotina</h4>
+    </li>
+    <li class="box-item with-icon{% if ckan_resumo.bases_sem_configuracao %} warning{% endif %}">
+        {% icone "exclamation-triangle" %}
+        <p class="stat">{{ ckan_resumo.bases_sem_configuracao }}</p>
+        <h4 class="title">Sem configuração mínima</h4>
+    </li>
+</ul>
+
+{% if bases_relacionadas %}
+<div class="table-responsive">
+    <table>
+        <caption class="pt-0">Sincronização por base</caption>
+        <thead>
+            <tr>
+                <th>Base de dados</th>
+                <th>Sincronização</th>
+                <th>Periodicidade</th>
+                <th class="text-end">Opções</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for rel in bases_relacionadas %}
+            <tr>
+                <td>
+                    <a href="{% url 'admin:dados_abertos_pdabasedados_change' rel.pk %}"><strong>{{ rel.base_dados.titulo }}</strong></a>
+                    {% if rel.base_dados.organizacao %}<small class="d-block text-muted">{{ rel.base_dados.organizacao }}</small>{% endif %}
+                </td>
+                <td>
+                    {% if rel.ckan_status == 'sincronizado' %}
+                        <span class="status status-success">{{ rel.ckan_status_label }}</span>
+                    {% elif rel.ckan_status == 'parcial' or rel.ckan_status == 'dataset' %}
+                        <span class="status status-alert">{{ rel.ckan_status_label }}</span>
+                    {% else %}
+                        <span class="status status-default">{{ rel.ckan_status_label }}</span>
+                    {% endif %}
+                    <small class="d-block text-muted">
+                        {% if not rel.num_recursos %}
+                            Nenhum recurso cadastrado.
+                        {% elif not rel.num_recursos_com_fonte %}
+                            Recursos sem URL ou arquivo configurado.
+                        {% else %}
+                            {{ rel.num_recursos_sincronizados }} de {{ rel.num_recursos }} recurso{{ rel.num_recursos|pluralize }} sincronizado{{ rel.num_recursos|pluralize }}{% if rel.ultima_sincronizacao_ckan %}, em {{ rel.ultima_sincronizacao_ckan|date:'d/m/Y H:i' }}{% endif %}.
+                        {% endif %}
+                    </small>
+                </td>
+                <td>
+                    {% if rel.periodicidade_status == 'em_dia' %}
+                        <span class="status status-success">{{ rel.periodicidade_label }}</span>
+                    {% elif rel.periodicidade_status == 'atencao' %}
+                        <span class="status status-alert">{{ rel.periodicidade_label }}</span>
+                    {% elif rel.periodicidade_status == 'atrasada' or rel.periodicidade_status == 'manual_pendente' %}
+                        <span class="status status-error">{{ rel.periodicidade_label }}</span>
+                    {% else %}
+                        <span class="status status-default">{{ rel.periodicidade_label }}</span>
+                    {% endif %}
+                    {% if rel.frequencia_atualizacao %}
+                    <small class="d-block text-muted">{{ rel.get_frequencia_atualizacao_display }}{% if rel.proxima_sincronizacao %}, próxima em {{ rel.proxima_sincronizacao|date:'d/m/Y' }}{% endif %}.</small>
+                    {% endif %}
+                    {% if rel.ultima_atualizacao %}
+                    <small class="d-block {% if rel.atualizacao_pendente %}text-danger{% else %}text-muted{% endif %}">
+                        Rotina automática em {{ rel.ultima_atualizacao.data|date:'d/m/Y H:i' }}: {{ rel.ultima_atualizacao.get_resultado_display }}.
+                    </small>
+                    {% if rel.falhas_consecutivas > 1 %}
+                    <span class="status status-error">{{ rel.falhas_consecutivas }} falhas seguidas</span>
+                    {% endif %}
+                    {% elif not rel.tem_fonte_automatica %}
+                    <small class="d-block text-muted">Sem URL de origem: atualização manual.</small>
+                    {% endif %}
+                </td>
+                <td class="text-end">
+                    <ul class="action-bar">
+                        {% if rel.pode_sincronizar_ckan %}
+                        <li>
+                            <form method="post" action="{% url 'dados_abertos:sincronizar_base_ckan' pda.id rel.pk %}">
+                                {% csrf_token %}
+                                <button type="submit" class="btn success">{% icone "sync-alt" %} Sincronizar</button>
+                            </form>
+                        </li>
+                        {% endif %}
+                        <li><a href="{% url 'dados_abertos:base_dados_detalhe' rel.base_dados_id %}" class="btn default">Visualizar base</a></li>
+                    </ul>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p class="alert alert-info">Nenhuma base de dados associada a este PDA.</p>
+{% endif %}

@@ -1,0 +1,253 @@
+{% extends super_template %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        <li class="has-child">
+            <a href="#" class="btn">Imprimir Lista</a>
+            <ul>
+                <li><a href='/ae/imprimir_lista_diaria/{{ programa.id }}/0?pdf_data={{ data_segunda|date:"d/m/Y" }}&pdf_tipo_refeicao={{ tipo_refeicao }}&categoria_busca={{ categoria_busca.id }}&agendados={{ agendados }}'>Segunda-Feira - {{ data_segunda }}</a></li>
+                <li><a href='/ae/imprimir_lista_diaria/{{ programa.id }}/1?pdf_data={{ data_terca|date:"d/m/Y" }}&pdf_tipo_refeicao={{ tipo_refeicao }}&categoria_busca={{ categoria_busca.id }}&agendados={{ agendados }}'>Terça-Feira - {{ data_terca }}</a></li>
+                <li><a href='/ae/imprimir_lista_diaria/{{ programa.id }}/2?pdf_data={{ data_quarta|date:"d/m/Y" }}&pdf_tipo_refeicao={{ tipo_refeicao }}&categoria_busca={{ categoria_busca.id }}&agendados={{ agendados }}'>Quarta-Feira - {{ data_quarta }}</a></li>
+                <li><a href='/ae/imprimir_lista_diaria/{{ programa.id }}/3?pdf_data={{ data_quinta|date:"d/m/Y" }}&pdf_tipo_refeicao={{ tipo_refeicao }}&categoria_busca={{ categoria_busca.id }}&agendados={{ agendados }}'>Quinta-Feira - {{ data_quinta }}</a></li>
+                <li><a href='/ae/imprimir_lista_diaria/{{ programa.id }}/4?pdf_data={{ data_sexta|date:"d/m/Y" }}&pdf_tipo_refeicao={{ tipo_refeicao }}&categoria_busca={{ categoria_busca.id }}&agendados={{ agendados }}'>Sexta-Feira - {{ data_sexta }}</a></li>
+            </ul>
+        </li>
+        <li><a href="/ae/programa/{{ programa.pk }}/" class="btn">Retornar ao Programa</a></li>
+        {% if buscou %}
+            <li><a href='?pdf_data={{ data|date:"d/m/Y" }}&pdf_tipo_refeicao={{ tipo_refeicao }}&categoria_busca={{ categoria_busca.id }}&agendados={{ agendados }}' class="btn">Exportar para PDF</a></li>
+        {% endif %}
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+    <div class="search-and-filters">
+        {% render_form form %}
+    </div>
+    {% if buscou %}
+        {% if atendimentos|length %}
+            {% box "Legenda" class="collapsed" %}
+                <div class="table-responsive">
+                    <table>
+                        <caption>Legenda</caption>
+                        <thead>
+                            <tr>
+                                <th>Mensagem</th>
+                                <th>Descrição</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><span class="status status-alert">P</span></td>
+                                <td>Aluno participante com refeição para esta data.</td>
+                            </tr>
+                            <tr>
+                                <td><span class="status status-success">P</span></td>
+                                <td>Aluno participante realizou refeição nesta data.</td>
+                            </tr>
+                            <tr>
+                                <td><span class="status status-error">FP</span></td>
+                                <td>Aluno participante não compareceu.</td>
+                            </tr>
+                            <tr>
+                                <td><span class="status status-alert">A</span></td>
+                                <td>Aluno possui refeição agendada para esta data.</td>
+                            </tr>
+                            <tr>
+                                <td><span class="status status-success">A</span></td>
+                                <td>Aluno realizou refeição nesta data, conforme agendamento.</td>
+                            </tr>
+                             <tr>
+                                <td><span class="status status-error">FA</span></td>
+                                <td>Aluno agendado não compareceu.</td>
+                            </tr>
+                            <tr>
+                                <td><span class="status status-success">X</span></td>
+                                <td>Aluno realizou refeição nesta data, de forma avulsa.</td>
+                            </tr>
+                            <tr>
+                                <td><span class="status status-info">FJ</span></td>
+                                <td>Aluno faltou mas justificou a falta previamente.</td>
+                            </tr>
+                            <tr>
+                                <td><span class="status status-default">R</span></td>
+                                <td>Recesso/Férias ou data liberada.</td>
+                            </tr>
+                            <tr>
+                                <td>-</td>
+                                <td>Não há refeição nesta data para este aluno.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            {% endbox %}
+        {% endif %}
+
+        {% box "Relatório Semanal" %}
+            <dl class="lista-simples">
+                <dt>Semana:</dt>
+                <dd>{{ data|format }} - {{ data_limite|format }}</dd>
+            </dl>
+
+            {% if atendimentos|length %}
+                <div class="table-responsive">
+                    <table>
+                        <caption>Relatório Semanal</caption>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Aluno</th>
+                                <th>Categoria</th>
+                                <th>Seg <span>Total: {{ seg_count }}</span></th>
+                                <th>Ter <span>Total: {{ ter_count }}</span></th>
+                                <th>Qua <span>Total: {{ qua_count }}</span></th>
+                                <th>Qui <span>Total: {{ qui_count }}</span></th>
+                                <th>Sex <span>Total: {{ sex_count }}</span></th>
+                                <th>Total</th>
+                                <th>Faltas</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for atendimento in atendimentos %}
+                                <tr>
+                                    <td>{{ atendimento.count }}</td>
+                                    <td>
+                                        {% if atendimento.participacao.participacaoalimentacao.suspensa %}
+                                            <span class="status status-error">{{ atendimento.pessoa_fisica }}
+                                        {% elif atendimento.uo != programa.instituicao.id %}
+                                            <span class="status status-alert">{{ atendimento.pessoa_fisica }}
+                                        {% else %}
+                                            {{ atendimento.pessoa_fisica }}
+                                        {% endif %}
+                                        {% if perms.edu.view_aluno %}
+                                            <a href="/edu/aluno/{{ atendimento.matricula }}/">({{ atendimento.matricula }})</a>
+                                        {% else %}
+                                            ({{ atendimento.matricula }})
+                                        {% endif %}
+                                        {% if atendimento.participacao.participacaoalimentacao.suspensa %}
+                                            <span class="false"> (Participação suspensa)</span></span>
+                                        {% elif atendimento.uo != programa.instituicao.id %}
+                                            <span class="false"> (Outro campus)</span></span>
+                                        {% endif %}
+                                        {% if atendimento.faltas >= 1 and atendimento.participacao %}
+                                            {% if perms.ae.pode_revogar_participacao or perms.ae.pode_revogar_participacaoalimentacao %}
+                                                <a href="/ae/revogar_participacao/{{ atendimento.participacao.id }}/" class="btn popup danger float-end">Finalizar Participação</a>
+                                            {% endif %}
+                                        {% endif %}
+                                    </td>
+                                    <td>{% if atendimento.participacao or atendimento.categoria %}{{ atendimento.categoria|format }}{% else %}Refeição Agendada{% endif %}</td>
+                                    <td class="text-center">{{ atendimento.seg|safe }}</td>
+                                    <td class="text-center">{{ atendimento.ter|safe }}</td>
+                                    <td class="text-center">{{ atendimento.qua|safe }}</td>
+                                    <td class="text-center">{{ atendimento.qui|safe }}</td>
+                                    <td class="text-center">{{ atendimento.sex|safe }}</td>
+                                    <td class="text-center">{{ atendimento.total }}</td>
+                                    <td class="text-center">{{ atendimento.faltas }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="3">Refeições Previstas para Participantes (+):</td>
+                                <td class="text-center">{{ total_participantes_seg }}</td>
+                                <td class="text-center">{{ total_participantes_ter }}</td>
+                                <td class="text-center">{{ total_participantes_qua }}</td>
+                                <td class="text-center">{{ total_participantes_qui }}</td>
+                                <td class="text-center">{{ total_participantes_sex }}</td>
+                                <td class="text-center">{{ total_participante }}</td>
+                                <td>-</td>
+                            </tr>
+                            <tr>
+                                <td colspan="3">Participações Suspensas (-):</td>
+                                <td class="text-center">{{ total_suspensas_seg }}</td>
+                                <td class="text-center">{{ total_suspensas_ter }}</td>
+                                <td class="text-center">{{ total_suspensas_qua }}</td>
+                                <td class="text-center">{{ total_suspensas_qui }}</td>
+                                <td class="text-center">{{ total_suspensas_sex }}</td>
+                                <td class="text-center">{{ total_suspensas }}</td>
+                                <td>-</td>
+                            </tr>
+                            <tr>
+                                <td colspan="3">Refeições Agendadas (+):</td>
+                                <td class="text-center">{{ seg_agendada }}</td>
+                                <td class="text-center">{{ ter_agendada }}</td>
+                                <td class="text-center">{{ qua_agendada }}</td>
+                                <td class="text-center">{{ qui_agendada }}</td>
+                                <td class="text-center">{{ sex_agendada }}</td>
+                                <td class="text-center">{{ total_agendada }}</td>
+                                <td>-</td>
+                            </tr>
+                            <tr>
+                                <td colspan="3">Refeições Adicionadas por Atendimento sem Agendamento Prévio (+):</td>
+                                <td class="text-center">{{ seg_avulsa }}</td>
+                                <td class="text-center">{{ ter_avulsa }}</td>
+                                <td class="text-center">{{ qua_avulsa }}</td>
+                                <td class="text-center">{{ qui_avulsa }}</td>
+                                <td class="text-center">{{ sex_avulsa }}</td>
+                                <td class="text-center">{{ total_avulsa }}</td>
+                                <td>-</td>
+                            </tr>
+                            <tr>
+                                <td colspan="3">Total de Faltas Justificadas de Participantes (-):</td>
+                                <td class="text-center">{{ seg_faltas_just }}</td>
+                                <td class="text-center">{{ ter_faltas_just }}</td>
+                                <td class="text-center">{{ qua_faltas_just }}</td>
+                                <td class="text-center">{{ qui_faltas_just }}</td>
+                                <td class="text-center">{{ sex_faltas_just }}</td>
+                                <td class="text-center">{{ total_faltas_just }}</td>
+                                <td>-</td>
+                            </tr>
+                            <tr>
+                                <td colspan="3">Total de Faltas não Justificadas de Participantes (-):</td>
+                                <td class="text-center">{{ seg_faltas }}</td>
+                                <td class="text-center">{{ ter_faltas }}</td>
+                                <td class="text-center">{{ qua_faltas }}</td>
+                                <td class="text-center">{{ qui_faltas }}</td>
+                                <td class="text-center">{{ sex_faltas }}</td>
+                                <td class="text-center">{{ total_faltas }}</td>
+                                <td>-</td>
+                            </tr>
+                            <tr>
+                                <td colspan="3">Toal de Faltas dos Agendados (-):</td>
+                                <td class="text-center">{{ seg_faltas_agendados }}</td>
+                                <td class="text-center">{{ ter_faltas_agendados }}</td>
+                                <td class="text-center">{{ qua_faltas_agendados }}</td>
+                                <td class="text-center">{{ qui_faltas_agendados }}</td>
+                                <td class="text-center">{{ sex_faltas_agendados }}</td>
+                                <td class="text-center">{{ total_faltas_agendados }}</td>
+                                <td>-</td>
+                            </tr>
+                            <tr>
+                                <td colspan="3">Total de Refeições Realizadas (=):</td>
+                                <td class="text-center">{{ seg_count }}</td>
+                                <td class="text-center">{{ ter_count }}</td>
+                                <td class="text-center">{{ qua_count }}</td>
+                                <td class="text-center">{{ qui_count }}</td>
+                                <td class="text-center">{{ sex_count }}</td>
+                                <td class="text-center">{{ total_executado }}</td>
+                                <td>-</td>
+                            </tr>
+                            <tr>
+                                <td colspan="3">Oferta de Refeição:</td>
+                                {% if disponibilidade %}
+                                    {% for item in dados_disponibilidade %}
+                                        <td class="text-center">{{ item }}</td>
+                                    {% endfor %}
+                                    <td class="text-center">{{ total_geral_disponibilidade }}</td>
+                                {% else %}
+                                    <td colspan="6"><span class="status status-alert">Não informada</span></td>
+                                {% endif %}
+                                <td>-</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            {% else %}
+                <p class="alert alert-warning">Nenhum atendimento cadastrado no período informado.</p>
+            {% endif %}
+        {% endbox %}
+
+    {% else %}
+        <p class="alert alert-warning">Selecione os parâmetros do relatório.</p>
+    {% endif %}
+{% endblock %}

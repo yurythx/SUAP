@@ -1,0 +1,98 @@
+{% load pipeline %}
+{% load static %}
+{% load tags %}
+{% javascript 'jquery' %}
+
+<h2>{{ app_config.verbose_name }}</h2>
+{% if app_config.description %}
+    <p class="description">{{ app_config.description }}</p>
+{% endif %}
+
+{% if workflows or has_module_bpmn %}
+    <script src="/static/djtools/bpmn-js/bpmn-viewer.production.min.js"></script>
+
+    <div class="canvas">
+        <h3>Fluxogramas</h3>
+        <div class="workflows">
+            <form action="">
+                <label for="js-url">Selecione uma funcionalidade:</label>
+                <select id="js-url">
+                    {% if has_module_bpmn %}
+                        <option value="/comum/documentacao/bpmn/{{ aplicacao }}/{{ aplicacao }}.bpmn/">Geral</option>
+                    {% endif %}
+                    {% for workflow in workflows %}
+                        <option value="/comum/documentacao/bpmn/{{ aplicacao }}/{{ workflow.1 }}/">{{ workflow.0 }}</option>
+                    {% endfor %}
+                </select>
+            </form>
+        </div>
+        <div id="js-canvas"></div>
+    </div>
+    <script>
+        var viewer = new BpmnJS({
+            container: $('#js-canvas'),
+            height: 300
+        });
+
+        function openFromUrl(url) {
+            $.ajax(url, {dataType: 'text'}).done(async function (xml) {
+                try {
+                    await viewer.importXML(xml);
+                    viewer.get('canvas').zoom('fit-viewport');
+                } catch (err) {
+                    console.error(err);
+                }
+            });
+        }
+
+        $(document).ready(function () {
+            var url = $('#js-url').val();
+            var str = window.location.search;
+            var match = /(?:\&|\?)url=([^&]+)/.exec(str);
+
+            openFromUrl(url);
+            if (match) {
+                var url = decodeURIComponent(match[1]);
+                $('#js-url').val(url);
+                openFromUrl(url);
+            }
+
+            $('#js-url').on('change', function () {
+                var url = $('#js-url').val();
+                openFromUrl(url);
+            });
+        });
+    </script>
+{% endif %}
+
+{% if perfis_da_app.exists %}
+    <div class="alert alert-info">
+        <h3>Grupos de Usuários da Aplicação</h3>
+        <ul class="list">
+            {% for perfil in perfis_da_app %}
+                <li class="item">
+                    <h4>{{ perfil.group }}</h4>
+                    {% if perfil.descricao %}
+                        <p class="description">{{ perfil.descricao }}</p>
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+{% endif %}
+
+{% if perfis_fora_app.exists %}
+    <div class="alert alert-info">
+        <h3>Outros Grupos de Usuários</h3>
+        <ul class="list">
+            {% for perfil in perfis_fora_app %}
+                <li class="item">
+                    <h4>{{ perfil.group }}</h4>
+                    {% if perfil.descricao %}
+                        <p class="description">{{ perfil.descricao }}</p>
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+{% endif %}

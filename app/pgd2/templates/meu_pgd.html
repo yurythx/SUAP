@@ -1,0 +1,334 @@
+{% extends super_template %}
+
+{% block bodyclass %}hasAsideRight large-action-bar{% endblock %}
+
+{% block action-bar %}
+    {% if eh_meu_pgd %}
+        <ul class="action-bar">
+            <li class="has-child">
+                <a class="btn success" href="#">Solicitar adesão</a>
+                <ul>
+                    <li><a href="{% url 'solicitar_adesao_pgd2' %}">Ao PGD</a></li>
+                    <li><a href="/pgd2/selecionar_setor_solicitar_adesao_pes/">A um PES</a></li>
+                </ul>
+            </li>
+            <li>
+                <a class="btn success" href="/pgd2/cadastrar_pit/">Adicionar {{ nomenclatura.plano_individual_de_trabalho_sigla_pgd2 }}</a>
+            </li>
+            <li class="has-child">
+                <a class="btn default" href="#">Ações</a>
+                <ul>
+                    <li><a href="/pgd2/meu_pgd/?modo=pessauxiliar">PESs que sou auxiliar</a></li>                    
+                    <li><a href="/admin/pgd2/periodopes/">Calendários de PES</a></li>
+                    <li><a href="/admin/pgd2/periodopitrit/">Calendários de {{ nomenclatura.pit_rit_pgd2 }}</a></li>
+                    <li><a href="/pgd2/atualizar_dados_pgd_suap_com_sougov/">Atualizar dados via SOU GOV</a></li>                    
+                </ul>
+            </li>
+            {% if modo == 'pessauxiliar' %}
+                <li>
+                    <a class="btn" href="/pgd2/meu_pgd/">Voltar</a>
+                </li>
+            {% endif %}
+        </ul>
+    {% endif %}
+{% endblock %}
+
+{% block asideright %}
+
+    <aside class="right">
+        <button id="collapseAsideRight"><span class="visually-hidden">Minimizar barra lateral</span></button>
+
+        <details open="open">
+            <summary>Dados do servidor</summary>
+            <div class="details-container">
+                <dl>
+                    <dt>Setor Suap</dt>
+                    <dd>
+                        <a href="/rh/setor/{{ servidor.setor.pk }}/">{{ servidor.setor|format }}</a> (campus: {{ servidor.setor.uo.setor|format }})
+                    </dd>
+                    <dt>Dados de PGD conforme SOU GOV</dt>
+                    <dd>
+                        {% if servidor.participa_pgd %}
+                            Está em PGD {{ servidor.modalidade_pgd|format|upper }}
+                        {% else %}
+                            Não está em PGD
+                        {% endif %}
+                    </dd>
+                    {% if not eh_meu_pgd %}
+                        <dt>Contato</dt>
+                        <dd>{{ ultima_adesao_vigente.get_contato_preferencia }}</dd>
+                    {% endif %}
+                </dl>
+            </div>
+        </details>
+    </aside>
+
+{% endblock %}
+
+{% block content %}
+
+    {{ block.super }}
+
+    {% if modo == 'pessauxiliar' %}
+        {% if not pess_que_sou_auxiliar %}
+            <p class="alert alert-warning">Não há PESs que sou auxiliar.</p>        
+        {% else %}
+            {% box 'PESs que sou auxiliar' class="mt-4" %}
+                <ol class="counter-container">
+                    {% for pes_aux in pess_que_sou_auxiliar %}
+                        <li class="counter-item"><a href="/pgd2/visualizar_pes/{{ pes_aux.pk }}/">{{ pes_aux }}</a></li>
+                    {% endfor %}
+                </ol>
+            {% endbox %}
+        {% endif %}
+    {% endif %}
+    
+    {% if modo == 'meupgd' %}
+        {% if pendencias_servidor %}
+            {% box 'Pendências de Servidor' %}
+                <div class="checklist-container">
+                    {% for pend in pendencias_servidor %}
+                        <a href="{{ pend.url }}" class="checklist error">{{ pend.msg }} <strong>Pendente</strong></a>
+                    {% endfor %}
+                </div>
+            {% endbox %}
+        {% endif %}
+
+        {% if registros_pgd_exterior and registros_pgd_exterior.0 or registros_pgd_exterior.1 %}
+            {% box 'Registros de PGD Exterior' %}
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Descrição</th>
+                                <th>Data Inicial</th>
+                                <th>Data Final</th>
+                                <th>Cancelado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for registro_pgd_exterior in registros_pgd_exterior.0 %}
+                            <tr>
+                                <td>
+                                    {{ registro_pgd_exterior.afastamento|format }}
+                                </td>
+                                <td>{{ registro_pgd_exterior.data_inicio }}</td>
+                                <td>{{ registro_pgd_exterior.data_fim|format }}</td>
+                                <td>{{ registro_pgd_exterior.cancelado|format }}</td>
+                            </tr>
+                        {% endfor %}
+                        {% for registro_pgd_exterior in registros_pgd_exterior.1 %}
+                            <tr>
+                                <td>
+                                    {{ registro_pgd_exterior.hipotese_legal|format }}
+                                    {% if registro_pgd_exterior.documento_eletronico %}
+                                        <span class="status status-info">{{ registro_pgd_exterior.documento_eletronico }}</span>
+                                    {% else %}
+                                        <span class="status status-alert">Sem portaria emitida/informada</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ registro_pgd_exterior.data_inicio }}</td>
+                                <td>{{ registro_pgd_exterior.data_fim|format }}</td>
+                                <td>{{ registro_pgd_exterior.cancelado|format }}</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endbox %}
+        {% endif %}
+
+        {% if not eh_meu_pgd %}
+            {% box 'Contato' %}
+                <dl class="definition-list flex">
+                    <div class="list-item">
+                        <dt>Contato</dt>
+                        <dd>{{ ultima_adesao_vigente.get_contato_preferencia }}</dd>
+                    </div>
+                </dl>
+            {% endbox %}
+
+            {% if horarios_presencial_servidor or horarios_atendimento_teletrabalho_servidor %}
+                {% box 'Horários do servidor' %}
+                    <p class="alert alert-info">Serão exibidos os horários dos últimos e próximos quinze dias. Para visualizar horários fora desse período ou para maiores detalhes, consulte os planejamentos homologados do servidor.</p>
+                    {% if horarios_presencial_servidor %}
+                        <div class="table-responsive">
+                            <table>
+                                <caption>Cronograma de Trabalho Presencial</caption>
+                                <thead>
+                                    <tr>
+                                        <th>Data</th>
+                                        <th colspan="2">Horário</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                {% for horario in horarios_presencial_servidor %}
+                                    <tr>
+                                        <td>{{ horario.data|format }}</td>
+                                        <td>{{ horario.hora_inicio|time:"H:i:s" }}</td>
+                                        <td>{{ horario.hora_final|time:"H:i:s" }}</td>
+                                    </tr>
+                                {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% endif %}
+
+                    {% if horarios_atendimento_teletrabalho_servidor %}
+                        <div class="table-responsive">
+                            <table>
+                                <caption>Cronograma de Atendimento em Teletrabalho</caption>
+                                <thead>
+                                    <tr>
+                                        <th>Data</th>
+                                        <th colspan="2">Horário</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                {% for horario in horarios_atendimento_teletrabalho_servidor %}
+                                    <tr>
+                                        <td>{{ horario.data|format }}</td>
+                                        <td>{{ horario.hora_inicio|time:"H:i:s" }}</td>
+                                        <td>{{ horario.hora_final|time:"H:i:s" }}</td>
+                                    </tr>
+                                {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="alert alert-warning">Não há horários informados para o período.</p>        
+                    {% endif %}
+                {% endbox %}
+            {% endif %}
+        {% endif %}
+
+        {% for adesao in adesoes_pgd %}
+            <div class="tab-pane"
+                data-title="{{ adesao.get_verbose_simples }}"
+                data-tab="adesoes_ao_pgd_{{ adesao.id }}"
+                data-checked="{% if adesao.estah_deferida and not adesao.estah_desligado %}True{% endif %}">
+                
+                <ul class="action-bar">
+                    <li class="has-child">
+                        <a class="btn default" href="#">Ações</a>
+                        <ul>
+                            {% if adesao|method:'pode_visualizar'|call:request.user %}
+                                <li>
+                                    <a href="/pgd2/visualizar_solicitacao_adesao/{{ adesao.id }}">Visualizar adesão ao PGD</a>
+                                </li>
+                            {% endif %}
+                            {% if adesao|method:'pode_visualizar_horas_servidor'|call:request.user %}
+                                <li>
+                                    <a href="/pgd2/servidor_pgd_horas/{{ adesao.id }}">Visualizar horas</a>
+                                </li>
+                            {% endif %}
+                            {% if adesao|method:'pode_editar_telefone_pgd'|call:request.user %}
+                                <li>
+                                    <a href="{% url 'editar_telefone_pgd_pgd2' adesao.id %}">Editar Telefone para contato PGD</a>
+                                </li>
+                            {% endif %}
+                            {% if adesao|method:'pode_iniciar_cadastro_desligamento'|call:request.user %}
+                                <li>
+                                    <a href="{% url 'cadastrar_desligamento_pgd_pgd2' adesao.id %}">Cadastrar desligamento</a>
+                                </li>
+                            {% endif %}
+                        </ul>
+                    </li>
+
+                </ul>
+        
+                {% include "includes/msg_desligamento_adesao_pgd.html" %}
+
+                <dl class="definition-list flex mb-4">
+                    <div class="list-item">
+                        <dt>Situação de adesão ao PGD</dt>
+                        <dd>{{ adesao.get_situacao_display|status }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Contato</dt>
+                        <dd>{{ adesao.get_contato_preferencia }}</dd>
+                    </div>
+                </dl>
+
+                {% if adesao.get_adesoes_pes %}
+                    {% box 'Adesões ao PES' %}
+                        <div class="table-responsive">
+                            <table>
+                                <caption>Adesões ao PES vinculadas a esta adesão ao PGD</caption>
+                                <thead>
+                                <tr>
+                                    <th class="no-print">Ações</th>
+                                    <th>Setor</th>
+                                    <th>Situação</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                {% for adesao in adesao.get_adesoes_pes %}
+                                    <tr>
+                                        <td class="no-print">
+                                            {% icon 'view' '/pgd2/visualizar_solicitacao_adesao_pes/{{ adesao.id }}' %}
+                                        </td>
+                                        <td>{{ adesao.setor }}</td>
+                                        <td>
+                                            {{ adesao.get_situacao_display|status }}
+                                            {% if adesao.data_desligamento %}
+                                                <span class="status status-danger">Desligamento em {{ adesao.data_desligamento|format }}</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% endbox %}
+                {% endif %}
+
+                {% if adesao.get_pits_todos %}
+                    {% box nomenclatura.pits_rits_pgd2 %}
+                        <div class="table-responsive">
+                            <table>
+                                <caption>{{ nomenclatura.pits_rits_pgd2 }} vinculados a esta adesão ao PGD</caption>
+                                <thead>
+                                    <tr>
+                                        <th>Período</th>
+                                        <th>Situação {{ nomenclatura.plano_individual_de_trabalho_sigla_pgd2 }}</th>
+                                        <th>Situação {{ nomenclatura.relatorio_individual_de_trabalho_sigla_pgd2 }}</th>
+                                        <th class="no-print text-end">Opções</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                {% for pit_rit in adesao.get_pits_todos %}
+                                    <tr>
+                                    <td>{{ pit_rit.get_verbose_periodo }}</td>
+                                    <td>
+                                        {{ pit_rit|method:"get_situacao_pit_calculado"|call:request.user }}
+                                    </td>
+                                    <td>
+                                        {{ pit_rit|method:"get_situacao_rit_calculado"|call:request.user }}
+                                    </td>
+                                    <td class="no-print">
+                                        <ul class="action-bar">
+                                        {% if pit_rit|method:'pode_visualizar'|call:request.user %}
+                                            <li>
+                                                <a href="/pgd2/visualizar_pit/{{ pit_rit.id }}" class="btn default">{% icone 'eye' %} Planejamento ({{ nomenclatura.plano_individual_de_trabalho_sigla_pgd2 }})</a>
+                                            </li>
+                                        {% endif %}
+                                        {% if pit_rit|method:'pode_visualizar_rit'|call:request.user %}
+                                            <li>
+                                                <a href="/pgd2/visualizar_rit/{{ pit_rit.id }}" class="btn default">{% icone 'eye' %} Execução ({{ nomenclatura.relatorio_individual_de_trabalho_sigla_pgd2 }})</a>
+                                            </li>
+                                        {% endif %}
+                                        </ul>
+                                    </td>
+                                    </tr>
+                                {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% endbox %}
+                {% endif %}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+{% endblock %}

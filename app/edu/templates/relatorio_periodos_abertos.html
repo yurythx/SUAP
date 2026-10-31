@@ -1,0 +1,96 @@
+{% extends super_template %}
+
+
+
+{% block extrahead %}
+    <script src="/static/djtools/graficos/highcharts.js"></script>
+    <script src="/static/djtools/graficos/exporting.js"></script>
+{% endblock %}
+
+{% block content %}
+
+    {% box 'Filtros' %}
+        {% render_form form %}
+    {% endbox %}
+
+    {% box "Resultado da Pesquisa" %}
+        <ul class="action-bar">
+            <li>
+                <a class="btn" href="?{{ request.META.QUERY_STRING }}&xls=1">Exportar para XLS</a>
+            </li>
+        </ul>
+
+        <ul class="pills">
+            {% for ano in anos %}
+                <li class="{% if ano_selecionado == ano %}active{% endif %}">
+                    <a href="?{{ request.META.QUERY_STRING }}&ano_selecionado={{ ano }}"
+                       onclick="$('*').css({'cursor':'wait'});">{{ ano }}</a>
+                </li>
+            {% endfor %}
+        </ul>
+
+        <ul class="pills">
+            {% if is_administador %}
+                <li class="{% if not uo_selecionada %}active{% endif %}">
+                    <a href="?{{ request.META.QUERY_STRING }}&uo_selecionada=" onclick="$('*').css({'cursor':'wait'});">Todos
+                        os Campi</a>
+                </li>
+            {% endif %}
+            {% for uo in uos %}
+
+                <li class="{% if uo_selecionada.pk == uo.pk %}active{% endif %}">
+                    <a href="?{{ request.META.QUERY_STRING }}&uo_selecionada={{ uo.id }}"
+                       onclick="$('*').css({'cursor':'wait'});">{{ uo.sigla }}</a>
+                </li>
+            {% endfor %}
+        </ul>
+
+        <script>
+            {{ grafico | safe }}
+        </script>
+        <div class="grafico-item" id="{{ grafico.id }}"></div>
+
+        {% if alunos.exists %}
+            <h3>Alunos ({{ alunos.count }})</h3>
+            {% autopaginate alunos 25 %}
+
+            <table>
+                <thead>
+                <tr>
+                    <th>Matrícula</th>
+                    <th>Aluno</th>
+                    <th>Curso</th>
+                    <th>Diretoria</th>
+                    <th>Situação no Curso</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% regroup alunos by curso_campus as alunos_agrupados %}
+                {% for item_aluno in alunos_agrupados %}
+                    <tr>
+                        <td colspan="6"><strong>{{ item_aluno.grouper }}</strong></td>
+                    </tr>
+
+                    {% for aluno in item_aluno.list %}
+                        <tr>
+                            <td><a href="{{ aluno.get_absolute_url }}?tab=dados_academicos">{{ aluno.matricula }}</a>
+                            </td>
+                            <td>
+                                {{ aluno.get_nome_social_composto }}
+                            </td>
+                            <td>{{ aluno.curso_campus }}</td>
+                            <td>{{ aluno.curso_campus.diretoria }}</td>
+                            <td>{{ aluno.situacao }}</td>
+                        </tr>
+                    {% endfor %}
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="alert alert-warning">
+                Nenhum aluno com situação do perído "Matriculado" no campus e ano selecionados.
+            </p>
+        {% endif %}
+        {% paginate %}
+    {% endbox %}
+{% endblock %}

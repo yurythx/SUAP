@@ -1,0 +1,139 @@
+{% extends super_template %}
+
+{% block object-status %}
+        <span>{{ obj.get_situacao_display|status }}</span>
+{% endblock %}
+
+{% block content %}
+    <style>
+        nofloat{
+            float: none;
+        }
+    </style>
+   
+    {% box 'Dados gerais' %}
+        <dl class="definition-list flex">
+            <div class="list-item flex-basis-100">
+                <dt>Descrição</dt>
+                <dd>{{ obj.descricao }}</dd>
+            </div>
+            <div class="list-item flex-basis-50">
+                <dt>Campus</dt>
+                <dd>{{ obj.uo }}</dd>
+            </div>
+            <div class="list-item flex-basis-50">
+                <dt>Ano/Período Letivo</dt>
+                <dd>{{ obj.ano_letivo }}/{{ obj.periodo_letivo }}</dd>
+            </div>
+            <div class="list-item flex-basis-100">
+                <dt>Matriz/Curso</dt>
+                <dd>{{ obj.matriz_curso|format }} (<b>{{ obj.qtd_vagas|format }} vagas</b>)</dd>
+            </div>
+        </dl>
+    {% endbox %}
+
+    <div class="tab-pane" data-title="Convocação" data-tab="convocacao">
+        {% if perms.edu.add_prematriculainternacional %}
+            <ul class="action-bar nofloat">
+                <li><a class="btn popup success" href="/edu/convocacao_prematricula_internacional/{{ obj.pk }}/">{% icone "upload" %} Convocar Selecionados</a></li>
+            </ul>
+        {% endif %}
+        
+        {% box "Convocações" %}
+
+            {% progressbar obj.get_percentual_inscritos %}
+
+            {% if obj.planilhaconvocacao_set.exists %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Candidatos Convocados ({{ obj.get_total_convocados }})</caption>
+                    <thead>
+                    <tr>
+                        <th>Data da Publicação</th>
+                        <th>Passaporte</th>
+                        <th>Nome</th>
+                        <th>Data de Nascimento</th>
+                        <th>Sexo</th>
+                        <th>E-mail</th>
+                        <th>Solicitação Realizada</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for planilha in obj.planilhaconvocacao_set.all %}
+                        {% for vinculo in planilha.vinculos.all %}
+                        <tr>
+                            <td>{{ planilha.data_publicacao|format }}</td>
+                            <td>{{ vinculo.pessoa.pessoafisica.passaporte }}</td>
+                            <td>{{ vinculo.pessoa.pessoafisica.nome }}</td>
+                            <td>{{ vinculo.pessoa.pessoafisica.nascimento_data|format }}</td>
+                            <td>{{ vinculo.pessoa.pessoafisica.sexo }}</td>
+                            <td>{{ vinculo.email_notificacao|format }}</td>
+                            <td>{% if vinculo.id in inscritos %}{{ True|format }}{% else %}{{ False|format }}{% endif %}</td>
+                        </tr>
+                        {% endfor %}
+                    {% endfor %}
+                    </tbody>
+                    </table>
+            </div>
+            {% else %}
+                <p class="alert alert-warning">Nenhuma convocação realizada até o momento.</p>
+            {% endif %}
+        {% endbox %}
+    </div>
+
+    <div class="tab-pane" data-title="Solicitação de Matrícula" data-tab="pre_matricula">
+        {% if obj.possui_inscricao_pendente_matricula %}
+            <ul class="action-bar nofloat">
+                <li><a class="btn success" href="/edu/processar_prematricula_internacional/{{ obj.pk }}/">{% icone "users" %} Gerar Matrículas</a></li>
+            </ul>
+        {% endif %}
+
+        {% box "Pré-Matrículas" %}
+            {% if obj.inscricaoalunoestrangeiro_set.exists %}
+
+            {% progressbar obj.get_percentual_avaliados %}
+
+            <div class="table-responsive">
+                <table>
+                    <caption>Candidados Pré-matriculados</caption>
+                    <thead>
+                    <tr>
+                        <th></th>
+                        <th>Passaporte</th>
+                        <th>Nome</th>
+                        <th>Data de Nascimento</th>
+                        <th>Sexo</th>
+                        <th>E-mail</th>
+                        <th>Situação</th>
+                        <th>Matrícula</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for inscricao in obj.inscricaoalunoestrangeiro_set.all %}
+                        <tr>
+                            <td>{% icon "search" "/edu/inscricao_aluno_estrangeiro/{{ inscricao.id }}/" %}</td>
+                            <td>{{ inscricao.vinculo.pessoa.pessoafisica.passaporte }}</td>
+                            <td>{{ inscricao.vinculo.pessoa.pessoafisica.nome }}</td>
+                            <td>{{ inscricao.vinculo.pessoa.pessoafisica.nascimento_data|format }}</td>
+                            <td>{{ inscricao.vinculo.pessoa.pessoafisica.sexo }}</td>
+                            <td>{{ inscricao.vinculo.email_notificacao|format }}</td>
+                            <td><span>{{ inscricao.get_situacao_display|status }}</span></td>
+                            <td>
+                                {% if inscricao.aluno_id %}
+                                    <a href="/edu/aluno/{{ inscricao.aluno.matricula }}/" target="_blank">
+                                        {{ inscricao.aluno.matricula }}
+                                    </a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                    </table>
+            </div>
+            {% else %}
+                <p class="alert alert-warning">Nenhuma pré-matrícula realizada até o momento.</p>
+            {% endif %}
+        {% endbox %}
+    </div>
+
+{% endblock %}

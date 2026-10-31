@@ -1,0 +1,211 @@
+{% extends super_template %}
+
+{% block bodyclass %}hasAsideRight{% endblock %}
+
+{% block object-status %}
+    {{ enquete.get_status }}
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if enquete.pode_publicar and not enquete.publicada %}
+            <li><a class="btn success" href="/enquete/publicar_enquete/{{ enquete.id }}/">Publicar</a></li>
+        {% endif %}
+        <li><a class="btn primary" href="/admin/enquete/enquete/{{ enquete.id }}/">Editar</a></li>
+        <li><a href="?clonar=1" class="btn primary">Clonar</a></li>
+        <li><a href="/enquete/ver_resultados/{{ enquete.id }}/" class="btn default">Ver Resultados</a></li>
+        {% if enquete.estah_aberta %}
+            {% if enquete.notificou_hoje_publico_nao_respondente %}
+                <li><a class="btn default confirm" 
+                    data-confirm="O público não-respondente já foi notificado hoje, {{ enquete.publico_nao_respondente_data_notificacao|format }}. Deseja notificar novamente?"
+                    href="/enquete/notificar_nao_respondentes/{{ enquete.id }}/">Notificar não-respondentes</a></li>
+            {% else %}
+                <li><a class="btn default confirm" 
+                    href="/enquete/notificar_nao_respondentes/{{ enquete.id }}/">Notificar não-respondentes</a></li>
+            {% endif %}
+        {% endif %}
+        {% if enquete.publicada %}
+            <li><a class="btn danger" href="/enquete/despublicar_enquete/{{ enquete.id }}/">Despublicar</a></li>
+        {% endif %}
+    </ul>
+{% endblock %}
+
+{% block content %}
+    
+    {% if enquete.tem_pergunta_sem_opcao or not enquete.categoria_set.exists or not enquete.pergunta_set.exists or not enquete.vinculos_publico.exists %}
+        <div class="alert alert-warning">
+            <p><strong>Enquete não pode ser publicada.</strong></p>
+            <p>Corrija os seguintes problemas:</p>
+            <ul>
+                {% if enquete.tem_pergunta_sem_opcao %}
+                    <li>Cadastrar Opções de Resposta gerais ou Opções de Resposta para a pergunta.</li>
+                {% endif %}
+                {% if not enquete.categoria_set.exists %}
+                    <li>Adicione, no mínimo, uma Categoria à enquete. Acesse a <a href="/admin/enquete/enquete/{{ enquete.id }}/">Edição da enquete</a>.</li>
+                {% elif not enquete.pergunta_set.exists %}
+                    <li>Adicione, no mínimo, uma Pergunta à enquete.</li>
+                {% endif %}
+                {% if not enquete.vinculos_publico.exists %}
+                    <li>Adicione, no mínimo, um Público à enquete. Acesse a <a href="/admin/enquete/enquete/{{ enquete.id }}/">Edição da enquete</a>.</li>
+                {% endif %}
+            </ul>
+        </div>
+    {% endif %}
+        
+    {% box 'Opções gerais de Resposta' badge=enquete.get_opcoes.count class='collapsed' %}
+        <ul class="action-bar">
+            <li><a href="/enquete/adicionar_opcao/{{ enquete.id }}/" class="btn success">Adicionar Opção geral de Resposta</a></li>
+        </ul>
+        <p class="alert alert-info">Estas são as opções de respostas padrão caso não seja cadastrada nenhuma opção para as perguntas objetivas.</p>
+        {% if enquete.get_opcoes.exists %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="no-print">Ações</th>
+                            <th>{% verbose_field_name_by_class 'enquete.Opcao' 'ordem' %}</th>
+                            <th>{% verbose_field_name_by_class 'enquete.Opcao' 'texto' %}</th>
+                            <th>Imagem</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for opcao in enquete.get_opcoes %}
+                            <tr>
+                                <td class="no-print">
+                                    {% icon "edit" "/enquete/editar_opcao/{{ opcao.id }}/" %}
+                                    {% icon "delete" "/enquete/remover_opcao/{{ opcao.id }}/" %}
+                                </td>
+                                <td>{{ opcao.ordem|format }}</td>
+                                <td>{{ opcao.get_html|format }}</td>
+                                <td>
+                                    {% if opcao.imagem %}<a href="{{ opcao.imagem.url }}" target="_blank"><img class="foto-miniatura" src="{{ opcao.imagem.url }}" alt="" /></a>{% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Não existem opções cadastradas.</p>
+        {% endif %}
+    {% endbox %}
+
+    {% for categoria in enquete.get_perguntas_agrupadas_por_categoria %}
+        {% box 'Categoria: #{{ categoria.ordem }}' %}
+            <dl>
+                <dt>Descrição:</dt>
+                <dd>{{ categoria.get_html }}</dd>
+            </dl>
+            <ul class="action-bar">
+                <li><a href="/enquete/adicionar_pergunta/{{ enquete.id }}/{{ categoria.id }}/" class="btn success popup">Adicionar Pergunta</a></li>
+            </ul>
+            {% if categoria.perguntas.exists %}
+                {% for pergunta in categoria.perguntas %}
+                    <div class="general-box {% if pergunta.objetiva and not enquete.get_opcoes.exists and not pergunta.opcoes.exists %}danger{% endif %}">
+                        <div class="primary-info">
+                            {% if pergunta.objetiva and not enquete.get_opcoes.exists and not pergunta.opcoes.exists %}
+                                <div class="status-info-container">
+                                    <span class="status status-error">Sem opções de resposta</span>
+                                </div>
+                            {% endif %}
+                            <h4>Pergunta #{{ pergunta.ordem|format }}</h4>
+                            <ul class="action-bar">
+                                {% if pergunta.objetiva %}
+                                    <li><a href="/enquete/adicionar_opcao/{{ enquete.id }}/{{ pergunta.id }}/" class="btn success">Adicionar Opções de Resposta</a></li>
+                                {% endif %}
+                                <li><a href="/enquete/editar_pergunta/{{ pergunta.id }}/" class="btn primary popup">Editar</a></li>
+                                <li><a href="/enquete/remover_pergunta/{{ pergunta.id }}/" class="btn danger">Remover</a></li>
+                            </ul>
+                            <div class="extra-info">
+                                <dl class="definition-list">
+                                    <dt>Descrição</dt>
+                                    <dd>{{ pergunta.get_html|format }}</dd>
+                                    {% if pergunta.opcoes.exists %}
+                                        <dt>Opções de Respostas</dt>
+                                        <dd>
+                                            <table>
+                                                <thead>
+                                                    <tr>
+                                                        <th class="no-print">Ações</th>
+                                                        <th>{% verbose_field_name_by_class 'enquete.OpcaoPergunta' 'ordem' %}</th>
+                                                        <th>Opção de Resposta</th>
+                                                        <th>Imagem</th>
+                                                        <th>Documento</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for opcao in pergunta.opcoes.all %}
+                                                        <tr>
+                                                            <td class="no-print">
+                                                                {% icon "edit" "/enquete/editar_opcao/{{ opcao.id }}/" %}
+                                                                {% icon "delete" "/enquete/remover_opcao/{{ opcao.id }}/" %}
+                                                            </td>
+                                                            <td>#{{ opcao.ordem|format }}</td>
+                                                            <td>{{ opcao.get_html|format }}</td>
+                                                            <td>
+                                                                {% if opcao.imagem %}
+                                                                    <a href="{{ opcao.imagem.url }}">
+                                                                        <img class="foto-miniatura" src="{{ opcao.imagem.url }}" alt="">
+                                                                    </a>
+                                                                {% else %}
+                                                                    -
+                                                                {% endif %}
+                                                            </td>
+                                                            <td>
+                                                                {% if opcao.documento %}
+                                                                    <a href="{{ opcao.documento.url }}" class="btn default">{% icone "file-pdf" %} Visualizar PDF</a>
+                                                                {% else %}
+                                                                    -
+                                                                {% endif %}
+                                                            </td>
+                                                        </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </dd>
+                                    {% elif pergunta.objetiva and enquete.get_opcoes.exists and not pergunta.opcoes.exists %}
+                                        <dt>Opções de Respostas</dt>
+                                        <dd>Utiliza as Opções gerais de Resposta</dd>
+                                    {% endif %}
+                                </dl>
+                            </div>
+                        </div>
+                        <dl class="secondary-info">
+                            <div class="list-item">
+                                <dt>{% icone "circle" %} Tipo:</dt>
+                                <dd>{% if pergunta.objetiva %}Objetiva{% else %}Subjetiva{% endif %}</dd>
+                            </div>
+                            {% if pergunta.objetiva %}
+                                <div class="list-item">
+                                    <dt>{% icone "ellipsis-h" %} Múltipla Escolha:</dt>
+                                    <dd>{{ pergunta.multipla_escolha|format }}</dd>
+                                </div>
+                                <div class="list-item">
+                                    <dt>{% icone "border-all" %} Layout:</dt>
+                                    <dd>{{ pergunta.layout|title|default:"Tabela" }}</dd>
+                                </div>
+                            {% else %}
+                                <div class="list-item">
+                                    <dt>{% icone "sort-numeric-up" %} Campo Numérico:</dt>
+                                    <dd>{{ pergunta.numerico|format }}</dd>
+                                </div>
+                            {% endif %}
+                            <div class="list-item">
+                                <dt>{% icone "asterisk" %} Obrigatória:</dt>
+                                <dd>{{ pergunta.obrigatoria|format }}</dd>
+                            </div>
+                        </dl>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p class="alert alert-warning">Não existem perguntas cadastradas.</p>
+            {% endif %}
+        {% endbox %}
+    {% endfor %}
+{% endblock %}
+
+{% block asideright %}
+
+{% include "includes/aside.html" %}
+
+{% endblock %}

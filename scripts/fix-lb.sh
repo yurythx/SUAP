@@ -1,0 +1,39 @@
+#!/bin/bash
+set -euo pipefail
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -qq || true
+apt-get install -y -qq nginx
+cat >/etc/nginx/sites-available/suap <<'NGX'
+map $http_x_forwarded_proto $suap_forwarded_proto {
+    default $http_x_forwarded_proto;
+    ""      $scheme;
+}
+server {
+    listen 80 default_server;
+    server_name hmlsuap.rondonopolis.mt.gov.br 192.168.29.110 192.168.110.10 _;
+    client_max_body_size 100m;
+    set_real_ip_from 192.168.0.218;
+    real_ip_header X-Forwarded-For;
+    real_ip_recursive on;
+    location / {
+        proxy_pass http://192.168.110.20:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $suap_forwarded_proto;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_read_timeout 300;
+    }
+    location /static/ {
+        alias /var/www/suap-static/;
+        expires 7d;
+    }
+}
+NGX
+ln -sfn /etc/nginx/sites-available/suap /etc/nginx/sites-enabled/suap
+rm -f /etc/nginx/sites-enabled/default
+mkdir -p /var/www/suap-static
+nginx -t
+systemctl enable --now nginx
+systemctl reload nginx
+echo LB_OK

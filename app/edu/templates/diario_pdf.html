@@ -1,0 +1,78 @@
+{% extends "relatorio_pdf.html" %}
+
+{% block page_orientation %}{{ orientation }}{% endblock %}
+
+{% block content %}
+{% for diario in diarios %}
+
+    <table class="definicoes">
+        <tr>
+            <td colspan="4"><strong>Curso: </strong> ({{ diario.turma.curso_campus.codigo }}) {{ diario.turma.curso_campus.descricao_historico|truncatechars:75 }}</td>
+        </tr>
+        <tr>
+            <td colspan="3"><strong>Diário:</strong> {{ diario }}</td>
+            <td><strong>Etapa: </strong> {{ diario.etapa }}</td>
+        </tr>
+        <tr>
+            <td><strong>Turma: </strong> {{ diario.turma.codigo }}</td>
+            <td><strong>Ano/Período: </strong> {{ diario.ano_letivo.ano }}/{{ diario.get_periodo_letivo }}</td>
+            <td><strong>Aulas Previstas: </strong> {{ diario.get_carga_horaria }} aulas</td>
+            <td><strong>Aulas Ministradas: </strong> {{ diario.get_carga_horaria_cumprida }} aulas</td>
+        </tr>
+        <tr>
+            <td colspan="4"><strong>Professores: </strong> {% for professor_diario in diario.get_professores %}{{ professor_diario.professor }}&nbsp;&nbsp;{% endfor %}</td>
+        </tr>
+    </table>
+
+    <div class="clear small"></div>
+
+    {% if diario.total_paginas < 2 %}
+        {% include "includes/tabela_diario_pdf.html" with datas=diario.datas_aulas faltas_source="simples" diario=diario %}
+    {% else %}
+        {% for pagina in diario.pagina %}
+            {% include "includes/tabela_diario_pdf.html" with datas=pagina faltas_source="paginada" diario=diario pagina_index=forloop.counter %}
+            {% if not forloop.last %}
+                <div class="page-break"></div>
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+
+    <div class="page-break"></div>
+
+    <h2>REGISTRO DE ATIVIDADES - Diário: {{ diario.pk }}</h2>
+    <table class="bordered">
+        <thead>
+        <tr>
+            <th>Data</th>
+            <th>Nº Aulas</th>
+            <th>Conteúdo</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for aula in diario.aulas %}
+            <tr>
+                <td class="text-center">{{ aula.data|format }}</td>
+                <td class="text-center">{{ aula.quantidade|format }}</td>
+                <td>{{ aula.conteudo|format|linebreaksbr }}</td>
+            </tr>
+        {% empty %}
+            <tr>
+                <td colspan="3">Nenhuma aula cadastrada neste diário.</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    <p class="right">{{ diario.uo.municipio.nome|normalizar }}/{{ diario.uo.municipio.uf }}, {{ diario.hoje|format }}</p>
+    {% for professor_diario in diario.professordiario_set.all %}
+        <p class="assinatura">
+            <strong>{{ professor_diario.professor.vinculo.pessoa.nome|normalizar }}</strong>
+            <br/>
+            (Professor {{ professor_diario.tipo }})
+        </p>
+    {% endfor %}
+
+    {% if not forloop.last %}<div class="page-break"></div>{% endif %}
+
+{% endfor %}
+{% endblock %}

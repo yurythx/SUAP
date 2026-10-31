@@ -1,0 +1,68 @@
+{% comment %}
+    context = request, base_conhecimento, modo_selecionar, modo_selecionar_checkbox_name, selecionada
+    static = /static/centralservicos/js/BaseConhecimento.js
+{% endcomment %}
+
+{% load centralservicos_templatetags %}
+
+{% tem_avaliacao_pendente base_conhecimento as avaliacao_pendente %}
+
+<div class="general-box {% if avaliacao_pendente or not base_conhecimento.estah_disponivel_para_uso %}danger{% endif %} {% if selecionada %}success{% endif %}" id="general_box_{{ base_conhecimento.id }}">    
+    {% if modo_selecionar %}
+        {% if base_conhecimento.estah_disponivel_para_uso %}
+            <div class="custom-checkbox {% if avaliacao_pendente %}disabled{% endif %}">
+                <input 
+                    class="base_conhecimento_select_input_checkbox" 
+                    id="id_{{ modo_selecionar_checkbox_name }}_{{ base_conhecimento.id }}" 
+                    name="{{ modo_selecionar_checkbox_name }}" 
+                    type="checkbox" 
+                    value="{{ base_conhecimento.id }}"
+                    {% if selecionada %}checked="checked"{% endif %}
+                    {% if avaliacao_pendente %}disabled="disabled"{% endif %} 
+                />
+                <label for="id_{{ modo_selecionar_checkbox_name }}_{{ base_conhecimento.id }}"></label>
+            </div>
+        {% endif %}
+    {% endif %}
+
+    <div class="primary-info">
+        <div class="status-info-container">
+            {% if base_conhecimento.estah_disponivel_para_uso %}
+                {% if avaliacao_pendente %}
+                    <span class="status status-alert">Você precisa avaliar este artigo.</span>
+                {% endif %}
+            {% else %}
+                {% if base_conhecimento.necessita_correcao %}<span aria-label="Este artigo não poderá ser utilizado, pois necessita de correção." class="status status-error hint hint-bottom--top-right hint hint-bottom--large">Necessita correção</span>{% endif %}
+                {% if base_conhecimento.supervisao_pendente %}<span aria-label="Este artigo não poderá ser utilizado, pois necessita de aprovação do supervisor." class="status status-error hint hint-bottom--top-right hint hint-bottom--large">Pendente de supervisão</span>{% endif %}
+            {% endif %}
+            {% if base_conhecimento.visibilidade == 'publica' %}
+                <span class="status status-info">Artigo público</span>
+            {% endif %}
+        </div>
+        <h4 class="title">
+            <a href="{% url 'centralservicos_visualizar_baseconhecimento_publica' base_conhecimento.id %}" class="popup"><strong>{{ base_conhecimento.titulo }}</strong></a>
+        </h4>
+        <ul class="action-bar">
+            <li><a href="{% url 'centralservicos_visualizar_baseconhecimento' base_conhecimento.id %}" class="btn default"><i class="fas fa-search" aria-hidden="true"></i> Artigo Completo</a></li>
+            {% pode_solicitar_correcao base_conhecimento as solicitacao_correcao %}
+            {% if solicitacao_correcao %}
+                <li><a class="btn popup warning" href="/centralservicos/baseconhecimento/marcar_para_correcao/{{ base_conhecimento.id }}/"><i class="fas fa-exclamation-circle" aria-hidden="true"></i> Solicitar Correção</a></li>
+            {% endif %}
+        </ul>
+        <div class="extra-info">
+            {{ base_conhecimento.resumo|truncatewords:100|safe }}
+        </div>
+    </div>
+
+    <dl class="secondary-info">
+        {% avaliar_base_conhecimento base_conhecimento "inner" %}
+        <div class="list-item">
+            <dt>{% icone "hourglass-end" %} Esta solução já foi utilizada para resolver:</dt>
+            <dd>{{ base_conhecimento.get_quantidade_utilizacoes|format }} chamados</dd>
+        </div>
+        <div class="list-item">
+            <dt>{% icone "circle" %} Média de avaliações desta solução:</dt>
+            <dd id="media_avaliacao_{{ base_conhecimento.id }}">{{ base_conhecimento.get_media_avaliacoes|format }}</dd>
+        </div>
+    </dl>
+</div>

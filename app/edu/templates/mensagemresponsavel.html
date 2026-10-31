@@ -1,0 +1,129 @@
+{% extends super_template %}
+
+{% block bodyclass %}hasAsideRight{% endblock %}
+
+{% block content %}
+
+    {% box "Mensagem" %}
+
+    <div class="richtext">{{ obj.conteudo|sanitize }}</div>
+
+    {% endbox %}
+
+    {% if is_remetente or is_administrador %}
+        {% box "Mensagem Visualizadadas" %}
+            <h4>Destinatários que visualizaram ({{ registros_leitura.count }})</h4>
+            <div class="table-responsive">
+            <table>
+                <thead>
+                <tr>
+                    <th>Matrícula</th>
+                    <th>Nome do Aluno</th>
+                    <th>Nome do Responsável</th>
+                    <th>E-mail do Responsável</th>
+                    <th>Data da Leitura</th>
+                    <th>Meio da Leitura</th>
+                    <th>Pergunta</th>
+                    <th>Resposta</th>
+                </tr>
+                </thead>
+                <tbody>
+                    {% autopaginate registros_leitura 20 %}
+                    {% for registro in registros_leitura %}
+                        <tr>
+                            <td>{{ registro.destinatario.matricula }}</td>
+                            <td>{{ registro.destinatario.pessoa_fisica.nome }}</td>
+                            <td>{{ registro.destinatario.responsavel }}</td>
+                            <td>{{ registro.destinatario.email_responsavel|format }}</td>
+                            <td>{{ registro.data_leitura|format }}</td>
+                            <td>{{ registro.meio_leitura|format }}</td>
+                            <td>
+                                {% if registro.pergunta %}
+                                    <strong>{{ registro.data_pergunta|format }}</strong>:
+                                    {{ registro.pergunta|linebreaks  }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if registro.pergunta %}
+                                    {% if registro.resposta %}
+                                        <strong>{{ registro.data_resposta|format }}</strong>:
+                                    {{ registro.resposta|linebreaks }}
+                                    {% else %}
+                                        <a class="btn primary popup" href="/edu/responder_mensagem_responsavel/{{ registro.pk }}/">Responder</a>
+                                    {% endif %}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8">
+                                <p class="alert alert-info">Até o momento nenhum destinário leu a mensagem. </p>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            </div>
+            {% paginate %}
+
+        {% endbox %}
+        {% box "Mensagem Aguardando Visualização" %}
+
+            <h4>Destinatários que não visualizaram ({{ outros_destinatarios.count }})</h4>
+            <div class="table-responsive">
+            <table>
+                <thead>
+                <tr>
+                    <th>Matrícula</th>
+                    <th>Nome do Aluno</th>
+                    <th>Nome do Responsável</th>
+                    <th>E-mail do Responsável</th>
+                </tr>
+                </thead>
+                <tbody>
+                    {% autopaginate outros_destinatarios 20 %}
+                    {% for destinatario in outros_destinatarios %}
+                        <tr>
+                            <td>{{ destinatario.matricula }}</td>
+                            <td>{{ destinatario.pessoa_fisica.nome }}</td>
+                            <td>{{ destinatario.responsavel|format }}</td>
+                            <td>{{ destinatario.email_responsavel|format }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5">
+                                <p class="alert alert-info">Lida por todos destinários.</p>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            </div>
+            {% paginate %}
+        {% endbox %}
+    {% endif %}
+{% endblock %}
+
+{% block asideright %}
+
+<aside class="right">
+    <details open="open">
+        <summary>Dados gerais</summary>
+        <dl class="details-container">
+            <dt>{{ obj|verbose:'remetente' }}:</dt>
+            <dd>{{ obj.remetente|format }}</dd>
+            <dt>Data de Envio:</dt>
+            <dd>{{ obj.data_envio|format }}</dd>
+            {% if obj.anexo %}
+                <dt>{{ obj|verbose:'anexo' }}:</dt>
+                <dd><a href="{{ obj.anexo.url }}">{{ obj.anexo|filename }}</a></dd>
+            {% endif %}
+        </dl>
+    </details>
+</aside>
+
+{% endblock %}

@@ -1,0 +1,162 @@
+{% if pode_gerenciar_conta %}
+    <ul class="action-bar">
+        <li><a class="btn success popup" href="/contratos/adicionar_conta/{{ contrato.pk }}/">{% icone "plus" %} Adicionar Conta Vinculada</a></li>
+    </ul>
+{% endif %}
+{% with contas=contrato.contas.all %}
+    {% if contas %}
+        {% for conta in contas %}
+            {% box "Conta Vinculada: {{ conta.descricao }}" %}
+                <ul class="action-bar">
+                    <li>
+                        <button
+                            type="button"
+                            class="btn default btn-copiar-conta"
+                            data-numero-conta="{{ conta.descricao }}"
+                            title="Copiar número da conta"
+                            aria-label="Copiar número da conta"
+                        >
+                            {% icone "copy" %}
+                            <span class="visually-hidden">Copiar número da conta</span>
+                        </button>
+                    </li>
+                    {% if pode_gerenciar_conta %}
+                        <li><a href="/contratos/saque_conta/{{ conta.id }}/" class="btn success popup">{% icone "plus" %} Adicionar Saque em Conta</a></li>
+                        <li><a href="/contratos/editar_conta/{{ conta.id }}/" class="btn primary popup">{% icone "edit" %} Editar Conta</a></li>
+                    {% endif %}
+                </ul>
+                <dl class="definition-list flex">
+                    <div class="list-item">
+                        <dt>Ativa</dt>
+                        <dd>{{ conta.ativa|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Saldo</dt>
+                        <dd>R$ {{ conta.get_saldo|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Última atualização</dt>
+                        <dd>{{ conta.data_atualizacao|format }} por
+                            {% if conta.fiscal %}
+                                {{ conta.fiscal.servidor|format }}
+                            {% else %}
+                                {{ conta.servidor|format }}
+                            {% endif %}
+                        </dd>
+                    </div>
+                </dl>
+                {% with movimentacao_contas=conta.movimentacoes_conta.all %}
+                    {% if movimentacao_contas %}
+                        <h4>Movimentações:</h4>
+                        <ul class="timeline">
+                            {% for movimentacao in movimentacao_contas %}
+                                <li class="{% if movimentacao.deposito %}success{% else %}danger{% endif %}">
+                                    <div class="timeline-date">{{ movimentacao.data|format }}</div>
+                                    <div class="timeline-icon"></div>
+                                    <div class="timeline-content">
+                                        <h4>{% if movimentacao.deposito %}Depósito{% else %}Saque{% endif %} de R$ {{ movimentacao.valor|format_money }}</h4>
+                                        {% if movimentacao.observacao %}
+                                            <p class="obs">{{ movimentacao.observacao }}</p>
+                                        {% endif %}
+                                        {% if movimentacao.processo_eletronico %}
+                                            <p class="obs">Processo Eletrônico Associado:
+                                                <a href="{{ movimentacao.processo_eletronico.get_absolute_url }}">{{ movimentacao.processo_eletronico|format }}</a>
+                                            </p>
+                                        {% endif %}
+                                        {% if pode_gerenciar_conta %}
+                                            <ul class="action-bar">
+                                                <li><a href="/contratos/editar_movimentacao/{{ movimentacao.id }}/" class="btn primary popup">{% icone "edit" %}<span class="visually-hidden">Editar Movimentação</span></a></li>
+                                            </ul>
+                                        {% endif %}
+                                    </div>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                {% endwith %}
+            {% endbox %}
+        {% endfor %}
+    {% else %}
+        <p class="alert alert-warning">Nenhuma conta adicionada.</p>
+    {% endif %}
+{% endwith %}
+
+{% with calculos_conta_vinculada=contrato.get_calculos_conta_vinculada %}
+    {% if calculos_conta_vinculada %}
+        {% box "Cálculos Salvos da Conta Vinculada" %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Cálculos salvos da conta vinculada</caption>
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Medição</th>
+                            <th>Conta</th>
+                            <th>Processo</th>
+                            <th>Usuário</th>
+                            <th>Total</th>
+                            <th>Justificativa</th>
+                            <th>Percentuais</th>
+                            <th>Fonte</th>
+                            <th>Opções</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for calculo in calculos_conta_vinculada %}
+                            <tr>
+                                <td>{{ calculo.data_criacao|format }}</td>
+                                <td>{% if calculo.medicao %}<a href="/contratos/historico_medicao/{{ calculo.medicao.id }}/">{{ calculo.medicao }}</a>{% else %}-{% endif %}</td>
+                                <td>{{ calculo.contas_relacionadas_display }}</td>
+                                <td>
+                                    {% if calculo.medicao and calculo.medicao.processo %}
+                                        <a href="{{ calculo.medicao.processo.get_absolute_url }}">{{ calculo.medicao.processo|format }}</a>
+                                    {% elif calculo.medicao and calculo.medicao.numero_processo %}
+                                        {{ calculo.medicao.numero_processo }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>{{ calculo.usuario_display|format }}</td>
+                                <td>R$ {{ calculo.valor_total|format_money }}</td>
+                                <td>{{ calculo.justificativa_display }}</td>
+                                <td>{{ calculo.percentuais_utilizados_display|default:'-' }}</td>
+                                <td>{{ calculo.FONTE_PERCENTUAIS }}</td>
+                                <td><a href="{% url 'exportar_calculo_conta_vinculada_xls' calculo.id %}" class="btn default">Exportar XLSX</a></td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endbox %}
+    {% endif %}
+{% endwith %}
+
+<script>
+    (function () {
+        document.querySelectorAll('.btn-copiar-conta').forEach(function (button) {
+            button.addEventListener('click', function () {
+                const numeroConta = button.dataset.numeroConta || '';
+                if (!numeroConta || !navigator.clipboard) {
+                    return;
+                }
+
+                navigator.clipboard.writeText(numeroConta).then(function () {
+                    const srOnly = button.querySelector('.visually-hidden');
+                    const tituloOriginal = button.getAttribute('title') || 'Copiar número da conta';
+                    button.setAttribute('title', 'Número copiado');
+                    button.setAttribute('aria-label', 'Número copiado');
+                    if (srOnly) {
+                        srOnly.textContent = 'Número copiado';
+                    }
+                    window.setTimeout(function () {
+                        button.setAttribute('title', tituloOriginal);
+                        button.setAttribute('aria-label', tituloOriginal);
+                        if (srOnly) {
+                            srOnly.textContent = tituloOriginal;
+                        }
+                    }, 1800);
+                });
+            });
+        });
+    })();
+</script>

@@ -1,0 +1,153 @@
+{% load demandas_templatetags %}
+
+{% if demanda.eh_raiz %}
+    <div class="tab-pane" data-title="Sub-demandas">
+        {# ── Pai com sub-demandas: indicador de progresso ── #}
+        {% if subdemandas %}
+            <div class="flex-container total-container sm no-icon">
+                <div class="total-item success">
+                    <p class="total">{{ demanda.percentual_conclusao }}%</p>
+                    <p class="description">Concluído</p>
+                </div>
+                <div class="total-item info">
+                    <p class="total">{{ demanda.total_subdemandas }}</p>
+                    <p class="description">Total</p>
+                </div>
+                <div class="total-item warning">
+                    <p class="total">{{ demanda.get_subdemandas_ativas.count }}</p>
+                    <p class="description">Em andamento</p>
+                </div>
+                <div class="total-item default">
+                    <p class="total">{{ demanda.subdemandas_encerradas }}</p>
+                    <p class="description">Encerrada{{ demanda.subdemandas_encerradas|pluralize }}</p>
+                </div>
+            </div>
+        {% endif %}
+
+        {% if pode_criar_subdemanda %}
+            <ul class="action-bar inside-container">
+                <li>
+                    <a href="{% url 'subdemanda_criar' demanda.pk %}" class="btn success popup">
+                        {% icone "plus" %} Nova sub-demanda
+                    </a>
+                </li>
+            </ul>
+        {% endif %}
+
+        {% if subdemandas %}
+            {% if pode_criar_subdemanda %}
+                <p class="alert alert-info">
+                    {% icone "arrows-alt-v" %} Arraste as linhas para reordenar a prioridade das sub-demandas.
+                </p>
+            {% endif %}
+
+            <div class="table-responsive">
+                <table id="subdemandas-sortable" data-demanda="{{ demanda.pk }}">
+                    <thead>
+                        <tr>
+                            {% if pode_criar_subdemanda %}<th class="col-drag"></th>{% endif %}
+                            <th>#</th>
+                            <th>Sub-demanda</th>
+                            <th>Situação</th>
+                            <th>Prioridade</th>
+                            <th>Story Points</th>
+                            <th>Entrega pendente</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sub in subdemandas %}
+                            <tr data-subdemanda="{{ sub.pk }}">
+                                {% if pode_criar_subdemanda %}
+                                    <td class="col-drag" title="Arraste para reordenar">{% icone "grip-vertical" %}</td>
+                                {% endif %}
+                                <td>{{ sub.pk }}</td>
+                                <td>
+                                    <a href="{{ sub.get_absolute_url }}">{{ sub.titulo }}</a>
+                                </td>
+                                <td>
+                                    {% if sub.situacao == 'Concluída' %}
+                                        <span class="status status-success">{{ sub.situacao }}</span>
+                                    {% elif sub.situacao == 'Cancelada' %}
+                                        <span class="status status-default">{{ sub.situacao }}</span>
+                                    {% elif sub.situacao == 'Em desenvolvimento' or sub.situacao == 'Em homologação' %}
+                                        <span class="status status-alert">{{ sub.situacao }}</span>
+                                    {% else %}
+                                        <span class="status status-info">{{ sub.situacao }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="prioridade-interna">
+                                    {% if sub.prioridade_interna %}
+                                        {{ sub.prioridade_interna }}ª
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                                <td>{{ sub.story_points|default:"—" }}</td>
+                                <td>
+                                    {% for e in sub.entregas.all %}
+                                        {% if e.status == 'ENVIADA' %}
+                                            <span class="status status-alert">{% icone "clock" %} Aguardando</span>
+                                        {% endif %}
+                                    {% empty %}
+                                        —
+                                    {% endfor %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if pode_criar_subdemanda %}
+                <script>
+                    $(function () {
+                        $("#subdemandas-sortable tbody").sortable({
+                            cursor: "move",
+                            items: "> tr",
+                            helper: "clone",
+                            placeholder: "ui-state-highlight",
+                            stop: function () {
+                                var demanda = $("#subdemandas-sortable").data("demanda");
+                                var pks = [];
+                                $("#subdemandas-sortable tbody tr").each(function (i) {
+                                    pks.push($(this).data("subdemanda"));
+                                    $(this).find(".prioridade-interna").text((i + 1) + "ª");
+                                });
+                                $.ajax({
+                                    url: "/demandas/demanda/" + demanda + "/subdemanda/reordenar/?subdemandas=" + pks.join(","),
+                                    type: "GET",
+                                    success: function (data) {
+                                        if (!data.ok) {
+                                            showFeedbackMessage(data.mensagem, "error");
+                                            location.reload();
+                                        }
+                                    }
+                                });
+                            }
+                        }).disableSelection();
+                    });
+                </script>
+            {% endif %}
+
+        {% else %}
+            <p class="alert alert-warning">
+                Nenhuma sub-demanda cadastrada.
+                {% if pode_criar_subdemanda %}
+                    Use o botão acima para decompor esta demanda em partes menores.
+                {% endif %}
+            </p>
+        {% endif %}
+    </div>
+{% endif %}
+
+{# ── Sub-demanda: exibe link para o pai ── #}
+{% if demanda.eh_subdemanda %}
+    <div class="alert alert-info">
+        {% icone "sitemap" %}
+        Esta é uma <strong>sub-demanda</strong> de:
+        <a href="{{ demanda.parent.get_absolute_url }}">{{ demanda.parent }}</a>
+        {% if demanda.prioridade_interna %}
+            &nbsp;· <strong>{{ demanda.prioridade_interna }}ª prioridade interna</strong>
+        {% endif %}
+    </div>
+{% endif %}

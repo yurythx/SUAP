@@ -1,0 +1,235 @@
+{% extends super_template %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        <li>
+            <a class="btn default" href="{{ turma.get_absolute_url }}"> Visualizar turma</a>
+        </li>
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+    {% box 'Selecione os diários' class='box_diarios' %}
+        {% render_form form %}
+    {% endbox %}
+
+    {% if form.is_valid %}
+        {% for chave_etapa, etapa in etapas.items %}
+            <script>
+                $('.box_diarios').addClass('hidden');
+            </script>
+
+            <div class="tab-pane" data-title="{{ etapa }}" data-tab="dados_{{ chave_etapa }}">
+
+                <ul class="action-bar">
+                    <li><a href="javascript:;"
+                           onclick="$('<input>').attr({type: 'hidden', id: 'xls', name: 'xls', value: '{{ etapa }}'}).appendTo('#mapaturma_form'); $('#mapaturma_form').submit();"
+                           class="btn">Exportar para Excel</a></li>
+                </ul>
+
+                {% box "Mapa da Turma {{ etapa }}" %}
+                    <table>
+                        <thead>
+                        <tr>
+                            <th></th>
+                            {% for diario in diarios %}
+                                <th class="text-center" colspan="4">
+                                    {{ diario.componente_curricular.componente.sigla }}
+                                    {% if diario.componente_curricular.componente.abreviatura %}(
+                                        {{ diario.componente_curricular.componente.abreviatura }}){% endif %}
+                                </th>
+                            {% endfor %}
+                            {% if not turma.matriz.estrutura.is_lancamento_conceito %}
+                            <th class="text-center" rowspan="4">Média geral da etapa</th>
+                            {% endif %}
+                        </tr>
+                        <tr>
+                            <th>Carga horária cumprida</th>
+                            {% for diario in diarios %}
+                                <th class="text-center" colspan="4">
+                                    {{ diario.get_carga_horaria_cumprida }} h/a
+                                    de {{ diario.componente_curricular.componente.ch_hora_aula }} h/a
+                                </th>
+                            {% endfor %}
+                        </tr>
+                        <tr>
+                            <th>Aluno</th>
+                            {% for diario in diarios %}
+                                <th class="text-center">N</th>
+                                <th class="text-center">F</th>
+                                <th class="text-center">%</th>
+                                <th class="text-center">Sit.</th>
+                            {% endfor %}
+                        </tr>
+                        </thead>
+
+                        <tbody>
+                        {% for item in tabela_mapa %}
+                            <tr>
+                                <td>{{ item.0.aluno.get_nome }} (<a
+                                        href="{{ item.0.aluno.get_absolute_url }}">{{ item.0.aluno.matricula }}</a>)
+                                </td>
+
+                                {% for value in item.1 %}
+                                    {% if etapa == "Etapa 1" %}
+                                        {% if value.md %}
+                                            <td> 
+                                                {{ value.md|method:"get_nota_boletim"|param:1|param:True|execute|format }}
+                                            </td>
+                                            <td> {{ value.faltas_etapa1|format }} </td>
+                                            <td> {{ value.percentualfrequencia1|format }}%</td>
+                                            <td> {{ value.rotulo }} </td>
+                                        {% else %}
+                                            <td> -</td>
+                                            <td> -</td>
+                                            <td> -</td>
+                                            <td> -</td>
+                                        {% endif %}
+                                    {% elif etapa == "Etapa 2" %}
+                                        {% if value.md %}
+                                            <td> {{ value.md|method:"get_nota_boletim"|param:2|param:True|execute|format }}</td>
+                                            <td> {{ value.faltas_etapa2|format }} </td>
+                                            <td> {{ value.percentualfrequencia2|format }}%</td>
+                                            <td> {{ value.rotulo }} </td>
+                                        {% else %}
+                                            <td> -</td>
+                                            <td> -</td>
+                                            <td> -</td>
+                                            <td> -</td>
+                                        {% endif %}
+                                    {% elif etapa == "Etapa 3" %}
+                                        {% if value.md %}
+                                            <td> {{ value.md|method:"get_nota_boletim"|param:3|param:True|execute|format }} </td>
+                                            <td> {{ value.faltas_etapa3|format }} </td>
+                                            <td> {{ value.percentualfrequencia3|format }}%</td>
+                                            <td> {{ value.rotulo }} </td>
+                                        {% else %}
+                                            <td> -</td>
+                                            <td> -</td>
+                                            <td> -</td>
+                                            <td> -</td>
+                                        {% endif %}
+                                    {% elif etapa == "Etapa 4" %}
+                                        {% if value.md %}
+                                            <td> {{ value.md|method:"get_nota_boletim"|param:4|param:True|execute|format }} </td>
+                                            <td> {{ value.faltas_etapa4|format }} </td>
+                                            <td> {{ value.percentualfrequencia4|format }}%</td>
+                                            <td> {{ value.rotulo }} </td>
+                                        {% else %}
+                                            <td> -</td>
+                                            <td> -</td>
+                                            <td> -</td>
+                                            <td> -</td>
+                                        {% endif %}
+                                    {% elif etapa == "Todas as etapas" %}
+                                        {% if value.md %}
+                                            <td> {{ value.md.get_media_final_disciplina_exibicao|format }} </td>
+                                            <td> {{ value.faltas|format }} </td>
+                                            <td> {{ value.percentualfrequencia|format }}%</td>
+                                            <td> {{ value.rotulo }} </td>
+                                        {% else %}
+                                            <td> -</td>
+                                            <td> -</td>
+                                            <td> -</td>
+                                            <td> -</td>
+                                        {% endif %}
+                                    {% else %}
+                                        {% if value.md %}
+                                            <td> {{ value.md|method:"get_nota_boletim"|param:5|param:True|execute|format }} </td>
+                                            <td> -</td>
+                                            <td> -</td>
+                                            <td> {{ value.rotulo }} </td>
+                                        {% else %}
+                                            <td> -</td>
+                                            <td> -</td>
+                                            <td> -</td>
+                                            <td> -</td>
+                                        {% endif %}
+                                    {% endif %}
+
+                                {% endfor %}
+                                {% if not turma.matriz.estrutura.is_lancamento_conceito %}
+                                    <td>
+                                        {% if etapa == "Etapa 1" %}
+                                            {{ item.0.get_media_na_primeira_etapa|floatformat:2 }}
+                                        {% elif etapa == "Etapa 2" %}
+                                            {{ item.0.get_media_na_segunda_etapa|floatformat:2 }}
+                                        {% elif etapa == "Etapa 3" %}
+                                            {{ item.0.get_media_na_terceira_etapa|floatformat:2 }}
+                                        {% elif etapa == "Etapa 4" %}
+                                            {{ item.0.get_media_na_quarta_etapa|floatformat:2 }}
+                                        {% elif etapa == "Etapa final" %}
+                                            {{ item.0.get_media_na_etapa_final|floatformat:2 }}
+                                        {% elif etapa == "Todas as etapas" %}
+                                            {{ item.0.get_media_final_periodo|floatformat:2 }}
+                                        {% endif %}
+                                    </td>
+                                {% endif %} 
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                {% endbox %}
+            </div>
+        {% endfor %}
+
+        {% if etapas %}
+            {% box 'Legenda da Situação' %}
+                <table>
+                    <thead>
+                    <th>Abreviação</th>
+                    <th>Definição</th>
+                    </thead>
+                    <tbody>
+                    <tr>
+                        <td>APR</td>
+                        <td>Aprovado</td>
+                    </tr>
+                    <tr>
+                        <td>REP</td>
+                        <td>Reprovado</td>
+                    </tr>
+                    <tr>
+                        <td>RF</td>
+                        <td>Reprovado por falta</td>
+                    </tr>
+                    <tr>
+                        <td>PF</td>
+                        <td>Prova final</td>
+                    </tr>
+                    <tr>
+                        <td>CUR</td>
+                        <td>Cursando</td>
+                    </tr>
+                    <tr>
+                        <td>TRA</td>
+                        <td>Trancado</td>
+                    </tr>
+                    <tr>
+                        <td>CAN</td>
+                        <td>Cancelado</td>
+                    </tr>
+                    </tbody>
+                </table>
+            {% endbox %}
+
+            {% box 'Legenda de siglas dos componentes' %}
+                <table>
+                    <thead>
+                    <th>Sigla</th>
+                    <th>Componente</th>
+                    </thead>
+                    <tbody>
+                    {% for diario in diarios %}
+                        <tr>
+                            <td>{{ diario.componente_curricular.componente.sigla }}</td>
+                            <td>{{ diario.componente_curricular.componente.descricao }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% endbox %}
+        {% endif %}
+    {% endif %}
+{% endblock %}

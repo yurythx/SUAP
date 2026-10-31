@@ -1,0 +1,200 @@
+{% extends super_template %}
+
+{% block content %}
+
+    {% if perms.avaliacao_cursos.view_avaliacao %}
+        <ul class="action-bar">
+            <li class="has-child">
+                <a class="btn default" href="#">Gerar Relatório</a>
+                <ul>
+                    <li><a class="default inverse" href="/avaliacao_cursos/estatistica_avaliacao/{{ obj.pk }}/">Avaliação Geral</a></li>
+                    <li><a class="default inverse" href="/avaliacao_cursos/estatistica_avaliacao_componentes/{{ obj.pk }}/">Avaliação das Matrizes</a></li>
+                </ul>
+            </li>
+        </ul>
+    {% endif %}
+
+    {% box "Dados gerais" %}
+        <table class="info">
+            <tr>
+                <td>Descrição</td>
+                <td colspan="3">{{ obj.descricao }}</td>
+                <td>Ano</td>
+                <td>{{ obj.ano }}</td>
+            </tr>
+            <tr>
+                <td>Total de Respondentes</td>
+                <td>{{ obj.get_qtd_respondentes }}</td>
+                <td>Questionários Iniciados</td>
+                <td>{{ obj.get_qtd_iniciado }}</td>
+                <td>Questionários Finalizados</td>
+                <td>{{ obj.get_qtd_finalizados }}</td>
+            </tr>
+            <tr>
+                <td>Segmentos</td>
+                <td colspan="5">{{ obj.get_segmentos }}</td>
+            </tr>
+            <tr>
+                <td>Modalidades</td>
+                <td colspan="5">{{ obj.get_modalidades }}</td>
+            </tr>
+        </table>
+    {% endbox %}
+
+    <div class="tab-pane ajax-rendered" data-title="Questionários" data-tab="questionarios">
+    {% if request.GET.tab == "questionarios" or not request.GET.tab %}
+    {% box "Questionários" %}
+
+        {% if perms.avaliacao_cursos.add_avaliacao %}
+        <ul class="action-bar">
+            <li><a class="btn success popup" href="/avaliacao_cursos/adicionar_questionario/{{ obj.pk }}/">Adicionar Questionário</a></li>
+        </ul>
+        {% endif %}
+
+        {% if obj.questionario_set.exists %}
+            <table>
+                <thead>
+                <tr>
+                    <th class="no-print">Ações</th>
+                    <th>Segmentos</th>
+                    <th>Modaliades</th>
+                    <th>Data de Início</th>
+                    <th>Data de Término</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for questionario in obj.questionario_set.all %}
+                    <tr>
+                        <td class="no-print">
+                            {% icon "view" "/avaliacao_cursos/questionario/{{ questionario.pk }}/" %}
+                            {% if perms.avaliacao_cursos.add_avaliacao %}
+                                {% icon "edit" "/avaliacao_cursos/adicionar_questionario/{{ obj.pk }}/{{ questionario.pk }}/" %}
+                                {% icon "delete" "?questionario_id={{ questionario.pk }}" %}
+                            {% endif %}
+                        </td>
+                        <td>{{ questionario.get_segmentos }}</td>
+                        <td>{{ questionario.get_modalidades }}</td>
+                        <td>{{ questionario.data_inicio|format }}</td>
+                        <td>{{ questionario.data_termino|format }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="alert alert-warning">Nenhum questionário cadastrado.</p>
+        {% endif %}
+    {% endbox %}
+    {% endif %}
+    </div>
+
+    <div class="tab-pane ajax-rendered" data-title="Monitoramento" data-tab="monitoramento">
+    {% if request.GET.tab == "monitoramento" %}
+    {% box "Monitoramento por Segmento" %}
+
+        <div class="legenda">
+                <p>Legenda:</p>
+                <ul>
+                    <li class="hoje">A: Aptos</li>
+                    <li class="warning">I: Iniciaram</li>
+                    <li class="success">F: Finalizados</li>
+                </ul>
+            </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th rowspan="2">Campus</th>
+                    {% for segmento in segmentos %}
+                        <th colspan="3">{{ segmento }}</th>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    {% for segmento in segmentos %}
+                    <th>A</th>
+                    <th>I</th>
+                    <th>F</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for uo, estatistica in estatisticas.items %}
+                <tr>
+                    <th>{{ uo }}</th>
+                    {% for valor in estatistica %}
+                        {% if valor == 0 %}
+                            <td class="disabled">-</td>
+                        {% else %}
+                            <td>{{ valor }}</td>
+                        {% endif %}
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endbox %}
+
+    {% box "Monitoramento por Modalidade - Alunos" %}
+        <table>
+            <thead>
+                <tr>
+                    <th rowspan="2">Campus</th>
+                    {% for modalidade in modalidades %}
+                        <th colspan="3">{{ modalidade }}</th>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    {% for modalidade in modalidades %}
+                    <th>A</th>
+                    <th>I</th>
+                    <th>F</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for uo, estatistica in estatisticas_discente.items %}
+                <tr>
+                    <th>{{ uo }}</th>
+                    {% for valor in estatistica %}
+                        {% if valor == 0 %}
+                            <td class="disabled">-</td>
+                        {% else %}
+                            <td>{{ valor }}</td>
+                        {% endif %}
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endbox %}
+    {% endif %}
+    </div>
+
+    <div class="tab-pane ajax-rendered" data-title="Matrizes Avaliadas" data-tab="matrizes">
+    {% if request.GET.tab == "matrizes" %}
+    {% box "Matrizes" %}
+
+        {% if obj.get_matrizes_avaliadas_por_alunos.exists %}
+            <table>
+                <thead>
+                <tr>
+                    <th class="no-print">Ações</th>
+                    <th>Descrição</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for matriz in obj.get_matrizes_avaliadas_por_alunos %}
+                    <tr>
+                        <td class="no-print">{% icon "view" "/avaliacao_cursos/resultado_avaliacao_matriz/{{ obj.pk }}/{{ matriz.pk }}/" %}</td>
+                        <td>{{ matriz.descricao }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="alert alert-warning">Nenhuma matriz avaliada.</p>
+        {% endif %}
+    {% endbox %}
+    {% endif %}
+    </div>
+
+{% endblock %}

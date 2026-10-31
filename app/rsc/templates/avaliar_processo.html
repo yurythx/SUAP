@@ -1,0 +1,289 @@
+{% extends super_template %}
+
+{% load rsc_tags %}
+
+{% block extrahead %}
+    <style>
+        ol.lower-alpha > li { list-style-type: lower-alpha; list-style: lower-alpha; }
+        ol.decimal > li { list-style-type: decimal; list-style: decimal; }
+        div.instrucoes-gerais { line-height: 20px; }
+        .boxsizingBorder {
+            -webkit-box-sizing: border-box;
+               -moz-box-sizing: border-box;
+                    box-sizing: border-box;
+                         width: 100%
+        }
+        .tbox .tcontent h2, .tbox .tcontent h3 {
+            margin: 0 !important;
+        }
+    </style>
+
+    <script>
+	    function finalizar_avaliacao(avaliacao_id){
+	    	if(confirm('Deseja mesmo finalizar esta avaliação? Depois de finalizada não será mais possível editá-la.')){
+		        $.ajax({
+		                type: "POST",
+		                url: '/rsc/finalizar_avaliacao/'+avaliacao_id+'/',
+		                data: $('#form_avaliacao').serialize(),
+		                success: function (retorno) {
+		                    if (retorno.ok) {
+		                    	alert(retorno.msg)
+		                    	window.location.href = "/rsc/processo_avaliacao/";
+		                    }else {
+		                        alert(retorno.msg)
+		                    }
+		                }
+		        });
+	    	}
+	    }
+
+	    function onInitTabs(){
+	        preencher_relatorio_descritivo();
+	        preencher_documentos_preliminares();
+
+	        preencher_quadro_resumo_avaliacao();
+	        $("a[data-tab='quadro_resumo_avaliacao']").on('click', function(){
+	        	preencher_quadro_resumo_avaliacao();
+	        });
+	    }
+
+	    function preencher_relatorio_descritivo(){
+	        $.get("/rsc/relatorio_descritivo/{{ processo.id }}/", function(data) {
+	            $("div[data-tab='relatorio_descritivo']").html(data);
+	        })
+	    }
+
+	    function preencher_documentos_preliminares(){
+            $.get("/rsc/documentos_preliminares/{{ processo.id }}/", function(data) {
+                $("div[data-tab='documentos_preliminares']").html(data);
+            });
+        }
+
+	    function preencher_quadro_resumo_avaliacao(){
+            $.get("/rsc/quadro_resumo_avaliacao/{{ avaliacao.id }}/", function(data) {
+                $("div[data-tab='quadro_resumo_avaliacao']").html(data);
+            });
+        }
+    </script>
+{% endblock %}
+
+{% block content %}
+
+<form id="form_avaliacao">
+    {% csrf_token %}
+    <ul class="action-bar">
+        {% if avaliacao.pode_avaliar %}
+            <li><a href="javascript:void(0);" onclick="finalizar_avaliacao({{ avaliacao.id }})" class="btn success">Finalizar Avaliação</a></li>
+            <li><a href="/rsc/desistir_avaliacao/{{ avaliacao.id }}" class="btn popup danger no-confirm">Desistir da Avaliação</a></li>
+        {% else %}
+            <li><a class="btn" href="/rsc/processo_avaliacao/?tab=avaliacoes_concluidas">Voltar</a></li>
+        {% endif %}
+    </ul>
+</form>
+
+{% box 'Dados do Requerente' %}
+    <table class="info">
+        <tbody>
+            <tr>
+                <td>Nome:</td>
+                <td colspan="3">{{ processo.servidor.pessoa_fisica.nome }}</td>
+                <td>Matrícula SIAPE:</td>
+                <td>{{ processo.servidor.matricula }}</td>
+            </tr>
+            <tr>
+                <td>Pontuação Requerida:</td>
+                <td colspan="3"><span id="pontuacao_requerida">{{ processo.pontuacao_pretendida|format }}</span></td>
+                <td>Data de Retroatividade Requerida:</td>
+                <td><span id="data_referencia_retroatividade">{{ data_referencia|format }}</span></td>
+            </tr>
+            <tr>
+                <td>Pontuação Validada:</td>
+                <td><span id="pontuacao_validada_com_corte">{{ pontuacao_validada_com_corte|format }}</span></td>
+                <td>Data de Referência dos Documentos:</td>
+                <td><span id="data_referencia_documentos">{{ data_referencia_arquivos|format }}</span></td>
+                <td>Data Retroatividade Validada:</td>
+                <td><span id="data_referencia_validada">{{ data_referencia_validada|format }}</span></td>
+            </tr>
+            <tr>
+                <td>Situação:</td>
+                <td colspan="5"><span class="status status-alert">{{ avaliacao_status|safe|format }}</span></td>
+            </tr>
+            <tr>
+                <td>Requer:</td>
+                <td colspan="5">
+                    {{ processo.tipo_rsc.nome }}
+                </td>
+            </tr>
+        </tbody>
+    </table>
+{% endbox %}
+
+<div class="tab-pane" data-title="Instruções gerais" data-tab="instrucoes_gerais">
+
+    <div class="instrucoes-gerais">
+
+        {{ config.instrucoes_gerais_avaliador|safe }}
+
+    </div>
+</div>
+
+<div class="tab-pane" data-title="Documentos preliminares" data-tab="documentos_preliminares"></div>
+
+<div class="tab-pane" data-title="Relatório descritivo" data-tab="relatorio_descritivo"></div>
+
+<div class="tab-pane" data-title="Avaliação" data-tab="avaliacao">
+
+    <p class="alert alert-warning">
+        <strong>Atenção:</strong> Para invalidar um arquivo que não corresponde com as informações descritas pelo avaliado, basta ZERAR as pontuações. Feito isso, o arquivo não será levado em consideração nos cálculos de retroatividade.
+    </p>
+
+    {% if arquivos_rsc1.exists %}
+	   {% box 'Reconhecimento de Saberes e Competências  - RSC-I' %}
+	        <table>
+	            <thead>
+	                <tr>
+	                    <th>Nº</th>
+	                    <th>Descrição</th>
+	                    <th>Ver arquivo</th>
+	                    <th>Data de Referência Requerida</th>
+	                    <th>Quantidade de Itens</th>
+	                    <th>Pontuação Requerida</th>
+                        <th>Situação</th>
+                        {% if avaliacao.pode_avaliar %}
+                            <th>Opções</th>
+                        {% endif %}
+	                </tr>
+	            </thead>
+	            <tbody>
+	                {% regroup arquivos_rsc1 by arquivo.criterio.diretriz as arquivos_diretriz %}
+	                {% for arquivo_diretriz in arquivos_diretriz %}
+	                    <tr>
+	                        <td colspan="9"><p class="negrito">{{ arquivo_diretriz.grouper }}</p></td>
+	                    </tr>
+    	                {% for arquivo_rsc in arquivo_diretriz.list %}
+    	                    <tr>
+    	                        <td align="right">{{ arquivo_rsc.arquivo.criterio.numero }}</td>
+    	                        <td>{{ arquivo_rsc.arquivo.criterio.nome }}</td>
+    	                        <td><a href="/rsc/visualizar_arquivo_pdf/{{ arquivo_rsc.arquivo.encrypted_pk }}" target="_blank">Visualizar o arquivo</a></td>
+    	                        <td align="center">{{ arquivo_rsc.arquivo.data_referencia|format }}</td>
+    	                        <td align="center">{{ arquivo_rsc.arquivo.qtd_itens }}</td>
+    	                        <td align="center">{{ arquivo_rsc.arquivo.nota_pretendida }}</td>
+    	                        <td>
+    	                            {% if arquivo_rsc.item_validado %}
+                                        <span class="status status-success" id="status">Avaliado</span>
+                                    {% else %}
+                                        <span class="status status-alert" id="status">Não avaliado</span>
+                                    {% endif %}
+                                </td>
+                                {% if avaliacao.pode_avaliar %}
+                                    <td><a class="btn {% if arquivo_rsc.item_validado %}primary {% else %}success {% endif %} popup" href="/rsc/avaliar_item/{{ arquivo_rsc.id }}">{% if arquivo_rsc.item_validado %} Editar {% else %} Avaliar {% endif %}</a></td>
+                                {% endif %}
+    	                    </tr>
+    	                {% endfor %}
+	                {% endfor %}
+	            </tbody>
+	        </table>
+	   {% endbox %}
+    {% endif %}
+
+    {% if arquivos_rsc2.exists %}
+	    {% box 'Reconhecimento de Saberes e Competências  - RSC-II' %}
+
+	        <table>
+	            <thead>
+	                <tr>
+                        <th>Nº</th>
+                        <th>Descrição</th>
+                        <th>Ver Arquivo</th>
+                        <th>Data de Referência Requerida</th>
+                        <th>Quantidade de Itens</th>
+                        <th>Pontuação Requerida</th>
+                        <th>Situação</th>
+                        {% if avaliacao.pode_avaliar %}<th>Opções</th>{% endif %}
+                    </tr>
+	            </thead>
+	            <tbody>
+	                {% regroup arquivos_rsc2 by arquivo.criterio.diretriz as arquivos_diretriz %}
+                    {% for arquivo_diretriz in arquivos_diretriz %}
+                        <tr>
+                            <td colspan="9"><p class="negrito">{{ arquivo_diretriz.grouper }}</p></td>
+                        </tr>
+    	                {% for arquivo_rsc in arquivo_diretriz.list %}
+    		                <tr>
+                                <td align="right">{{ arquivo_rsc.arquivo.criterio.numero }}</td>
+                                <td>{{ arquivo_rsc.arquivo.criterio.nome }}</td>
+                                <td><a href="/rsc/visualizar_arquivo_pdf/{{ arquivo_rsc.arquivo.encrypted_pk }}" target="_blank">Visualizar o arquivo</a></td>
+                                <td align="center">{{ arquivo_rsc.arquivo.data_referencia|format }}</td>
+                                <td align="center">{{ arquivo_rsc.arquivo.qtd_itens }}</td>
+                                <td align="center">{{ arquivo_rsc.arquivo.nota_pretendida }}</td>
+                                <td align="center">
+                                    {% if arquivo_rsc.item_validado %}
+                                        <span class="status status-success" id="status">Avaliado</span>
+                                    {% else %}
+                                        <span class="status status-alert" id="status">Não Avaliado</span>
+                                    {% endif %}
+                                </td>
+                                {% if avaliacao.pode_avaliar %}
+                                    <td><a class="btn {% if arquivo_rsc.item_validado %}primary {% else %}success {% endif %} popup" href="/rsc/avaliar_item/{{ arquivo_rsc.id }}">{% if arquivo_rsc.item_validado %} Editar {% else %} Avaliar {% endif %}</a></td>
+                                {% endif %}
+                            </tr>
+    	                {% endfor %}
+	                {% endfor %}
+	            </tbody>
+	        </table>
+	    {% endbox %}
+    {% endif %}
+
+    {% if arquivos_rsc3.exists %}
+	    {% box 'Reconhecimento de Saberes e Competências  - RSC-III' %}
+	        <table>
+	            <thead>
+	                <tr>
+                        <th>Nº</th>
+                        <th>Descrição</th>
+                        <th>Ver arquivo</th>
+                        <th>Data de Referência Requerida</th>
+                        <th>Quantidade de Itens</th>
+                        <th>Pontuação Requerida</th>
+                        <th>Situação</th>
+                        {% if avaliacao.pode_avaliar %}<th>Opções</th>{% endif %}
+                    </tr>
+	            </thead>
+	            <tbody>
+	                {% regroup arquivos_rsc3 by arquivo.criterio.diretriz as arquivos_diretriz %}
+                    {% for arquivo_diretriz in arquivos_diretriz %}
+                        <tr>
+                            <td colspan="9"><p class="negrito">{{ arquivo_diretriz.grouper }}</p></td>
+                        </tr>
+                        {% for arquivo_rsc in arquivo_diretriz.list %}
+    		                <tr>
+                                <td align="right">{{ arquivo_rsc.arquivo.criterio.numero }}</td>
+                                <td>{{ arquivo_rsc.arquivo.criterio.nome }}</td>
+                                <td><a href="/rsc/visualizar_arquivo_pdf/{{ arquivo_rsc.arquivo.encrypted_pk }}" target="_blank">Visualizar o arquivo</a></td>
+                                <td align="center">{{ arquivo_rsc.arquivo.data_referencia|format }}</td>
+                                <td align="center">{{ arquivo_rsc.arquivo.qtd_itens }}</td>
+                                <td align="center">{{ arquivo_rsc.arquivo.nota_pretendida }}</td>
+                                <td align="center">
+                                    {% if arquivo_rsc.item_validado %}
+                                        <span class="status status-success" id="status">Avaliado</span>
+                                    {% else %}
+                                        <span class="status status-alert" id="status">Não Avaliado</span>
+                                    {% endif %}
+                                </td>
+                                {% if avaliacao.pode_avaliar %}
+                                    <td><a class="btn {% if arquivo_rsc.item_validado %}primary {% else %}success {% endif %} popup" href="/rsc/avaliar_item/{{ arquivo_rsc.id }}">{% if arquivo_rsc.item_validado %} Editar {% else %} Avaliar {% endif %}</a></td>
+                                {% endif %}
+                            </tr>
+    	                {% endfor %}
+	                {% endfor %}
+	            </tbody>
+	        </table>
+	    {% endbox %}
+    {% endif %}
+
+</div>
+
+<div class="tab-pane" data-title="Quadro de Resumo da Avaliação" data-tab="quadro_resumo_avaliacao">
+</div>
+
+{% endblock %}

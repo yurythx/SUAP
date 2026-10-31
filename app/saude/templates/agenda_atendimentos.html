@@ -1,0 +1,123 @@
+{% extends super_template %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if pode_cadastrar_horario %}
+            <li><a class="btn success" href="/saude/adicionar_horario_atendimento_saude/">Adicionar Data de Atendimento</a></li>
+        {% endif %}
+        <li><a class="btn default" href="/saude/ver_calendario_agendamento/?{{ string }}">Ver Calendário</a></li>
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+    <div class="search-and-filters">
+        {% render_form form %}
+    </div>
+
+    {% if horarios.exists %}
+        <div class="alert alert-info">
+            <p><strong>Atenção:</strong></p>
+            <ul>
+                <li>A solicitação do agendamento deve ser feita até 12 horas antes da data do atendimento.</li>
+                <li>O agendamento pode ser cancelado até 12 horas antes da data do atendimento.</li>
+            </ul>
+        </div>
+        <div class="legenda">
+	        <p>Legenda:</p>
+	        <ul>
+	            <li class="warning">Meus Agendamentos</li>
+	        </ul>
+		</div>
+        <form method="post" id="bolsas_form" action="/saude/cancelar_horarios_atendimentos/">
+            {% csrf_token %}
+            {% if not eh_aluno %}
+                <div class="actions">
+                    <label>Ação:
+                        <select name="action">
+                            <option selected="selected">Cancelar Horários</option>
+                        </select>
+                    </label>
+                    <button value="0" name="index" title="Executar ação selecionada" class="button" type="submit">Aplicar</button>
+                </div>
+            {% endif %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Horários</caption>
+                    <thead>
+                        <tr>
+                            {% if not eh_aluno %}
+                                <th class="no-print">Seleção <input type="checkbox" onchange="var is = this.parentNode.parentNode.parentNode.parentNode.getElementsByTagName('input');for(var i=0; i<is.length; i++){ is[i].checked = this.checked;}" /></th>
+                            {% endif %}
+                            <th>Campus</th>
+                            <th>Especialidade</th>
+                            <th>Data</th>
+                            <th>Horário</th>
+                            <th>Modalidade</th>
+                            {% if pode_cadastrar_horario %}
+                                <th>Paciente</th>
+                            {% endif %}
+                            <th>Profissional</th>
+                            <th>Disponível</th>
+                            <th class="no-print">Opções</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% autopaginate horarios 30 %}
+                        {% paginate %}
+                        {% for horario in horarios %}
+                            <tr {% if horario.vinculo_paciente == request.user.get_vinculo %}class="highlight"{% endif %}>
+                                {% if not eh_aluno %}
+                                    <td class="no-print">
+                                        {% if horario|method:"pode_cancelar"|call:request.user %}
+                                            <INPUT TYPE="checkbox" NAME="registros" value="{{ horario.id }}" />
+                                        {% endif %}
+                                    </td>
+                                {% endif %}
+                                <td>{{ horario.campus }}</td>
+                                <td>{{ horario.get_especialidade_display }}</td>
+                                <td>{{ horario.data }}</td>
+                                <td>{{ horario.hora_inicio|time:"H:i" }} {% if not eh_aluno %} às {{ horario.hora_termino|time:"H:i" }}{% endif %}</td>
+                                <td>{{ horario.modalidade }}</td>
+                                {% if pode_cadastrar_horario %}
+                                    <td>
+                                        {% if eh_profissional_saude %}
+                                            <a href="/saude/prontuario/{{ horario.vinculo_paciente.id }}/">{{ horario.vinculo_paciente.pessoa.nome }}</a>
+                                        {% else %}
+                                            {{ horario.vinculo_paciente.pessoa.nome }}
+                                        {% endif %}
+                                    </td>
+                                {% endif %}
+                                <td>{{ horario.cadastrado_por_vinculo.user|format }}</td>
+                                <td>{{ horario.get_disponibilidade|format }}</td>
+                                <td class="no-print">
+                                    {% if horario|method:"aluno_tem_aula"|call:request.user %}
+                                        <p class="alert alert-warning">Horário de consulta em horário de aula. O aluno não receberá atestado de comparecimento para abonar a falta da aula.</p>
+                                    {% endif %}
+                                    <ul class="action-bar">
+                                        {% if horario.disponivel and horario.dentro_prazo_agendamento %}
+                                            {% if horario|method:"pode_agendar"|call:request.user or eh_aluno %}
+                                                <li><a class="btn success" href="/saude/reservar_horario_atendimento/{{ horario.id }}/">Agendar</a></li>
+                                            {% endif %}
+                                        {% endif %}
+                                        {% if horario|method:"pode_bloquear_aluno"|call:request.user and not horario.paciente_bloqueado %}
+                                            <li><a href="/saude/bloquear_aluno_atendimento/{{ horario.id }}/" class="btn warning confirm" data-confirm="Deseja bloquear o paciente por 21 dias?">Bloquear Paciente</a></li>
+                                        {% elif horario|method:"pode_bloquear_aluno"|call:request.user and horario.paciente_bloqueado %}
+                                            <li><a href="/saude/desbloquear_aluno_atendimento/{{ horario.vinculo_paciente.id }}/" class="btn confirm success" data-confirm="Deseja desbloquear o paciente?">Desbloquear Paciente</a></li>
+                                        {% endif %}
+                                        {% if horario|method:"pode_cancelar"|call:request.user %}
+                                            <li><a class="btn danger" href="/saude/cancelar_horario_atendimento/{{ horario.id }}/">Cancelar</a></li>
+                                        {% endif %}
+                                    </ul>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </form>
+    {% else %}
+        <p class="alert alert-warning">Sem horário de agendamento disponível no período informado.</p>
+    {% endif %}
+
+{% endblock %}

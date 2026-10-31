@@ -1,0 +1,151 @@
+{% extends super_template %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        <li><a href="{% url 'evento' evento.id %}" class="btn">{% icone "return" %} Voltar para o evento</a></li>
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+    <p class="alert alert-info">Visualização completa de todas as submissões com alta similaridade de conteúdo, incluindo aquelas já removidas.</p>
+
+    {% if grupos_duplicados %}
+        <ul class="flex-container boxes infos">
+            <li class="box-item info">
+                <p class="stat">{{ total_grupos }}</p>
+                <p class="title">Grupos Identificados</p>
+            </li>
+            <li class="box-item warning">
+                <p class="stat">{{ total_submissoes_envolvidas }}</p>
+                <p class="title">Submissões envolvidas</p>
+            </li>
+            <li class="box-item success">
+                <p class="stat">{{ total_ativas }}</p>
+                <p class="title">Submissões Ativas</p>
+            </li>
+            <li class="box-item error">
+                <p class="stat">{{ total_removidas }}</p>
+                <p class="title">Submissões já removidas</p>
+            </li>
+        </ul>
+        
+        {# Explicação usando Alert do SUAP #}
+        <div class="alert alert-info">
+            <p><strong>Como interpretar esta análise:</strong>:</p>
+            
+            <p><strong>O que você está vendo:</strong></p>
+            <ul>
+                <li>Grupos de submissões com <strong>similaridade de conteúdo ≥ 85%</strong>;</li>
+                <li>Todas as submissões do grupo, <strong>incluindo as já removidas</strong>;</li>
+                <li>A primeira submissão de cada grupo é marcada como <strong>Primeira submissão</strong>.</li>
+            </ul>
+            
+            <p><strong>Como decidir qual remover:</strong></p>
+            <ol>
+                <li><strong>Data de submissão:</strong> Normalmente a mais antiga é mantida, mas você pode optar pela mais recente se contiver melhorias;</li>
+                <li><strong>Conteúdo:</strong> Use o botão "Comparar" para ver as diferenças lado a lado;</li>
+                <li><strong>Autores:</strong> Verifique se são os mesmos autores (pode indicar reenvio com correções);</li>
+                <li><strong>Flexibilidade:</strong> Você pode remover qualquer submissão do grupo, inclusive a primeira.</li>
+            </ol>
+        </div>
+
+        <p class="alert alert-info mb-3">
+            <strong>Dica:</strong> Submissões já removidas aparecem em cinza com o motivo da remoção. Você pode restaurá-las se a decisão foi equivocada.
+        </p>
+
+        {% for grupo in grupos_duplicados %}
+            {% box "Grupo {{ forloop.counter }}" badge="{{ grupo.submissoes|length }} submissões similares" %}
+                <dl class="definition-list">
+                    <dt>Modalidade</dd>
+                    <dd>{{ grupo.modalidade.tipo.titulo }}</dd>
+                    <dt>Área temática</dt>
+                    <dd>{{ grupo.area_tematica.titulo }}</dd>
+                </dl>
+
+                {% for item in grupo.submissoes %}
+                    <div class="general-box">
+                        <div class="primary-info">
+                            <div class="status-info-container">
+                                {% if item.is_primeira %}
+                                    <span class="status status-info">Primeira submissão</span>
+                                {% else %}
+                                    <span class="status status-{% if item.similaridade_conteudo >= 95 %}error{% elif item.similaridade_conteudo >= 90 %}alert{% else %}extra{% endif %}">
+                                        {{ item.similaridade_conteudo }}% de similaridade
+                                    </span>
+                                {% endif %}
+                                
+                                {% if item.removida %}
+                                    <span class="status status-error">Removida</span>
+                                {% else %}
+                                    <span class="status status-success">Ativa</span>
+                                {% endif %}
+                            </div>
+                            <h4 class="title">
+                                <small>{{ item.submissao.id }}</small> {{ item.submissao.titulo }}
+                            </h4>
+                            <ul class="action-bar">
+                                {% if not item.is_primeira %}
+                                    <li><a href="{% url 'comparar_submissoes' grupo.submissoes.0.submissao.id item.submissao.id %}" 
+                                    class="btn" title="Comparar com a primeira submissão">
+                                        {% icone "columns" %} Comparar
+                                    </a></li>
+                                {% endif %}
+                                
+                                {% if item.removida %}
+                                    <li><a href="{% url 'restaurar_submissao' item.submissao.id %}" 
+                                    class="btn success confirm" 
+                                    data-confirm="Tem certeza que deseja restaurar a submissão #{{ item.submissao.id }}?"
+                                    title="Restaurar esta submissão">
+                                        {% icone "undo" %} Restaurar
+                                    </a></li>
+                                {% endif %}
+                                
+                                <li><a href="{% url 'exibir_detalhes_avaliacao' item.submissao.id %}" 
+                                class="btn default popup" 
+                                title="Ver detalhes completos da submissão">
+                                    {% icone "eye" %} Ver detalhes
+                                </a></li>
+                            </ul>
+
+                            {% if item.removida and item.submissao.motivo_remocao %}
+                                <div class="extra-info">
+                                    <h5>Motivo da remoção:</h5>
+                                    {{ item.submissao.motivo_remocao }}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <dl class="secondary-info">
+                            <div class="list-item">
+                                <dt>{% icone "list-alt" %} Situação:</dt>
+                                <dd>{{ item.submissao.get_situacao_display }}</dd>
+                            </div>
+                            <div class="list-item">
+                                <dt>{% icone "calendar" %} Data/Hora:</dt>
+                                <dd>{{ item.submissao.data_hora|date:"d/m/Y H:i:s" }}</dd>
+                            </div>
+                            {% if not item.is_primeira %}
+                                <div class="list-item">
+                                    <dt>{% icone "heading" %} Sim. Título:</dt>
+                                    <dd>{{ item.similaridade_titulo }}%</dd>
+                                </div>
+                            {% endif %}
+                            <div class="list-item">
+                                <dt>{% icone "users" %} Autores:</dt>
+                                {% for autor in item.submissao.autores %}
+                                    <dd>{{ autor.nome }}</dd>
+                                {% endfor %}
+                            </div>
+                        </dl>
+                    </div>
+                {% endfor %}
+            {% endbox %}
+        {% endfor %}
+    {% else %}
+        <div class="alert alert-warning">
+            <p>Não foram encontradas submissões com similaridade de conteúdo ≥ 85% neste evento.</p>
+            <p class="mb-0">Todas as submissões parecem ser trabalhos únicos e originais.</p>
+        </div>
+    {% endif %}
+{% endblock %}

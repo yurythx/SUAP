@@ -1,0 +1,995 @@
+{% extends super_template %}
+{% load ppc_tags %}
+
+{% block extrahead %}
+    <script>
+        function change_tab(aba){
+            if (aba.includes("/")) {
+                window.location.href = aba
+            }else{
+                if (aba.includes("#")) {
+                    a = aba.substring(0, aba.indexOf("#"));
+                    ancora = aba.substring(aba.indexOf("#")+1);
+                    changeTabs(a);
+                    const elemAncora = document.getElementById(ancora);
+                    if (elemAncora) elemAncora.scrollIntoView();
+                }
+                else{
+                    changeTabs(aba)
+                }
+            }
+        };
+    </script>
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if pode_elaborar %}
+            <li><a class="btn primary popup" href="/ppc/matrizppc/{{ matrizppc.pk }}/editar/">Editar</a></li>
+            <li><a class="btn" href="/ppc/replicar_matrizppc/{{ pk }}/">Replicar</a></li>
+        {% endif %}
+        <li class="has-child">
+            <a href="#" class="btn default">{% icone "eye" %} Visualizar</a>
+            <ul>
+                <li><a class="btn" href="{{ matrizppc.ppc.diretriz.get_absolute_url }}">Diretriz</a></li>
+                <li><a class="btn" href="{{ matrizppc.ppc.get_absolute_url }}">PPC</a></li>
+            </ul>
+        </li>
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+    {% if tem_pendencia %}
+        <p class="alert alert-warning"><strong>Atenção:</strong> Esta matriz de PPC possui <a onclick="javascript:change_tab('pendencias#abas')">pendências não resolvidas</a>.</p>
+    {% endif %}
+
+    {% box "Dados gerais" %}
+        <dl class="definition-list flex">
+            <div class="list-item flex-basis-100">
+                <dt>PPC</dt>
+                <dd>{{ matrizppc.ppc }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Situação do PPC</dt>
+                <dd>{{ matrizppc.ppc.get_situacao_display|status }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Situação do matriz</dt>
+                <dd>{{ matrizppc.get_situacao_matriz_display|status }}</dd>
+            </div>
+            {% if matrizppc.ppc.ch_pratica > 0 %}
+                <div class="list-item">
+                    <dt>Situação da prática profissional</dt>
+                    <dd>{{ matrizppc.get_situacao_modalidadepraticaprofissional_display|status }}</dd>
+                </div>
+            {% endif %}
+            <div class="list-item">
+                <dt>Turno</dt>
+                <dd>{{ matrizppc.turno|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Quantidade de períodos</dt>
+                <dd>{{ matrizppc.quantidade_periodos }}</dd>
+            </div>
+        </dl>
+    {% endbox %}
+
+    <span id="abas"></span>
+
+    <div class="tab-pane ajax-rendered" data-title="Matriz curricular" data-tab="matriz">
+
+        {% box "Matriz curricular" %}
+            <ul class="action-bar">
+                {% if pode_retomar_edicao_matriz %}
+                    <li><a class="btn" href="/ppc/matrizppc/matrizcurricular/{{ matrizppc.pk }}/retomar/">{% icone "undo" %} Retomar elaboração</a></li>
+                {% endif %}
+                {% if pode_concluir_matriz %}
+                    <li><a class="btn success" href="/ppc/matrizppc/matrizcurricular/{{ matrizppc.pk }}/concluir/">Concluir elaboração</a></li>
+                {% endif %}
+                {% if pode_aprovar_revisao_matriz %}
+                    <li><a class="btn success" href="/ppc/matrizppc/matrizcurricular/{{ matrizppc.pk }}/aprovar/">Aprovar matriz curricular</a></li>
+                {% endif %}
+                {% if pode_revisar_matriz %}
+                    <li><a class="btn warning" href="/ppc/matrizppc/matrizcurricular/{{ matrizppc.pk }}/devolver/">Solicitar correção</a></li>
+                {% endif %}
+                {% if pode_desfazer_aprovacao_matriz %}
+                    <li><a class="btn" href="/ppc/matrizppc/matrizcurricular/{{ matrizppc.pk }}/desfazer_aprovacao/">{% icone "undo" %} Desfazer aprovação</a></li>
+                {% endif %}
+            </ul>
+
+            {% if matrizppc.justificativa_matriz %}
+                <p class="alert alert-warning"><strong>Mensagem do revisor</strong>: {{ matrizppc.justificativa_matriz }}</p>
+            {% endif %}
+
+            {% if pode_elaborar and not matrizppc.ppc.periodicidade %}
+                <p class="alert alert-warning"><strong>Atenção:</strong> <a href="/admin/ppc/projetopedagogicocurso/{{ matrizppc.ppc_id }}/change/">Defina a periodicidade do PPC</a> para habilitar o cadastro dos planos de disciplina.</p>
+            {% else %}
+                <div class="progress">
+                    <p data-prefix="da carga horária informada">{{ matrizppc.get_percentual_ch_informada_matriz }}%</p>
+                </div>
+            {% endif %}
+
+            <dl class="definition-list flex">
+                <div class="list-item">
+                    <dt>Quantidade de períodos</dt>
+                    <dd>{{ matrizppc.quantidade_periodos }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Turno</dt>
+                    <dd>{{ matrizppc.turno|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Situação</dt>
+                    <dd>{{ matrizppc.get_situacao_matriz_display|status }}</dd>
+                </div>
+                {% with ch_informada=matrizppc.get_ch_informada_matriz ch_exigida=matrizppc.ppc.get_ch_exigida_matriz %}
+                    <div class="list-item">
+                        <dt>Carga horária exigida</dt>
+                        <dd>{{ ch_exigida }}h</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Carga horária informada</dt>
+                        <dd class="{% if ch_informada >= ch_exigida %}true{% else %}false{% endif %}">{{ ch_informada }}h</dd>
+                    </div>
+                    {% if ch_informada != ch_exigida %}
+                    <div class="list-item">
+                        <dt>Carga horária pendente</dt> 
+                        <dd class="false">{{ ch_exigida|subtract:ch_informada }}h</dd>
+                    </div>
+                    {% endif %}
+                    {% if matrizppc.ppc.ch_cc_optativo %}
+                    <div class="list-item">
+                        <dt>Carga horária de optativas</dt> 
+                        <dd>{{ matrizppc.get_ch_informada_optativas_matriz }}h (exigido {{ matrizppc.ppc.ch_cc_optativo }}h)</dd>
+                    </div>
+                    {% endif %}
+                    {% if exige_ead %}
+                    <div class="list-item">
+                        <dt>Percentual EAD exigido</dt> 
+                        <dd>{{ matrizppc.ppc.diretriz.percentual_min_ead }}% a {{ matrizppc.ppc.diretriz.percentual_max_ead }}%</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Percentual EAD informado</dt> 
+                        {% with percentual_ead=matrizppc.get_percentual_ead_total %}
+                        <dd class="{% if percentual_ead > matrizppc.ppc.diretriz.percentual_max_ead or percentual_ead < matrizppc.ppc.diretriz.percentual_min_ead %}false{% endif %}">{{ matrizppc.get_info_hora_relogio_ead_total }}</dd>
+                        {% endwith %}
+                    </div>
+                    {% endif %}
+                {% endwith %}
+            </dl>
+        {% endbox %}
+
+        {% for nd in nucleos_matriz %}
+            <span id="id_nucleo_{{ nd.nucleo_id }}"></span>
+            {% box 'Núcleo {{ matrizppc.ppc|method:"get_nome_nucleo"|call:nd }}' %}
+
+                <ul class="action-bar">
+                    {% if pode_elaborar_matriz %}
+                        {% if nd.permite_criacao_plano_disciplina %}
+                            <li><a class="btn success" href="/ppc/planodisciplina/{{ matrizppc.pk }}/adicionar/{{ nd.nucleo_id }}/">Adicionar plano de disciplina</a></li>
+                        {% endif %}
+                        <li><a class="btn primary" href="{% url 'adicionar_planodisciplinappc' matrizppc.pk nd.nucleo_id %}">Vincular plano de disciplina existente</a></li>
+                        <li><a class="btn" href="{% url 'listar_planodisciplina' matrizppc.ppc.diretriz.tipo_oferta_id nd.nucleo_id matrizppc.pk %}">Listar planos de disciplina existentes</a></li>
+                    {% endif %}
+
+                </ul>
+
+                <dl class="definition-list flex">
+                    {% with ch_informada=matrizppc|method:"get_ch_informada_matriz"|call:nd.nucleo_id ch_minima=matrizppc.ppc|method:"get_ch_min_pd_exigida"|call:nd %}
+                        <div class="list-item">
+                            <dt>Carga horária exigida</dt>
+                            <dd>{{ matrizppc.ppc|method:"get_ch_pd_exigida"|call:nd }}</dd>
+                        </div>
+                        <div class="list-item">
+                            <dt>Carga horária informada</dt>
+                            <dd class="{% if ch_informada >= ch_minima %}true{% else %}false{% endif %}">{{ ch_informada }}h</dd>
+                        </div>
+                    {% endwith %}
+                </dl>
+
+                {% with planos=matrizppc|method:"get_planos_disciplinappc"|call:nd.nucleo_id %}
+                    {% if planos.exists %}
+                        <div class="table-responsive mt-5">
+                            <table>
+                                <caption>Planos de disciplina</caption>
+                                <thead>
+                                <th class="no-print">Ações</th>
+                                <th>Disciplina</th>
+                                
+                                <th>Carga horária</th>
+                                <th>Tipo</th>
+                                <th>Período</th>
+                                <th>Etapas</th>
+                                <th>Periodicidade</th>
+                                {% if matrizppc.ppc.is_curso_anual %}
+                                    <th>Aulas 1° semestre</th>
+                                    <th>Aulas 2° semestre</th>
+                                {% endif %}
+                                <th>Identificador do plano</th>
+                                <th>Natureza</th>
+                                <th>Segundo semestre</th>
+                                <th>Situação</th>
+                                {% if pode_elaborar_matriz and nd.permite_criacao_plano_disciplina %}
+                                    <th class="no-print">Opções</th>
+                                {% endif %}
+                                </thead>
+                                <tbody>
+                                {% for plano in planos %}
+                                    <tr>
+                                        <td class="no-print field-get_acoes">
+                                            {% icon "view" "/ppc/planodisciplinappc/{{ plano.pk }}/" "Visualizar" %}
+                                            {% if pode_elaborar_matriz %}
+                                                {% icon "edit" "/admin/ppc/planodisciplinappc/{{ plano.pk }}/change/" "Editar" "popup" %}
+                                                {% icon "delete" "/comum/excluir/ppc/planodisciplinappc/{{ plano.pk }}/" "Excluir " %}
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ plano.plano_disciplina.nome_disciplina }}</td>
+                                        <td>
+                                            <dl>
+                                                <dt>Teórica <dt>
+                                                <dd>{{ plano.ch_teorica }}h<dd>
+                                                <dt>Extensão</dt>
+                                                <dd>{{ plano.ch_extensao }}h</dd>
+                                                <dt>Total</dt>
+                                                <dd>{{ plano.plano_disciplina.ch_disciplina }}h</dd>
+                                                {% if plano.qtd_aulas_ead %}
+                                                    <dt>EAD</dt>
+                                                    <dd>{{ plano.get_percentual_ead }}% ({{ plano.qtd_aulas_ead }} aulas)</dd>
+                                                {% endif %}
+                                            </dl>
+                                        </td>
+                                        <td>{{ plano.get_tipo_display|format }}</td>
+                                        <td>{{ plano.periodo_oferta|format }}</td>
+                                        
+                                        <td>{{ plano.quantidade_etapas|format }}</td>
+                                        <td>{{ plano.get_periodicidade|format }}</td>
+                                        {% if matrizppc.ppc.is_curso_anual %}
+                                            <td>{{ plano.get_qtd_aulas_1s|format }}</td>
+                                            <td>{{ plano.get_qtd_aulas_2s|format }}</td>
+                                        {% endif %}
+                                        <td>{{ plano.plano_disciplina_id }}</td>
+                                        <td>{{ plano.get_natureza_disciplina_status }}</td>
+                                        <td>{{ plano.segundo_semestre|format }}</td>
+                                        <td>
+                                            {{ plano.plano_disciplina.get_situacao_display|status }}
+                                            {% if not plano.plano_disciplina.ativo %}
+                                                <p>{{ "Inativo"|status }}</p>
+                                            {% endif %}
+                                        </td>
+                                        {% if pode_elaborar_matriz and nd.permite_criacao_plano_disciplina %}
+                                            <td class="no-print field-get_acoes">
+                                                <ul class="action-list">
+                                                    {% if plano.plano_disciplina|method:"can_change"|call:request.user %}
+                                                        <li><a class="btn primary" href="{{ plano.plano_disciplina.get_absolute_url }}">{% icone "edit" %} Atualizar ementa e programa</a></li>
+                                                    {% endif %}
+                                                    {% if plano.plano_disciplina|method:"pode_enviar_analise"|call:request.user %}
+                                                        <li><a class="btn success" href="/ppc/planodisciplina/{{ plano.plano_disciplina.id }}/enviar/">{% icone "share" %} Enviar plano para análise</a></li>
+                                                    {% endif %}
+                                                </ul>
+                                            </td>
+                                        {% endif %}
+                                    </tr>
+                                {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="alert alert-warning">Nenhum plano de disciplina adicionado.</p>
+                    {% endif %}
+                {% endwith %}
+            {% endbox %}
+        {% endfor %}
+    </div>
+
+    {% if matrizppc.ppc.ch_cc_optativo %}
+        <div class="tab-pane ajax-rendered" data-title="Configuração de optativas" data-tab="optativas">
+
+            <ul class="action-bar">
+                {% if pode_elaborar_matriz %}
+                    <li><a class="btn success popup" href="{% url 'adicionar_configuracaooptativasmatrizppc' matrizppc.pk %}">{% icone "plus" %} Adicionar configuração</a></li>
+                {% endif %} 
+            </ul>
+
+            <dl class="definition-list flex">
+                <div class="list-item">
+                    <dt>Carga horária exigida no PPC</dt>
+                    <dd>{{ matrizppc.ppc.ch_cc_optativo }}h</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Carga horária configurada por período</dt>
+                    <dd>{{ matrizppc.get_ch_total_optativo_periodo }}h</dd>
+                </div>
+            </dl>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                    {% if pode_elaborar_matriz %}
+                        <th class="no-print">Ações</th>
+                    {% endif %}
+                    <th>Período</th>
+                    <th>CH exigida</th>
+                    <th>Núcleo da diretriz</th>
+                    <th>CH vinculada</th>
+                    <th>Planos vinculados</th>
+                    </thead>
+                        <tbody>
+                            <tr>
+                                {% if pode_elaborar_matriz %}
+                                    <td class="no-print field-get_acoes"></td>
+                                {% endif %}
+                                <td>-</td>
+                                <td>-</td>
+                                <td>-</td>
+                                <td>{{ matrizppc.get_ch_vinculada_optativo_sem_periodo }}h</td>
+                                <td>{{ matrizppc.get_planos_vinculados_sem_periodo }}</td>
+                            </tr>
+                            {% for config in matrizppc.configuracaooptativasmatrizppc_set.all %}
+                                <tr>
+                                    {% if pode_elaborar_matriz %}
+                                        <td class="no-print field-get_acoes">
+                                            {% icon "edit" "/ppc/configuracaooptativasmatrizppc/{{ config.pk }}/editar/" "Editar" "popup" %} <!-- editar_configuracaooptativasmatrizppc -->
+                                        </td>
+                                    {% endif %}
+                                    <td>{{ config.periodo }}°</td>
+                                    <td>{{ config.ch_exigida }}h</td>
+                                    <td>{{ config.nucleo_diretriz|format }}</td>
+                                    <td>{{ config.get_ch_vinculada }}h</td>
+                                    <td>{{ config.get_planos_vinculados }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+        </div>
+    {% endif %}
+    <div class="tab-pane ajax-rendered" data-title="Quadro resumo" data-tab="quadro-resumo">
+        {% if request.GET.tab == "quadro-resumo" %}
+
+            {% box "Carga horária geral" %}
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                        <tr>
+                            {% if tem_optativo %}
+                            <th></th>
+                            {% endif %}
+                            <th>C.H. Teórica</th>
+                            {% if tem_extensao %}
+                            <th>C.H. Extensão</th>
+                            {% endif %}
+                            <th>C.H. Total</th>
+                            <th>Quantidade de disciplinas</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr>
+                            {% if tem_optativo %}
+                                <td class="text-end negrito">Obrigatório</td>
+                            {% endif %}
+                            <td>{{ matrizppc.get_ch_teorica }}h</td>
+                            {% if tem_extensao %}
+                                <td>{{ matrizppc.get_ch_extensao }}h</td>
+                            {% endif %}
+                            <td>{{ matrizppc.get_ch_informada_matriz_obrigatorio }}h</td>
+                            <td>{{ matrizppc.get_qtd_componentes_obrigatorio }}</td>
+                        </tr>
+                        {% if tem_optativo %}
+                            <tr>
+                                <td class="text-end negrito">Optativo</td>
+                                <td>{{ matrizppc.get_ch_teorica_optativo }}h</td>
+                                {% if tem_extensao %}
+                                    <td>{{ matrizppc.get_ch_extensao_optativo }}h</td>
+                                {% endif %}
+                                <td>
+                                    {{ matrizppc.get_ch_informada_matriz_optativo }}h <span class="hint hint-top" aria-label="{{ matrizppc.get_ch_vinculada_matriz_optativo }}h vinculadas"> <span class="fas fa-question-circle"></span></span>
+                                </td>
+                                <td>{{ matrizppc.get_qtd_componentes_optativo }}</td>
+                            </tr>
+                            <tr>
+                                <td class="text-end negrito">Total</td>
+                                <td class="text-center" colspan="{% if tem_extensao %}2{% else %}1{% endif %}">
+                                </td>
+                                <td>
+                                    {{ matrizppc.get_ch_informada_matriz }}h 
+                                </td>
+                                <td>{{ matrizppc.get_qtd_componentes }}</td>
+                            </tr>
+                        {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endbox %}
+            {% if tem_extensao %}
+                {% box "Carga horária extensionista" %}
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                            <tr>
+                                <th>Tipo de componente</th>
+                                <th>C.H.</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr>
+                                <tr>
+                                    <td>Atividade de Extensão</td>
+                                    <td>{{ matrizppc.get_ch_extensionista_tipo_atividade_extensao }}h</td>
+                                </tr>
+                                <tr>
+                                    <td>Regular - com carga horária parcial em extensão</td>
+                                    <td>{{ matrizppc.get_ch_extensionista_tipo_regular }}h</td>
+                                </tr>
+                                <tr>
+                                    <td class="negrito">Total</td>
+                                    <td class="negrito">{{ matrizppc.get_ch_extensionista_total }}h</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                {% endbox %}
+            {% endif %}
+            {% box "Carga horária por período" %}
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>Período</th>
+                            <th>C.H. Teórica</th>
+                            <th>C.H. Extensão</th>
+                            <th>C.H. Total</th>
+                            <th>Quantidade de disciplinas</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for periodo in lista_periodos %}
+                            <tr>
+                                <td>{{ periodo }}</td>
+                                <td>{{ matrizppc|method:"get_ch_teorica_por_periodo"|call:periodo }}</td>
+                                <td>{{ matrizppc|method:"get_ch_extensao_por_periodo"|call:periodo }}</td>
+                                <td>{{ matrizppc|method:"get_ch_total_por_periodo"|call:periodo }}</td>
+                                <td>{{ matrizppc|method:"get_qtd_disciplinas_por_periodo"|call:periodo }}</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endbox %}
+
+            {% box "Carga horária semanal" %}
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>Período</th>
+                            {% if matrizppc.ppc.is_curso_anual %}
+                                <th>Semestre</th>
+                            {% endif %}
+                            <th>C.H. semanal</th>
+                            <th>Quantidade de disciplinas</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                            {% for periodo in lista_periodos %}
+                                {% if matrizppc.ppc.is_curso_anual %}
+                                    {% for semestre in semestres %}
+                                        <tr>
+                                            <td>{{ periodo }}</td>
+                                            <td>{{ semestre }}</td>
+                                            <td>{% get_total_creditos_por_planos_disciplinappc matrizppc 0 periodo semestre %}</td>
+                                            <td>{% get_qtd_disciplinas_por_periodo matrizppc periodo semestre %}</td>
+                                        </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td>{{ periodo }}</td>
+                                        <td>{% get_total_creditos_por_planos_disciplinappc matrizppc 0 periodo %}</td>
+                                        <td>{% get_qtd_disciplinas_por_periodo matrizppc periodo %}</td>
+                                    </tr>
+                                {% endif %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endbox %}
+
+            {% box "Carga horária por tipo de componente" %}
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>Tipo de componente</th>
+                            <th>C.H. Obrigatórias</th>
+                            <th>C.H. Optativas</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Regular</td>
+                                <td>{{ matrizppc|method:"get_ch_total_obrigatorio_por_tipo"|call:1 }}h</td>
+                                {% with ch=matrizppc|method:"get_ch_total_optativo_contabilizado_por_tipo"|call:1  %}
+                                    <td>{{ ch }}h {% if ch %}<span class="hint hint-top" aria-label="{{ matrizppc|method:"get_ch_total_optativo_por_tipo"|call:1 }}h vinculadas"> <span class="fas fa-question-circle"></span></span>{% endif %}</td>
+                                {% endwith %}
+                            </tr>
+                            <tr>
+                                <td>Trabalho de Conclusão de Curso</td>
+                                <td>{{ matrizppc|method:"get_ch_total_obrigatorio_por_tipo"|call:4 }}h</td>
+                                {% with ch=matrizppc|method:"get_ch_total_optativo_contabilizado_por_tipo"|call:4  %}
+                                    <td>{{ ch }}h {% if ch %}<span class="hint hint-top" aria-label="{{ matrizppc|method:"get_ch_total_optativo_por_tipo"|call:4 }}h vinculadas"> <span class="fas fa-question-circle"></span></span>{% endif %}</td>
+                                {% endwith %}
+                            </tr>
+                            <tr>
+                                <td>Atividade de Extensão</td>
+                                <td>{{ matrizppc|method:"get_ch_total_obrigatorio_por_tipo"|call:5 }}h</td>
+                                {% with ch=matrizppc|method:"get_ch_total_optativo_contabilizado_por_tipo"|call:5  %}
+                                    <td>{{ ch }}h {% if ch %}<span class="hint hint-top" aria-label="{{ matrizppc|method:"get_ch_total_optativo_por_tipo"|call:5 }}h vinculadas"> <span class="fas fa-question-circle"></span></span>{% endif %}</td>
+                                {% endwith %}
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            {% endbox %}
+
+            {% box "Carga horária por núcleo" %}
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>Núcleo</th>
+                            <th>C.H. Teórica</th>
+                            <th>C.H. Extensão</th>
+                            <th>C.H. Total</th>
+                            <th>C.H. Semanal</th>
+                            <th>Quantidade de disciplinas</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for item in nucleos_matriz %}
+                            <tr>
+                                <td>{{ item.nucleo }}</td>
+                                <td>{{ matrizppc|method:"get_ch_teorica"|call:item.nucleo_id }}</td>
+                                <td>{{ matrizppc|method:"get_ch_extensao"|call:item.nucleo_id }}</td>
+                                <td>{{ matrizppc|method:"get_ch_informada_matriz"|call:item.nucleo_id }}</td>
+                                <td>{{ matrizppc|method:"get_ch_semanal"|call:item.nucleo_id }}</td>
+                                <td>{{ matrizppc|method:"get_qtd_componentes"|call:item.nucleo_id }}</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endbox %}
+
+            {% box "Detalhamento por núcleo" %}
+                {% for nd in nucleos_matriz %}
+                    <h4>Núcleo {{ nd.nucleo }}</h4>
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                            <tr>
+                                <th rowspan="2">Disciplina</th>
+                                <th colspan="{% if matrizppc.ppc.is_curso_anual %}{{ maior_periodo|multiply:2 }}{% else %}{{ maior_periodo }}{% endif %}">Aulas semanais por período</th>
+                                <th colspan="{% if matrizppc.possui_ch_ead %}3{% else %}2{% endif %}">Carga horária total</th>
+                            </tr>
+                            <tr>
+                                {% for periodo in lista_periodos %}
+                                    <th colspan="{% if matrizppc.ppc.is_curso_anual %}2{% endif %}">{{ periodo }}</th>
+                                {% endfor %}
+                                <th>Hora/Relógio</th>
+                                <th>Hora/Aula</th>
+                                {% if matrizppc.possui_ch_ead %}
+                                    <th>EAD</th>
+                                {% endif %}
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for plano in matrizppc|method:"get_planos_disciplinappc_quadro"|call:nd.nucleo_id %}
+                                <tr>
+                                    <td>{{ plano.plano_disciplina.nome_disciplina }}</td>
+                                    {% for periodo in lista_periodos %}
+                                        {% if matrizppc.ppc.is_curso_anual and plano.periodo_oferta == periodo %}
+                                            <td class="text-center">
+                                                {{ plano.get_qtd_aulas_1s|format }}
+                                            </td>
+                                            <td class="text-center">
+                                                {{ plano.get_qtd_aulas_2s|format }}
+                                            </td>
+                                        {% else %}
+                                            <td colspan="{% if matrizppc.ppc.is_curso_anual %}2{% endif %}" class="text-center">
+                                                {% if plano.periodo_oferta == periodo %}
+                                                    {{ plano.get_qtd_creditos|format }}
+                                                {% endif %}
+                                            </td>
+                                        {% endif %}
+                                    {% endfor %}
+                                    <td>{{ plano.get_hora_relogio|format }}h</td>
+                                    <td>{{ plano.get_hora_aula|format }}h</td>
+                                    {% if matrizppc.possui_ch_ead %}
+                                        <td>
+                                            {% if plano.qtd_aulas_ead %}
+                                                {{ plano.get_info_hora_relogio_ead }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                    {% endif %}
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="{% if matrizppc.possui_ch_ead %}{{ maior_periodo|add:"4" }}{% else %}{{ maior_periodo|add:"3" }}{% endif %}"><span class="status status-alert">Nenhum plano de disciplina {% if matrizppc.ppc.ch_cc_optativo %}obrigatório {% endif %}adicionado.</span></td></tr>
+                            {% endfor %}
+                            {% if matrizppc.ppc.ch_cc_optativo %}
+                                {% for optativo in matrizppc|method:"get_configuracao_optativas"|call:nd.nucleo_id %}
+                                    <tr>
+                                        <td>Disciplina optativa</td>
+                                        {% for periodo in matrizppc.get_periodos %}
+                                            <td colspan="{% if projeto.is_curso_anual %}2{% endif %}" class="text-center">
+                                                {% if optativo.periodo == periodo %}
+                                                    {{ optativo.get_qtd_creditos|format }}
+                                                {% endif %}
+                                            </td>
+                                        {% endfor %}
+                                        <td>{{ optativo.ch_exigida|format }}h</td>
+                                        <td>{{ optativo.get_hora_aula|format }}h</td>
+                                        {% if matrizppc.possui_ch_ead %}
+                                            <td>-</td>
+                                        {% endif %}
+                                    </tr>
+                                {% endfor %}
+                            {% endif %}
+                            </tbody>
+                            <tfoot>
+                            <tr>
+                                <td>Totais</td>
+                                {% if matrizppc.ppc.is_curso_anual %}
+                                    {% for periodo in lista_periodos %}
+                                        {% for semestre in semestres %}
+                                            <td class="text-center">{% get_total_creditos_por_planos_disciplinappc matrizppc nd.nucleo_id periodo semestre %}</td>
+                                        {% endfor %}
+                                    {% endfor %}
+                                {% else %}
+                                    {% for periodo in lista_periodos %}
+                                        <td class="text-center">{% get_total_creditos_por_planos_disciplinappc matrizppc nd.nucleo_id periodo %}</td>
+                                    {% endfor %}
+                                {% endif %}
+                                <td>{{ matrizppc|method:"get_total_ch_hora_relogio_por_planos_disciplinappc"|call:nd.nucleo_id }}h</td>
+                                <td>{{ matrizppc|method:"get_total_ch_hora_aula_por_planos_disciplinappc"|call:nd.nucleo_id }}h</td>
+                                {% if matrizppc.possui_ch_ead %}
+                                    <td>{{ matrizppc|method:"get_total_ch_ead_por_planos_disciplinappc"|call:nd.nucleo_id }}h</td>
+                                {% endif %}
+                            </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                {% endfor %}
+            {% endbox %}
+
+            {% if planos_disciplinas_com_associacao %}
+                {% box "Planos de disciplinas associados" %}
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                            <tr>
+                                <th>Plano de disciplina</th>
+                                <th>Plano de disciplina associado</th>
+                                <th>Núcleo</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for plano in planos_disciplinas_com_associacao %}
+                                <tr>
+                                    <td>{{ plano }}</td>
+                                    <td>{{ plano.plano_disciplinappc_associado }}</td>
+                                    <td>{{ plano.plano_disciplina.nucleo }}</td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                {% endbox %}
+            {% endif %}
+        {% endif %}
+    </div>
+
+    <div class="tab-pane ajax-rendered" data-title="Pré/Co-Requisitos" data-tab="pre-co-requisitos">
+        {% if request.GET.tab == "pre-co-requisitos" %}
+            <p class="alert alert-info"><strong>Atencão:</strong> Os requisitos dos planos de disciplinas podem ser alterados somente na fase de elaboração da matriz curricular.</p>
+            {% with planos=matrizppc.get_planos_disciplinappc %}
+                {% if planos.exists %}
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                            <th class="no-print">Ações</th>
+                            <th>Período</th>
+                            <th>Disciplina</th>
+                            <th>Pré-requisitos</th>
+                            <th>Co-Requisitos</th>
+                            </thead>
+                            <tbody>
+                            {% for plano in planos %}
+                                <tr>
+                                    <td class="no-print field-get_acoes">
+                                        {% icon "view" "/ppc/planodisciplinappc/{{ plano.id }}/" "Visualizar" %}
+                                        {% if pode_elaborar_matriz %}
+                                            {% icon "edit" "/ppc/planodisciplinappc/{{ plano.id }}/requisitos/" "Editar requisitos" "popup" %}
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if plano.periodo_oferta %}
+                                            {{ plano.periodo_oferta }}
+                                        {% else %}
+                                            {{ plano.get_periodo_oferta|status }}
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ plano.plano_disciplina.nome_disciplina }}</td>
+                                    <td>
+                                        <ul>
+                                            {% for item in plano.pre_requisitos.all %}
+                                                <li>{{ item.plano_disciplina.nome_disciplina }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                    </td>
+                                    <td>
+                                        <ul>
+                                            {% for item in plano.co_requisitos.all %}
+                                                <li>{{ item.plano_disciplina.nome_disciplina }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="alert alert-warning">Nenhum plano de disciplina foi adicionado.</p>
+                {% endif %}
+            {% endwith %}
+        {% endif %}
+    </div>
+    
+    {% if matrizppc.ppc.diretriz.emite_certificacao_parcial %}
+        <div class="tab-pane ajax-rendered" data-title="Certificação intermediária" data-tab="certificacao" data-counter="{{ matrizppc.ppc.certificacaoparcial_set.count }}">
+            {% if request.GET.tab == "certificacao" %}
+                {% box "Certificações intermediárias" %}
+                    {% if matrizppc.ppc.certificacaoparcial_set.exists %}
+                        {% for cp in matrizppc.ppc.certificacaoparcial_set.all %}
+                            {% box cp.descricao %}
+                                <dl class="definition-list flex">
+                                    <div class="list-item">
+                                        <dt>Modalidade</dt>
+                                        <dd>{{ cp.modalidade_certificacao }}</dd>
+                                    </div>
+                                    <div class="list-item">
+                                        <dt>Titulação</dt>
+                                        <dd>{{ cp.titulacao_masculino }} | {{ cp.titulacao_feminino }} </dd>
+                                    </div>
+                                    <div class="list-item">
+                                        <dt>CH de componentes optativos</dt>
+                                        <dd>{{ cp.ch_componentes_optativos }}</dd>
+                                    </div>
+                                    <div class="list-item">
+                                        <dt>CH total</dt>
+                                        <dd>{{ cp.get_carga_horaria_total }}</dd>
+                                    </div>
+                                </dl>
+
+                                {% with planos=cp.planodisciplinacertificacaoparcial_set.all %}
+                                    {% if planos.exists %}
+                                        <div class="table-responsive mt-5">
+                                            <table>
+                                                <caption>Planos de disciplina da certificação intermediária</caption>
+                                                <thead>
+                                                    <th class="no-print">Ações</th>
+                                                    <th>Disciplina</th>
+                                                    <th>Carga horária</th>
+                                                    <th>Tipo</th>
+                                                    <th>Período</th>
+                                                    <th>Etapas</th>
+                                                    <th>Periodicidade</th>
+                                                    {% if matrizppc.ppc.is_curso_anual %}
+                                                        <th>Aulas 1° semestre</th>
+                                                        <th>Aulas 2° semestre</th>
+                                                    {% endif %}
+                                                    <th>Segundo semestre</th>
+                                                    <th>Situação do plano</th>
+                                                </thead>
+                                                <tbody>
+                                                {% for plano in planos %}
+                                                    {% with plano_disciplina_ppc=plano|method:"get_planodisciplinappc"|call:matrizppc.id %}
+                                                    <tr>
+                                                        {% if plano_disciplina_ppc %}
+                                                            <td class="no-print field-get_acoes">
+                                                                {% icon "view" "/ppc/planodisciplinappc/{{ plano_disciplina_ppc.pk }}/" "Visualizar" %}
+                                                            </td>
+                                                            <td>{{ plano.plano_disciplina.nome_disciplina }}</td>
+                                                            <td>
+                                                                <dl>
+                                                                    <dt>Teórica <dt>
+                                                                    <dd>{{ plano_disciplina_ppc.ch_teorica }}h<dd>
+                                                                    <dt>Extensão</dt>
+                                                                    <dd>{{ plano_disciplina_ppc.ch_extensao }}h</dd>
+                                                                    <dt>Total</dt>
+                                                                    <dd>{{ plano.plano_disciplina.ch_disciplina }}h</dd>
+                                                                </dl>
+                                                            </td>
+                                                            <td>{{ plano_disciplina_ppc.get_tipo_display|format }}</td>
+                                                            <td>
+                                                                {% if plano_disciplina_ppc.periodo_oferta %}
+                                                                    {{ plano_disciplina_ppc.periodo_oferta }}
+                                                                {% else %}
+                                                                    {{ plano_disciplina_ppc.get_periodo_oferta|status }}
+                                                                {% endif %}
+                                                            </td>
+                                                            <td>{{ plano_disciplina_ppc.quantidade_etapas|format }}</td>
+                                                            <td>{{ plano_disciplina_ppc.get_periodicidade|format }}</td>
+                                                            {% if matrizppc.ppc.is_curso_anual %}
+                                                                <td>{{ plano_disciplina_ppc.get_qtd_aulas_1s|format }}</td>
+                                                                <td>{{ plano_disciplina_ppc.get_qtd_aulas_2s|format }}</td>
+                                                            {% endif %}
+                                                            <td>{{ plano_disciplina_ppc.segundo_semestre|format }}</td>
+                                                            <td>
+                                                                {{ plano.plano_disciplina.get_situacao_display|status }}
+                                                                {% if not plano.plano_disciplina.ativo %}
+                                                                    <p>{{ "Inativo"|status }}</p>
+                                                                {% endif %}
+                                                            </td>
+                                                        {% else %}
+                                                            <td colspan="{% if matrizppc.ppc.is_curso_anual %}12{% else %}10{% endif %}">
+                                                                <p class="alert alert-warning">Atenção: O plano de disciplina <strong>{{ plano.plano_disciplina }}</strong> foi adicionado a esta certificação intermediária, mas ele não existe nesta matriz.</p>
+                                                            </td>
+                                                        {% endif %}
+                                                    </tr>
+                                                    {% endwith %}
+                                                {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    {% else %}
+                                        <p class="alert alert-warning">Nenhum plano de disciplina adicionado.</p>
+                                    {% endif %}
+                                {% endwith %}
+                            {% endbox %}
+                        {% endfor %}
+                    {% else %}
+                        <p class="alert alert-warning">Nenhuma certificação intermediária foi cadastrada no PPC desta matriz.</p>
+                    {% endif %}
+                {% endbox %}
+            {% endif %}
+        </div>
+    {% endif %}
+    
+    {% if matrizppc.ppc.ch_pratica > 0 %}
+        <div class="tab-pane ajax-rendered" data-title="Prática profissional" data-tab="pratica">
+            {% if request.GET.tab == "pratica" %}
+                {% box "Prática profissional" %}
+
+                    {% if matrizppc.justificativa_modalidadepraticaprofissional %}
+                        <p class="alert alert-warning"><strong>Mensagem do revisor</strong>: {{ matrizppc.justificativa_modalidadepraticaprofissional }}</p>
+                    {% endif %}
+
+                    <p class="alert alert-info">A carga horária deste PPC destinada à prática profissional é de <strong>{{ matrizppc.ppc.ch_pratica }}</strong> horas.</p>
+
+                    <ul class="action-bar">
+                        {% if pode_retomar_edicao_modalidadepraticaprofissional %}
+                            <li><a class="btn" href="/ppc/matrizppc/modalidadepraticaprofissional/{{ matrizppc.pk }}/retomar/">{% icone "undo" %} Retomar elaboração</a></li>
+                        {% endif %} 
+                        {% if pode_concluir_modalidadepraticaprofissional %}
+                            <li><a class="btn success" href="/ppc/matrizppc/modalidadepraticaprofissional/{{ matrizppc.pk }}/concluir/">Concluir elaboração</a></li>
+                        {% endif %}
+                        {% if pode_revisar_modalidadepraticaprofissional %}
+                            <li><a class="btn success" href="/ppc/matrizppc/modalidadepraticaprofissional/{{ matrizppc.pk }}/aprovar/">Aprovar modalidades</a></li>
+                            <li><a class="btn warning" href="/ppc/matrizppc/modalidadepraticaprofissional/{{ matrizppc.pk }}/devolver/">Solicitar correção</a></li>
+                        {% endif %}
+                        {% if pode_desfazer_aprovacao_modalidadepraticaprofissional %}
+                            <li><a class="btn" href="/ppc/matrizppc/modalidadepraticaprofissional/{{ matrizppc.pk }}/desfazer_aprovacao/">{% icone "undo" %} Desfazer aprovação</a></li>
+                        {% endif %}
+                    </ul>
+
+                    <dl class="definition-list">
+                        <dt>Situação</dt>
+                        <dd>{{ matrizppc.get_situacao_modalidadepraticaprofissional_display|status }}</dd>
+                    </dl>
+                {% endbox %}
+
+                {% include "includes/matrizppc_modalidades_praticaprofissional.html" with pode_elaborar_pratica=pode_elaborar_pratica matrizppc=matrizppc exibe_info=True only %} 
+
+            {% endif %}
+        </div>
+    {% endif %}
+
+    {% if matrizppc.matriz %}
+        <div class="tab-pane ajax-rendered" data-title="Matriz e Cursos" data-tab="matriz_cursos">
+            {% if request.GET.tab == "matriz_cursos" %}
+                {% if not matrizppc.ppc.data_aprovacao %}
+                    <p class="alert alert-info">A matriz curricular foi gerada antecipadamente sem a aprovação dos conselhos.</p>
+                {% endif %}
+
+                {% box "Matriz e cursos" %}
+                    <ul class="action-bar">
+                        {% if pode_gerar_curso %}
+                            <li><a class="btn popup" href="/ppc/matrizppc/{{ matrizppc.pk }}/gerar_cursos/">Gerar cursos</a></li>
+                        {% endif %}
+                        {% if pode_vincular_curso %}
+                            <li><a class="btn popup" href="/ppc/matrizppc/{{ matrizppc.pk }}/vincular_cursos/">Vincular cursos</a></li>
+                        {% endif %}
+                    </ul>
+
+                    <div class="table-responsive mt-5">
+                        <table>
+                            <caption>Matriz curricular</caption>
+                            <thead>
+                                <th class="no-print">Ações</th>
+                                <th>Nome</th>
+                                <th>Ano</th>
+                                <th>Código</th>
+                                <th>Ativa</th>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="no-print field-get_acoes">
+                                        {% icon "view" "/edu/matriz/{{ matrizppc.matriz_id }}/" "Visualizar" %}
+                                    </td>
+                                    <td>{{ matrizppc.matriz.descricao }}</td>
+                                    <td>{{ matrizppc.matriz.ano_criacao|format }}</td>
+                                    <td>{{ matrizppc.matriz.id }}</td>
+                                    <td>{{ matrizppc.matriz.ativo|format }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="table-responsive mt-5">
+                        {% if matrizppc.cursos.exists %}
+                        <table>
+                            <caption>Cursos {% if matrizppc.ppc.is_tramite_criacao %}criados{% else %}vinculados{% endif %}</caption>
+                            <thead>
+                                <th class="no-print">Ações</th>
+                                <th>Nome</th>
+                                <th>Código</th>
+                                <th>Diretoria</th>
+                                <th>PAFC</th>
+                            </thead>
+                            <tbody>
+                                {% for curso in matrizppc.cursos.all %}
+                                    <tr>
+                                        <td class="no-print field-get_acoes">
+                                            {% icon "view" "/edu/cursocampus/{{ curso.id }}/" "Visualizar" %}
+                                            {% if pode_remover_curso %}
+                                                {% icon "delete" "/ppc/matrizppc/{{ matrizppc.pk }}/remover_curso/{{ curso.id }}/" "Excluir" %}
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ curso.descricao }}</td>
+                                        <td>{{ curso.codigo }}</td>
+                                        <td>{{ curso.diretoria|format }}</td>
+                                        <td>{{ curso.get_pafc|format }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        {% else %}
+                            <p class="alert alert-warning">Nenhum curso vinculado a este PPC.</p>
+                        {% endif %}
+                    </div>
+
+                {% endbox %}
+            {% endif %}
+        </div>
+    {% endif %}
+
+    {% if exibe_pendencias %}
+        <div class="tab-pane ajax-rendered" data-title="Pendências" data-tab="pendencias" data-checked="{% if tem_pendencia %}False{% else %}True{% endif %}">
+            {% if request.GET.tab == "pendencias" %}
+                {% for grupo in pendencias %}
+                    {% box grupo.0 %}
+                        {% for item in grupo.1 %}
+                            <p class="checklist error">{% if item.1 %}<a onclick="javascript:change_tab('{{ item.1 }}')">{% endif %}{{ item.0 }}{% if item.1 %}</a>{% endif %}<strong>Pendente</strong></p>
+                            {% empty %}
+                            <p class="alert alert-info">Nenhuma pendência encontrada.</p>
+                        {% endfor %}
+                    {% endbox %}
+                    {% empty %}
+                    <p class="alert alert-info">Nenhuma pendência encontrada.</p>
+                {% endfor %}
+            {% endif %}
+        </div>
+    {% endif %}
+{% endblock %}

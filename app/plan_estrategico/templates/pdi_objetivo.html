@@ -1,0 +1,86 @@
+{% block extrahead %}
+    <script src="/static/plan_estrategico/js/pills.js"></script>
+{% endblock %}
+
+<ul class="pills">
+    <li data-pill="todos_itens" class="active"><a href="#">Todas as Perspectivas</a></li>
+    {% for perspectiva in query_dados %}
+        <li data-pill="{{ perspectiva|slugify }}"><a href="#">{{ perspectiva }}</a></li>
+    {% endfor %}
+</ul>
+
+{% for pdi_perspectiva in query_dados %}
+    <div class='pill' id="{{ pdi_perspectiva|slugify }}">
+        {% box "{{ pdi_perspectiva.perspectiva.sigla }} - {{ pdi_perspectiva.perspectiva.nome }}" %}
+            {% if user|in_group:"Administrador de Planejamento Estratégico" %}
+                <ul class="action-bar">
+                    <li><a href="{% url 'pdi_objetivo_associar' pdi.pk pdi_perspectiva.pk %}" class="btn popup">Associar Objetivo Estratégico</a></li>
+                </ul>
+            {% endif %}
+            {% for objetivo in pdi_perspectiva.pdiobjetivoestrategico_set.all %}
+                <div class="general-box">
+                    <div class="primary-info">
+                        <h4>{{ objetivo.objetivo.sigla }} - {{ objetivo.objetivo.descricao }}</h4>
+                        {% if pode_adicionar_objetivo %}
+                            <ul class="action-bar">
+                                {% if objetivo.pdiindicador_set.all %}
+                                    <li><a href="{% url 'indicador_relevancia_atualizar' objetivo.id %}" class="btn popup">Atualizar Relevância</a></li>
+                                {% endif %}
+                                <li><a href="{% url 'pdi_indicador_associar' pdi.pk objetivo.id %}" class="btn popup">Associar Indicador</a></li>
+                            </ul>
+                        {% endif %}
+                        <div class="extra-info">
+                            {% if objetivo.pdiindicador_set.all %}
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th rowspan="2">#</th>
+                                            <th rowspan="2">Indicador</th>
+                                            <th rowspan="2">Relevância</th>
+                                            <th colspan="{{ anos_pdi|length }}" class="text-center">Metas</th>
+                                        </tr>
+                                        <tr>
+                                            {% for ano in anos_pdi %}
+                                                <th>{{ ano }}</th>
+                                            {% endfor %}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for pdi_indicador in objetivo.pdiindicador_set.all %}
+                                            <tr>
+                                                <td>{{ forloop.counter }}</td>
+                                                <td>
+                                                    {{ pdi_indicador.indicador.descricao }}
+                                                    {% if pdi_indicador.indicador.tendencia == "Quanto mais melhor" %}
+                                                        <span class="fas fa-long-arrow-alt-up float-end" aria-hidden="true"></span>
+                                                    {% else %}
+                                                        <span class="fas fa-long-arrow-alt-down float-end" aria-hidden="true"></span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    {% for objetivoindicador in objetivo.objetivoindicador_set.all %}
+                                                        {% if objetivoindicador.indicador == pdi_indicador %}
+                                                            {{ objetivoindicador.relevancia }}%
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                </td>
+                                                {% for meta in pdi_indicador.metaindicador_set.all %}
+                                                    <td>
+                                                        {{ meta.meta|floatformat:pdi_indicador.casas_decimais|default:'-' }}&nbsp;&nbsp;&nbsp;
+                                                        {% icon "view" "/plan_estrategico/pdi/metaindicador/{{ pdi_indicador.id }}/{{ meta.ano }}/meta/" %}
+                                                    </td>
+                                                {% endfor %}
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            {% else %}
+                                <p class="alert alert-warning">Nenhum indicador cadastrado para este objetivo estratégico.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        {% endbox %}
+    </div>
+{% endfor %}

@@ -1,0 +1,75 @@
+{% extends super_template %}
+
+{% block content %}
+    {% if tem_email %}
+        <div class="alert alert-warning">
+            <dl>
+            {% for horario in horarios %}
+                <dt>{{ horario.get_tipo_refeicao_display }}:</dt>
+                <dd>Deve ser solicitado entre {{ horario.hora_inicio }} do {{ horario.get_dia_inicio_display }} e {{ horario.hora_fim }} do {{ horario.get_dia_fim_display }}.</dd>
+            {% endfor %}
+            </dl>
+        </div>
+
+        <div class="tab-pane" data-title="Solicitar Refeição">
+            {% if horarios_permitidos and eh_dia_util %}
+                {% render_form form %}
+            {% elif eh_dia_util %}
+                <p class="alert alert-warning">Nenhuma refeição pode ser solicitada neste horário.</p>
+            {% else %}
+                <p class="alert alert-warning">Não é possível solicitar refeição nos fins de semana e nos dias com liberação de faltas.</p>
+            {% endif %}
+        </div>
+
+        <div class="tab-pane" data-title="Refeições solicitadas" data-counter="{{ solicitacoes.count }}">
+            {% if solicitacoes.exists %}
+                {% autopaginate solicitacoes 25 %}
+                {% paginate %}
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Data da Solicitação</th>
+                                <th>Para o Dia</th>
+                                <th>Tipo</th>
+                                <th>Motivo</th>
+                                <th>Situação</th>
+                                <th class="no-print">Opções</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for solicitacao in solicitacoes %}
+                                <tr>
+                                    <td>{{ solicitacao.data_solicitacao|date:"d/m/Y" }}</td>
+                                    <td>{{ solicitacao.data_auxilio|date:"d/m/Y" }}</td>
+                                    <td>{{ solicitacao.get_tipo_refeicao_display }}</td>
+                                    <td>{{ solicitacao.motivo_solicitacao }}</td>
+                                    {% if not solicitacao.ativa %}
+                                        <td><span class="status status-error">Solicitação cancelada</span></td>
+                                    {% elif solicitacao.deferida == null %}
+                                        <td><span class="status status-alert">Aguardando avaliação</span></td>
+                                    {% elif solicitacao.deferida == True %}
+                                        <td><span class="status status-success">Deferida</span></td>
+                                    {% else %}
+                                        <td><span class="status status-error">Indeferida</span></td>
+                                    {% endif %}
+                                    <td class="no-print">
+                                        {% if solicitacao.pode_cancelar_solicitacao and solicitacao.ativa %}
+                                            <a href="/ae/cancelar_solicitacao_refeicao/{{ solicitacao.id }}/" class="btn danger" data-confirm="Deseja realmente cancelar esta solicitação?">Cancelar Solicitação</a>
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+           {% else %}
+               <p class="alert alert-warning">Nenhuma solicitação cadastrada.</p>
+           {% endif %}
+       </div>
+    {% else %}
+        <p class="alert alert-warning">Você precisa cadastrar um email para utilizar este recurso.</p>
+    {% endif %}
+{% endblock %}

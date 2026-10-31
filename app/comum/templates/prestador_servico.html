@@ -1,0 +1,185 @@
+{% extends super_template %}
+
+{% block object-status %}
+    {% if obj.ativo %}
+        <span class="status status-success">Ativo</span>
+    {% else %}
+        <span class="status status-error">Inativo</span>
+    {% endif %}
+    {% if obj.tem_ocupacao_ativa %}
+        <span class="status status-success">É prestador de serviço</span>
+    {% else %}
+        <span class="status status-alert">Sem ocupação ativa como prestador de serviço</span>
+    {% endif %}
+    {% if obj.pessoa_fisica.tem_digital %}
+        <span class="status status-success">Impressão digital cadastrada</span>
+    {% else %}
+        <span class="status status-alert">Sem impressão digital cadastrada</span>
+    {% endif %}
+{% endblock %}
+
+{% block action-bar %}
+<ul class="action-bar">
+    {% if user|in_group:"Coordenador de TI sistêmico" %}
+        {% if obj.ativo %}
+            <li><a href="/comum/usuario_externo/inativar/{{ obj.pk }}/" class="btn danger confirm">{% icone "toggle-off" %} Inativar</a></li>
+        {% else %}
+            <li><a href="/comum/usuario_externo/ativar/{{ obj.pk }}/" class="btn success confirm">{% icone "toggle-on" %} Ativar</a></li>
+        {% endif %}
+    {% endif %}
+    <li class="has-child">
+        <a href="#" class="btn primary">{% icone "edit" %} Editar</a>
+        <ul>
+            {% if perms.comum.change_prestadorservico %}
+                <li><a href="/admin/comum/prestadorservico/{{ obj.pk }}/">Dados</a></li>
+                <li><a href="/comum/alterar_foto_prestador/{{ obj.pk }}/">Foto</a></li>
+            {% endif %}
+            {% if perms.rh.pode_editar_email_secundario_prestador or verificacao_propria %}
+                <li><a class="popup" href="/comum/atualizar_email_secundario/{{ obj.get_vinculo.pk }}/">E-mail</a></li>
+            {% endif %}
+            {% if perms.rh.pode_cadastrar_digital %}
+                <li><a class="popup" href="/rh/editar_informacoes_digitais_fracas/{{ obj.pessoa_fisica.pk }}/">Informações
+                    de digitais fracas</a></li>
+            {% endif %}
+            {% if perms.change_user and obj.user %}
+                <li><a href="/admin/comum/user/{{ obj.user.pk }}/">Usuário</a></li>
+            {% endif %}
+        </ul>
+    </li>
+    {% ldap_actions obj %}
+    {% if obj.professor and pode_ver_professor %}
+        <li><a href="{{ obj.professor.get_absolute_url }}" class="btn default">{% icone "info-circle" %} Dados do Professor</a></li>
+    {% endif %}
+    {% if verificacao_propria %}
+        <li><a class="btn default" href="/comum/minha_conta/">{% icone "user" %} Minha conta</a></li>
+    {% endif %}
+</ul>
+{% endblock %}
+
+{% block content %}
+
+    {% if obj.foto %}
+        <div class="photo-circle medium mb-5">
+            <img src="{{ obj.get_foto_75x100_url }}" alt="Foto de {{ obj.pessoa_fisica.nome|normalizar }}">
+        </div>
+    {% endif %}
+    <dl class="definition-list flex">
+        <div class="list-item">
+            <dt>Nome</dt>
+            <dd>{{ obj.pessoa_fisica.nome|normalizar }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>CPF</dt>
+            <dd>{{ obj.pessoa_fisica.cpf|format }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Sexo</dt>
+            <dd>{{ obj.pessoa_fisica.get_sexo_display }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Nacionalidade</dt>
+            <dd>{{ obj.pessoa_fisica.get_nacionalidade_display|format }}</dd>
+        </div>
+        {% if obj.pessoa_fisica.passaporte %}
+            <div class="list-item">
+                <dt>Passaporte</dt>
+                <dd>{{ obj.pessoa_fisica.passaporte|format }}</dd>
+            </div>
+        {% endif %}
+        <div class="list-item">
+            <dt>E-mail pessoal</dt>
+            <dd>{{ obj.email_pessoal|format }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>E-mail para notificações</dt>
+            <dd>{{ obj.email_notificacao|format }}</dd>
+        </div>
+        {% if obj.email_google_classroom %}
+            <div class="list-item">
+                <dt>E-mail Google Classroom</dt>
+                <dd>{{ obj.email_google_classroom|format }}</dd>
+            </div>
+        {% endif %}
+        {% if obj.email_academico %}
+            <div class="list-item">
+                <dt>E-mail Acadêmico</dt>
+                <dd>{{ obj.email_academico|format }}</dd>
+            </div>
+        {% endif %}
+        <div class="list-item">
+            <dt>Usuário para login</dt>
+            <dd>{{ obj.matricula }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Setor Suap</dt>
+            <dd>{{ obj.setor|format }}</dd>
+        </div>
+    </dl>
+
+    {% box 'Ocupações' %}
+        {% if pode_editar_ocupacao %}
+            <ul class="action-bar">
+                <li>
+                    <a href="/comum/ocupacao_prestador/{{ obj.pk }}/" class="btn success popup">{% icone "plus" %} Vincular ocupação</a>
+                </li>
+            </ul>
+        {% endif %}
+
+        <p class="alert alert-info">Ao adicionar ou editar uma ocupação, o Setor SUAP do Prestador de Serviço será atualizado.</p>
+
+        {% if obj.ocupacaoprestador_set.exists %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Ocupações do prestador de serviço</caption>
+                    <thead>
+                        <tr>
+                            <th class="no-print">Ações</th>
+                            <th>Empresa</th>
+                            <th>Ocupação</th>
+                            <th>Data de Início</th>
+                            <th>Data Fim</th>
+                            <th>Setor Suap</th>
+                            <th>Situação</th>
+                            <th>Última atualização</th>
+                            <th class="no-print">Opções</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for ocupacao_prestador in obj.ocupacaoprestador_set.all %}
+                        <tr>
+                            <td class="no-print">
+                                {% if pode_editar_ocupacao and ocupacao_prestador.eh_ativa %}
+                                    {% icon "edit" "/comum/ocupacao_prestador/{{ obj.pk }}/?pk={{ ocupacao_prestador.pk }}" "Editar" "popup" %}
+                                {% endif %}
+                                {% if perms.comum.delete_ocupacaoprestador and not ocupacao_prestador.assinou_documentos and obj.ativo %}
+                                    {% icon "delete" "/comum/excluir/comum/ocupacaoprestador/{{ ocupacao_prestador.pk }}/" "Remover" "no-confirm popup" %}
+                                {% endif %}
+                            </td>
+                            <td>{{ ocupacao_prestador.empresa|format }}</td>
+                            <td>{{ ocupacao_prestador.ocupacao }}</td>
+                            <td>{{ ocupacao_prestador.data_inicio|format }}</td>
+                            <td>{{ ocupacao_prestador.data_fim|format }}</td>
+                            <td>{{ ocupacao_prestador.setor_suap }}</td>
+                            <td>{% if ocupacao_prestador.eh_ativa %}<span class="status status-success">Ativa</span>{% else %}<span class="status status-error">Inativa</span>{% endif %}</td>
+                            <td>
+                                <p>{{ ocupacao_prestador.atualizado_por|format }}</p>
+                                <p>{{ ocupacao_prestador.atualizado_em|format }}</p>
+                            </td>
+                            <td class="no-print">
+                                {% if pode_editar_ocupacao and ocupacao_prestador.eh_ativa %}
+                                    <a class="btn warning popup" href="/comum/encerrar_ocupacao_prestador/{{ ocupacao_prestador.pk }}">{% icone "calendar-check" %} Encerrar ocupação</a>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning"><strong>Atenção:</strong> Este usuário não tem nenhuma ocupação associada e, por isso, não pode utilizar algumas funcionalidades do Suap.</p>
+        {% endif %}
+    {% endbox %}
+
+{% endblock %}

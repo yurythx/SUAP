@@ -1,0 +1,238 @@
+{% extends super_template %}
+
+{% load documento_eletronico_templatetags %}
+
+{% block extrahead %}
+    <script>
+    $(document).ready(function(){
+        $('#listardocumentostexto_form').submit(function () {
+            $('#changelist').html("").addClass("loader");
+            var id_processo = $(this).attr('data-id_processo');
+            $.ajax({
+                url: 'processo_eletronico/listar_documentos_adicionar/'+id_processo,
+                success: function (response) {
+                    $('#changelist').html(response);
+                    history.pushState(undefined, '', url);
+                    updateActiveFilter();
+                },
+            });
+        });
+    });
+    </script>
+{% endblock %}
+
+{% block content %}
+
+    {% if not is_anexar_documento and not is_contrato and not is_requerimento %}
+        {% include 'processo_eletronico/includes/dados_processo.html' %}
+    {% endif %}
+
+    {% if is_adicionar_documento_processo or is_anexar_documento or is_requerimento %}
+        <div class="tab-pane" data-title="Documentos Internos">
+    {% endif %}
+
+        <div class="search-and-filters">
+            {% render_form form %}
+        </div>
+
+        {% if is_requerimento %}
+            <p class="alert alert-info">Somente documentos finalizados poderão ser adicionados ao requerimento.</p>
+        {% elif is_contrato %}
+            <p class="alert alert-info">Somente documentos finalizados poderão ser vinculados ao contrato.</p>
+        {% elif is_anexar_documento %}
+            <p class="alert alert-info">Somente documentos finalizados poderão ser adicionados ao documento.</p>
+        {% else %}
+            <p class="alert alert-info">Somente documentos finalizados poderão ser adicionados ao processo.</p>
+        {% endif %}
+
+        {% if documentos %}
+            <div id="changelist" data-id_processo="{{ instance.id }}">
+                {% autopaginate documentos 32 %}
+                {% paginate %}
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th class="no-print">Ações</th>
+                                {% cabecalho_ordenado 'identificador_tipo_documento_sigla, identificador_numero, identificador_ano, identificador_setor_sigla' 'Número do Documento' '{{ querystring }}' '{{ order_str }}' %}
+                                <th>Assunto</th>
+                                {% cabecalho_ordenado 'nivel_acesso' 'Nível de Acesso' '{{ querystring }}' '{{ order_str }}' %}
+                                {% if eh_documentos_compartilhados %}
+                                    {% cabecalho_ordenado 'setor_dono__sigla' 'Setor Dono' '{{querystring}}' '{{order_str}}' %}
+                                {% endif %}
+                                {% if requisicao %}
+                                    {% cabecalho_ordenado 'assinatura' 'Solicitado a' '{{querystring}}' '{{order_str}}' %}
+                                {% elif solicitacao %}
+                                    {% cabecalho_ordenado 'assinatura' 'Solicitado por' '{{querystring}}' '{{order_str}}' %}
+                                {% endif %}
+                                {% cabecalho_ordenado 'assinatura' 'Assinado por' '{{querystring}}' '{{order_str}}' %}
+                                {% cabecalho_ordenado 'usuario_criacao__pessoa_fisica__nome' 'Autor' '{{querystring}}' '{{order_str}}' %}
+                                <th class="no-print">Opções</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for documento in documentos %}
+                            <tr>
+                                <td class="no-print">
+                                    {% if documento.pode_ler or documento.pode_editar %}
+                                        {% if documento.pode_ler %}
+                                            {% icon "view" "/documento_eletronico/visualizar_documento/{{ documento.id }}/" "Ver {{ documento.identificador }}" %}
+                                        {% endif %}
+                                    {% endif %}
+                                </td>
+                                <td>{{ documento.identificador }}</td>
+                                <td>{{ documento.assunto }}</td>
+                                <td>{{ documento.get_nivel_acesso_display|status }}</td>
+                                {% if requisicao %}
+                                    <td>{{ documento.solicitado_a.all|join:", " }}</td>
+                                {% elif solicitacao %}
+                                    <td>{{ documento.solicitado_por.all|join:", " }}</td>
+                                {% endif %}
+                                <td>{{ documento.get_assinado_por|safe }}</td>
+                                {% if eh_documentos_compartilhados %}
+                                    <td>{{ documento.setor_dono }}</td>
+                                {% endif %}
+                                <td>{{ documento.usuario_criacao|format }}</td>
+                                <td class="no-print">
+                                    {% if is_requerimento %}
+                                        <a class="btn success"
+                                        href="/processo_eletronico/adicionar_documento_requerimento/{{ requerimento.id }}/{{ documento.id }}/">
+                                            Adicionar ao Requerimento
+                                        </a>
+                                    {% elif is_contrato %}
+                                        <a class="btn success"
+                                        href="/contratos/vincular_documento_contrato/{{ contrato.id }}/{{ documento.id }}/">
+                                            Vincular ao Contrato
+                                        </a>
+                                    {% else %}
+                                        <a class="btn success" href="{% url view_action instance.id documento.id %}">
+                                            {% if is_anexar_documento %}
+                                                Anexar documento
+                                            {% else %}
+                                                Adicionar ao Processo
+                                            {% endif %}
+                                        </a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% paginate %}
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Nenhum documento foi encontrado.</p>
+        {% endif %}
+
+    {% if is_adicionar_documento_processo or is_anexar_documento or is_requerimento %}
+        </div>
+    {% endif %}
+
+    {% if is_adicionar_documento_processo or is_anexar_documento or is_requerimento %}
+        {% if documentos_pessoais %}
+            <div class="tab-pane" data-title="Documentos Internos Pessoais">
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th class="no-print">Ações</th>
+                                <th>Identificador</th>
+                                <th>Assunto</th>
+                                <th>Nível de Acesso</th>
+                                <th>Assinado por</th>
+                                <th>Dono do Documento</th>
+                                <th class="no-print">Opções</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for documento in documentos_pessoais %}
+                            <tr>
+                                <th class="no-print">
+                                    {% if documento.pode_ler or documento.pode_editar %}
+                                        {% if documento.pode_ler %}
+                                            {% icon "view" "/documento_eletronico/visualizar_documento/{{ documento.id }}/" "Ver {{ documento.identificador }}" %}
+                                        {% endif %}
+                                    {% endif %}
+                                </th>
+                                <td>{{ documento.identificador }}</td>
+                                <td>{{ documento.assunto }}</td>
+                                <td>{{ documento.get_nivel_acesso_display|status }}</td>
+                                <td>{{ documento.get_assinado_por|safe }}</td>
+                                <td>{{ documento.usuario_criacao|format }}</td>
+                                <td class="no-print">
+                                    {% if is_requerimento %}
+                                        <a class="btn success"
+                                        href="/processo_eletronico/adicionar_documento_requerimento/{{ requerimento.id }}/{{ documento.id }}/">
+                                            Adicionar ao Requerimento
+                                        </a>
+                                    {% else %}
+                                        <a class="btn success" href="{% url view_action instance.id documento.id %}">
+                                            {% if is_anexar_documento %}
+                                                Anexar documento
+                                            {% else %}
+                                                Adicionar ao Processo
+                                            {% endif %}
+                                        </a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        {% endif %}
+
+        {% if documentos_pessoais_digitalizados %}
+            <div class="tab-pane" data-title="Documentos Digitalizados Pessoais">
+                <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="no-print">Ações</th>
+                            <th>Assunto</th>
+                            <th>Nível de acesso</th>
+                            <th>Dono do documento</th>
+                            <th class="no-print">Opções</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for documento in documentos_pessoais_digitalizados %}
+                        <tr>
+                            <th class="no-print">
+                                {% if documento.pode_ler or documento.pode_editar %}
+                                    {% if documento.pode_ler %}
+                                        {% icon "view" "{{ documento.get_absolute_url }}" %}
+                                    {% endif %}
+                                {% endif %}
+                            </th>
+                            <td>{{ documento.assunto }}</td>
+                            <td>{{ documento.get_nivel_acesso_display|status }}</td>
+                            <td>{{ documento.usuario_criacao }}</td>
+                            <td class="no-print">
+                                {% if is_requerimento %}
+                                    <a class="btn success"
+                                    href="/processo_eletronico/adicionar_documento_requerimento/{{ requerimento.id }}/{{ documento.id }}/">
+                                        Adicionar ao Requerimento
+                                    </a>
+                                {% elif is_anexar_documento %}
+                                    <a class="btn success" href="{% url view_action instance.id documento.id %}">
+                                        Anexar documento
+                                    </a>
+                                {% else %}
+                                    <a class="btn success" href="{% url view_action instance.id documento.id %}">
+                                        Adicionar ao Processo
+                                    </a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                </div>
+            </div>
+        {% endif %}
+    {% endif %}
+
+{% endblock %}

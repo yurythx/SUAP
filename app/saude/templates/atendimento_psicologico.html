@@ -1,0 +1,144 @@
+{% extends super_template %}
+
+{% block bodyclass %}hasAsideRight{% endblock %}
+
+{% block action-bar %}
+    {% include "includes/actionbar_atendimento.html" %}
+{% endblock %}
+
+{% block object-status %}
+    {% include "includes/status_atendimento.html" %}
+{% endblock %}
+
+{% block content %}
+
+    {% include "includes/dados_paciente.html" %}
+
+    <div class="tab-pane" data-tab="aba_motivo" data-title="Informações sobre o atendimento" data-checked="{% if motivo_count > 0 %}True{% endif %}">
+        <ul class="action-bar">
+            {% if atendimento.is_aberto and atendimento_psicologia.data_atendimento %}
+                <li><a class="btn primary" href="/saude/registrar_hora_atendimento/{{ atendimento.id }}/">Editar Data/Hora do Atendimento</a></li>
+            {% elif atendimento.is_aberto %}
+                <li><a class="btn success" href="/saude/registrar_hora_atendimento/{{ atendimento.id }}/">Registrar Data/Hora do Atendimento</a></li>
+            {% endif %}
+            {% if atendimento.is_aberto and pode_editar %}
+                {% if atendimento_psicologia.motivo_chegada %}
+                    <li><a class="btn primary" href="/saude/adicionar_motivo_psicologia/{{ atendimento.id }}/">Editar informações</a></li>
+                {% else %}
+                    <li><a class="btn success" href="/saude/adicionar_motivo_psicologia/{{ atendimento.id }}/">Adicionar informações</a></li>
+                {% endif %}
+            {% endif %}
+        </ul>
+
+        {% if atendimento_psicologia %}
+            <dl class="definition-list">
+                <dt>Data/Hora do Atendimento</dt>
+                <dd>{{ atendimento_psicologia.data_atendimento }}</dd>
+                <dt>Motivo da Chegada</dt>
+                <dd>{{ atendimento_psicologia.motivo_chegada|format }}</dd>
+                <dt>Tipo do atendimento</dt>
+                <dd>{{ atendimento_psicologia.tipo_atendimento|format }}</dd>
+                <dt>Queixa Principal</dt>
+                <dd>{{ atendimento_psicologia.queixa_principal.all|format }}</dd>
+                {% if atendimento_psicologia.descricao_queixa_outros %}
+                    <dt>Queixa Principal - Outros</dt>
+                    <dd>{{ atendimento_psicologia.descricao_queixa_outros }}</dd>
+                {% endif %}
+                <dt>Queixa Identificada</dt>
+                <dd>{{ atendimento_psicologia.queixa_identificada.all|format }}</dd>
+                {% if atendimento_psicologia.descricao_queixa_identificada_outros %}
+                    <dt>Queixa Identificada - Outros</dt>
+                    <dd>{{ atendimento_psicologia.descricao_queixa_identificada_outros }}</dd>
+                {% endif %}
+                <dt>Intervenção/Encaminhamento</dt>
+                <dd>{{ atendimento_psicologia.intervencao|format }}</dd>
+            </dl>
+            <p class="obs">{{ atendimento_psicologia_responsavel }}</p>
+        {% else %}
+            <p class="alert alert-warning">Nenhum registro cadastrado.</p>
+        {% endif %}
+    </div>
+
+    <div class="tab-pane" data-tab="aba_anexos" data-title="Anexos" data-count="{{ anexos.count }}">
+        {% if atendimento.is_aberto and pode_editar %}
+            <ul class="action-bar">
+                <li><a class="btn success" href="/saude/adicionar_anexo_psicologia/{{ atendimento.id }}/">Adicionar</a></li>
+            </ul>
+        {% endif %}
+        {% if anexos.exists %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="no-print">Ações</th>
+                            <th>Descrição</th>
+                            <th>Arquivo</th>
+                            <th>Cadastrado em</th>
+                            <th>Cadastrado por</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for anexo in anexos %}
+                        <tr>
+                            <td class="no-print">
+                                {% if request.user.get_vinculo == anexo.cadastrado_por_vinculo %}
+                                    {% icon "edit" "/saude/editar_anexo_psicologia/{{ anexo.id }}/" %}
+                                    {% icon "delete" "/saude/remover_anexo_psicologia/{{ anexo.id }}/" %}
+                                {% endif %}
+                            </td>
+                            <td>{{ anexo.descricao }}</td>
+                            <td><a href="{{ anexo.arquivo.url }}">Ver Arquivo</a></td>
+                            <td>{{ anexo.cadastrado_em }}</td>
+                            <td>{{ anexo.cadastrado_por_vinculo.user|format }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Nenhum registro cadastrado.</p>
+        {% endif %}
+    </div>
+
+    <div class="tab-pane" data-tab="aba_historicos" data-title="Históricos de atendimentos" data-checked="{% if historicos.count > 0 %}True{% endif %}">
+        {% if historicos.exists %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Aberto em</th>
+                            <th>Fechado em</th>
+                            <th>Motivo da chegada</th>
+                            <th>Queixa principal</th>
+                            <th>Queixa identificada</th>
+                            <th>Intervenção/Encaminhamento</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for historico in historicos %}
+                            <tr>
+                                <td>{{ historico.data_atendimento }} - {{ historico.atendimento.usuario_aberto }}</td>
+                                <td>{{ historico.atendimento.data_fechado }} - {{ historico.atendimento.usuario_fechado }}</td>
+                                <td>{{ historico.motivo_chegada|format }}</td>
+                                <td>{{ historico.queixa_principal.all|format }}</td>
+                                <td>{{ historico.queixa_identificada.all|format }}</td>
+                                <td>{{ historico.intervencao|format }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Nenhum registro cadastrado.</p>
+        {% endif %}
+    </div>
+
+{% endblock %}
+
+{% block asideright %}
+    <aside class="right">
+        {% include "includes/dados_extras_paciente.html" %}
+        
+        {% include "includes/regras_para_fechamento.html" %}
+    </aside>
+{% endblock %}

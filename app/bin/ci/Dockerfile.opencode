@@ -1,0 +1,34 @@
+# Imagem custom do opencode para o pipeline do SUAP.
+# Base: https://gitlab.com/nagyv/gitlab-opencode (alpine + opencode + glab + jq + git).
+# Adiciona nodejs/npm e pré-instala os MCPs usados pelas skills (gitlab e sentry),
+# evitando download via npx a cada job.
+
+ARG GITLAB_OPENCODE_VERSION=2.0.24
+FROM  ghcr.io/anomalyco/opencode:${GITLAB_OPENCODE_VERSION}
+
+# Versões dos MCPs (pin para builds reprodutíveis; "latest" se omitido)
+ARG SENTRY_MCP_VERSION=latest
+# 2.1.46+: suporta `--tool-policy-hidden`, usado por bin/ci/opencode-skill.sh para
+# esconder do agente as ferramentas de publicação de draft note (versão sem o flag
+# o ignora em silêncio e o agente volta a duplicar os comentários da revisão).
+ARG GITLAB_MCP_VERSION=2.1.46
+
+RUN apk update \
+    && apk add --no-cache jq bash git coreutils zip glab tar npm curl python3 py3-pip \
+    && pip3 install --no-cache-dir --break-system-packages pre-commit ruff \
+    && npm install -g --omit=dev \
+    "@sentry/mcp-server@${SENTRY_MCP_VERSION}" \
+    "@zereight/mcp-gitlab@${GITLAB_MCP_VERSION}" \
+    && npm cache clean --force \
+    && rm -rf /var/cache/apk/*
+
+WORKDIR /app
+
+# Sanity check em build-time
+RUN opencode --version \
+    && node --version \
+    && python3 --version \
+    && pre-commit --version \
+    && ruff --version \
+    && command -v sentry-mcp \
+    && command -v mcp-gitlab

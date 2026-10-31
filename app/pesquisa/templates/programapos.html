@@ -1,0 +1,249 @@
+{% extends super_template %}
+
+{% block extrahead %}
+    <script src="/static/djtools/joint/lodash.js"></script>
+    <script src="/static/djtools/joint/backbone.js"></script>
+    <script src="/static/djtools/joint/joint.js"></script>
+    <script src="/static/edu/js/Matriz.js"></script>
+{% endblock %}
+
+{% block extracss %}
+    <link rel="stylesheet" type="text/css" href="/static/djtools/joint/joint.css"/>
+    <style>
+        .extra-info {
+            background-color: #f8dac6;
+            padding: 5px;
+        }
+    </style>
+{% endblock %}
+
+{% block object-status %}
+    {% if obj.ativo %}<span class="status status-success">Ativo</span>{% else %}
+        <span class="status status-error">Inativo</span>{% endif %}
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if perms.pesquisa.change_programaposgraduacao %}
+            <li><a href="/admin/pesquisa/programaposgraduacao/{{ obj.pk }}/change" class="btn success">Editar Programa</a></li>
+        {% endif %}
+        {% if perms.pesquisa.view_programaposgraduacao %}
+            <li><a href="/cnpq/?programa_posgraduacao={{ obj.id }}" class="btn secondary-info popup">Ver Indicadores CNPQ</a></li>
+        {% endif %}
+    </ul>
+{% endblock %}
+
+{% block content %}
+    {% box "Dados gerais" %}
+        <dl class="definition-list flex">
+            <div class="list-item flex-basis-100">
+                <dt>Nome do Programa</dt>
+                <dd>{{ obj.nome }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Código CAPES</dt>
+                <dd>{{ obj.codigo_capes|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Modalidade</dt>
+                <dd>{{ obj.modalidade|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Área CAPES</dt>
+                <dd>{{ obj.area_capes|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Coordenador</dt>
+                <dd>{{ obj.coordenador|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Campus Sede</dt>
+                <dd>{{ obj.campus_sede.nome|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Campi de Oferta</dt>
+                {% for uo in obj.campi_oferta.all %}
+                    <dd>{{ uo.nome|format }}</dd>
+                {% endfor %}
+            </div>
+        </dl>
+    {% endbox %}
+
+    <div class="tab-pane" data-title="Equipe de Gestão" data-tab="equipe_gestao">
+        {% if perms.pesquisa.change_programaposgraduacao %}
+            <ul class="action-bar">
+                <li><a class="btn success popup" href="/pesquisa/vincular_secretario/{{ obj.pk }}/">Vincular Secretário</a>
+                </li>
+            </ul>
+        {% endif %}
+
+        {% if secretarios_programa.exists %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                    <tr>
+                        <th class="no-print">Ações</th>
+                        <th>Nome</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for secretario_programa in secretarios_programa %}
+                        <tr>
+                            {% if perms.pesquisa.change_programaposgraduacao %}
+                                <td class="no-print field-get_acoes">
+                                    {% if perms.pesquisa.change_programaposgraduacao %}
+                                        {% icon "delete" "/pesquisa/desvincular_secretario/{{ secretario_programa.pk }}/" "Desvincular" "no-confirm popup" %}
+                                    {% endif %}
+                                </td>
+                            {% endif %}
+                            <td>{{ secretario_programa.secretario.nome|format }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Nenhum coordenador ou secretario vinculado ao Programa.</p>
+        {% endif %}
+    </div>
+
+    <div class="tab-pane" data-title="Corpo Docente" data-tab="corpo_docente">
+        {% if perms.pesquisa.change_programaposgraduacao %}
+            <ul class="action-bar">
+                <li><a class="btn success popup" href="/pesquisa/vincular_docente/{{ obj.pk }}/">Vincular Docente</a></li>
+            </ul>
+        {% endif %}
+
+        {% if docentes_programa.exists %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                    <tr>
+                        <th class="no-print">Ações</th>
+                        <th>Nome</th>
+                        <th>Tipo</th>
+                        <th>Data de Início</th>
+                        <th>Data de Fim</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for docenteprograma in docentes_programa %}
+                        <tr>
+                            {% if perms.pesquisa.change_programaposgraduacao %}
+                                <td class="no-print field-get_acoes">
+                                    {% if perms.pesquisa.change_programaposgraduacao %}
+                                        {% icon "delete" "/comum/excluir/pesquisa/docenteprogramapos/{{ docenteprograma.pk }}/" "Desvincular" "no-confirm popup" %}
+                                    {% endif %}
+                                </td>
+                            {% endif %}
+                            <td>{{ docenteprograma.docente|format }}</td>
+                            <td>{{ docenteprograma.tipo_vinculo|format }}</td>
+                            <td>{{ docenteprograma.data_inicio|format }}</td>
+                            <td>{{ docenteprograma.data_fim|format }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Nenhum docente vinculado ao Programa.</p>
+        {% endif %}
+    </div>
+
+    <div class="tab-pane" data-title="Áreas de Concentração" data-tab="areas_concetracao">
+        {% if perms.pesquisa.change_programaposgraduacao %}
+            <ul class="action-bar">
+                <li><a class="btn success popup" href="/pesquisa/vincular_area/{{ obj.pk }}/">Vincular Área de
+                    Concentração</a></li>
+            </ul>
+        {% endif %}
+
+        {% if areas_programa.exists %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                    <tr>
+                        <th class="no-print">Ações</th>
+                        <th>Área de Concentração</th>
+                        <th>Área CAPES</th>
+                        <th>Área de Avaliação</th>
+                        <th>Data de Início</th>
+                        <th>Data de Fim</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for areaprograma in areas_programa %}
+                        <tr>
+                            {% if perms.pesquisa.change_programaposgraduacao %}
+                                <td class="no-print field-get_acoes">
+                                    {% if perms.pesquisa.change_programaposgraduacao %}
+                                        {% icon "delete" "/comum/excluir/pesquisa/areaconcentracaoprogramapos/{{ areaprograma.pk }}/" "Desvincular" "no-confirm popup" %}
+                                    {% endif %}
+                                </td>
+                            {% endif %}
+                            <td>{{ areaprograma.area_concentracao.descricao|format }}</td>
+                            <td>{{ areaprograma.area_concentracao.area_capes.descricao|format }}</td>
+                            <td>{{ areaprograma.area_concentracao.area_avaliacao.nome|format }}</td>
+                            <td>{{ areaprograma.data_inicio|format }}</td>
+                            <td>{{ areaprograma.data_fim|format }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Nenhuma área de concentração vinculada ao Programa.</p>
+        {% endif %}
+    </div>
+
+    <div class="tab-pane" data-title="Cursos" data-tab="cursos_alunos">
+        {% if perms.pesquisa.change_programaposgraduacao %}
+            <ul class="action-bar">
+                <li><a class="btn success popup" href="/pesquisa/vincular_curso/{{ obj.pk }}/">Vincular Curso</a></li>
+            </ul>
+        {% endif %}
+
+        {% if cursos_programa.exists %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                    <tr>
+                        <th class="no-print">Ações</th>
+                        <th>Curso</th>
+                        <th>Modalidade</th>
+                        <th class="no-print">Opções</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for curso_programa in cursos_programa %}
+                        <tr>
+                            {% if perms.pesquisa.change_programaposgraduacao %}
+                                <td class="no-print field-get_acoes">
+                                    {% if perms.pesquisa.change_programaposgraduacao %}
+                                        {% icon "delete" "/comum/excluir/pesquisa/cursoprogramapos/{{ curso_programa.pk }}/" "Desvincular" "no-confirm popup" %}
+                                    {% endif %}
+                                </td>
+                            {% endif %}
+                            <td>{{ curso_programa.curso.descricao|format }}</td>
+                            <td>{{ curso_programa.curso.modalidade.descricao|format }}</td>
+                            <td class="no-print">
+                                <ul class="action-bar">
+                                    <li><a href="/admin/edu/aluno/?curso_campus={{ curso_programa.curso.pk }}"
+                                           class="btn default">Ver Alunos</a></li>
+                                    <li><a href="/edu/relatorio/?curso_campus={{ curso_programa.curso.pk }}&periodo_letivo=0&periodo_matriz=0&periodo_referencia=0&ano_conclusao=&situacao_diario=0&ano_ingresso_inicio=&periodo_ingresso_inicio=0&ano_ingresso_fim=&periodo_ingresso_fim=0&aluno_especial=&forma_ingresso=&situacao_sistema=TODOS&medida_disciplinar=&percentual_conclusao_curso_inicial=&percentual_conclusao_curso_final=&pendencias=&formatacao=simples&quantidade_itens=25&ordenacao=Nome&agrupamento=Campus&exibicao=curso_campus.diretoria.setor.uo&exibicao=curso_campus.codigo&exibicao=curso_campus.descricao&exibicao=ira&exibicao=matriz"
+                                           class="btn default">Ver Relatório</a></li>
+                                </ul>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Nenhum curso vinculado ao Programa.</p>
+        {% endif %}
+    </div>
+
+  {% include "tabs/autoavaliacao_programapos.html" %}
+
+{% endblock %}

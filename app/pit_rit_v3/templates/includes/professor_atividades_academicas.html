@@ -1,0 +1,280 @@
+<style>
+    .subtotal {
+        width: 11%;
+    }
+    .no-border th{
+        border: 0px !important;
+    }
+</style>
+
+<ul class="action-bar">
+    {% if pit %}
+        {% if is_proprio_professor %}
+            {% if pode_enviar_plano %}
+                <li><a class="btn popup" href="/pit_rit_v3/enviar_plano/{{ pit.pk }}/">Submeter Plano para Avaliação</a></li>
+            {% endif %}
+            {% if pit.pode_desfazer_envio_plano %}
+                <li><a class="btn warning confirm" data-confirm="Deseja realmente desfazer o envio do plano para avaliação?" href="/pit_rit_v3/desfazer_envio_plano/{{ pit.pk }}/">Desfazer Envio do Plano</a></li>
+            {% endif %}
+            {% if pit.pode_desfazer_envio_relatorio %}
+                <li><a class="btn warning confirm" data-confirm="Deseja realmente desfazer o envio do relatório para avaliação?" href="/pit_rit_v3/desfazer_envio_relatorio/{{ pit.pk }}/">Desfazer Envio do Relatório</a></li>
+            {% endif %}
+        {% endif %}
+        {% if pode_alterar_avaliador_plano %}
+			<li><a class="btn popup" href="/pit_rit_v3/enviar_plano/{{ pit.pk }}/">Alterar Avaliador do Plano</a></li>
+        {% endif %}
+        {% if pode_avaliar_plano %}
+			<li><a class="btn success popup" href="/pit_rit_v3/aprovar_plano/{{ pit.pk }}/">Aprovar Plano</a></li>
+			<li><a class="btn popup" href="/pit_rit_v3/devolver_plano/{{ pit.pk }}/">Devolver Plano</a></li>
+        {% endif %}
+    {% else %}
+        <li><a class="btn primary" href="/pit_rit_v3/criar_plano/{{ obj.pk }}/">Criar Plano</a></li>
+    {% endif %}
+</ul>
+
+<div class="search-and-filters">
+    <div class="filter">
+        <form id="form_periodo_letivo">
+            <div class="filter">
+                <label>Período:</label>
+                <select id="select_ano_periodo" name="ano-periodo"
+                        onchange="if( window.location.search.indexOf('ano-periodo') !=-1){ window.location.search = window.location.search.substring(0,window.location.search.indexOf('ano-periodo'))+'ano-periodo='+document.getElementById('select_ano_periodo').value +  window.location.search.substring(window.location.search.indexOf('ano-periodo')+18) } else { window.location.search = window.location.search + '&ano-periodo=' + document.getElementById('select_ano_periodo').value }">
+                    {% for tupla in periodo_letivo_atual.get_periodos %}
+                        <option {% if periodo_letivo_atual.ano == tupla.0 and periodo_letivo_atual.periodo == tupla.1 %}
+                            selected="selected" {% endif %}>{{ tupla.0 }}.{{ tupla.1 }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if pit %}
+
+    <p class="alert alert-info">
+        A carga horária das atividades segue as regras da PORTARIA NORMATIVA vigente em
+        {{ periodo_letivo_atual.ano }}.{{ periodo_letivo_atual.periodo }} e será contabilizada após o deferimento das mesmas
+    </p>
+
+    <ul class="flex-container boxes infos sm">
+        <li class="box-item info"><p class="stat">{{ ch_prevista|format }}h</p><p class="title">Horas previstas</p></li>
+        <li class="box-item info"><p class="stat">{{ ch_total|format }}h</p><p class="title">Hora(s) planejada(s)</p></li>
+        <li class="box-item info"><p class="stat">{{ ch_pendente|format }}h</p><p class="title">Hora(s) pendente(s)</p></li>
+        <li class="box-item info"><p class="stat">{{ ch_considerada|format }}h</p><p class="title">Horas consideradas</p></li>
+    </ul>
+
+    <div class="mb-3">
+        {% if vinculos_diarios_regulares or vinculos_diarios_fics or vinculos_turmas_minicurso %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Diários de cursos regulares, FIC e FIC &lt; 160h</caption>
+                    <thead>
+                        <tr>
+                            <th>Diário</th>
+                            <th>Disciplina</th>
+                            <th>Diário Dividido</th>
+                            <th>Local</th>
+                            <th>Modalidade de Ensino</th>
+                            <th>Horário</th>
+                            <th class="text-center">Nº de Alunos</th>
+                            <th class="text-center">CH Semanal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for professor_diario in vinculos_diarios_regulares %}
+                        <tr>
+                            <td class="text-center">
+                                {% if eh_proprio_professor %}
+                                    <a href="/edu/meu_diario/{{ professor_diario.diario.pk }}/1/">{{ professor_diario.diario.pk }}</a>
+                                {% else %}
+                                    <a href="/edu/diario/{{ professor_diario.diario.pk }}/">{{ professor_diario.diario.pk }}</a>
+                                {% endif %}
+                            </td>
+                            <td>{{ professor_diario.diario.componente_curricular.componente.descricao }}</td>
+                            <td>
+                                {% if professor_diario.diario.get_professores.count > 1 %}
+                                    <span class="status status-success">Sim ({{ professor_diario.get_percentual_ch }}% {% if professor_diario.periodo_letivo_ch %} em {{ professor_diario.diario.ano_letivo }}/{{ professor_diario.periodo_letivo_ch }} {% endif %})</span>
+                                {% else %}
+                                    <span class="status status-error">Não</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ professor_diario.diario.get_locais_aula|format }}</td>
+                            <td>{{ professor_diario.diario.turma.curso_campus.modalidade }}</td>
+                            <td class="text-center">{{ professor_diario.diario.get_horario_aulas|format }}</td>
+                            <td class="text-center">{{ professor_diario.diario.get_alunos_ativos.count }}</td>
+                            <td class="text-center">
+                                {{ professor_diario|method:"get_qtd_creditos_efetiva"|call:pit.periodo_letivo|format }}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    {% for professor_diario in vinculos_diarios_fics %}
+                        <tr>
+                            <td class="text-center">
+                                {% if eh_proprio_professor %}
+                                    <a href="/edu/meu_diario/{{ professor_diario.diario.pk }}/1/">{{ professor_diario.diario.pk }}</a>
+                                {% else %}
+                                    <a href="/edu/diario/{{ professor_diario.diario.pk }}/">{{ professor_diario.diario.pk }}</a>
+                                {% endif %}
+                            </td>
+                            <td>{{ professor_diario.diario.componente_curricular.componente.descricao }}</td>
+                            <td>
+                                {% if professor_diario.diario.get_professores.count > 1 %}
+                                    <span class="status status-success">Sim</span>
+                                {% else %}
+                                    <span class="status status-error">Não</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ professor_diario.diario.get_locais_aula|format }}</td>
+                            <td>{{ professor_diario.diario.turma.curso_campus.modalidade }}</td>
+                            <td class="text-center">{{ professor_diario.diario.get_horario_aulas|format }}</td>
+                            <td class="text-center">{{ professor_diario.diario.get_alunos_ativos.count }}</td>
+                            <td class="text-center">{{ professor_diario|method:"get_qtd_creditos_efetiva"|call:pit.periodo_letivo|format }}</td>
+                        </tr>
+                    {% endfor %}
+                    {% for professor_minicurso in vinculos_turmas_minicurso %}
+                        <tr>
+                            <td class="text-center">
+                                <a href="/edu/turma_minicurso/{{ professor_minicurso.turma_minicurso.pk }}/">{{ professor_minicurso.turma_minicurso.pk }}</a>
+                            </td>
+                            <td>{{ professor_minicurso.turma_minicurso.minicurso.descricao }}</td>
+                            <td class="text-center">-</td>
+                            <td>-</td>
+                            <td>{{ professor_minicurso.turma_minicurso.minicurso.modalidade }}</td>
+                            <td class="text-center">-</td>
+                            <td class="text-center">{{ professor_minicurso.turma_minicurso.participantes.count }}</td>
+                            <td class="text-center">{{ professor_minicurso.get_carga_horaria_semanal_ha|format }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td class="text-end" colspan="7"></td>
+                            <td class="text-center subtotal">
+                                {{ ch_semanal_aulas|floatformat:0 }} h/a<br>
+                                <span> ({{ ch_aulas|floatformat:0 }} h)</span>
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        {% endif %}
+    </div>
+{% else %}
+    <p class="alert alert-warning">Não há plano individual de trabalho cadastrado para o ano/período selecionado.</p>
+{% endif %}
+
+{% box "Dados da Avaliação" %}
+    <dl class="definition-list flex">
+        <div class="list-item">
+            <dt>Avaliador do Plano</dt>
+            <dd>{{ pit.avaliador|format }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Plano Enviado</dt>
+            <dd>
+                {% if pit.data_envio %}
+                    <span class="status status-success">Sim</span> {{ pit.data_envio }}
+                {% else %}
+                    <span class="status status-error">Não</span>
+                {% endif %}
+            </dd>
+        </div>
+        <div class="list-item">
+            <dt>Plano Aprovado</dt>
+            <dd>
+                {% if pit.aprovado %}
+                    <span class="status status-success">Sim</span> {% if pit.data_aprovacao %}{{ pit.data_aprovacao }}{% endif %}
+                {% else %}
+                    <span class="status status-error">Não</span>
+                {% endif %}
+            </dd>
+        </div>
+        {% if pit.parecer_set.exists %}
+            <div class="list-item flex-basis-100">
+                <dt>Histórico</dt>
+                {% for parecer in pit.parecer_set.all %}
+                    <dd>{% if parecer.tipo %}<strong>{{ parecer.tipo }} - </strong>{% endif %}{{ parecer.data|format }} - {{ parecer.obs }} {% if parecer.servidor %} ({{ parecer.servidor.pessoa_fisica.nome_usual }} - {{ parecer.servidor.matricula }}) {% endif %}</dd>
+                {% endfor %}
+            </div>
+        {% endif %}
+    </dl>
+{% endbox %}
+
+{% for grupo, atividades_planejadas in atividades_planejadas.items %}
+    {% box "{{ grupo.nome }} ({{ grupo.total }}h)" class="" %}
+    <ul class="action-bar">
+        {% if is_proprio_professor %}
+            {% if pit.avaliador is None %}
+                <li><a class="btn success popup" href="/pit_rit_v3/planejar_atividade/{{ pit.pk }}/{{ grupo.id }}/">Adicionar Atividade</a></li>
+            {% endif %}
+        {% endif %}
+    </ul>
+    {% if atividades_planejadas %}
+        <div class="table-responsive">
+            <table>
+                <caption>Atividades registradas</caption>
+                <thead>
+                    <tr>
+                        {% if is_proprio_professor and pit.avaliador is None %}
+                        <th>Ações</th>
+                        {% endif %}
+                        <th>Subgrupo</th>
+                        <th>Atividade</th>
+                        <th>Objeto Institucional</th>
+                        <th>CH Informada</th>
+                        <th>CH Limite por Item</th>
+                        <th>CH Limite por Período</th>
+                        <th>CH Considerada</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for atividade_planejada in atividades_planejadas %}
+                        <tr>
+                            {% if is_proprio_professor and pit.avaliador is None %}
+                                <td>
+                                    {% if atividade_planejada.id %}
+                                        {% icon "edit" "/pit_rit_v3/planejar_atividade/{{ pit.pk }}/{{ grupo.id }}/{{ atividade_planejada.id }}/" "Editar" "popup" %}
+                                        {% icon "trash" "/pit_rit_v3/remover_atividade/{{ pit.pk }}/{{ atividade_planejada.id }}/" "Remover" "confirm" %}
+                                    {% endif %}
+                                </td>
+                            {% endif %}
+                            <td>{{ atividade_planejada.atividade.subgrupo }}</td>
+                            <td>
+                                {{ atividade_planejada.atividade|format }}
+                                {% if atividade_planejada.bolsa_especifica %}
+                                    <div><strong>Nota: </strong>Não contabilizado por possuir bolsa ou retribuição específica.</div>
+                                {% endif %}
+                                {% if atividade_planejada.observacao %}
+                                    <div><i>{{ atividade_planejada.observacao }}</i></div>
+                                {% endif %}
+                                {% if atividade_planejada.comprovante %}
+                                    <a href="{{ atividade_planejada.comprovante.url }}"> Documento Comprovatório</a>
+                                {% endif %}
+                            </td>
+                            <td>{{ atividade_planejada.objeto_institucional }}</td>
+                            <td class="text-center">{{ atividade_planejada.carga_horaria|format }}</td>
+                            <td class="text-center">
+                                {{ atividade_planejada.atividade.carga_horaria_unitaria|format  }}
+                            </td>
+                            <td class="text-center">
+                                {{ atividade_planejada.atividade.carga_horaria_maxima|format  }}
+                            </td>
+                            <td class="text-center">{{ atividade_planejada.carga_horaria_considerada|format }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td class="text-end" colspan="{% if is_proprio_professor and pit.avaliador is None %}7{% else %}6{% endif %}">Subtotal</td>
+                        <td class="text-center subtotal">
+                            {{ grupo.total }} h<br>
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    {% else %}
+        <p class="alert alert-info">Nenhuma atividade informada para esse grupo.</p>
+    {% endif %}
+    {% endbox %}
+{% endfor %}

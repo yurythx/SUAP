@@ -1,0 +1,87 @@
+{% extends super_template %}
+
+{% block content %}
+    {% box 'Professores'%}
+        <p>{{ diario.get_professores_display|format }}</p>
+    {% endbox %}
+
+    {% box 'Detalhamento das Notas' %}
+        {% regroup notas_avaliacoes by item_configuracao_avaliacao.configuracao_avaliacao.etapa as notas_avaliacoes_por_etapa %}
+
+        {% for notas_avaliacoes_etapa in notas_avaliacoes_por_etapa %}
+            {% if notas_avaliacoes_etapa.grouper == 5 %}
+                <h4>Etapa Final
+                    - {{ notas_avaliacoes_etapa.list.0.item_configuracao_avaliacao.configuracao_avaliacao.get_forma_calculo_display }}</h4>
+            {% else %}
+                <h4>Etapa {{ notas_avaliacoes_etapa.grouper }}
+                    - {{ notas_avaliacoes_etapa.list.0.item_configuracao_avaliacao.configuracao_avaliacao.get_forma_calculo_display }}</h4>
+            {% endif %}
+            <div class="table-responsive">
+            <table class="bordered">
+                <thead>
+                <tr>
+                    <th>Sigla</th>
+                    <th>Tipo</th>
+                    <th>Descrição</th>
+                    {% if not is_lancamento_conceito %}
+                        <th>Peso</th>
+                    {% endif %}
+                    <th>{% if is_lancamento_conceito %}Conceito{% else %}Nota Obtida{% endif %}</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for nota_avaliacao in notas_avaliacoes_etapa.list %}
+                    <tr>
+                        <td>{{ nota_avaliacao.item_configuracao_avaliacao.sigla }}</td>
+                        <td>{{ nota_avaliacao.item_configuracao_avaliacao.get_tipo_display|format }}</td>
+                        <td>{{ nota_avaliacao.item_configuracao_avaliacao.descricao|format }}</td>
+                        {% if nota_avaliacao.pode_exibir_nota %}
+                            {% if not is_lancamento_conceito %}
+                                <td>{{ nota_avaliacao.item_configuracao_avaliacao.peso|format }}</td>
+                            {% endif %}
+                            <td>{{ nota_avaliacao.get_nota|format }}</td>
+                        {% else %}
+                            <td>-</td>
+                            <td>-</td>
+                        {% endif %}
+                    </tr>
+                {% endfor %}
+                {% if notas_avaliacoes_etapa.grouper != 5 and matricula_diario.diario.estrutura_curso.permite_recuperacao_etapa %}
+                    {% with nota_recuperacao=matricula_diario|method:"get_nota_recuperacao_etapa"|call:notas_avaliacoes_etapa.grouper %}
+                    <tr>
+                        <td>{{ nota_recuperacao.item_configuracao_avaliacao.sigla }}</td>
+                        <td>{{ nota_recuperacao.item_configuracao_avaliacao.get_tipo_display|format }}</td>
+                        <td>{{ nota_recuperacao.item_configuracao_avaliacao.descricao|format }}</td>
+                        {% if nota_recuperacao.pode_exibir_nota %}
+                            {% if not is_lancamento_conceito %}
+                                <td>{{ nota_recuperacao.item_configuracao_avaliacao.peso|format }}</td>
+                            {% endif %}
+                            <td>{{ nota_recuperacao.get_nota|format }}</td>
+                        {% else %}
+                            <td>-</td>
+                            <td>-</td>
+                        {% endif %}
+                   </tr> 
+                   {% endwith %}
+                {% endif %}
+                </tbody>
+            </table>
+            </div>
+            <div class="legenda mt-1">
+                <ul>
+                    {% if notas_avaliacoes_etapa.list.0.item_configuracao_avaliacao.configuracao_avaliacao.divisor %}
+                        <li class="info">
+                            Divisor: {{ notas_avaliacoes_etapa.list.0.item_configuracao_avaliacao.configuracao_avaliacao.divisor }}</li>
+                    {% endif %}
+                    {% if notas_avaliacoes_etapa.list.0.item_configuracao_avaliacao.configuracao_avaliacao.maior_nota %}
+                        <li class="info">Ignorar Menor Nota</li>
+                    {% endif %}
+
+                    {% if notas_avaliacoes_etapa.list.0.item_configuracao_avaliacao.configuracao_avaliacao.menor_nota %}
+                        <li class="info">Ignorar Menor Nota</li>
+                    {% endif %}
+                </ul>
+            </div>
+        {% endfor %}
+    {% endbox %}
+{% endblock %}

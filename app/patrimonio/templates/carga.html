@@ -1,0 +1,124 @@
+{% extends super_template %}
+
+
+
+{% block extrahead %}
+    {{ form_carga.media }}
+	{{ form_filtro.media }}
+<script>
+jQuery(document).ready(function() {
+    $("input[name=inventarios]").each(function() {
+        if($(this).is(':checked')){
+            $(this).parent().parent().addClass('highlight');
+        }
+    });
+    $("input[name=inventarios]").click(function(){
+        $(this).parent().parent().toggleClass('highlight');
+    });
+});
+function marcar_todos() {
+    var todos = $('#inventarios_form input:checkbox');
+    todos.prop('checked', true);
+    todos.parent().parent().addClass('highlight');
+}
+function desmarcar_todos() {
+    var todos = $('#inventarios_form input:checkbox');
+    todos.prop('checked', false); 
+    todos.parent().parent().removeClass('highlight');
+}
+</script>
+{% endblock %}
+
+{% block content %}
+
+<div class="search-and-filters">
+    <form name="formUO" action="" method="GET">	        
+        {% for field in form_filtro %}
+        	<div class="filter filter-large-select">
+                <label>{{ field.label_tag }}</label>
+        		{{ field }}
+        	</div>
+        {% endfor %}
+    </form> 
+</div>
+
+{% if inventarios.exists %}
+	{% box "Inventários Pendentes" %}
+		<form id="inventarios_form" action="" method="POST">
+			<fieldset>
+				{% csrf_token %}
+				<div class="destino form-row">
+                    <div class="field-box">
+                        {{ form_carga.servidor_destino.errors }}
+                        <label>{{ form_carga.servidor_destino.label }}:</label> {{ form_carga.servidor_destino }}
+                    </div>
+				</div>
+				<div class="destino form-row">
+                    <div class="field-box">
+                        {{ form_carga.estado_conservacao.errors }}
+                        <label>{{ form_carga.estado_conservacao.label }}:</label> {{ form_carga.estado_conservacao }}
+                    </div>
+				</div>
+				<div class="destino form-row">
+                    <div class="field-box">
+                        {{ form_carga.sala.errors }}
+                        <label>{{ form_carga.sala.label }}:</label> {{ form_carga.sala }}
+                    </div>
+				</div>
+				<div class="destino form-row">
+                    <div class="field-box">
+                        {{ form_carga.rotulos.errors }}
+                        <label>{{ form_carga.rotulos.label }}:</label> {{ form_carga.rotulos }}
+				    </div>
+				</div>
+				<div class="destino form-row">
+                    <div class="field-box">
+                        <label>{{ form_carga.descricao.label }}:</label> {{ form_carga.descricao }}
+                    </div>
+				</div>
+            </fieldset>
+
+            <h4>Selecione os inventários:</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>
+                            {{ form_carga.inventarios.errors }}
+                            <a href="#" id="marcar_todos" onclick="marcar_todos(); return false;">Todos</a> -
+                            <a href="#" id="desmarcar_todos" onclick="desmarcar_todos(); return false;">Nenhum</a>
+                        </th>
+                        <th>Nº</th>
+                        <th>Descrição</th>
+                        <th>Campus da Entrada</th>
+                        <th>ED</th>
+                        <th>Valor</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% paginate %}
+                    {% autopaginate inventarios 100 %}
+                    {% for inventario in inventarios %}
+                    <tr>
+                        <td align="center">
+                            <input type="checkbox" name="inventarios" value="{{ inventario.id }}" {% if inventario.id in inventarios_ids %}checked="checked"{% endif %}>
+                        </td>
+                        <td align="center"><a href="{{ inventario.get_absolute_url }}">{{ inventario.numero }}</a></td>
+                        <td>{{ inventario.descricao }}</td>
+                        <td align="center">{{ inventario.entrada_permanente.entrada.uo }}</td>
+                        <td>{{ inventario.entrada_permanente.categoria.codigo }}</td>
+                        <td align="right">{{ inventario.entrada_permanente.get_valor_unitario }}</td>
+                    </tr>
+                    {% endfor %}
+                    {% paginate %}
+                </tbody>
+            </table>
+            <div class="submit-row">
+                <input type="submit" value="Criar requisição de carga para os inventários selecionados"/>
+            </div>
+		</form>
+	{% endbox %}
+{% else %}
+	<p class="alert alert-warning">Nenhum item encontrado.</p>
+{% endif %}
+
+{% endblock %}

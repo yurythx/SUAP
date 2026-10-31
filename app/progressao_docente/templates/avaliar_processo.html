@@ -1,0 +1,285 @@
+{% extends super_template %}
+
+{% load static progressao_docente_tags %}
+
+{% block extrahead %}
+    <style>
+        label { width: auto; }
+        .checkboxes li {
+            flex-basis: auto;
+            list-style: none;
+        }
+        .iframe-arquivo {
+            float: left;
+            width: 70%;
+            padding-right: 5px;
+        }
+        .dados {
+            float: right;
+            width: 30%;
+        }
+    </style>
+
+    {% if not eh_aluno %}
+        <script src="{% static 'progressao_docente/js/ProgressaoDocente.js' %}" charset="utf-8"></script>
+        <script src="{% static 'progressao_docente/js/AceleracaoProgressao.js' %}" charset="utf-8"></script>
+    {% endif %}
+{% endblock %}
+
+{% block object-status %}
+    {{ processo.get_situacao_display|status }}
+{% endblock %}
+
+{% block action-bar %}
+    {% if not eh_aluno %}
+        <ul class="action-bar">
+            <li><a href="/progressao_docente/avaliacao/{{ avaliacao.pk }}/assinar_avaliacao/" class="btn success">Finalizar</a></li>
+        </ul>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+
+    {% box 'Dados do processo' %}
+        <dl class="definition-list">
+            <dt>Servidor Avaliado</dt>
+            <dd>{{ processo.avaliado }}</dd>
+            <dt>Período</dt>
+            <dd>{{ processo.get_periodo_descricao }}</dd>
+            <dt>Nível</dt>
+            <dd>{{ processo.nivel_atual }} para {{ processo.proximo_nivel }}</dd>
+            <dt>Média do Processo</dt>
+            <dd>0</dd>
+        </dl>
+    {% endbox %}
+
+    {% if tem_aceleracao_para_validar and not eh_aluno %}
+        <div class="alert alert-warning">
+            <p><strong>Atenção:</strong></p>
+            <ul>
+                <li>O servidor solicitou a aceleração da progressão tipo <strong>{{ processo.get_tipo_aceleracao_display }}</strong>, sendo necessário a validação do arquivo comprobatório.</li>
+                <li>Após esta validação, os itens da avaliação serão liberado para conferência.</li>
+            </ul>
+        </div>
+        <h2>Aceleração de Progressão Docente</h2>
+        <div id="iframe" class="iframe-arquivo">
+            <iframe src="{{ processo.arquivo_aceleracao.url }}" width="100%" height="600" allow="fullscreen"></iframe>
+        </div>
+        <form id="form-aceleracao-progressao" method="post">
+
+            <div id="dados" class="dados">
+
+                {% csrf_token %}
+                <input type="hidden" name="id_processo" value="{{ processo.pk }}" />
+                <table>
+                    <caption>INFORMAÇÕES</caption>
+                    <tr>
+                        <td>Aceleração Requerida</td>
+                        <td>{{ processo.get_tipo_aceleracao_display }}</td>
+                    </tr>
+                    <tr>
+                        <td colspan="2">
+                            <a href="javascript:;" onclick="submit_aceleracao_form('validar')" class="btn success"style="width: 100%; text-align: center; height: 40px; align-content: center;">Validar</a>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="2">
+                            <label>Justificativa do Indeferimento</label>
+                            <textarea id="justificativa" name="justificativa" style="width: 100%; margin: 5px 0 5px 0"></textarea>
+                            <br />
+                            <a href="javascript:;" onclick="submit_aceleracao_form('indeferir')" class="btn danger no-confirm">Indeferir Arquivo</a>
+                        </td>
+                    </tr>
+                </table>
+
+            </div>
+
+        </form>
+
+    {% else %}
+
+        <h2>{{ avaliacao.formulario }}</h2>
+
+        <form id="form_progressao_docente" action="{% if eh_aluno %}/progressao_docente/avaliacao/{{ avaliacao.pk }}/finalizar_avaliacao_discente/{% endif %}" method="post">
+        {% csrf_token %}
+        {% for criterio in criterios %}
+        <div class="general-box">
+            <div class="primary-info">
+                {% if criterio.limite_pontos and not criterio.autoavaliacao %}
+                <div class="status-info-container">
+                    <span class="status status-info"><strong>Atenção: </strong> este critério tem um limite de pontos de {{ criterio.limite_pontos }}</span>
+                </div>
+                {% endif %}
+                <h4><small><a  name="criterio_{{ criterio.pk }}">{{ criterio.order }}</a></small> {{ criterio.nome }}</h4>
+
+                <ul class="action-bar">
+                    <li>
+                        <a class="btn default popup" href="/progressao_docente/avaliacaoitem/{{ avaliacao.pk }}/{{ criterio.pk }}/ver_criterio/">
+                            <span class="fas fa-search" aria-hidden="true"></span> Visualizar
+                            <span class="sr-only">Visualizar</span>
+                        </a>
+                    </li>
+                </ul>
+
+                <div class="extra-info">
+                    {% if not criterio.necessita_arquivos %}
+
+                        {% if not criterio.autoavaliacao or eh_aluno and criterio.avaliacao_discente %}
+                            {% for item in criterio.item_set.all %}
+                            <div class="mb-2">
+                                {{ criterio.order }}.{{ forloop.counter }} {{ item.nome }}
+                                {% render_nota item avaliacao avaliador avaliado_processo %}
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="alert alert-warning mt-2">Este critério é de autoavaliação, não sendo necessário o preenchimento pelo avaliador.</p>
+                        {% endif %}
+
+                    {% elif not eh_aluno %}
+                        {% if criterio.itens %}
+                        <div class="table-responsive">
+                            <table>
+                                <caption>Itens do critério</caption>
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Item</th>
+                                        <th>Arquivo</th>
+                                        <th>Descrição</th>
+                                        <th>Pontuação</th>
+                                        <th>Pontuação Validada</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                {% for item in criterio.itens %}
+                                    <tr>
+                                        <td{% if item.deferimento == 2 %} rowspan="2"{% endif %}>{{ forloop.counter }}</td>
+                                        <td>{{ item.item }}</td>
+                                        <td>{{ item.arquivo }}</td>
+                                        <td>{{ item.pontuacao.descricao }}</td>
+                                        <td>
+                                            {% if item.deferimento == 2 %}
+                                                <s>{{ item.pontuacao.pontos|format }}</s>
+                                            {% else %}
+                                                {{ item.pontuacao.pontos|format }}
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ item.get_pontuacao_validada|format }}</td>
+                                        <th class="field-show_list_display_icons">
+                                        {% if item.deferimento %}
+                                            <a href="/progressao_docente/avaliar_item_arquivo/{{ item.pk }}/" class="btn primary popup"><i class=" fas fa-edit"></i>Editar</a>
+                                        {% else %}
+                                            <a href="/progressao_docente/avaliar_item_arquivo/{{ item.pk }}/" class="btn success popup"><i class=" fas fa-check"></i>Avaliar</a>
+                                        {% endif %}
+                                        </th>
+                                    </tr>
+                                    {% if item.deferimento == 2 %}
+                                    <tr>
+                                        <td colspan="6">
+                                            <span class="status status-warning"><strong>Indeferido:</strong> {{ item.justificativa }}</span>
+                                        </td>
+                                    </tr>
+                                    {% endif %}
+                                {% endfor %}
+                                </tbody>
+                                <tfoot>
+                                    {% comment %} <tr>
+                                        <td colspan="5">Total Possível:</td>
+                                        <td colspan="2">{{ criterio.pontuacao.p|format }}</td>
+                                    </tr> {% endcomment %}
+                                    <tr>
+                                        <td colspan="5">Total Avaliado:</td>
+                                        <td colspan="2">{{ criterio.pontuacao_total_avaliado.p|format }}</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                        {% else %}
+                            <p class="alert alert-warning mt-2">Nenhum arquivo cadastrado até o momento para este critério.</p>
+                        {% endif %}
+
+                    {% endif %}
+                </div>
+
+            </div>
+
+            {% if not criterio.autoavaliacao %}
+            <dl class="secondary-info">
+                <div class="list-item">
+                    <dt><span class="fas fa-angle-double-up" aria-hidden="true"></span> Pontuação:</dt>
+                    <dd>
+                        {% if criterio.pontuacao|get_dict_value:"ajuste" %}
+                            {% if criterio.pontuacao_total_avaliado.ajuste %}
+                                <span class="status status-alert"> Pontuação ajustada para <strong>{{ criterio.pontuacao_total_avaliado.p|format }}</strong> pontos (-{{ criterio.pontuacao_total_avaliado.ajuste|format }} pontos) devido ao limite do critério.</span>
+                            {% else %}
+
+                                {% if eh_aluno %}
+                                    <span id="pontuacao_criterio_{{ criterio.pk }}">{{ criterio.pontuacao_total_avaliado.nota_discente|format }}</span>
+                                {% elif criterio.autoavaliacao %}
+                                    <span id="pontuacao_criterio_{{ criterio.pk }}">{{ criterio.pontuacao_total_avaliado.nota_avaliado|format }}</span>
+                                {% else %}
+                                    <span id="pontuacao_criterio_{{ criterio.pk }}">{{ criterio.pontuacao_total_avaliado.p|format }}</span>
+                                {% endif %}
+
+                            {% endif %}
+                        {% else %}
+
+                            {% if eh_aluno %}
+                                <span id="pontuacao_criterio_{{ criterio.pk }}">{{ criterio.pontuacao_total_avaliado.nota_discente|format }}</span>
+                            {% elif criterio.autoavaliacao %}
+                                <span id="pontuacao_criterio_{{ criterio.pk }}">{{ criterio.pontuacao_total_avaliado.nota_avaliado|format }}</span>
+                            {% else %}
+                                <span id="pontuacao_criterio_{{ criterio.pk }}">{{ criterio.pontuacao_total_avaliado.p|format }}</span>
+                            {% endif %}
+
+                        {% endif %}
+                    </dd>
+                </div>
+                {% if criterio.valor_minimo_consideracao_positiva and not eh_aluno %}
+                    <div class="list-item">
+                        <dt><span class="fas fa-angle-double-up" aria-hidden="true"></span> Média do Critério:</dt>
+                        <dd>
+                            <span id="media_criterio_{{ criterio.pk }}">{{ criterio.media_para_avaliacao_criterio }}</span>
+                        </dd>
+                    </div>
+                    <div class="list-item">
+                        <dt><span class="fas fa-angle-double-up" aria-hidden="true"></span> Pontuação de Consideração Positiva:</dt>
+                        <dd>
+                            <span id="pontuacao_consideracao_positiva_{{ criterio.pk }}">{{ criterio.pontuacao_para_consideracao_positiva|format }}</span>
+                        </dd>
+                    </div>
+                    {% endif %}
+                {% if criterio.necessita_arquivos %}
+                <div class="list-item">
+                    <dt><span class="fas fa-list-ol" aria-hidden="true"></span> Quantidade de Arquivos:</dt>
+                    <dd>
+                        {{ criterio.itens|length }}
+                    </dd>
+                </div>
+
+                <div class="list-item">
+                    <dt><span class="fas fa-check-double" aria-hidden="true"></span> Quantidade de Arquivos Avaliados:</dt>
+                    <dd>
+                        {{ criterio.qtde_itens_avaliados }}
+                    </dd>
+                </div>
+                {% endif %}
+
+            </dl>
+            {% endif %}
+
+        </div>
+        {% endfor %}
+
+        {% if eh_aluno %}
+        <div class="submit-row">
+            <input type="submit" value="Finalizar Avaliação Discente" class="btn success confirm">
+        </div>
+        {% endif %}
+
+        </form>
+
+    {% endif %}
+
+{% endblock %}

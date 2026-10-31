@@ -1,0 +1,226 @@
+{% extends super_template %}
+
+{% block bodyclass %}hasAsideRight{% endblock %}
+
+{% block object-status %}
+    {% if steps %}
+        {{ steps|safe }}
+    {% else %}
+        {{ sugestao_melhoria.get_situacao_display|status }}
+    {% endif %}
+    {% if sugestao_melhoria.is_deferida %}
+        {% if not sugestao_melhoria.demanda_gerada and pode_visualizar_demanda_gerada %}
+            <span class="status status-alert">A demanda ainda não foi gerada pelo responsável.</span>
+        {% endif %}
+        {% if sugestao_melhoria.demanda_gerada %}
+            <span class="status status-{{ sugestao_melhoria.demanda_gerada.get_situacao_display|slugify }}">Implementação: {{ sugestao_melhoria.demanda_gerada.get_situacao_display }}</span>
+        {% endif %}
+    {% endif %}
+    <span class="status status-default" title="Esta sugestão de melhoria está com {{ sugestao_melhoria.votos }} pontos na votação">{% icone "heart" %} {{ sugestao_melhoria.votos }}</span>
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if pode_gerar_demanda %}
+            <li><a class="btn success confirm" href="/demandas/gerar_demanda_sugestao_melhoria/{{ sugestao_melhoria.pk }}/">{% icone "plus" %} Gerar Demanda</a></li>
+        {% endif %}
+
+        {% if voto and not eh_interessado and not eh_requisitante %}
+            <li><a class="btn success" href="/demandas/tornar_se_interessado/{{ sugestao_melhoria.pk }}/">{% icone "hand-point-right " %} Tornar-se Interessado</a></li>
+        {% endif %}
+
+        {% if pode_anexar %}
+            <li><a class="btn success" href="/demandas/adicionar_anexo_sugestao/{{ sugestao_melhoria.pk }}/">{% icone "plus" %} Anexo</a></li>
+        {% endif %}
+
+        {% if pode_editar_todos_dados %}
+            {% if not sugestao_melhoria.responsavel %}
+                <li><a class="btn success" href="/demandas/atribuir_se_como_responsavel_sugestao_melhoria/{{ sugestao_melhoria.pk }}/">{% icone "user" %} Atribuir-se como Responsável</a></li>
+            {% endif %}
+            <li><a class="btn primary" href="/demandas/editar_todos_dados_sugestao_melhoria/{{ sugestao_melhoria.pk }}/">{% icone "edit" %} Editar</a></li>
+        {% endif %}
+
+        {% if pode_editar_dados_basicos and not pode_editar_todos_dados %}
+            <li><a class="btn primary" href="/demandas/editar_dados_basicos_sugestao_melhoria/{{ sugestao_melhoria.pk }}/">{% icone "edit" %} Editar</a></li>
+        {% endif %}
+
+        {% if perms.comum.is_coordenador_de_sistemas and not sugestao_melhoria.is_deferida %}
+            <li><a class="btn primary" href="/demandas/editar_area_atuacao/{{ sugestao_melhoria.pk }}/">{% icone "edit" %} Editar Área de Atuação</a></li>
+        {% endif %}
+
+        {% if sugestao_melhoria|method:"is_responsavel"|call:request.user and sugestao_melhoria.is_situacao_ativa %}
+            <li class="has-child">
+                <a href="#" class="btn primary">{% icone "edit" %} Avaliar</a>
+                <ul>
+                    {% for situacao in sugestao_melhoria.get_etapas %}
+                        <li><a href="{% url 'alterar_situacao_sugestao' sugestao_melhoria.pk situacao.0 %}">{{ situacao.1 }}</a></li>
+                    {% endfor %}
+                </ul>
+            </li>
+        {% endif %}
+
+        {% if sugestao_melhoria.demanda_gerada %}
+            {% if pode_visualizar_demanda_gerada %}
+                <li><a class="btn default" href="{{ sugestao_melhoria.demanda_gerada.get_absolute_url }}">{% icone "eye" %} Ver demanda</a></li>
+            {% endif %}
+        {% endif %}
+    </ul>
+{% endblock %}
+
+{% block content %}
+    {% box 'Sugestão' %}
+        {% if sugestao_melhoria.pode_votar %}
+            <ul class="action-bar inside-container">
+                <li><a href="/demandas/concordar_sugestao/{{ sugestao_melhoria.pk }}" class="btn {% if sugestao_melhoria.ja_concordou %}disabled{% else %}success{% endif %}" title="Concordar com a sugestão de melhoria">{% icone "heart" %} Concordar</a></li>
+                <li><a href="/demandas/discordar_sugestao/{{ sugestao_melhoria.pk }}" class="btn {% if sugestao_melhoria.ja_discordou %}disabled{% else %}danger no-confirm{% endif %}" title="Discordar da sugestão de melhoria">{% icone "heart-broken" %} Discordar</a></li>
+            </ul>
+        {% endif %}
+
+        <dl class="definition-list flex">
+            <div class="list-item flex-basis-100">
+                <dt>Descrição</dt>
+                <dd>{{ sugestao_melhoria.descricao|linebreaksbr }}</dd>
+            </div>
+            {% if sugestao_melhoria.quem_concordou.exists %}
+                <div class="list-item flex-basis-50">
+                    <dt>Concordaram <span class="badge ms-1">{{ sugestao_melhoria.quem_concordou.all.count }}</span></dt>
+                    <dd>
+                        <div class="d-flex flex-wrap gap-2">
+                        {% for concordou in sugestao_melhoria.quem_concordou.all %}
+                            <div class="person smallest my-0 {% if concordou.usuario == request.user %}success{% endif %}">
+                                <div class="photo-circle smallest">
+                                    <img alt="{{ concordou.usuario.get_profile.nome_usual }}" src="{{ concordou.usuario.get_vinculo.get_foto_75x100_url }}" />
+                                </div>
+                                <dl>
+                                    <dt class="visually-hidden">Nome</dt>
+                                    <dd>{{ concordou.usuario|format }}</dd>
+                                </dl>
+                            </div>
+                        {% endfor %}
+                        </div>
+                    </dd>
+                </div>
+            {% endif %}
+            {% if sugestao_melhoria.quem_discordou.exists %}
+                <div class="list-item flex-basis-50">
+                    <dt>Discordaram <span class="badge ms-1">{{ sugestao_melhoria.quem_discordou.all.count }}</span></dt>
+                    <dd>
+                        <div class="d-flex flex-wrap gap-2">
+                            {% for discordou in sugestao_melhoria.quem_discordou.all %}
+                                <div class="person smallest my-0 {% if discordou.usuario == request.user %}error{% endif %}">
+                                    <div class="photo-circle smallest">
+                                        <img alt="{{ discordou.usuario.get_profile.nome_usual }}" src="{{ discordou.usuario.get_vinculo.get_foto_75x100_url }}" />
+                                    </div>
+                                    <dl>
+                                        <dt class="visually-hidden">Nome</dt>
+                                        <dd>{{ discordou.usuario|format }}</dd>
+                                    </dl>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </dd>
+                </div>
+            {% endif %}
+        </dl>
+    {% endbox %}
+
+    {% if pode_visualizar_comentario %}
+        {% if qtd_comentarios == 0 and pode_registrar_comentario or qtd_comentarios > 0 %}
+            {% box 'Comentários' badge=qtd_comentarios %}
+                {% comentarios sugestao_melhoria 'Não há comentários para esta sugestão de melhoria.' pode_registrar_comentario %}
+            {% endbox %}
+        {% endif %}
+
+        {% if sugestao_melhoria.sugestaoanexo_set.all %}
+            {% box 'Anexos' %}
+                <ul class="timeline compact">
+                    {% for anexo in sugestao_melhoria.sugestaoanexo_set.all %}
+                        <li>
+                            <div class="timeline-date">{{ anexo.anexado_em }}</div>
+                            <div class="timeline-icon"></div>
+                            <div class="timeline-content">
+                                <h4><a href="{{ anexo.anexo.get_url_publica }}">{{ anexo.descricao }}</a> <small>por {{ anexo.anexado_por.get_profile.nome_usual }}</small></h4>
+                            </div>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endbox %}
+        {% endif %}
+    {% endif %}
+
+    {% if sugestao_melhoria.demandantes.exists %}
+        {% box 'Demandantes de {{ sugestao_melhoria.area_atuacao }} / {{ sugestao_melhoria.tags.all|format }}' %}
+            <div class="card-container">
+                {% for demandante in sugestao_melhoria.demandantes %}
+                    {% if demandante == sugestao_melhoria.area_atuacao.demandante_responsavel %}
+                        {% include "usuario_card.html" with usuario=demandante demandante_responsavel=True %}
+                    {% else %}
+                        {% include "usuario_card.html" with usuario=demandante %}
+                    {% endif %}
+                {% endfor %}
+            </div>
+        {% endbox %}
+    {% endif %}
+
+{% endblock %}
+
+{% block asideright %}
+    <aside class="right">
+        <button id="collapseAsideRight"><span class="visually-hidden">Minimizar barra lateral</span></button>
+
+        <details open="open">
+            <summary>Dados gerais</summary>
+            <dl class="details-container">
+                <dt>Área de Atuação:</dt>
+                <dd><a href="/admin/demandas/sugestaomelhoria/?area_atuacao__id__exact={{ sugestao_melhoria.area_atuacao.pk }}">{{ sugestao_melhoria.area_atuacao|format }}</a></dd>
+                {% if sugestao_melhoria.tags.all %}
+                    <dt>Módulo:</dt>
+                    {% for tag in sugestao_melhoria.tags.all %}
+                        <dd>{{ tag.nome }}</dd>
+                    {% endfor %}
+                {% endif %}
+                {% if sugestao_melhoria.cadastrado_em %}
+                    <dt>Sugerida em:</dt>
+                    <dd>{{ sugestao_melhoria.cadastrado_em|format }}</dd>
+                {% endif %}
+            </dl>
+        </details>
+
+        <details open="open">
+            <summary>Responsável</summary>
+            <div class="details-container">
+                {% if sugestao_melhoria.responsavel %}
+                    {% include "usuario_display.html" with usuario=sugestao_melhoria.responsavel %}
+                {% else %}
+                    <p class="alert alert-warning">Nenhum responsável definido.</p>
+                {% endif %}
+            </div>
+        </details>
+
+        <details open="open">
+            <summary>Requisitante</summary>
+            <div class="details-container">
+                {% include "usuario_display.html" with usuario=sugestao_melhoria.requisitante %}
+            </div>
+        </details>
+
+        {% if sugestao_melhoria.interessados.exists %}
+            <details open="open">
+                <summary>Interessados <span class="badge">{{ sugestao_melhoria.interessados.all.count }}</span></summary>
+                <div class="details-container">
+                    {% for interessado in sugestao_melhoria.interessados.all %}
+                        {% include "usuario_display.html" with usuario=interessado classname="smallest" %}
+                    {% endfor %}
+                </div>
+            </details>
+        {% endif %}
+    </aside>
+{% endblock %}
+
+{% block action-links %}
+    {% if sugestao_melhoria.atualizado_por or sugestao_melhoria.atualizado_em %}
+        <li>
+            Última atualização {% if sugestao_melhoria.atualizado_por %}por {{ sugestao_melhoria.atualizado_por|format }} {% endif %}{% if sugestao_melhoria.atualizado_em %}em {{ sugestao_melhoria.atualizado_em|format }}{% endif %}
+        </li>
+    {% endif %}
+{% endblock %}

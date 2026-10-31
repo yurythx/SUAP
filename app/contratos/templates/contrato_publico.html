@@ -1,0 +1,676 @@
+{% extends "admin/base_anonima.html" %}
+
+{% block content %}
+    {% box "Dados gerais" %}
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>Tipo</dt>
+                <dd>{{ contrato.tipo }}</dd>
+            </div>
+            <div class="list-item flex-basis-50">
+                <dt>Subtipo</dt>
+                <dd>{{ contrato.subtipo|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Continuidade</dt>
+                <dd>{{ contrato.get_continuidade_display|status }}</dd>
+            </div>
+            {% if contrato.contrato %}
+                <div class="list-item">
+                    <dt>Tipo de Aditivo</dt>
+                    <dd>
+                        {% if contrato.de_fiscal %}Aditivo de Fiscal{% endif %}
+                        {% if contrato.de_prazo %}Aditivo de Prazo{% endif %}
+                        {% if contrato.de_valor %}Aditivo de Valor{% endif %}
+                        {% if contrato.de_outro %}Aditivo de Outro{% endif %}
+                    </dd>
+                </div>
+                <div class="list-item">
+                    <dt>Número do Contrato</dt>
+                    <dd>{{ contrato.numero }}</dd>
+                </div>
+            {% endif %}
+            <div class="list-item">
+                <dt>Data de Início</dt>
+                <dd>{{ contrato.data_inicio|date:"d/m/Y" }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Data de Término</dt>
+                {% if contrato.get_data_fim != contrato.data_fim %}
+                    <dd>Prorrogado de {{ contrato.data_fim|date:"d/m/Y" }}
+                        para {{ contrato.get_data_fim|date:"d/m/Y" }}</dd>
+                {% else %}
+                    <dd>{{ contrato.data_fim|format }}</dd>
+                {% endif %}
+            </div>
+            {% if contrato.eh_continuo %}
+                <div class="list-item">
+                    <dt>Data Limite de Prorrogação</dt>
+                    <dd>{{ contrato.get_data_prorrogacao|date:"d/m/Y" }}</dd>
+                </div>
+            {% endif %}
+            {% if contrato.processo %}
+                <div class="list-item">
+                    <dt>Processo</dt>
+                    <dd>{{ contrato.processo.get_numero }}
+                        <a class="btn default" href="{{ contrato.processo.get_url_consulta_publica }}">
+                                 Visualizar Processo
+                            </a>
+                    </dd>
+                </div>
+            {% endif %}
+            {% if contrato.empenho %}
+                <div class="list-item">
+                    <dt>Empenho</dt>
+                    <dd>{{ contrato.empenho.numero }}</dd>
+                </div>
+            {% endif %}
+            <div class="list-item">
+                <dt>{{ nomenclatura.campi }}</dt>
+                <dd>
+                    <ul>
+                        {% for campus in contrato.campi.all %}
+                            <li>{{ campus.setor.nome }}</li>
+                        {% endfor %}
+                    </ul>
+                </dd>
+            </div>
+            <div class="list-item">
+                <dt>Arquivo Digitalizado</dt>
+                <dd>
+                    {% if contrato.arquivo_contrato %}
+                        <a href="/contratos/visualizar_arquivo_contrato/{{ contrato.id }}/" class="btn default">{% icone "eye" %} Arquivo do contrato</a>
+                    {% else %}
+                        <span class="status status-alert">Aguardando submissão do arquivo</span>
+                    {% endif %}
+                </dd>
+            </div>
+            <div class="list-item flex-basis-100">
+                <dt>Objeto</dt>
+                <dd>{{ contrato.objeto }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Tipo de Licitação</dt>
+                <dd>{{ contrato.tipo_licitacao|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Número da Licitação</dt>
+                <dd>{{ contrato.pregao|format }}</dd>
+            </div>
+            {% if contrato.estimativa_licitacao %}
+                <div class="list-item">
+                    <dt>Estimativa para Início dos Procedimentos para Nova Licitação</dt>
+                    <dd>{{ contrato.estimativa_licitacao|format }}</dd>
+                </div>
+            {% endif %}
+            <div class="list-item">
+                <dt>Número do Cronograma</dt>
+                <dd>
+                    {% if contrato.get_cronograma %}
+                        {{ contrato.get_cronograma|default:"" }}
+                    {% else %}
+                        <span class="status status-alert">Aguardando definição do cronograma</span>
+                    {% endif %}
+                </dd>
+            </div>
+            <div class="list-item">
+                <dt>Quantidade de Parcelas</dt>
+                <dd>{{ contrato.qtd_parcelas }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Concluído</dt>
+                <dd>{{ contrato.concluido|status }}</dd>
+            </div>
+            {% if contrato.concluido %}
+                <div class="list-item">
+                    <dt>Motivo da Conclusão</dt>
+                    <dd>{{ contrato.motivo_conclusao }}</dd>
+                </div>
+            {% endif %}
+            {% if contrato.cancelado %}
+                <div class="list-item">
+                    <dt>Cancelado</dt>
+                    <dd>
+                        <span class="status status-error">Cancelado em {{ contrato.dh_cancelamento }} por {{ contrato.usuario_cancelamento.pessoafisica.nome }}</span>
+                    </dd>
+                </div>
+                <div class="list-item">
+                    <dt>Motivo do Cancelamento</dt>
+                    <dd>{{ contrato.motivo_cancelamento }}</dd>
+                </div>
+            {% endif %}
+            <div class="list-item">
+                <dt>Período executado</dt>
+                <dd>
+                    {% progressbar contrato.get_percentual_dias_executado %}
+                    <p><span class="{% if contrato.get_qtd_dias_executado > contrato.get_qtd_dias_total %}false{% else %}true{% endif %}"><b>{{ contrato.get_qtd_dias_executado }}</b> dias</span>
+                        de <b>{{ contrato.get_qtd_dias_total }} dias</b></p>
+                </dd>
+            </div>
+            <div class="list-item">
+                <dt>Valor executado</dt>
+                <dd>
+                    {% progressbar contrato.get_percentual_executado %}
+                    <p>
+                        <span class="{% if contrato.valor_executado > contrato.valor_total %}false{% endif %}">
+                            R$ {{ contrato.valor_executado|mascara_dinheiro }} de <b>R$ {{ contrato.valor_total|mascara_dinheiro }}</b>
+                        </span>
+                    </p>
+                </dd>
+            </div>
+        </dl>
+    {% endbox %}
+
+    {% box "Demonstrativo de Valores" %}
+        <table>
+            <thead>
+                <tr>
+                    <th class="text-end">Item</th>
+                    <th class="text-end">Valor (R$)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="text-end">Contrato Original</td>
+                    <td class="text-end">+ {{ contrato.valor|mascara_dinheiro }}</td>
+                </tr>
+                {% for aditivo in contrato.get_aditivos %}
+                    {% if aditivo.de_valor %}
+                        <tr>
+                            <td class="text-end">Termo Aditivo {{ aditivo.ordem }} ({{ aditivo.get_tipo }})</td>
+                            {% if aditivo.tipo_termo_aditivo == 'SUP' %}
+                                <td class="text-end false"> -
+                            {% else %}
+                                <td class="text-end true"> +
+                            {% endif %}
+                            {{ aditivo.valor|mascara_dinheiro }}
+                            </td>
+                        </tr>
+                    {% endif %}
+                {% endfor %}
+                {% for apostilamento in contrato.get_apostilamentos %}
+                    <tr>
+                        <td class="text-end">Apostilamento {{ forloop.counter }}</td>
+                        <td {% if apostilamento.valor < 0.0 %} class="text-end false">&nbsp;-{% else %}
+                            class="true">+{% endif %}
+                        R$ {{ apostilamento.valor|mascara_dinheiro }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+            <tr>
+                <td>Total: Contrato + Aditivos de Valor + Apostilamentos</td>
+                <td class="text-end {% if contrato.valor_total < 0.0 %}false{% endif %}"> {{ contrato.valor_total|mascara_dinheiro }}</td>
+            </tr>
+            <tr>
+                <td>Total Executado</td>
+                <td class="text-end {% if contrato.valor_total > 0.0 %}false{% endif %}">- {{ contrato.valor_executado|mascara_dinheiro }}</td>
+            </tr>
+            <tr>
+                <td>Saldo</td>
+                <td class="text-end {% if contrato.get_saldo_atual >= 0.0 %}true{% else %}false{% endif %}"> {{ contrato.get_saldo_atual|mascara_dinheiro }}</td>
+            </tr>
+            </tfoot>
+        </table>
+    {% endbox %}
+
+    {% box "Dados da Contratada" %}
+        <dl class="definition-list flex">
+            <div class="list-item flex-basis-50">
+                <dt>Nome</dt>
+                <dd>{{ contrato.vinculo_contratado.pessoa.nome|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>{% if contrato.vinculo_contratado.eh_pessoajuridica %}CNPJ{% else %}CPF{% endif %}</dt>
+                <dd>{{ contrato.vinculo_contratado.pessoa.get_cpf_ou_cnpj|format }}</dd>
+            </div>
+            <div class="list-item flex-basis-50">
+                <dt>Endereço</dt>
+                <dd>{{ contrato.vinculo_contratado.pessoa.endereco|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>E-mail para notificações</dt>
+                <dd>{{ contrato.vinculo_contratado.email_notificacao|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Telefones</dt>
+                <dd>{{ contrato.vinculo_contratado.pessoa.telefones|format }}</dd>
+            </div>
+            {% if contrato.vinculo_contratado.eh_pessoajuridica %}
+            <div class="list-item">
+                <dt>Representantes</dt>
+                <dd>{{ contrato.vinculo_contratado.pessoa.get_representantes|format }}</dd>
+            </div>
+            {% endif %}
+        </dl>
+    {% endbox %}
+
+    <div class="tab-pane" data-title="Publicações" data-counter="{{ contrato.get_publicacoes_contrato.count }}">
+        {% box "Publicações do Contrato" %}
+            {% with publicacoes_contrato=contrato.get_publicacoes_contrato.all %}
+                {% if publicacoes_contrato %}
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>Tipo</th>
+                            <th>Número</th>
+                            <th>Data</th>
+                            <th>Descrição</th>
+                            <th>Arquivo Digitalizado</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for pub in publicacoes_contrato %}
+                            <tr>
+                                <td>{{ pub.tipo }}</td>
+                                <td>{{ pub.numero }}</td>
+                                <td>{{ pub.data|format }}</td>
+                                <td>{{ pub.descricao }}</td>
+                                <td>
+                                {% if pub.arquivo %}
+                                    <a href="/contratos/visualizar_arquivo/{{ pub.arquivo.id }}/">{{ pub.arquivo.nome }}</a>
+                                {% else %}
+                                    <span class="status status-alert">Aguardando submissão do arquivo</span>
+                                {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p class="alert alert-warning">Nenhuma publicação de contrato cadastrada.</p>
+                {% endif %}
+            {% endwith %}
+        {% endbox %}
+
+        {% box "Publicações de Termos Aditivos" %}
+            {% with publicacoes_anexo=contrato.get_publicacoes_anexo.all %}
+                {% if publicacoes_anexo %}
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>Tipo</th>
+                            <th>Número</th>
+                            <th>Data</th>
+                            <th>Descrição</th>
+                            <th>Arquivo Digitalizado</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for pub in publicacoes_anexo %}
+                            <tr>
+                                <td>{{ pub.tipo }}</td>
+                                <td>{{ pub.numero }}</td>
+                                <td>{{ pub.data|format }}</td>
+                                <td>{{ pub.descricao }}</td>
+                                <td>
+                                    {% if pub.arquivo %}
+                                        <a href="/contratos/visualizar_arquivo/{{ pub.arquivo.id }}/">{{ pub.arquivo.nome }}</a>
+                                    {% else %}
+                                        <span class="status status-alert">Aguardando submissão do arquivo.</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p class="alert alert-warning">Nenhuma publicação de termo aditivo cadastrada.</p>
+                {% endif %}
+            {% endwith %}
+        {% endbox %}
+    </div>
+
+    <div class="tab-pane" data-title="Cronograma" data-counter="{{ contrato.get_cronograma.get_parcelas.count }}">
+        <dl class="definition-list">
+            <dt>Nº:</dt>
+            <dd>{{ contrato.get_cronograma.numero|default:"" }}</dd>
+            {% if contrato.get_cronograma.nl %}
+                <dt>NL:</dt>
+                <dd>{{ contrato.get_cronograma.nl|default:"" }}</dd>
+            {% endif %}
+            {% if contrato.get_cronograma.rc %}
+                <dt>RC:</dt>
+                <dd>{{ contrato.get_cronograma.rc|default:"" }}</dd>
+            {% endif %}
+        </dl>
+
+        {% if contrato.get_cronograma.get_parcelas %}
+            <table>
+                <thead>
+                <tr>
+                    <th>Nº da Parcela</th>
+                    <th>Período Previsto</th>
+                    <th>Valor Previsto</th>
+                    <th>Medição</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for parcela in contrato.get_cronograma.get_parcelas %}
+                    <tr>
+                        <td>#{{ forloop.counter }}</td>
+                        <td>{{ parcela.data_prevista_inicio|format }} a {{ parcela.data_prevista_fim|format }}</td>
+                        <td>R$ {{ parcela.valor_previsto|mascara_dinheiro }}</td>
+                        <td class="contratos">
+                            {% with medicoes=parcela.medicoes.all %}
+                                {% if medicoes %}
+                                    {% for medicao in medicoes %}
+                                        <dl>
+                                            <dt>Fiscal da Medição:</dt>
+                                            <dd>{{ medicao.fiscal }}</dd>
+                                            <dt>Período Executado:</dt>
+                                            <dd>{{ medicao.data_inicio|format }} a {{ medicao.data_fim|format }}</dd>
+                                            <dt>Valor Executado:</dt>
+                                            <dd>R$ {{ medicao.valor_executado|format }}</dd>
+                                            <dt>Nº do Documento:</dt>
+                                            <dd>{{ medicao.numero_documento }}</dd>
+                                            <dt>Ocorrência:</dt>
+                                            <dd>{{ medicao.ocorrencia }}</dd>
+                                            {% if medicao.processo %}
+                                                <dt>Processo:</dt>
+                                                <dd>{{ medicao.processo|format }}</dd>
+                                            {% endif %}
+                                            {% if medicao.providencia %}
+                                                <dt>Providência:</dt>
+                                                <dd>{{ medicao.providencia }}</dd>
+                                            {% endif %}
+                                        </dl>
+                                        {% if pode_efetuar_medicao and not contrato.cancelado and not parcela.sem_medicao %}
+                                            <ul class="action-bar">
+                                                <li><a class="btn primary"
+                                                    href="/contratos/atualizar_medicao/{{ medicao.id }}/{{ contrato.id }}/">Editar
+                                                    Medição</a></li>
+                                                <li>
+                                                    <a class="btn" href="/contratos/despacho_medicao/{{ medicao.id }}/{{ contrato.id }}/">Imprimir
+                                                        Despacho</a></li>
+                                                <li><a href="/contratos/upload_medicao/{{ medicao.id }}/{{ contrato.id }}/">Anexar
+                                                    Arquivo</a></li>
+                                                <li><a class="btn danger"
+                                                    href="/contratos/excluir_medicao/{{ medicao.id }}/{{ contrato.id }}/">Remover
+                                                    Medição</a></li>
+                                            </ul>
+                                        {% endif %}
+                                    {% endfor %}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            {% endwith %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="alert alert-warning">Nenhuma parcela cadastrada/gerada.</p>
+        {% endif %}
+    </div>
+
+    {% with fiscais=contrato.fiscais.all %}
+        <div class="tab-pane" data-title="Fiscais" data-counter="{{ fiscais|length }}">
+            {% if fiscais %}
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Servidor</th>
+                        <th>Tipo</th>
+                        <th>Termo</th>
+                        <th>Portaria</th>
+                        <th>{{ nomenclatura.campus }}</th>
+                        <th>Data da Nomeação</th>
+                        <th>Data Final da Vigência</th>
+                        <th>Situação</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for fiscal in fiscais %}
+                        <tr>
+                            <td>{{ fiscal.servidor.matricula }} - {{ fiscal.servidor.pessoa_fisica.nome }}</td>
+                            <td>{{ fiscal.tipo.descricao }}</td>
+                            {% if fiscal.termo_aditivo %}
+                                <td>{{ fiscal.termo_aditivo.ordem }}º Termo</td>
+                            {% else %}
+                                <td>-</td>
+                            {% endif %}
+                            <td>{{ fiscal.numero_portaria }}</td>
+                            <td>{{ fiscal.campus }}</td>
+                            <td>{{ fiscal.data_nomeacao|date:"d/m/y" }}</td>
+                            <td>{{ fiscal.data_vigencia|date:"d/m/y" }}</td>
+                            {% if fiscal.data_exclusao %}
+                                <td><span
+                                        class="status status-error">Excluído desde {{ fiscal.data_exclusao|date:"d/m/y" }}</span>
+                                </td>
+                            {% else %}
+                                {% if fiscal.inativo %}
+                                    <td><span class="status status-error">Inativo</span></td>
+                                {% else %}
+                                    <td><span class="status status-success">Ativo</span></td>
+                                {% endif %}
+                            {% endif %}
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="alert alert-warning">Nenhum fiscal cadastrado.</p>
+            {% endif %}
+        </div>
+    {% endwith %}
+
+    <div class="tab-pane" data-title="Aditivos" data-counter="{{ aditivos.count }}">
+        {% if aditivos %}
+            <table>
+                <thead>
+                <tr>
+                    <th>Ordem</th>
+                    <th>Número</th>
+                    <th>Tipo de Aditivo</th>
+                    <th>Tipo de Termo</th>
+                    <th>Parcelas</th>
+                    <th>Arquivo Digitalizado</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for termo in aditivos %}
+                    <tr>
+                        <td>{{ termo.ordem }}º Termo</td>
+                        <td>{{ termo.numero }}</td>
+                        <td>
+                            {% if termo.de_fiscal %}<p>Aditivo de Fiscal</p>{% endif %}
+                            {% if termo.de_prazo %}<p>Aditivo de Prazo ({{ termo.data_inicio|date:"d/m/y" }}
+                                - {{ termo.data_fim|date:"d/m/y" }})</p>{% endif %}
+                            {% if termo.de_valor %}
+                                <p>Aditivo de Valor (R$ {{ termo.valor|mascara_dinheiro }})</p>{% endif %}
+                        </td>
+                        <td>{{ termo.get_tipo_termo_aditivo_display|format }}</td>
+                        <td>{{ termo.numero_parcelas|format }}</td>
+                        <td>
+                            {% if termo.arquivo %}
+                                <a href="/contratos/visualizar_arquivo/{{ termo.arquivo.id }}/">{{ termo.arquivo.nome }}</a>
+                            {% else %}
+                                <span class="status status-alert">Aguardando submissão do arquivo</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="alert alert-warning">Nenhum termo aditivo cadastrado.</p>
+        {% endif %}
+    </div>
+
+    <div class="tab-pane" data-title="Apostilamentos" data-counter="{{ apostilamentos.count }}">
+        {% if apostilamentos %}
+            <table>
+                <thead>
+                <tr>
+                    <th>Número</th>
+                    <th>Valor</th>
+                    <th>Data Inicial</th>
+                    <th>Data Final</th>
+                    <th>Arquivo Digitalizado</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for apostilamento in apostilamentos %}
+                    <tr>
+                        <td>{{ apostilamento.numero|format }}</td>
+                        <td>{{ apostilamento.valor|format }}</td>
+                        <td>{{ apostilamento.data_inicio|format }}</td>
+                        <td>{{ apostilamento.data_fim|format }}</td>
+                        <td>
+                            {% if apostilamento.arquivo %}
+                                <a href="{{ apostilamento.arquivo.url }}" class="btn default">Ver arquivo</a>
+                            {% else %}
+                                <span class="status status-alert">Nenhum arquivo enviado</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="alert alert-warning">Nenhum apostilamento cadastrado.</p>
+        {% endif %}
+    </div>
+
+    {% with anexos=contrato.anexos.all %}
+        <div class="tab-pane" data-title="Anexos" data-counter="{{ anexos|length }}">
+            {% if anexos %}
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Tipo</th>
+                        <th>Data</th>
+                        <th>Descrição</th>
+                        <th>Arquivo Digitalizado</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for anexo in anexos %}
+                        <tr>
+                            <td>{{ anexo.tipo }}</td>
+                            <td>{{ anexo.data|date }}</td>
+                            <td>{{ anexo.descricao }}</td>
+                            <td>
+                                {% if anexo.arquivo %}
+                                    <a href="/contratos/visualizar_arquivo/{{ anexo.arquivo.id }}/">{{ anexo.arquivo.nome }}</a>
+                                {% else %}
+                                    <span class="status status-alert">Aguardando submissão do arquivo</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="alert alert-warning">Nenhum anexo cadastrado.</p>
+            {% endif %}
+        </div>
+    {% endwith %}
+
+    <div class="tab-pane" data-title="Ocorrências" data-counter="{{ ocorrencias.count }}">
+        {% if ocorrencias %}
+            <table>
+                <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Hora</th>
+                    <th>Fiscal</th>
+                    <th>Descrição</th>
+                    <th>Prazo Resolução</th>
+                    <th>Situação</th>
+                    <th>Anexo Resposta</th>
+                    <th>Notificada?</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for ocorrencia in ocorrencias %}
+                    <tr>
+                        <td>{{ ocorrencia.data|date:"d/m/y" }}</td>
+                        <td>{{ ocorrencia.data|date:"H:i" }}</td>
+                        <td>{{ ocorrencia.fiscal }}</td>
+                        <td>{{ ocorrencia.descricao }}</td>
+                        <td>{{ ocorrencia.prazo_resolucao|date }}</td>
+                        <td>{{ ocorrencia.get_situacao_display|format }}</td>
+                        <td>{{ ocorrencia.notificacao_enviada|format }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="alert alert-warning">Nenhuma ocorrência cadastrada.</p>
+        {% endif %}
+    </div>
+
+    <div class="tab-pane" data-title="Garantias" data-counter="{{ garantias.count }}">
+        {% if garantias %}
+            <table>
+                <thead>
+                <tr>
+                    <th>Tipo</th>
+                    <th>Vigência</th>
+                    <th>PA do SIAFI</th>
+                    <th>Valor</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for garantia in garantias %}
+                    <tr>
+                        <td>{{ garantia.get_tipo_display }}</td>
+                        <td>{{ garantia.vigencia }}</td>
+                        <td>{{ garantia.pa_siafi }}</td>
+                        <td>{{ garantia.valor }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="alert alert-warning">Nenhuma garantia cadastrada.</p>
+        {% endif %}
+    </div>
+
+    <div class="tab-pane" data-title="Mão de Obra" data-counter="{{ maosdeobra.count }}">
+        {% if maosdeobra %}
+            <table>
+                <thead>
+                <tr>
+                    <th>Nome</th>
+                    <th>CPF</th>
+                    <th>Classificação Brasileira de Ocupações - CBO</th>
+                    <th>Função</th>
+                    <th>Jornada de Trabalho</th>
+                    <th>Salário Bruto</th>
+                    <th>Custo Mensal</th>
+                    <th>Desligamento</th>
+                    <th>Situação</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for maodeobra in maosdeobra %}
+                    <tr>
+                        <td>{{ maodeobra.prestador_servico.pessoa_fisica.nome }}</td>
+                        <td>{{ maodeobra.prestador_servico.pessoa_fisica.cpf|anonimizar_cpf }}</td>
+                        <td>{{ maodeobra.categoria }}</td>
+                        <td>{{ maodeobra.funcao }}</td>
+                        <td>{{ maodeobra.jornada_trabalho }}</td>
+                        <td>{{ maodeobra.salario_bruto|format }}</td>
+                        <td>{{ maodeobra.custo_mensal|format }}</td>
+                        <td>{{ maodeobra.desligamento|format }}</td>
+                        <td>
+                            {% if maodeobra.desligamento %}
+                                <span class="status status-error">Inativo</span>
+                            {% else %}
+                                <span class="status status-success">Ativo</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="alert alert-warning">Nenhuma mão de obra cadastrada.</p>
+        {% endif %}
+    </div>
+
+{% endblock %}

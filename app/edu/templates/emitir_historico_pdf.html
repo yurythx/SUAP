@@ -1,0 +1,627 @@
+{% extends "relatorio_pdf.html" %}
+
+{% block page_settings %}
+    @page {
+        size: a4 portrait;
+        margin-top: 10.5cm; /* HeaderHeight */
+        margin-bottom: 2cm; /* FooterHeight */
+        margin-left: 0.5cm;
+        margin-right: 0.5cm;
+        @bottom-right {
+            content: "Página " counter(page) " de " counter(pages);
+            font-size: 8pt;
+            margin-right: 0.25cm;
+        }
+    }
+    header {
+        top: -9.5cm; /* -HeaderHeight */
+        height: 10.5cm; /* HeaderHeight */
+        position: fixed;
+        width: 19.6cm;
+    }
+    footer {
+        bottom: -1.3cm; /* -FooterHeight */
+        height: 2cm; /* FooterHeight */
+    }
+{% endblock %}
+
+{% block style %}
+ 	main table td,
+    main table th {
+		font-size: 9pt;
+	}
+    h1 {
+        margin-top: 20px;
+        margin-bottom: 5px;
+      	padding-top: 5px;
+        padding-bottom: 5px;
+    }
+    h2 {
+        margin-bottom: 0;
+    }
+    h2 + p.alert {
+        margin-top: 0;
+    }
+    .word-wrap-anywhere {
+        word-wrap: anywhere;
+    }
+
+{% endblock %}
+
+{% block cabecalho %}
+{% endblock %}
+
+{% block content %}
+    {% for historico in historicos %}
+
+        <header id="cabecalho{{ forloop.counter }}">
+            <table border="0">
+                <tr>
+                    <td rowspan="6" width="100"><img src="/static/comum/img/brazao_colorido.jpg" alt="Brasão do Brasil">
+                    </td>
+                    <td class="titulo">REPÚBLICA FEDERATIVA DO BRASIL</td>
+                </tr>
+                <tr>
+                    <td class="titulo">MINISTÉRIO DA EDUCAÇÃO</td>
+                </tr>
+                <tr>
+                    <td class="titulo">{{ instituicao }}</td>
+                </tr>
+                <tr>
+                    <td>{{ historico.nome_campus|normalizar }} - Telefone: {{ historico.telefone_campus }}</td>
+                </tr>
+                <tr>
+                    <td>{{ historico.endereco_campus }},
+                        CEP {{ historico.cep_campus }}, {{ historico.municipio_campus|normalizar }}
+                        ({{ historico.uf_campus|format }})
+                    </td>
+                </tr>
+                <tr>
+                    <td>CNPJ: {{ historico.cnpj_campus }}
+                    {% if historico.codigo_inep or historico.codigo_emec %}
+                    (
+                        {% if historico.codigo_inep %} Código INEP: {{ historico.codigo_inep }}{% endif %}
+                        {% if historico.codigo_inep and historico.codigo_emec %}, {% endif %}
+                        {% if historico.codigo_emec %} Código e-MEC: {{ historico.codigo_emec }}{% endif %}
+                    )
+                    {% endif %}
+                    </td>
+                </tr>
+            </table>
+            <h1> HISTÓRICO ESCOLAR {% if final and not historico.is_integralizado_cursando %} FINAL {% else %} PARCIAL {% endif %} </h1>
+
+            {% if cancelado_por_duplicidade %}
+            <p class="alert alert-danger center">
+                De acordo com a Lei Nº 12.089 de 11 de novembro de 2009, os créditos adquiridos nesse curso são nulos em
+                virtude da ocupação, na condição de estudante, de duas vagas simultaneamente em curso de graduação, em
+                instituições públicas de ensino superior no território nacional.
+            </p>
+            {% endif %}
+
+            <h2>Dados Pessoais</h2>
+            <table class="definicoes">
+                <tr>
+                    <td colspan="2"><strong>Nome:</strong> {{ historico.nome|normalizar }}</td>
+                    <td><strong>Sexo:</strong> {{ historico.sexo }}</td>
+                </tr>
+                <tr>
+                    <td><strong>CPF:</strong> {{ historico.cpf|format }}</td>
+                    <td><strong>Nacionalidade:</strong> {{ historico.nacionalidade|format }}</td>
+                    <td><strong>Naturalidade:</strong> {{ historico.naturalidade|format }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Data de Nasc.:</strong> {{ historico.data_nascimento|format }}</td>
+                    <td colspan="2"><strong>Identidade:</strong> {{ historico.numero_rg|format }}
+                        - {{ historico.orgao_emissao_rg|format }}/{{ historico.uf_emissao_rg.get_sigla|format }}
+                        - {{ historico.data_emissao_rg|format }}</td>
+                </tr>
+            </table>
+        </header>
+
+        <main>
+            <h2>Filiação</h2>
+            <table class="definicoes">
+                <tr>
+                    <td><strong>Nome do Pai:</strong> {{ historico.nome_pai|format|normalizar }}</td>
+                    <td><strong>Nome da Mãe:</strong> {{ historico.nome_mae|format|normalizar }}</td>
+                </tr>
+            </table>
+
+            {% if historico.numero_titulo_eleitor %}
+                <h2>Título Eleitoral</h2>
+                <table class="definicoes">
+                    <tr>
+                        <td><strong>Título Número:</strong> {{ historico.numero_titulo_eleitor|format }}</td>
+                        <td><strong>Zona / Seção:</strong> {{ historico.zona_titulo_eleitor|format }} / {{ historico.secao_titulo_eleitor|format }}</td>
+                        <td><strong>UF / Dt. Emissão:</strong> {{ historico.uf_emissao_titulo_eleitor.get_sigla|format }}
+                            / {{ historico.data_emissao_titulo_eleitor|format }}</td>
+                    </tr>
+                </table>
+            {% endif %}
+
+            <h2>Dados Acadêmicos</h2>
+            <table class="definicoes">
+                <tr>
+                    <td><strong>Matrícula:</strong> {{ historico.matricula }}</td>
+                    <td><strong>Situação:</strong> {{ historico.situacao|format }}</td>
+                </tr>
+                {% if historico.forma_ingresso %}
+                <tr>
+                    <td><strong>Forma de Ingresso:</strong> {{ historico.forma_ingresso|format }}</td>
+                    <td><strong>Data de Matrícula:</strong> {{ historico.data_matricula|date:"d/m/Y" }}</td>
+                </tr>
+                {% endif %}
+                {% if historico.novo_modelo and historico.mes_ano_processo_seletivo %}
+                <tr>
+                    <td><strong>Processo Seletivo:</strong> {{ historico.mes_ano_processo_seletivo|format }}</td>
+                    <td><strong>Ingresso:</strong> {{ historico.ano_periodo_ingresso|format }}</td>
+                </tr>
+                {% endif %}
+                <tr>
+                    <td><strong>Curso:</strong> {{ historico.descricao_curso|format }} {% if historico.codigo_emec_curso %} (Código e-MEC: {{ historico.codigo_emec_curso }}) {% endif %}</td>
+                    <td><strong>Regime:</strong> {{ historico.regime|format }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Matriz:</strong> {{ historico.descricao_matriz|format }}</td>
+                    <td><strong>Periodicidade:</strong> {{ historico.periodicidade|format }}</td>
+                </tr>
+                {% if historico.habilitacao %}
+                    <tr>
+                        <td colspan="2"><strong>Habilitação:</strong> {{ historico.habilitacao|format }}</td>
+                    </tr>
+                {% endif %}
+                <tr>
+                    <td colspan="2"><strong>Autorização:</strong> {{ historico.resolucao_criacao|format }}</td>
+                </tr>
+                {% if historico.reconhecimento_texto %}
+                    <tr>
+                        <td colspan="2"><strong>Reconhecimento:</strong> {{ historico.reconhecimento_texto|format }}</td>
+                    </tr>
+                {% endif %}
+                {% if historico.credenciamento %}
+                    <!--
+                    <tr>
+                        <td class='negrito'>Credenciamento:</td>
+                        <td colspan="6">{{ historico.credenciamento|format }}</td>
+                    </tr>
+                    -->
+                {% endif %}
+                {% if historico.recredenciamento %}
+                    <tr>
+                        <td colspan="2"><strong>Recredenciamento:</strong> {{ historico.recredenciamento|format }}</td>
+                    </tr>
+                {% endif %}
+                {% if historico.descricao_linha_pesquisa %}
+                    <tr>
+                        <td colspan="2"><strong>Linha de Pesquisa:</strong> {{ historico.descricao_linha_pesquisa|format }}</td>
+                    </tr>
+                {% endif %}
+            </table>
+
+            {% if historico.exige_tcc or historico.apresentou_tcc %}
+                <h2>Trabalho de Conclusão</h2>
+                {% if historico.apresentou_tcc %}
+                    <table class="definicoes">
+                        <tbody>
+                            <tr>
+                                <td colspan="{% if historico.nota_projeto %}4{% else %}3{% endif %}"><strong>Título:</strong> {{ historico.titulo_projeto|format }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Tipo:</strong> {{ historico.tipo_projeto|format }}</td>
+                                <td><strong>Data da Defesa:</strong> {{ historico.data_defesa|format }}</td>
+                                {% if historico.nota_projeto %}
+                                     <td>
+                                        {% if historico.is_lancamento_conceito %}
+                                            <strong>Conceito:</strong>
+                                        {% else %}
+                                            <strong>Nota:</strong>
+                                        {% endif %}
+                                        {{ historico.nota_projeto|format }}
+                                    </td>
+                                {% endif %}
+                                <td><strong>Resultado:</strong> {{ historico.situacao_projeto|format }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p class="alert alert-danger text-center">Não registrado.</p>
+                {% endif %}
+            {% endif %}
+
+            {% if historico.exige_enade %}
+                <h2>ENADE</h2>
+                {% if historico.foi_convocado_enade %}
+                	<table class="bordered" repeat="1">
+                        <thead>
+	                        <tr>
+	                            <th class="w-25">Convocação</th>
+	                            <th class="w-25">Data da Prova</th>
+	                            <th>Situação</th>
+	                        </tr>
+                        </thead>
+                        <tbody>
+		                {% for convocacao in historico.convocacoes %}
+		                	<tr>
+		                		<td class="text-center">{{ convocacao.tipo_convocacao|format }}</td>
+		                		<td class="text-center">{{ convocacao.data_prova_enade|format }}</td>
+		                		<td class="text-center">
+		                			{{ convocacao.situacao_enade|format }}{% if convocacao.justificativa_enade %} - {{ convocacao.justificativa_enade|format }}{% endif %}
+		                		</td>
+		                	</tr>
+		                {% endfor %}
+                		</tbody>
+	                </table>
+                {% else %}
+                    <p class="alert alert-danger center">Não convocado.</p>
+                {% endif %}
+            {% endif %}
+
+            <div class="break-inside-avoid">
+                <h2>{% if final %}Diploma{% else %}Registro de Emissão{% endif %}</h2>
+                {% if historico.emitiu_diploma %}
+                    <table class="definicoes">
+                        <tbody>
+                        <tr>
+                            <td><strong>Emissor:</strong> {{ historico.responsavel_emissao_diploma.get_profile.nome|format }}</td>
+                            <td><strong>Conclusão do Curso:</strong> {{ historico.data_conclusao_curso|format }}</td>
+                            <td><strong>Colação de Grau:</strong> {{ historico.data_colacao_grau|format }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Registro:</strong> {{ historico.numero_registro|format }}, Livro {{ historico.livro|format }}, Folha {{ historico.folha|format }}</td>
+                            <td><strong>Expedição do Registro:</strong> {{ historico.data_expedicao|format }}</td>
+                            <td><strong>Expedição do Diploma:</strong> {{ historico.data_emissao_diploma|format }}</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p class="alert alert-warning center">Não emitido.</p>
+                {% endif %}
+            </div>
+
+            {% if historico.integralizou_ensino_medio %}
+                {% if not historico.situacao.id == 6 and not historico.situacao.id == 19 %}
+                <p class="alert alert-warning center">{{ historico.obs_integralizacao_ensino_medio }}</p>
+                {% endif %}
+            {% endif %}
+
+            {% for tipo, componentes in historico.grupos_componentes.items %}
+                {% if componentes %}
+                    <h2>{{ tipo|upper }}</h2>
+                    <table class="bordered" repeat="2">
+                        <thead>
+                        <tr>
+                            <th rowspan="2">Período Letivo</th>
+                            <th rowspan="2">Período Matriz</th>
+                            <th colspan="{% if not final %}3{% else %}2{% endif %}">Componentes Curriculares</th>
+                            <th rowspan="2">C.H.</th>
+                            <th rowspan="2">Nota/ Conceito</th>
+                            <th rowspan="2">Freq.</th>
+                            <th rowspan="2">Situação</th>
+                        </tr>
+                        <tr>
+                            <th>Código</th>
+                            <th>Descrição {% if final %} / Docentes {% endif %}</th>
+                            {% if not final %}
+                            <th>Turma</th>
+                            {% endif %}
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for componente_curricular in componentes %}
+                            <tr>
+                                <td class="center">{{ componente_curricular.ano_periodo_letivo|format }}</td>
+                                <td class="center">{{ componente_curricular.periodo_matriz|format }}</td>
+                                <td class="center">{{ componente_curricular.sigla_componente|format }}</td>
+                                <td>
+                                    {{ componente_curricular.descricao_componente|format }}
+                                    {% if final %}
+                                    {% for sigla, descricao, nome, titulacao in componente_curricular.professores %}
+                                        {% if nome %}<br>&nbsp;&nbsp;&nbsp; <i>{{ nome|normalizar }} {% if titulacao %}({{ titulacao }}){% endif %}</i>{% endif %}
+                                    {% endfor %}
+                                    {% endif %}
+                                </td>
+                                {% if not final %}
+                                <td class="center word-wrap-anywhere">{{ componente_curricular.codigo_turma|format }}</td>
+                                {% endif %}
+                                <td class="center">{{ componente_curricular.carga_horaria|format }}</td>
+                                <td class="center">{{ componente_curricular.media_final_disciplina|format }}</td>
+                                <td class="center">
+                                    {% if componente_curricular.percentual_carga_horaria_frequentada|default_if_none:"" %}
+                                        {{ componente_curricular.percentual_carga_horaria_frequentada|format }}%
+                                        {% else %}-{% endif %}</td>
+                                <td class="center">{{ componente_curricular.situacao_display|format }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="{% if not final %}9{% else %}8{% endif %}" class="center">Nenhum componente concluído.</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                {% endif %}
+            {% endfor %}
+
+            {% if historico.creditos_especiais %}
+                <h2>CRÉDITOS ESPECIAIS</h2>
+                <table class="bordered" repeat="2">
+                    <thead>
+                    <tr>
+                        <th class="text-center">Ano/Período Letivo</th>
+                        <th class="text-center">Atividade Acadêmica</th>
+                        <th class="text-center">Qtd. de Créditos</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for credito_especial in historico.creditos_especiais %}
+                        <tr>
+                            <td class="text-center">{{ credito_especial.matricula_periodo.ano_letivo.ano }}/{{ credito_especial.matricula_periodo.periodo_letivo }}</td>
+                            <td>{{ credito_especial.item_configuracao_creditos_especiais.atividade_academica }}</td>
+                            <td class="text-center">{{ credito_especial.item_configuracao_creditos_especiais.equivalencia_creditos }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% endif %}
+
+            {% if historico.accs %}
+                <h2>ATIVIDADES COMPLEMENTARES</h2>
+                <table class="bordered" repeat="2">
+                    <thead>
+                    <tr>
+                        <th class="text-center">Período Letivo</th>
+                        <th class="text-center">Atividade</th>
+                        <th class="text-center">Data da Atividade</th>
+                        <th class="text-center">C.H. Curricular</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for acc in historico.accs %}
+                        <tr>
+                            <td class="text-center">{{ acc.ano_letivo.ano }}/{{ acc.periodo_letivo }}</td>
+                            <td>{{ acc.descricao|normalizar }}</td>
+                            <td class="text-center">{{ acc.data_atividade|format }}</td>
+                            <td class="text-center">{{ acc.is_curricular|format }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% endif %}
+
+            {% if historico.estagios %}
+                <h2>ESTÁGIOS</h2>
+                <table class="bordered" repeat="2">
+                    <thead>
+                    <tr>
+                        <th>Empresa</th>
+                        <th>Período</th>
+                        <th>C.H. Final</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for estagio in historico.estagios %}
+                        <tr>
+                            <td>{{ estagio.empresa.nome }}</td>
+                            <td class="center">De {{ estagio.data_inicio|format }} a {{ estagio.data_fim|format }}</td>
+                            <td class="center">{{ estagio.ch_final }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% endif %}
+
+            <h2>QUADRO RESUMO - C.H.</h2>
+            <table class="bordered" repeat="2">
+                <thead>
+                    {% if historico.legado_sica %}
+                        <tr>
+                            <th class="text-center">CH Total</th>
+                            <th class="text-center">CH Geral</th>
+                            <th class="text-center">CH Especial</th>
+                            <th class="text-center">CH Estágio</th>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            {% if historico.ch_componentes_obrigatorios %}
+                                <th class="text-center" colspan="2">Obrigatória</th>
+                            {% endif %}
+                            {% if historico.ch_componentes_optativos or historico.ch_componentes_optativos_cumprida %}
+                                <th class="text-center" colspan="2">Optativa</th>
+                            {% endif %}
+                            {% if historico.ch_componentes_eletivos %}
+                                <th class="text-center" colspan="2">Eletiva</th>
+                            {% endif %}
+                            {% if historico.ch_componentes_seminario or historico.ch_componentes_seminario_cumprida %}
+                                <th class="text-center" colspan="2">Seminário</th>
+                            {% endif %}
+                            {% if historico.ch_componentes_pratica_profissional or historico.ch_componentes_pratica_profissional_cumprida %}
+                                <th class="text-center" colspan="2">Prática Profis.</th>
+                            {% endif %}
+                            {% if historico.ch_atividades_complementares or historico.ch_atividades_complementares_cumprida %}
+                                <th class="text-center" colspan="2">Ativ. Complementar</th>
+                            {% endif %}
+                            {% if historico.ch_atividades_extensao or historico.ch_atividades_extensao_cumprida %}
+                                <th class="text-center" colspan="2">Ativ. Extensão</th>
+                            {% endif %}
+                            {% if historico.ch_componentes_pratica_como_componente or historico.ch_componentes_pratica_como_componente_cumprida %}
+                                <th class="text-center" colspan="2">Prática como Componente</th>
+                            {% endif %}
+                            {% if historico.ch_componentes_visita_tecnica or historico.ch_componentes_visita_tecnica_cumprida %}
+                                <th class="text-center" colspan="2">Visita Técnica / Aula de Campo</th>
+                            {% endif %}
+                            {% if historico.ch_atividades_pratica_profissional or historico.ch_atividades_pratica_profissional_cumprida %}
+                                <th class="text-center" colspan="2">Ativ. de Prática Profissional</th>
+                            {% endif %}
+                            {% if historico.ch_componentes_tcc %}
+                                <th class="text-center" colspan="2">TCC</th>
+                            {% endif %}
+                                <th class="text-center" colspan="2">Total</th>
+                            {% if not historico.is_lancamento_conceito %}
+                                <th class="text-center" rowspan="2">I.R.A</th>
+                            {% endif %}
+                        </tr>
+                        <tr>
+                            {% if historico.ch_componentes_obrigatorios %}
+                                <th class="text-center">P</th>
+                                <th class="text-center">C</th>
+                            {% endif %}
+                            {% if historico.ch_componentes_optativos or historico.ch_componentes_optativos_cumprida %}
+                                <th class="text-center">P</th>
+                                <th class="text-center">C</th>
+                            {% endif %}
+                            {% if historico.ch_componentes_eletivos %}
+                                <th class="text-center">P</th>
+                                <th class="text-center">C</th>
+                            {% endif %}
+                            {% if historico.ch_componentes_seminario or historico.ch_componentes_seminario_cumprida %}
+                                <th class="text-center">P</th>
+                                <th class="text-center">C</th>
+                            {% endif %}
+                            {% if historico.ch_componentes_pratica_profissional or historico.ch_componentes_pratica_profissional_cumprida %}
+                                <th class="text-center">P</th>
+                                <th class="text-center">C</th>
+                            {% endif %}
+                            {% if historico.ch_atividades_complementares or historico.ch_atividades_complementares_cumprida %}
+                                <th class="text-center">P</th>
+                                <th class="text-center">C</th>
+                            {% endif %}
+                            {% if historico.ch_atividades_extensao or historico.ch_atividades_extensao_cumprida %}
+                                <th class="text-center">P</th>
+                                <th class="text-center">C</th>
+                            {% endif %}
+                            {% if historico.ch_componentes_pratica_como_componente or historico.ch_componentes_pratica_como_componente_cumprida %}
+                                <th class="text-center">P</th>
+                                <th class="text-center">C</th>
+                            {% endif %}
+                            {% if historico.ch_componentes_visita_tecnica or historico.ch_componentes_visita_tecnica_cumprida %}
+                                <th class="text-center">P</th>
+                                <th class="text-center">C</th>
+                            {% endif %}
+                            {% if historico.ch_atividades_pratica_profissional or historico.ch_atividades_pratica_profissional_cumprida %}
+                                <th class="text-center">P</th>
+                                <th class="text-center">C</th>
+                            {% endif %}
+                            {% if historico.ch_componentes_tcc %}
+                                <th class="text-center">P</th>
+                                <th class="text-center">C</th>
+                            {% endif %}
+                            <th class="text-center">P</th>
+                            <th class="text-center">C</th>
+                        </tr>
+                    {% endif %}
+                </thead>
+                <tbody>
+                    {% if historico.legado_sica %}
+                        <tr>
+                            <td class="center">{{ historico.ch_cumprida }}</td>
+                            <td class="center">{{ historico.ch_geral }}</td>
+                            <td class="center">{{ historico.ch_especial }}</td>
+                            <td class="center">{{ historico.carga_horaria_estagio }}</td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            {% if historico.ch_componentes_obrigatorios %}
+                                <td class="center">{{ historico.ch_componentes_obrigatorios }}</td>
+                                <td class="center">{{ historico.ch_componentes_obrigatorios_cumprida }}</td>
+                            {% endif %}
+                            {% if historico.ch_componentes_optativos or historico.ch_componentes_optativos_cumprida %}
+                                <td class="center">{{ historico.ch_componentes_optativos }}</td>
+                                <td class="center">{{ historico.ch_componentes_optativos_cumprida }}</td>
+                            {% endif %}
+                            {% if historico.ch_componentes_eletivos %}
+                                <td class="center">{{ historico.ch_componentes_eletivos }}</td>
+                                <td class="center">{{ historico.ch_componentes_eletivos_cumprida }}</td>
+                            {% endif %}
+                            {% if historico.ch_componentes_seminario or historico.ch_componentes_seminario_cumprida %}
+                                <td class="center">{{ historico.ch_componentes_seminario }}</td>
+                                <td class="center">{{ historico.ch_componentes_seminario_cumprida }}</td>
+                            {% endif %}
+                            {% if historico.ch_componentes_pratica_profissional or historico.ch_componentes_pratica_profissional_cumprida %}
+                                <td class="center">{{ historico.ch_componentes_pratica_profissional }}</td>
+                                <td class="center">{{ historico.ch_componentes_pratica_profissional_cumprida }}</td>
+                            {% endif %}
+                            {% if historico.ch_atividades_complementares or historico.ch_atividades_complementares_cumprida %}
+                                <td class="center">{{ historico.ch_atividades_complementares }}</td>
+                                <td class="center">{{ historico.ch_atividades_complementares_cumprida }}</td>
+                            {% endif %}
+                            {% if historico.ch_atividades_extensao or historico.ch_atividades_extensao_cumprida %}
+                                <td class="center">{{ historico.ch_atividades_extensao }}</td>
+                                <td class="center">{{ historico.ch_atividades_extensao_cumprida }}</td>
+                            {% endif %}
+                            {% if historico.ch_componentes_pratica_como_componente or historico.ch_componentes_pratica_como_componente_cumprida %}
+                                <td class="center">{{ historico.ch_componentes_pratica_como_componente }}</td>
+                                <td class="center">{{ historico.ch_componentes_pratica_como_componente_cumprida }}</td>
+                            {% endif %}
+                            {% if historico.ch_componentes_visita_tecnica or historico.ch_componentes_visita_tecnica_cumprida %}
+                                <td class="center">{{ historico.ch_componentes_visita_tecnica }}</td>
+                                <td class="center">{{ historico.ch_componentes_visita_tecnica_cumprida }}</td>
+                            {% endif %}
+                            {% if historico.ch_atividades_pratica_profissional or historico.ch_atividades_pratica_profissional_cumprida %}
+                                <td class="center">{{ historico.ch_atividades_pratica_profissional }}</td>
+                                <td class="center">{{ historico.ch_atividades_pratica_profissional_cumprida }}</td>
+                            {% endif %}
+                            {% if historico.ch_componentes_tcc %}
+                                <td class="center">{{ historico.ch_componentes_tcc }}</td>
+                                <td class="center">{{ historico.ch_componentes_tcc_cumprida }}</td>
+                            {% endif %}
+                            <td class="center">{{ historico.ch_total }}</td>
+                            <td class="center">{{ historico.ch_total_cumprida }}</td>
+                            {% if not historico.is_lancamento_conceito %}
+                                <td class="center">{{ historico.ira|format }}</td>
+                            {% endif %}
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+            {% if not historico.legado_sica %}
+                <div>
+                    <strong>P</strong> = Carga horária prevista / <strong>C</strong> = Carga horária cumprida
+                </div>
+            {% endif %}
+            {% if historico.observacoes %}
+                <h2>Observações</h2>
+                {% for obs in historico.observacoes %}
+                    {{ obs }}
+                    <br/>
+                {% endfor %}
+            {% endif %}
+
+            {% if final %}
+                <div class="break-inside-avoid">
+
+                    {% if not historico.assinatura_eletronica and not esconder_assinatura %}
+
+                    <table class="pdf-keep-with-next-true">
+                        <tr>
+                            <td>&nbsp;</td>
+                            <td class="cidade text-end">
+                                <br/>
+                                <br/>
+                                {{ historico.municipio_campus|normalizar }} ({{ historico.uf_campus|format }}), {{ historico.hoje|format }}
+                            </td>
+                        </tr>
+                    </table>
+                    <br>
+
+                    <table>
+                        <tr>
+                            <td class="assinatura">DIRETOR(A) ACADÊMICO(A)</td>
+                            <td></td>
+                            <td class="assinatura">DIRETOR(A) GERAL DO CAMPUS</td>
+                        </tr>
+                    </table>
+                    {% endif %}
+                </div>
+            {% endif %}
+            {% if qr %}
+                <div class="text-end w-100">
+                    <img class="w-100px" src="{{ qr.image }}" alt="qrcode_image"><br>
+                    <a href="{{ qr.url }}">{{ qr.url }}</a><br>
+                    <strong>Código de Validação</strong>: {{ qr.code }}
+                </div>
+            {% endif %}    
+       </main>
+       {% if not forloop.last %}
+           <div class="page-break"></div>
+       {% endif %}
+    {% endfor %}
+{% endblock %}

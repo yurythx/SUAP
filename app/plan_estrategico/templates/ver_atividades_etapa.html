@@ -1,0 +1,167 @@
+{% extends super_template %}
+
+{% block content %}
+
+    <ul class="action-bar">
+        <li><a href="{% url 'ver_plano_atividade' etapa_projeto_plano_atividade.projeto_plano_atividade.plano_atividade.pk %}" class="btn">Voltar para o Plano de Atividades</a></li>
+    </ul>
+
+    {% box 'Dados' %}
+        <table class="info">
+            <tr>
+                <td>Código</td>
+                <td>{{ etapa_projeto_plano_atividade.etapa.codigo }}</td>
+            </tr>
+            <tr>
+                <td>Componente funcional</td>
+                <td>{{ etapa_projeto_plano_atividade.etapa.descricao|format }}</td>
+            </tr>
+            <tr>
+                <td>Origens de Recurso</td>
+                <td>
+                    {% for or_recurso in etapa_projeto_plano_atividade.origens_recurso_projeto_etapa.all %}
+                        {{ or_recurso }}
+                    {% endfor %}
+                </td>
+            </tr>
+            <tr>
+            <td>Unidades gestoras</td>
+            <td>
+            {% if etapa_projeto_plano_atividade.get_unidades_etapa %}
+                {% for etapa in etapa_projeto_plano_atividade.get_unidades_etapa %}
+                    <span>{{ etapa.campi }}</span>
+                {% endfor %}
+            {% else %}
+                    <span class="status status-alert">Nenhuma unid. administrativa selecionada.</span>
+            {% endif %}
+            </td>
+            <td>
+                {% for or_etapa in etapa.get_unidades_etapa %}
+                    <span>{{ or_etapa.campi }}</span>
+                 {% endfor %}
+            </td>
+            </tr>
+        </table>
+    {% endbox %}
+    <ul class="action-bar">
+        <li><a href="{% url 'ver_rateio_reserva_tecnica' etapa_projeto_plano_atividade.pk %}" class="btn default">Demonstrativo Reserva Técnica</a></li>
+    </ul>
+    {% box "Origens de Recurso" %}
+        {% if origens %}
+            <table>
+                <thead>
+                <tr>
+
+                    <th>Origem de Recurso</th>
+                    <th>Valor distribuído para componente funcional</th>
+                    {% if pode_ratear_valor_atividade %}
+                        <th>Ações</th>
+                    {% endif %}
+                </tr>
+                </thead>
+                <tbody>
+                    {% for origem in origens %}
+                        <tr>
+                            <td>{{ origem }}{% if origem.tipo_especial %} <strong> (Especial) </strong> {% endif %}</td>
+                            {% if origem.unidadeorigemetapa_set.exists %}
+                                {% if pode_ratear_valor_atividade %}
+                                    <td>R$ {{ origem.get_valor_unidade|format_money }}</td>
+                                    <td>
+                                        <ul class="action-bar">
+                                            <a href="{% url 'ratear_valores_atividades' etapa_projeto_plano_atividade.pk origem.pk %}"class="btn default">Ratear por Atividades</a>
+                                        </ul>
+                                    </td>
+                                 {% else %}
+                                    <td>R$ 0,00</td>
+                                {% endif %}
+                            {% else %}
+                                <td>R$ 0,00</td>
+                                {% if pode_ratear_valor_atividade %}
+                                    <td class="alert alert-warning">Contacte o Gestor de Projeto para realizar o rateio desta OR.</td>
+                                {% endif %}
+                            {% endif %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% elif etapa_projeto_plano_atividade.origens_recurso_projeto_etapa.all %}
+            <table>
+                <thead>
+                <tr>
+                    <th>Origem de Recurso</th>
+                    <th>Ações</th>
+                </tr>
+                </thead>
+                <tbody>
+                    {% for origem in etapa_projeto_plano_atividade.origens_recurso_projeto_etapa.all %}
+                        <tr>
+                            <td>{{ origem }}</td>
+                            <td><p class="alert alert-warning">Nenhuma atividade cadastrada</p></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="alert alert-warning">Nenhuma origem de recurso.</p>
+        {% endif %}
+    {% endbox %}
+
+    {% box "Atividades" %}
+
+            {% if atividade_pode_incluir and etapa_projeto_plano_atividade.tem_unidade_adm %}
+            <ul class="action-bar">
+                <li><a href="{% url 'atividade_etapa_add' etapa_projeto_plano_atividade.pk %}" class="btn success">Incluir Atividades</a></li>
+            </ul>
+            {% endif %}
+            {% if atividades_etapa %}
+            <table>
+                <thead>
+                <tr>
+
+                    <th>Nome</th>
+                    <th>Descrição</th>
+                    <th>Unidade</th>
+                    <th>Origem de recurso</th>
+                    <th>Natureza de despesa</th>
+                    <th>Valor Proposto pela UA (R$)</th>
+                    <th>Valor Compatibilizado pela UA (R$)</th>
+                    <th>Valor Complementado pela UA (R$)</th>
+                    <th>Total (R$)</th>
+                    {% if atividade_pode_incluir %}
+                        <th>Ações</th>
+                    {% endif %}
+                </tr>
+                </thead>
+                <tbody>
+                {% for atividade_etapa in atividades_etapa %}
+                    <tr>
+                        <td>{{ atividade_etapa.nome }}</td>
+                        <td>{{ atividade_etapa.descricao|format }}</td>
+                        <td>{{ atividade_etapa.unidade_gestora.setor_equivalente.sigla }}</td>
+                        <td>{{ atividade_etapa.origem_recurso_etapa|format }}</td>
+                        <td>{{ atividade_etapa.naturezadespesa|format }}</td>
+                        <td align="right">{{ atividade_etapa.valor|format_money }}</td>
+                        <td align="right">{{ atividade_etapa.valor_rateio|format_money }}</td>
+                        <td align="right">{{ atividade_etapa.valor_reserva_tecnica|format_money }}</td>
+                        <td align="right"><strong>{{ atividade_etapa.get_total|format_money }}</strong></td>
+                        {% if atividade_pode_incluir %}
+                        <td>
+                            <ul class="action-bar">
+                                {% if atividade_pode_editar and atividade_etapa.eh_dono %}
+                                    <li><a href="{% url 'atividade_etapa_change' etapa_projeto_plano_atividade.pk atividade_etapa.pk %}" class="btn primary">Editar</a></li>
+                                {% endif %}
+                                {% if atividade_pode_excluir and atividade_etapa.eh_dono %}
+                                    <li><a href="{% url 'atividade_etapa_delete' atividade_etapa.pk %}" class="btn danger">Remover</a></li>
+                                {% endif %}
+                            </ul>
+                        </td>
+                        {% endif %}
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="alert alert-warning">Nenhuma atividade cadastrada</p>
+        {% endif %}
+    {% endbox %}
+{% endblock %}

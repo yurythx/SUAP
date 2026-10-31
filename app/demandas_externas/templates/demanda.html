@@ -1,0 +1,169 @@
+{% extends super_template %}
+
+{% block extrahead %}
+    <script>
+        function mudar_url(url, aba){
+            if(aba != ""){
+                window.location.href=url+"?tab="+aba;
+            } else {
+                window.location.href=url;
+            };
+        };
+
+    </script>
+{% endblock %}
+    {% block object-status %}
+        {{ demanda.situacao|format|status }}
+        {% if demanda.foi_aceita %}
+            {% if demanda.prioridade == 1 %}
+                <span class="status status-success">Esta é a demanda <strong>prioritária.</strong></span>
+            {% elif demanda.prioridade < 6 %}
+                <span class="status status-success">Prioridade: {{ demanda.prioridade }}º</span>
+            {% elif demanda.prioridade > 5 %}
+                <span class="status status-error">Prioridade: {{ demanda.prioridade }}º</span>
+            {% else %}
+                <span class="status status-error">Sem Prioridade</span>
+            {% endif %}
+        {% endif %}
+    {% endblock %}
+
+{% block content %}
+
+    <ul class="action-bar">
+        {% if pode_aceitar %}
+            <li><a class="btn" href="/demandas_externas/indicar_campus_atendimento/{{ demanda.pk }}/">Indicar Campus de Atendimento</a></li>
+            {% if demanda.situacao == demanda.SUBMETIDA %}
+                <li><a class="btn success" href="/demandas_externas/aceitar_demanda/{{ demanda.pk }}/">Aceitar</a></li>
+                <li><a class="btn danger" data-confirm="Deseja mesmo não aceitar o recebimento desta demanda?" href="/demandas_externas/nao_aceitar_demanda/{{ demanda.pk }}/">Não Aceitar</a></li>
+            {% elif demanda.foi_aceita %}
+                {% if demanda.campus_atendimento %}
+                    <li><a class="btn" href="/demandas_externas/atribuir_prioridade/{{ demanda.pk }}/">Definir Prioridade</a></li>
+                    <li><a class="btn" href="/demandas_externas/atribuir_demanda/{{ demanda.pk }}/">Atribuir Responsável</a></li>
+                    <li><a class="btn danger" data-confirm="Deseja mesmo indicar que seu campus não irá atender esta demanda?" href="/demandas_externas/retornar_demanda/{{ demanda.pk }}/">Retornar Demanda</a></li>
+                    <li><a class="btn danger" data-confirm="Deseja mesmo não aceitar o recebimento desta demanda?" href="/demandas_externas/nao_aceitar_demanda/{{ demanda.pk }}/">Cancelar</a></li>
+                {% endif %}
+            {% endif %}
+        {% endif %}
+    </ul>
+
+    <!-- O status "Selecionado" não pode ser revelado antes da data de divulgação. -->
+
+    {% box "Dados gerais" %}
+        <dl class="definition-list flex">
+
+             <div class="list-item flex-basis-50">
+                <dt>Nome/Razão Social</dt>
+                <dd>{{ demanda.nome }}</dd>
+             </div>
+              <div class="list-item flex-basis-50">
+                <dt>Email</dt>
+                <dd>{{ demanda.email }} {% if demanda.email_alternativo %} (Alternativo: {{ demanda.email_alternativo }}){% endif %}</dd>
+             </div>
+            <div class="list-item flex-basis-50">
+                <dt>CPF/CNPJ</dt>
+                <dd>{{ demanda.identificador }}</dd>
+            </div>
+            <div class="list-item flex-basis-50">
+                <dt>Telefones/Whatsapp</dt>
+                <dd>{{ demanda.telefones }} {% if demanda.whatsapp %} / {{ demanda.whatsapp }}{% endif %}</dd>
+            </div>
+            <div class="list-item flex-basis-50">
+                <dt>Campus Indicado</dt>
+                <dd>{{ demanda.campus_indicado }}</dd>
+            </div>
+            <div class="list-item flex-basis-50">
+                <dt>Campus de Atendimento</dt>
+                <dd>{{ demanda.campus_atendimento|format }}</dd>
+            </div>
+            {% if demanda.responsavel %}
+                <div class="list-item flex-basis-50">
+                    <dt>Responsável</dt>
+                    <dd>{{ demanda.responsavel.user|format }} <small>Atribuída em {{ demanda.atribuida_em }} por {{ demanda.atribuida_por }}</small></dd>
+                </div>
+                <div class="list-item flex-basis-50">
+                    <dt>Previsão de Atendimento</dt>
+                    <dd>{{ demanda.data_prevista }}</dd>
+                </div>
+            {% endif %}
+            {% if demanda.situacao == demanda.NAO_ACEITA %}
+                <div class="list-item">
+                    <dt>Justificativa da Não Aceitação</dt>
+                    <dd>{{ demanda.observacoes|format }}</dd>
+                </div>
+            {% endif %}
+            <div class="list-item flex-basis-50">
+                <dt>Cadastrada em</dt>
+                <dd>{{ demanda.cadastrada_em|format }}</dd>
+            </div>
+            {% if demanda.avaliada_em %}
+                <div class="list-item flex-basis-50">
+                    <dt>Avaliada em</dt>
+                    <dd>{{ demanda.avaliada_em|format }}<small> por {{ demanda.avaliada_por.user|format }}</small></dd>
+                </div>
+            {% endif %}
+        </dl>
+    {% endbox %}
+
+    <div class="tab-pane" data-title="Informações da Demanda" data-tab="dados_demanda" data-checked="True">
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>Tipo da Demanda</dt>
+                <dd>{{ demanda.tipo_demanda|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Nome da Comunidade/Grupo</dt>
+                <dd>{{ demanda.nome_comunidade|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Descrição</dt>
+                <dd>{{ demanda.descricao|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Público-Alvo</dt>
+                <dd>{{ demanda.publico_alvo.all|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Quantidade Prevista de Beneficiados</dt>
+                <dd>{{ demanda.qtd_prevista_beneficiados|format }}</dd>
+            </div>
+        </dl>
+    </div>
+    {% if demanda.eh_ativa %}
+        <div class="tab-pane" data-title="Execução da Demanda" data-tab="dados_execucao_demanda" {% if demanda.qtd_beneficiados_atendidos %}data-checked="True"{% else %}data-checked="False"{% endif %}>
+            {% if demanda.responsavel == request.user.get_vinculo and not demanda.qtd_beneficiados_atendidos %}
+                <ul class="action-bar">
+                    <li><a class="btn success" href="/demandas_externas/registrar_atendimento/{{ demanda.pk }}/">Registrar Conclusão</a></li>
+                </ul>
+            {% endif %}
+            <dl class="definition-list flex">
+                <div class="list-item">
+                    <dt>Data Prevista</dt>
+                    <dd>{{ demanda.data_prevista|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Área Temática</dt>
+                    <dd>{{ demanda.area_tematica|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Tipo de Ação</dt>
+                    <dd>{{ demanda.tipo_acao|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Quantidade de Beneficiados Atendidos</dt>
+                    <dd>{{ demanda.qtd_beneficiados_atendidos|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Descrição sobre o Atendimento</dt>
+                    <dd>{{ demanda.descricao_atendimento|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Concluída em</dt>
+                    <dd>{{ demanda.concluida_em|format }}</dd>
+                </div>
+            </dl>
+        </div>
+    {% endif %}
+
+
+
+{% endblock %}

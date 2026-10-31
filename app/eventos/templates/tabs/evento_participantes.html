@@ -1,0 +1,394 @@
+{% load eventos_tags %}
+{% if quantitativo_participantes %}
+    <ul class="flex-container boxes infos sm">
+        {% for item in quantitativo_participantes %}
+            <li class="box-item info">
+                <p class="stat">{{ item.quantidade }}</p>
+                <p class="title">{{ item.descricao }}</p>
+            </li>
+        {% endfor %}
+    </ul>
+{% endif %}
+{% for tipo_participante, participantes in tipos_participantes %}
+    <div class="tab-pane ajax-rendered"
+         data-title="{{ tipo_participante.tipo_participacao.descricao }}"
+         data-counter="{{ participantes.count }}"
+         data-tab="{{ tipo_participante.tipo_participacao.descricao|slugify }}{{ tipo_participante.pk }}">
+        {% if pode_gerenciar and evento_deferido and evento_ativo %}
+            {% with tipo_id=tipo_participante.id %}
+                <ul class="action-bar">
+                    <li>
+                        <a class="btn popup success"
+                           href="/eventos/adicionar_participante/{{ evento_pk }}/{{ tipo_id }}/">Adicionar</a>
+                    </li>
+                    <li>
+                        <a class="btn popup"
+                           href="/eventos/importar_participantes_evento/{{ evento_pk }}/{{ tipo_id }}/">Importar</a>
+                    </li>
+                    <li>
+                        <a class="btn"
+                           href="/eventos/exportar_participantes_evento/{{ evento_pk }}/{{ tipo_id }}/">Exportar</a>
+                    </li>
+                    <li>
+                        <a class="btn popup"
+                           href="/eventos/importar_lista_presenca/{{ evento_pk }}/{{ tipo_id }}/">Importar Lista de Presença</a>
+                    </li>
+                    <li>
+                        <a class="btn popup" href="/eventos/enviar_mensagem/{{ evento_pk }}/">Enviar Mensagem</a>
+                    </li>
+                </ul>
+            {% endwith %}
+        {% endif %}
+        {% with tipo_id=tipo_participante.id %}
+            <form method="get">
+                <input type="hidden"
+                       name="tab"
+                       value="{{ tipo_participante.tipo_participacao.descricao|slugify }}{{ tipo_id }}">
+                <div class="search-and-filters">
+                    <div class="filter">
+                        <label for="q{{ tipo_id }}">Nome/CPF:</label>
+                        <input type="text"
+                               id="q{{ tipo_id }}"
+                               name="q{{ tipo_id }}"
+                               value="{{ queries|getval:tipo_id|default:"" }}">
+                    </div>
+                    <div class="filter">
+                        <label>Perfil:</label>
+                        <select id="q_publico_alvo_{{ tipo_id }}" name="q_publico_alvo">
+                            <option value="" {% if not publico_alvo_id %}selected="selected"{% endif %}>Todos</option>
+                            {% for item in publico_alvo %}
+                                <option value="{{ item.id }}"
+                                        {% if publico_alvo_id|slugify == item.id|slugify %}selected="selected"{% endif %}>
+                                    {{ item.descricao }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="filter">
+                        <label for="q_inscricao_confirmada_{{ tipo_id }}">Inscrição confirmada:</label>
+                        <select id="q_inscricao_confirmada_{{ tipo_id }}"
+                                name="q_inscricao_confirmada">
+                            <option value=""
+                                    {% if inscricao_confirmada|length == 0 %}selected="selected"{% endif %}>
+                                Todos
+                            </option>
+                            <option value="True"
+                                    {% if inscricao_confirmada|slugify == 'true' %}selected="selected"{% endif %}>
+                                Sim
+                            </option>
+                            <option value="False"
+                                    {% if inscricao_confirmada|slugify == 'false' %}selected="selected"{% endif %}>
+                                Não
+                            </option>
+                        </select>
+                    </div>
+                    <div class="filter">
+                        <label for="q_presenca_confirmada_{{ tipo_id }}">Presença confirmada:</label>
+                        <select id="q_presenca_confirmada_{{ tipo_id }}" name="q_presenca_confirmada">
+                            <option value=""
+                                    {% if presenca_confirmada|length == 0 %}selected="selected"{% endif %}>
+                                Todos
+                            </option>
+                            <option value="True"
+                                    {% if presenca_confirmada|slugify == 'true' %}selected="selected"{% endif %}>
+                                Sim
+                            </option>
+                            <option value="False"
+                                    {% if presenca_confirmada|slugify == 'false' %}selected="selected"{% endif %}>
+                                Não
+                            </option>
+                        </select>
+                    </div>
+                    <div class="submit-button">
+                        <button type="submit" class="btn default">Buscar</button>
+                    </div>
+                </div>
+            </form>
+        {% endwith %}
+        {% if participantes.exists %}
+            {% if evento_gera_certificado and evento_pode_enviar_certificado %}
+                <p class="alert alert-warning">
+                    Os certificados serão enviados apenas para os participantes que possuírem a <strong>carga horária cumprida maior do que 0h</strong> e estiverem com <strong>presença confirmada</strong> no evento.
+                </p>
+                {% if evento_certificado_bloqueado_por_falta_de_avaliacao_configurada %}
+                    <p class="alert alert-warning">
+                        O envio de certificados está indisponível no momento, porque este evento foi configurado para <strong>exigir a avaliação pós-evento</strong>, mas <strong>nenhuma avaliação foi cadastrada</strong> ainda. Cadastre pelo menos uma pergunta de avaliação para liberar a emissão dos certificados.
+                    </p>
+                {% endif %}
+            {% endif %}
+            {% autopaginate participantes %}
+            {% if pode_gerenciar and eh_editavel %}
+                <div class="markall-container mb-5">
+                    <label for="markall-{{ tipo_participante.tipo_participacao.descricao|slugify }}">
+                        Marcar os {{ participantes|length }} participantes
+                    </label>
+                    <input type="checkbox"
+                           id="markall-{{ tipo_participante.tipo_participacao.descricao|slugify }}"
+                           data-markall="true"
+                           data-markall-total="{{ participantes|length }}">
+                </div>
+                {% include "includes/participantes_acoes.html" %}
+            {% endif %}
+            <form method="post" action="">
+                {% csrf_token %}
+                {% paginate %}
+                {% for participante in participantes %}
+                    <div class="general-box">
+                        {% if pode_gerenciar and eh_editavel %}
+                            <div class="custom-checkbox">
+                                <input id="id_participante_{{ participante.pk }}"
+                                       name="ids"
+                                       type="checkbox"
+                                       value="{{ participante.id }}"
+                                       onchange="$(this).closest('table').find('thead input:checkbox').prop('checked', false);">
+                                <label for="id_participante_{{ participante.pk }}"></label>
+                            </div>
+                        {% endif %}
+                        <div class="primary-info">
+                            <div class="status-info-container">
+                                {% if participante.inscricao_validada %}
+                                    <span class="status status-success">Inscrição confirmada</span>
+                                {% else %}
+                                    <span class="status status-error">Inscrição não confirmada</span>
+                                {% endif %}
+                                {% if participante.presenca_confirmada %}
+                                    <span class="status status-success">Presença confirmada</span>
+                                {% else %}
+                                    <span class="status status-error">Presença não confirmada</span>
+                                {% endif %}
+                                {% if tipo_participante.eh_avaliador_de_trabalho or tipo_participante.eh_convidado %}
+                                    {% if participante.get_situacao_convite_display %}
+                                        <span class="status status-{{ participante.get_situacao_convite_class }}">{{ participante.get_situacao_convite_display }}</span>
+                                    {% endif %}
+                                {% endif %}
+                                {% if avaliacao_disponivel %}
+                                    {% if participante.avaliacao_realizada %}
+                                        <span class="status status-success">Avaliação realizada</span>
+                                    {% else %}
+                                        <span class="status status-error">Avaliação não realizada</span>
+                                    {% endif %}
+                                {% endif %}
+                                {% if evento_gera_certificado %}
+                                    {% if participante.certificado_enviado %}
+                                        <span class="status status-success">Certificado enviado</span>
+                                    {% else %}
+                                        <span class="status status-error">Certificado não enviado</span>
+                                    {% endif %}
+                                {% endif %}
+                                {% if tipo_participante.eh_avaliador_de_trabalho and participante.eh_avaliador_sem_modalidade_vinculada %}
+                                    <span class="status status-alert">Sem modalidades de submissão de trabalho vinculadas</span>
+                                {% endif %}
+                            </div>
+                            <h4 class="title">
+                                {% if pode_gerenciar %}
+                                    <a href="{% url 'exibir_informacoes_participante' participante.id %}">{{ participante.nome|format }}</a>
+                                {% else %}
+                                    {{ participante.nome|format }}
+                                {% endif %}
+                            </h4>
+                            <ul class="action-bar">
+                                {% if pode_gerenciar and eh_editavel %}
+                                    <li>
+                                        <a href="/eventos/editar_participante/{{ participante.pk }}/"
+                                           class="btn primary popup"
+                                           title="Editar">{% icone "edit" %}<span class="visually-hidden">Editar</span></a>
+                                    </li>
+                                {% endif %}
+                                {% if atingiu_configuracoes_minimas_submissao and tipo_participante.eh_avaliador_de_trabalho or evento_subtipo_multiplas_atividades %}
+                                    <li>
+                                        <a class="btn popup"
+                                           href="{% url 'listar_atividades_participante' evento_pk participante.id %}">{% icone "list" %} Ver atividades</a>
+                                    </li>
+                                {% endif %}
+                                {% if evento_gera_certificado %}
+                                    {% if evento_subtipo_multiplas_atividades %}
+                                        <li>
+                                            <a class="btn popup"
+                                               href="/eventos/informar_atividades/{{ participante.id }}/">
+                                                {% icone "table" %} Inscrever em atividades
+                                            </a>
+                                        </li>
+                                    {% endif %}
+                                    {% if participante.certificado_enviado and evento_ativo %}
+                                        {% with url_download_certificado=participante.get_url_download_certificado %}
+                                            {% if url_download_certificado %}
+                                                <li>
+                                                    <a class="btn" href="{{ url_download_certificado }}">{% icone "print" %} Imprimir certificado</a>
+                                                </li>
+                                            {% endif %}
+                                        {% endwith %}
+                                    {% endif %}
+                                {% endif %}
+                                {% if pode_gerenciar and evento_utilizar_qr_code %}
+                                    <li>
+                                        <a href="{% url 'gerar_etiqueta_participante' participante.pk %}"
+                                           class="btn"
+                                           title="Imprimir Etiqueta">{% icone "print" %}<span class="visually-hidden">Imprimir etiqueta</span></a>
+                                    </li>
+                                {% endif %}
+                                {% if atingiu_configuracoes_minimas_submissao and tipo_participante.eh_avaliador_de_trabalho and pode_gerenciar %}
+                                    <li>
+                                        <a class="btn popup"
+                                           href="{% url 'vincular_modalidade_avaliador' evento_pk participante.id %}">{% icone "plus" %} Vincular modalidade</a>
+                                    </li>
+                                    {% if participante.num_trabalhos_avaliados > 0 %}
+                                        <li>
+                                            <a class="btn popup"
+                                               href="{% url 'declaracao_avaliador_pdf' evento_pk participante.id %}">Declaração do avaliador</a>
+                                        </li>
+                                    {% endif %}
+                                {% endif %}
+                                {% if pode_gerenciar and eh_editavel and not eh_organizador %}
+                                    <li>
+                                        <a href="/comum/excluir/eventos/participante/{{ participante.pk }}/"
+                                           class="btn danger"
+                                           title="Remover">{% icone "trash" %}<span class="visually-hidden">Remover</span></a>
+                                    </li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                        <dl class="secondary-info">
+                            <div class="list-item">
+                                <dt>Tipo de participante:</dt>
+                                <dd>
+                                    {{ tipo_participante }}
+                                </dd>
+                            </div>
+                            <div class="list-item">
+                                <dt>E-mail:</dt>
+                                <dd id="copia_email_{{ participante.pk }}">
+                                    {{ participante.email|format }}
+                                </dd>
+                                <button type="button" class="btn botao-copiar">{% icone "copy" %} Copiar</button>
+                            </div>
+                            {% with documento=participante.get_documento_identificacao %}
+                                <div class="list-item">
+                                    <dt>{{ documento.tipo_documento }}:</dt>
+                                    <dd id="copia_documento_{{ participante.pk }}">
+                                        {{ documento.numero_documento|format }}
+                                    </dd>
+                                    <button type="button" class="btn botao-copiar">{% icone "copy" %} Copiar</button>
+                                </div>
+                            {% endwith %}
+                            {% if participante.telefone %}
+                                <div class="list-item">
+                                    <dt>Telefone:</dt>
+                                    <dd>
+                                        {{ participante.telefone|format }}
+                                    </dd>
+                                </div>
+                            {% endif %}
+                            {% if participante.vinculo %}
+                                <div class="list-item">
+                                    <dt>Vínculo:</dt>
+                                    <dd>
+                                        {{ participante.vinculo.user|format }}
+                                    </dd>
+                                </div>
+                            {% endif %}
+                            <div class="list-item">
+                                <dt>Perfil:</dt>
+                                <dd>
+                                    {{ participante.publico_alvo|format }}
+                                </dd>
+                            </div>
+                            {% if tem_espacialidades %}
+                                <div class="list-item">
+                                    <dt>Forma de participação:</dt>
+                                    <dd>
+                                        {{ participante.get_forma_participacao_display|format }}
+                                    </dd>
+                                </div>
+                            {% endif %}
+                            {% if evento_subtipo_multiplas_atividades and not tipo_participante.tipo_participacao.ch_organizacao %}
+                                <div class="list-item">
+                                    <dt>C.H. Total:</dt>
+                                    <dd>
+                                        {{ participante.get_ch_inscrita }}h
+                                    </dd>
+                                </div>
+                                {% if participante.get_ch_total %}
+                                    <div class="list-item">
+                                        <dt>C.H. Cumprida:</dt>
+                                        <dd>
+                                            {{ participante.get_ch_total }}h
+                                        </dd>
+                                    </div>
+                                {% endif %}
+                            {% else %}
+                                <div class="list-item">
+                                    <dt>C.H. Total:</dt>
+                                    <dd>
+                                        {{ participante.get_ch_total }}h
+                                    </dd>
+                                </div>
+                            {% endif %}
+                            <div class="list-item">
+                                <dt>Inscrito em:</dt>
+                                <dd>
+                                    {{ participante.data_cadastro|format }}
+                                </dd>
+                            </div>
+                            {% if participante.ch_extensao %}
+                                <div class="list-item">
+                                    <dt>C.H de Extensão:</dt>
+                                    <dd>
+                                        {{ participante.ch_extensao|format }}
+                                    </dd>
+                                </div>
+                            {% endif %}
+                            {% if debug and pode_gerenciar and tipo_participante.eh_avaliador_ou_convidado_ou_participante %}
+                                <div class="list-item">
+                                    <dt>
+                                        <a href="{% url 'autenticar_participante' evento_pk %}?email={{ participante.email }}"
+                                           target="_blank">Chave de acesso:</a>
+                                    </dt>
+                                    <dd id="copia_chave_{{ participante.pk }}">
+                                        {{ participante.chave_acesso }}
+                                    </dd>
+                                    <button type="button" class="btn botao-copiar">{% icone "copy" %} Copiar</button>
+                                </div>
+                            {% endif %}
+                            {% if tipo_participante.eh_convidado %}
+                                <div class="list-item">
+                                    <dt>Foto:</dt>
+                                    <dd>
+                                        {% if participante.foto %}
+                                            <a href="{{ participante.foto.url }}" class="btn default">{% icone "download" %} Baixar foto</a>
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </dd>
+                                </div>
+                            {% endif %}
+                        </dl>
+                    </div>
+                {% endfor %}
+                {% paginate %}
+            </form>
+            {% if pode_gerenciar and eh_editavel %}
+                {% include "includes/participantes_acoes.html" %}
+            {% endif %}
+        {% else %}
+            <p class="alert alert-warning">Nenhum {{ tipo_participante.tipo_participacao.descricao }} inscrito.</p>
+        {% endif %}
+        <script>
+            jQuery(function(){
+                if(!$("input[name='ids']").length){
+                    $("#btn_remover_{{ tipo_participante.pk }}").hide();
+                }
+            });
+            $("#btn_remover_{{ tipo_participante.pk }}").click(function(e) {
+                ids = $("input[name='ids']:checked").map(function () {return this.value;}).get().join("_");
+                if(!ids){
+                    alert("Nenhum participante selecionado.");
+                } else {
+                    $.fancybox.open({
+                        src  : '/comum/excluir/eventos/participante/' + ids + '/?_popup=1',
+                        type : 'iframe'
+                    });
+                }
+            });
+        </script>
+    </div>
+{% endfor %}

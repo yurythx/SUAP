@@ -1,0 +1,589 @@
+{% extends "relatorio_pdf.html" %}
+
+{% block page_settings %}
+    @page {
+        size: a4 {% block page_orientation %}portrait{% endblock %};
+        background-image: url(/static/comum/img/logo_if_portrait.png);
+        background-position: right bottom;
+        background-repeat: no-repeat;
+        margin-top: 2.5cm; /* HeaderHeight */
+        margin-bottom: 2.5cm; /* FooterHeight */
+        margin-left: 0.5cm;
+        margin-right: 0.5cm;
+        @bottom-right {
+            content: "Página " counter(page) " de " counter(pages);
+        }
+    }
+    header{
+        top: -2.5cm; /* -HeaderHeight */
+        height: 2.5cm; /* HeaderHeight */
+        position: fixed;
+        width:98%;
+        padding-top: 0.5cm;
+    }
+    main{
+        margin-top: 0.5cm;
+    }
+    footer{
+        bottom: 0cm; /* -FooterHeight */
+        height: 1cm; /* FooterHeight */
+        position: fixed;
+        width: 100%;
+        text-align: center;
+    }
+{% endblock %}
+
+{% block style %}
+    html, body {
+        min-height: 100vh;
+        min-width: 100vw;
+        margin: 0;
+        padding: 0;
+    }
+    html {
+        background-color: transparent;
+        color: #000;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 10pt;
+        font-weight: normal;
+        line-height: 150%;
+        white-space: normal;
+    }
+    h1 {
+        text-align: center;
+        border: 1px solid black;
+        padding-top: 2px;
+        line-height: 1em;
+    }
+    th {
+    padding: 3px;
+    font-size: 10px !important;
+    }
+    .borda td {
+    font-size:10px !important;
+    }
+    .text-center {
+    text-align: center;
+    }
+    .text-end {
+    text-align: right;
+    }
+    .borda tfoot tr td {
+    font-weight: bold;
+    }
+    .ch-total{
+    text-align: right;
+    font-size: 22px !important;
+    }
+    .ch-relogio-total{
+    font-size: 18px !important;
+    }
+{% endblock %}
+
+{% block content %}
+    <div class="corpo">
+        <h1 align="center">
+            {{ title }} - {{ pit.ano_letivo }}.{{ pit.periodo_letivo }}<br/>
+            {{ pit.professor|upper }}<br/>
+        </h1>
+        <div class="ch-total">
+            CH TOTAL SEMANAL: {{ ch_total|format }} horas
+        </div>
+
+        <div>
+            <h2>QUADRO RESUMO</h2>
+            <table class="bordered">
+
+                <thead>
+                    <tr>
+                        <th>ATIVIDADE</th>
+                        <th>CH SEMANAL</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ch, atividade in ch_resumo %}
+                    <tr>
+                        <td>{{ atividade }}</td>
+                        <td class="text-end">{{ ch }} h</td>
+                    </tr>
+                    {% endfor %}
+                    <tr>
+                        <td colspan="2" class="text-end"><strong>{{ ch_total }} h</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        {% if ch_aulas or relatorio %}
+        <h2 align="center">ENSINO [{{ ch_ensino }} horas]</h2>
+        <table class="bordered">
+            <thead>
+            <tr>
+                <th class="text-center" colspan="7">AULAS [{{ ch_aulas }} horas]</th>
+            </tr>
+            <tr>
+                <th>Diário</th>
+                <th>Disciplina/Componente</th>
+                <th>Local</th>
+                <th>Modalidade de Ensino</th>
+                <th>Horário</th>
+                <th>Nº de Alunos</th>
+                <th>CH Semanal</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for professor_diario in vinculos_diarios_regulares %}
+                <tr>
+                    <td class="text-center">
+                        {{ professor_diario.diario.pk }}
+                    </td>
+                    <td>{{ professor_diario.diario.componente_curricular.componente.descricao }}</td>
+                    <td>{{ professor_diario.diario.get_locais_aula|format }}</td>
+                    <td class="text-center">{{ professor_diario.diario.turma.curso_campus.modalidade }}</td>
+                    <td class="text-center">{{ professor_diario.diario.get_horario_aulas|format }}</td>
+                    <td class="text-center">{{ professor_diario.diario.matriculadiario_set.count }}</td>
+                    <td class="text-center">
+                        {{ professor_diario|method:"get_qtd_creditos_efetiva"|call:pit.periodo_letivo|format }}
+                    </td>
+                </tr>
+            {% endfor %}
+            {% for professor_diario in vinculos_diarios_fics %}
+                <tr>
+                    <td class="text-center">
+                        {{ professor_diario.diario.pk }}
+                    </td>
+                    <td>{{ professor_diario.diario.componente_curricular.componente.descricao }}</td>
+                    <td>{{ professor_diario.diario.get_locais_aula|format }}</td>
+                    <td class="text-center">{{ professor_diario.diario.turma.curso_campus.modalidade }}</td>
+                    <td class="text-center">{{ professor_diario.diario.get_horario_aulas|format }}</td>
+                    <td class="text-center">{{ professor_diario.diario.matriculadiario_set.count }}</td>
+                    <td class="text-center">{{ professor_diario.diario.componente_curricular.componente.ch_qtd_creditos }}</td>
+                </tr>
+            {% endfor %}
+            {% for professor_minicurso in vinculos_turmas_minicurso %}
+                    <tr>
+                        <td class="text-center">{{ professor_minicurso.turma_minicurso.pk }}</td>
+                        <td>{{ professor_minicurso.turma_minicurso.minicurso.descricao }}</td>
+                        <td>-</td>
+                        <td class="text-center">{{ professor_minicurso.turma_minicurso.minicurso.modalidade }}</td>
+                        <td class="text-center">-</td>
+                        <td class="text-center">{{ professor_minicurso.turma_minicurso.participantes.count }}</td>
+                        <td class="text-center">{{ professor_minicurso.carga_horaria_semanal|format }}</td>
+                    </tr>
+            {% endfor %}
+            {% for diario_especial in diarios_especiais %}
+                    <tr>
+                        <td class="text-center">-</td>
+                        <td>{{ diario_especial.componente.descricao }}</td>
+                        <td>{{ diario_especial.sala|format }}</td>
+                        <td class="text-center">Atividade Específica de Ensino</td>
+                        <td class="text-center">{{ diario_especial.get_horario_aulas|format }}</td>
+                        <td class="text-center">{{ diario_especial.participantes.count }}</td>
+                        <td class="text-center">{{ diario_especial.get_carga_horaria_semanal_ha }}</td>
+                    </tr>
+            {% endfor %}
+            {% if relatorio %}
+                <tr>
+                    <th colspan="7">Relatos</th>
+                </tr>
+                <tr>
+                    <td colspan="7">
+                        {{ pit.obs_aulas|format|remove_nbsp|sanitize }}
+                    </td>
+                </tr>
+                {% endif %}
+                {% if pit.arquivo_aulas %}
+                <tr>
+                    <th colspan="7">Arquivo</th>
+                </tr>
+                <tr>
+                    <td colspan="7">
+                    	<a href="https://{{ request.get_host }}{{ pit.arquivo_aulas.get_url_publica }}">https://{{ request.get_host }}{{ pit.arquivo_aulas.get_url_publica }}</a>
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+            <tfoot>
+            <tr>
+                <td class="text-end" colspan="6">Subtotal</td>
+                <td class="text-center">
+                    {{ ch_semanal_aulas|floatformat:0 }} h/a<br>
+                    <span> ({{ ch_aulas|floatformat:0 }} horas)</span>
+                </td>
+            </tr>
+            </tfoot>
+        </table>
+        <br/>
+        <table class="bordered">
+            <thead>
+            <tr>
+                <th class="text-center" colspan="8">PREPARAÇÃO E MANUTENÇÃO DO ENSINO</th>
+            </tr>
+            </thead>
+            <tbody>
+                {% if relatorio %}
+                <tr>
+                    <th colspan="8">Relatos</th>
+                </tr>
+                <tr>
+                    <td colspan="8">
+                        {{ pit.obs_preparacao_manutencao_ensino|format|remove_nbsp|sanitize }}
+                    </td>
+                </tr>
+                {% endif %}
+                {% if pit.arquivo_preparacao_manutencao_ensino %}
+                <tr>
+                    <th colspan="8">Arquivo</th>
+                </tr>
+                <tr>
+                    <td colspan="8">
+                    	<a href="https://{{ request.get_host }}{{ pit.arquivo_preparacao_manutencao_ensino.get_url_publica }}">https://{{ request.get_host }}{{ pit.arquivo_preparacao_manutencao_ensino.get_url_publica }}</a>
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+            <tfoot>
+            <tr>
+                <td class="text-end" colspan="7">Subtotal</td>
+                <td class="text-center">
+                    {{ ch_preparacao_manutencao_ensino|format }} horas
+                </td>
+            </tr>
+            </tfoot>
+        </table>
+        <br>
+        {% endif %}
+
+        {% if pit.ch_apoio_ensino or relatorio %}
+        <h3>APOIO AO ENSINO [{{ pit.ch_apoio_ensino }} horas]</h3>
+        <table class="bordered">
+            <thead>
+            <tr>
+                <th class="text-center" colspan="3">Atividades</th>
+            </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td colspan="3">
+                        <ul>
+                        {% for atividade in pit.get_atividades_apoio_ensino %}
+                           <li>{{ atividade }}</li>
+                        {% endfor %}
+                        </ul>
+                    </td>
+                </tr>
+                {% if relatorio %}
+                <tr>
+                    <th colspan="3">Relatos</th>
+                </tr>
+                <tr>
+                    <td colspan="3">
+                        {{ pit.obs_apoio_ensino|format|remove_nbsp|sanitize }}
+                    </td>
+                </tr>
+                {% endif %}
+                {% if pit.arquivo_apoio_ensino %}
+                <tr>
+                    <th colspan="3">Arquivo</th>
+                </tr>
+                <tr>
+                    <td colspan="3">
+                    	<a href="https://{{ request.get_host }}{{ pit.arquivo_apoio_ensino.get_url_publica }}">https://{{ request.get_host }}{{ pit.arquivo_apoio_ensino.get_url_publica }}</a>
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+        <br/>
+        {% endif %}
+
+        {% if pit.ch_programas_projetos_ensino or relatorio %}
+        {% if relatorio %}
+        <h3>PROGRAMAS OU PROJETOS DE ENSINO [{{ pit.ch_programas_projetos_ensino }} horas]</h3>
+        <table class="bordered">
+            <thead>
+                <tr>
+                    <th colspan="3">Relatos</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td colspan="3">
+                        {{ pit.obs_programas_projetos_ensino|format|remove_nbsp|sanitize }}
+                    </td>
+                </tr>
+                {% if pit.arquivo_programas_projetos_ensino %}
+                <tr>
+                    <th colspan="3">Arquivo</th>
+                </tr>
+                <tr>
+                    <td colspan="3">
+                    	<a href="https://{{ request.get_host }}{{ pit.arquivo_programas_projetos_ensino.get_url_publica }}">https://{{ request.get_host }}{{ pit.arquivo_programas_projetos_ensino.get_url_publica }}</a>
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+        <br>
+        {% else %}
+        <table class="bordered">
+            <thead>
+            <tr>
+                <th class="text-center" colspan="8">PROGRAMAS OU PROJETOS DE ENSINO</th>
+            </tr>
+            </thead>
+            <tfoot>
+            <tr>
+                <td class="text-end" colspan="7">Subtotal</td>
+                <td class="text-center">
+                    {{ pit.ch_programas_projetos_ensino|format }} horas
+                </td>
+            </tr>
+            </tfoot>
+        </table>
+        <br>
+        {% endif %}
+        {% endif %}
+
+        {% if pit.ch_orientacao_alunos or relatorio %}
+        <h3>ATENDIMENTO, ACOMPANHAMENTO, AVALIAÇÃO E ORIENTAÇÃO DE ALUNOS [{{ pit.ch_orientacao_alunos }} horas]</h3>
+        <table class="bordered">
+            <thead>
+            <tr>
+                <th class="text-center" colspan="3">Atividades</th>
+            </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td colspan="3">
+                        <ul>
+                        {% for atividade in pit.get_atividades_orientacao_alunos %}
+                           <li>{{ atividade }}</li>
+                        {% endfor %}
+                        </ul>
+                    </td>
+                </tr>
+                {% if relatorio %}
+                <tr>
+                    <th colspan="3">Relatos</th>
+                </tr>
+                <tr>
+                    <td colspan="3">
+                        {{ pit.obs_orientacao_alunos|format|remove_nbsp|sanitize }}
+                    </td>
+                </tr>
+                {% endif %}
+                {% if pit.arquivo_orientacao_alunos %}
+                <tr>
+                    <th colspan="3">Arquivo</th>
+                </tr>
+                <tr>
+                    <td colspan="3">
+                    	<a href="https://{{ request.get_host }}{{ pit.arquivo_orientacao_alunos.get_url_publica }}">https://{{ request.get_host }}{{ pit.arquivo_orientacao_alunos.get_url_publica }}</a>
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+        <br>
+        {% endif %}
+
+        {% if pit.ch_reunioes or relatorio %}
+        <h3>REUNIÕES PEDAGÓGICAS, DE GRUPO E AFINS [{{ pit.ch_reunioes }} horas]</h3>
+        <table class="bordered">
+            <thead>
+            <tr>
+                <th class="text-center" colspan="3">Atividades</th>
+            </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td colspan="3">
+                        <ul>
+                        {% for atividade in pit.get_atividades_reunioes %}
+                           <li>{{ atividade }}</li>
+                        {% endfor %}
+                        </ul>
+                    </td>
+                </tr>
+                {% if relatorio %}
+                <tr>
+                    <th colspan="3">Relatos</th>
+                </tr>
+                <tr>
+                    <td colspan="3">
+                        {{ pit.obs_reunioes|format|remove_nbsp|sanitize }}
+                    </td>
+                </tr>
+                {% endif %}
+                {% if pit.arquivo_reunioes %}
+                <tr>
+                    <th colspan="3">Arquivo</th>
+                </tr>
+                <tr>
+                    <td colspan="3">
+                    	<a href="https://{{ request.get_host }}{{ pit.arquivo_reunioes.get_url_publica }}">https://{{ request.get_host }}{{ pit.arquivo_reunioes.get_url_publica }}</a>
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+        <br>
+        {% endif %}
+
+        {% if pit.ch_pesquisa or relatorio %}
+        <h2 align="center">PESQUISA E INOVAÇÃO [{{ pit.ch_pesquisa }} horas]</h2>
+        <table class="bordered">
+            <thead>
+                <tr>
+                    <th colspan="3">Atividades</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td colspan="3">
+                        <ul>
+                        {% for atividade in pit.get_atividades_pesquisa %}
+                           <li>{{ atividade }}</li>
+                        {% endfor %}
+                        </ul>
+                    </td>
+                </tr>
+                {% if relatorio %}
+                <tr>
+                    <th colspan="3">Relatos</th>
+                </tr>
+                <tr>
+                    <td colspan="3">
+                        {{ pit.obs_pesquisa|format|remove_nbsp|sanitize }}
+                    </td>
+                </tr>
+                {% endif %}
+                {% if pit.arquivo_pesquisa %}
+                <tr>
+                    <th colspan="3">Arquivo</th>
+                </tr>
+                <tr>
+                    <td colspan="3">
+                    	<a href="https://{{ request.get_host }}{{ pit.arquivo_pesquisa.get_url_publica }}">https://{{ request.get_host }}{{ pit.arquivo_pesquisa.get_url_publica }}</a>
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+        <br>
+        {% endif %}
+
+        {% if pit.ch_extensao or relatorio %}
+        <h2 align="center">EXTENSÃO [{{ pit.ch_extensao }} horas]</h2>
+        <table class="bordered">
+            <thead>
+                <tr>
+                    <th colspan="3">Atividades</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td colspan="3">
+                        <ul>
+                        {% for atividade in pit.get_atividades_extensao %}
+                           <li>{{ atividade }}</li>
+                        {% endfor %}
+                        </ul>
+                    </td>
+                </tr>
+                {% if relatorio %}
+                <tr>
+                    <th colspan="3">Relatos</th>
+                </tr>
+                <tr>
+                    <td colspan="3">
+                        {{ pit.obs_extensao|format|remove_nbsp|sanitize }}
+                    </td>
+                </tr>
+                {% endif %}
+                {% if pit.arquivo_extensao %}
+                <tr>
+                    <th colspan="3">Arquivo</th>
+                </tr>
+                <tr>
+                    <td colspan="3">
+                    	<a href="https://{{ request.get_host }}{{ pit.arquivo_extensao.get_url_publica }}">https://{{ request.get_host }}{{ pit.arquivo_extensao.get_url_publica }}</a>
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+        <br>
+        {% endif %}
+
+        {% if pit.ch_gestao or relatorio %}
+        <h2 align="center">GESTÃO E REPRESENTAÇÃO INSTITUCIONAL [{{ pit.ch_gestao }} horas]</h2>
+        <table class="bordered">
+            <thead>
+                <tr>
+                    <th colspan="3">Atividades</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td colspan="3">
+                        <ul>
+                        {% for atividade in pit.get_atividades_gestao %}
+                           <li>{{ atividade }}</li>
+                        {% endfor %}
+                        </ul>
+                    </td>
+                </tr>
+                {% if relatorio %}
+                <tr>
+                    <th colspan="3">Relatos</th>
+                </tr>
+                <tr>
+                    <td colspan="3">
+                        {{ pit.obs_gestao|format|remove_nbsp|sanitize }}
+                    </td>
+                </tr>
+                {% endif %}
+                {% if pit.arquivo_gestao %}
+                <tr>
+                    <th colspan="3">Arquivo</th>
+                </tr>
+                <tr>
+                    <td colspan="3">
+                        <a href="https://{{ request.get_host }}{{ pit.arquivo_gestao.get_url_publica }}">https://{{ request.get_host }}{{ pit.arquivo_gestao.get_url_publica }}</a>
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+        <br>
+        {% if historico_funcoes %}
+            <h2 align="center">FUNÇÕES</h2>
+            <table class="bordered">
+                <thead>
+                <tr>
+                    <th class="text-center" colspan="4">HISTÓRICO DE FUNÇÕES</th>
+                </tr>
+                <tr>
+                    <th>Função</th>
+                    <th>Atividade</th>
+                    <th>Data de Início</th>
+                    <th>Data de Término</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for historico_funcao in historico_funcoes %}
+                    <tr>
+                        <td class="text-center">{{ historico_funcao.funcao_display }}</td>
+                        <td class="text-center">{{ historico_funcao.atividade.nome }}</td>
+                        <td class="text-center">{{ historico_funcao.data_inicio_funcao }}</td>
+                        <td class="text-center">{{ historico_funcao.data_fim_funcao|format }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+        {% endif %}
+    </div>
+{% endblock %}

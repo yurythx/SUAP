@@ -1,0 +1,105 @@
+<div class="tab-pane ajax-rendered" data-title="Detalhamento" data-tab="detalhamento">
+    {% if pode_gerenciar %}
+        <ul class="action-bar">
+            <li><a href="/eventos/participantes/{{ evento.pk }}/" class="btn default">{% icone "eye" %} Participantes</a></li>
+        </ul>
+    {% endif %}
+
+    {% if evento.subtipo and evento.subtipo.multiplas_atividades %}
+        <p class="alert alert-warning">Este evento é do subtipo multiplas atividades. Por isso, os certificados consideram a carga horária das atividades. Para considerar a carga horária do evento, selecione um subtipo que não possua múltiplas atividades.</p>
+    {% endif %}
+    
+    {% box "Coordenação" %}
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>Coordenador</dt>
+                <dd>{{ evento.coordenador|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Campus do Coordenador</dt>
+                <dd>{{ evento.campus|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Setor do Coordenador</dt>
+                <dd>{{ evento.setor|format }}</dd>
+            </div>
+        </dl>
+    {% endbox %}
+
+    {% box "Tipos de participantes" %}
+        {% if pode_gerenciar %}
+            <ul class="action-bar">
+                <li><a href="{% url 'adicionar_tipo_participante' evento.pk %}" class="btn popup success">{% icone "plus" %} Adicionar tipo de participante</a></li>
+            </ul>
+        {% endif %}
+        {% if evento.tipos_participante.exists %}
+            <div class="alert alert-info">
+                <p><strong>Pré-visualização dos certificados:</strong></p>
+                <ul>
+                    <li>Verifique se os marcadores foram substituídos corretamente.</li>
+                    <li>Caso haja alguma inconsistência, lembre-se de formatar o marcador todo incluindo os "#".</li>
+                </ul>
+            </div>
+            <div class="table-responsive">
+                <table>
+                    <caption>Tipos de participantes cadastrados</caption>
+                    <thead>
+                    <tr>
+                        <th class="no-print">Ações</th>
+                        <th>Tipo de Participação</th>
+                        <th>Permite Inscrições Diretas</th>
+                        <th>Exibir Participantes na Inscrição</th>
+                        <th>Limite de Inscrições</th>
+                        <th>Período de Inscrições</th>
+                        <th>Modelo do Certificado</th>
+                        <th class="no-print">Opções</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for tipo_participante in evento.tipos_participante.all %}
+                        <tr>
+                            <td class="list-display-icons no-print">
+                                {% if pode_gerenciar %}
+                                    <a class="icon icon-edit popup" title="Editar" href="{% url 'editar_tipo_participante' evento.pk tipo_participante.pk %}">
+                                        <span class="visually-hidden">Editar</span>
+                                    </a>
+                                
+                                    {% if not tipo_participante.tem_participantes_vinculados and not tipo_participante.eh_participante and not tipo_participante.eh_organizador %}
+                                        <form method="post" action="{% url 'remover_tipo_participante' evento.pk tipo_participante.pk %}">
+                                            {% csrf_token %}
+                                            <button class="icon icon-delete" type="submit">
+                                                <span class="visually-hidden">Remover</span>
+                                            </button>
+                                        </form>
+                                    {% endif %}
+                                {% endif %}
+                            </td>
+                            <td>{{ tipo_participante.tipo_participacao }}</td>
+                            <td>{{ tipo_participante.permite_inscricao_direta|format }}</td>
+                            <td>{{ tipo_participante.exibir_participantes_inscricao|format }}</td>
+                            <td>{{ tipo_participante.limite_inscricoes|format }}</td>
+                            <td>{{ tipo_participante.get_periodo_inscricao }}</td>
+                            <td>
+                                <a href="{{ tipo_participante.get_modelo_certificado.url }}">
+                                    {% if tipo_participante.modelo_certificado %}
+                                        {{ tipo_participante.get_modelo_certificado }}
+                                    {% else %}
+                                        Padrão
+                                    {% endif %}
+                                </a>
+                            </td>
+                            <td class="no-print">
+                                <ul class="action-bar">
+                                    <li><a href="/eventos/baixar_certificado/{{ evento.id }}/?tipo-participante={{ tipo_participante.id }}" class="btn default">{% icone "file-download" %} Pré-visualizar Certificado</a></li>
+                                </ul>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="alert alert-warning">Nenhum tipo de participante foi informado.</div>
+        {% endif %}
+    {% endbox %}
+</div>

@@ -1,0 +1,257 @@
+{% extends "admin/base_anonima.html" %}
+{% load eventos_tags %}
+{% block extrahead %}
+    <style>
+        .perfil-apresentacao {
+            display: flex;
+            gap: 2rem;
+            align-items: flex-start;
+            flex-wrap: wrap;
+        }
+
+        .perfil-apresentacao-foto {
+            flex: 0 0 180px;
+            max-width: 180px;
+        }
+
+        .perfil-apresentacao-imagem {
+            width: 180px;
+            max-width: 100%;
+            height: 180px;
+            object-fit: cover;
+            border-radius: 0.5rem;
+            display: block;
+        }
+
+        .perfil-apresentacao-curriculo {
+            flex: 1 1 320px;
+            min-width: 280px;
+        }
+    </style>
+{% endblock %}
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if not participante_logado.tipo.eh_avaliador_de_trabalho %}
+            <li>
+                <a href="{% url 'atualizar_participante' evento.pk %}"
+                   class="btn primary">{% icone "edit" %} Atualizar dados</a>
+            </li>
+        {% else %}
+            <li>
+                <a href="{% url 'listar_trabalhos_submetidos_ao_avaliador' evento.pk %}"
+                   class="btn default">{% icone "list" %} Listar trabalhos</a>
+            </li>
+        {% endif %}
+        {% if avaliacao_disponivel %}
+            {% if avaliacao_realizada %}
+                <li>
+                    <a href="#avaliacoes" class="btn default">{% icone "eye" %} Ver avaliações</a>
+                </li>
+            {% else %}
+                <li>
+                    <a href="{% url 'responder_avaliacao_evento' evento.pk %}"
+                       class="btn success">{% icone "check" %} Responder Avaliação</a>
+                </li>
+            {% endif %}
+        {% endif %}
+        <li>
+            <a href="{% url 'logout_participante' %}" class="btn danger">{% icone "sign-out-alt" %} Sair</a>
+        </li>
+    </ul>
+{% endblock %}
+{% block content %}
+    <dl class="definition-list flex">
+        <div class="list-item">
+            <dt>Nome</dt>
+            <dd>
+                {{ participante_logado.nome }}
+            </dd>
+        </div>
+        <div class="list-item">
+            <dt>E-mail</dt>
+            <dd>
+                {{ participante_logado.email|format }}
+            </dd>
+        </div>
+        {% with documento=participante_logado.get_documento_identificacao %}
+            <div class="list-item">
+                <dt>{{ documento.tipo_documento }}</dt>
+                <dd>
+                    {{ documento.numero_documento|format }}
+                </dd>
+            </div>
+        {% endwith %}
+        {% if participante_logado.telefone %}
+            <div class="list-item">
+                <dt>Telefone</dt>
+                <dd>
+                    {{ participante_logado.telefone|format }}
+                </dd>
+            </div>
+        {% endif %}
+        {% if participante_logado.vinculo %}
+            <div class="list-item">
+                <dt>Vínculo</dt>
+                <dd>
+                    {{ participante_logado.vinculo.user|format }}
+                </dd>
+            </div>
+        {% endif %}
+        <div class="list-item">
+            <dt>Perfil</dt>
+            <dd>
+                {{ participante_logado.publico_alvo|format }}
+            </dd>
+        </div>
+        <div class="list-item">
+            <dt>Inscrito em</dt>
+            <dd>
+                {{ participante_logado.data_cadastro|format }}
+            </dd>
+        </div>
+        {% with url_download_certificado=participante_logado.get_url_download_certificado %}
+            {% if evento.gera_certificado and participante_logado.certificado_enviado and url_download_certificado %}
+                <div class="list-item">
+                    <dt>Certificado</dt>
+                    <dd>
+                        <a class="btn" href="{{ url_download_certificado }}">{% icone "print" %} Baixar certificado</a>
+                    </dd>
+                </div>
+            {% endif %}
+        {% endwith %}
+    </dl>
+    {% if participante_logado.foto or participante_logado.curriculo %}
+        {% box "Apresentação" %}
+            <div class="perfil-apresentacao">
+                {% if participante_logado.foto %}
+                    <div class="perfil-apresentacao-foto">
+                        <a href="{{ participante_logado.foto.url }}">
+                            <img src="{{ participante_logado.foto.url }}"
+                                 alt="Foto de {{ participante_logado.nome }}"
+                                 class="perfil-apresentacao-imagem">
+                        </a>
+                    </div>
+                {% endif %}
+                {% if participante_logado.curriculo %}
+                    <div class="perfil-apresentacao-curriculo">
+                        <div class="general-box">
+                            <div class="primary-info">
+                                <h4>Currículo</h4>
+                                <p>{{ participante_logado.curriculo|linebreaksbr }}</p>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        {% endbox %}
+    {% endif %}
+    {% if avaliacao_disponivel %}
+        <div id="avaliacoes">
+            {% box "Avaliações respondidas" %}
+                {% if avaliacoes_respondidas %}
+                    {% for avaliacao in avaliacoes_respondidas %}
+                        <div class="general-box">
+                            <div class="primary-info">
+                                <dl class="definition-list">
+                                    {% for resposta in avaliacao.respostas %}
+                                        <dt>{{ resposta.pergunta.titulo }}</dt>
+                                        <dd>{{ resposta.valor|default:"-"|format }}</dd>
+                                    {% endfor %}
+                                </dl>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="alert alert-warning">Nenhuma avaliação foi respondida.</p>
+                {% endif %}
+            {% endbox %}
+        </div>
+    {% endif %}
+    {% if participante_logado.atividades.exists %}
+        <h3>Atividades inscritas:</h3>
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Tipo</th>
+                        <th>Descrição</th>
+                        <th>Presença Confirmada</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for atividade in participante_logado.atividades.all %}
+                        <tr>
+                            <td>{{ atividade.tipo }}</td>
+                            <td>{{ atividade }}</td>
+                            <td>{% atividade_confirmada_display participante_logado atividade %}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+    {% if participante_logado.autorsubmissao_set.exists %}
+        <h3>Trabalhos submetidos:</h3>
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Título</th>
+                        <th>Situação</th>
+                        <th>Modalidade</th>
+                        <th>Áreas temáticas</th>
+                        <th>Autores</th>
+                        <th>Data de submissão</th>
+                        <th class="no-print text-end">Opções</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for autor in participante_logado.autorsubmissao_set.all %}
+                        {% with submissao=autor.submissao %}
+                            <tr>
+                                <td>#{{ submissao.pk }}</td>
+                                <td>{{ submissao.titulo }}</td>
+                                <td>{{ submissao.get_situacao_display|status }}</td>
+                                <td>{{ submissao.modalidade.tipo }}</td>
+                                <td>{{ submissao.area_tematica }}</td>
+                                <td>
+                                    <ul>
+                                        {% for autor_submissao in submissao.autores_relacionados.all %}
+                                            <li>
+                                                {{ autor_submissao.participante.nome }} (
+                                                {% if autor_submissao.autor_correspondente %}Autor correspondente e{% endif %}
+                                                {{ autor_submissao.get_tipo_autor_display }})
+                                            </li>
+                                        {% endfor %}
+                                    </ul>
+                                </td>
+                                <td>{{ submissao.data_hora|format }}</td>
+                                <td class="no-print">
+                                    <ul class="action-bar">
+                                        {% if submissao.arquivo or submissao.link_video %}
+                                            {% if submissao.arquivo %}
+                                                <li>
+                                                    <a href="{{ submissao.arquivo.url }}" class="btn default">{% icone "download" %} Baixar trabalho</a>
+                                                </li>
+                                            {% endif %}
+                                            {% if submissao.link_video %}
+                                                <li>
+                                                    <a href="{{ submissao.link_video }}" class="btn default">{% icone "play" %} Assistir vídeo</a>
+                                                </li>
+                                            {% endif %}
+                                        {% endif %}
+                                        <li>
+                                            <a href="{% url 'visualizar_revisoes' evento.id submissao.id %}"
+                                               class="btn default">{% icone "eye" %} Visualizar detalhes</a>
+                                        </li>
+                                    </ul>
+                                </td>
+                            </tr>
+                        {% endwith %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+{% endblock %}

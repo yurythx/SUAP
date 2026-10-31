@@ -1,0 +1,238 @@
+{% extends super_template %}
+
+{% block extrahead %}
+    <style>
+        .scrollable-graph {
+            width: 100%;
+            height: 800px;
+            overflow-x: auto;
+            overflow-y: auto;
+        }
+
+        .graph-content {
+            height: 800px;
+        }
+
+        .box-item {
+            text-decoration: none !important;
+            color: inherit;
+            display: block;
+            flex: 1;
+            min-width: 200px;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.2);
+            transition: transform 0.2s, box-shadow 0.3s, background-color 0.3s;
+            width: 100%;
+        }
+
+        .box-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 4px 4px 15px rgba(0, 0, 0, 0.3);
+            background-color: rgba(0, 0, 0, 0.05);
+        }
+
+        .box-item.warning:hover {
+            background-color: #ffcc00;
+        }
+
+        .box-item.success:hover {
+            background-color: #28a745;
+            color: white;
+        }
+
+        .box-item.error:hover {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        .graph-row {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 60px;
+            margin: 30px 0;
+            width: 100%;
+        }
+
+        .graph-row .graph-box {
+            flex: 1 1 45%; /* Responsivo, evita conflito com width: 50% */
+            min-width: 300px;
+            max-width: 600px;
+            padding: 30px 40px 30px 30px;
+            border-radius: 8px;
+            background-color: white;
+            box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .graph-box > div {
+            width: 100% !important;
+            height: auto !important;
+        }
+
+        .plotly-graph-div {
+            position: static !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            z-index: 0 !important;
+            overflow: visible !important;
+        }
+    </style>
+
+    <script>
+        // Aguarda renderização completa e força resize dos gráficos
+        window.addEventListener("load", function () {
+            setTimeout(() => {
+                const graphs = document.querySelectorAll(".plotly-graph-div");
+                graphs.forEach(div => {
+                    if (typeof Plotly !== 'undefined') {
+                        Plotly.Plots.resize(div);
+                    }
+                });
+            }, 150);
+        });
+    </script>
+{% endblock %}
+
+{% block content %}
+    <div class="search-and-filters">
+        {% render_form form %}
+    </div> 
+    <div class="tab-pane" data-tab="beneficio-geral" data-title="Dados gerais">
+        <div class="grid-container grid-columns">
+            <div class="grid-item">
+                <h4>Estatísticas</h4>
+                <div class="flex-container boxes services">
+                    <a href="" class="box-item">
+                        {% icone "eye" %}
+                        <h4>Total de Benefícios</h4>
+                        <p class="stat">{{ total_beneficios }}</p>
+                    </a>
+                    <a href="" class="box-item warning">
+                        {% icone "exclamation-triangle" %}
+                        <h4>Benefícios em monitoramento </h4>
+                        <p class="stat">{{ beneficios.pendentes }}</p>
+                    </a>
+                    <a href="" class="box-item success">
+                        {% icone "check" %}
+                        <h4>Benefícios Concluídos</h4>
+                        <p class="stat">{{ beneficios.concluidos }}</p>
+                    </a>
+                    <a href="" class="box-item error">
+                        {% icone "times" %}
+                        <h4>Benefícios Finalizados </h4>
+                        <p class="stat">{{ beneficios.finalizados }}</p>
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="graph-row">
+            <div class="graph-box">
+                <h2>Tipos de Benefício </h2>
+                {{ chart_tipos_de_beneficio|safe }}
+            </div>
+            <div class="graph-box">
+                <h2>Status de Conclusão do Benefício</h2>
+                {{ chart_conclusao_porcentagem|safe }}
+            </div>
+        </div>
+        <div class="graph-row">
+            <div class="graph-box">
+                <h2>Benefício por Status</h2>
+                {{ chart_status_por_etapa|safe }}
+            </div>
+        </div>
+        <div class="graph-row">
+            <div class="graph-box">
+                {{ chart_evolucao_por_tipo|safe }}
+            </div>
+        </div>
+    </div>
+    <div class="tab-pane" data-tab="beneficio-financeiro" data-title="Benefícios Financeiros">
+        <div class="grid-container grid-columns">
+            <div class="grid-item">
+                <h4>Estatísticas</h4>
+                <div class="flex-container boxes services">
+                    <a href="" class="box-item">
+                        {% icone "eye" %}
+                        <h4>Total de Benefícios Financeiros</h4>
+                        <p class="stat">R$ {{ total_beneficios_financeiros|floatformat:2 }}</p>
+                    </a>
+                    <a href="" class="box-item success">
+                        {% icone "exclamation-triangle" %}
+                        <h4>Total de Valores Recuperados </h4>
+                        <p class="stat">R$ {{ total_recuperado|floatformat:2 }}</p>
+                    </a>
+                    <a href="" class="box-item warning">
+                        {% icone "check" %}
+                        <h4>Total de Gastos Indevidos Evitados</h4>
+                        <p class="stat">R$ {{ total_evitado|floatformat:2 }}</p>
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="graph-row"> 
+            <div class="graph-box">
+                <h2>Valores Planejado vs Efetivo</h2>
+                {{ chart_planejado_vs_efetivo|safe }}
+            </div>
+            <div class="graph-box">
+                <h2>Valores Recuperados e Evitados por Ano</h2>
+                {{ chart_valores_por_natureza_bar|safe }}
+            </div>
+        </div>
+        <div class="graph-row"> 
+            <div class="graph-box">
+                <h2>Evolução dos Gastos por Natureza Financeira</h2>
+                {{ chart_valores_por_natureza_linha|safe }}
+            </div>
+        </div>
+    </div>
+
+    <div class="tab-pane" data-tab="beneficio-qualitativo" data-title="Benefícios Qualitativos">
+        <div class="grid-container grid-columns">
+            <div class="grid-item">
+                <h4>Estatísticas</h4>
+                <div class="flex-container boxes services">
+                    <a href="" class="box-item">
+                        {% icone "eye" %}
+                        <h4>Total de Benefícios Qualitativos</h4>
+                        <p class="stat">{{ total_beneficios_qualitativos }}</p>
+                    </a>
+                    <a href="" class="box-item success">
+                        {% icone "exclamation-triangle" %}
+                        <h4>Total de Benefícios por Unidade </h4>
+                        <p class="stat">{{ total_beneficios_por_unidade }}</p>
+                    </a>
+                    <a href="" class="box-item warning">
+                        {% icone "check" %}
+                        <h4>Total de Benefícios por Dimensão</h4>
+                        <p class="stat">{{ total_beneficios_por_estrategia }}</p>
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="graph-row"> 
+            <div class="graph-box">
+                <h2>Distribuição de Benefícios Qualitativos por Unidade Afetada</h2>
+                {{ chart_qualitativo_por_unidade|safe }}
+            </div>
+            <div class="graph-box">
+                <h2>Distribuição por Alcance Estratégico</h2>
+                {{ chart_qualitativo_por_estrategia|safe }}
+            </div>
+        </div>
+        <div class="graph-row"> 
+            <div class="graph-box">
+                <h2>Distribuição por Dimensão</h2>
+                {{ chart_estrategia_por_ano|safe }}
+            </div>
+        </div>
+        <div class="graph-row"> 
+            <div class="graph-box">
+                <h2>Unidade Afetada vs Alcance Estratégico</h2>
+                {{ chart_relacao_unidade_estrategia|safe }}
+            </div>
+        </div>
+    </div>
+{% endblock %}

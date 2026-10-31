@@ -1,0 +1,177 @@
+name: suap
+
+x-app: &app
+  image: ${SUAP_IMAGE:-suap:prod}
+  build:
+    context: ..
+    dockerfile: compose/Dockerfile
+    target: suap-app
+  env_file:
+    - .env
+  networks:
+    - suap_back
+  restart: unless-stopped
+  depends_on:
+    db:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  user: "33:33"
+  security_opt:
+    - no-new-privileges:true
+
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: suap-nginx
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./nginx/suap.conf:/etc/nginx/conf.d/default.conf:ro
+      - suap_static:/opt/suap/static:ro
+      - suap_media:/opt/suap/deploy/media:ro
+      - ${SUAP_TLS_HOST_PATH:-../data/tls}:/etc/nginx/tls:ro
+    networks:
+      - suap_front
+      - suap_back
+    depends_on:
+      web:
+        condition: service_started
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+  web:
+    <<: *app
+    container_name: suap-web
+    command: ["gunicorn"]
+    volumes:
+      - suap_media:/opt/suap/deploy/media
+      - suap_static:/opt/suap/static
+      - suap_logs:/opt/suap/deploy/logs
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8000/accounts/login/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 30
+      # sync/migrate inicial do SUAP oficial pode passar de 30–40 min em VM 4GB
+      start_period: 2400s
+    shm_size: 256mb
+
+  celery_worker:
+    <<: *app
+    container_name: suap-celery-worker
+    command: ["celery-worker"]
+    volumes:
+      - suap_media:/opt/suap/deploy/media
+      - suap_logs:/opt/suap/deploy/logs
+    environment:
+      RUN_SYNC_ON_START: "False"
+
+  celery_beat:
+    <<: *app
+    container_name: suap-celery-beat
+    command: ["celery-beat"]
+    volumes:
+      - suap_logs:/opt/suap/deploy/logs
+    environment:
+      RUN_SYNC_ON_START: "False"
+
+  db:
+    image: postgres:18
+    container_name: suap-db
+    environment:
+      POSTGRES_DB: ${DATABASE_NAME:-suap}
+      POSTGRES_USER: ${DATABASE_USER:-suap}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?DATABASE_PASSWORD obrigatório}
+      # PG 18+: PGDATA padrão = /var/lib/postgresql/18/docker
+    command:
+      - postgres
+      - -c
+      - shared_buffers=${PG_SHARED_BUFFERS:-512MB}
+      - -c
+      - work_mem=${PG_WORK_MEM:-16MB}
+      - -c
+      - maintenance_work_mem=${PG_MAINTENANCE_WORK_MEM:-128MB}
+      - -c
+      - effective_cache_size=${PG_EFFECTIVE_CACHE_SIZE:-1536MB}
+      - -c
+      - max_connections=${PG_MAX_CONNECTIONS:-100}
+      - -c
+      - max_locks_per_transaction=256
+      - -c
+      - random_page_cost=1.1
+      - -c
+      - checkpoint_completion_target=0.9
+      - -c
+      - wal_buffers=16MB
+    volumes:
+      - ${SUAP_POSTGRES_HOST_PATH:-../data/postgres}:/var/lib/postgresql
+      - ./postgres/init-extensions.sql:/docker-entrypoint-initdb.d/01-extensions.sql:ro
+    networks:
+      - suap_back
+    restart: unless-stopped
+    shm_size: ${PG_SHM_SIZE:-512mb}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER:-suap} -d ${DATABASE_NAME:-suap}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    security_opt:
+      - no-new-privileges:true
+
+  redis:
+    image: redis:7-alpine
+    container_name: suap-redis
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --requirepass
+      - ${REDIS_PASSWORD:?REDIS_PASSWORD obrigatório}
+      - --maxmemory
+      - ${REDIS_MAXMEMORY:-1gb}
+      - --maxmemory-policy
+      - allkeys-lru
+      - --tcp-backlog
+      - "4096"
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    volumes:
+      - ${SUAP_REDIS_HOST_PATH:-../data/redis}:/data
+    networks:
+      - suap_back
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  # front: único ingresso público (Nginx 80/443)
+  suap_front:
+    name: suap_front
+    driver: bridge
+  # back: sem portas publicadas no host; egress liberado para SIAPE/e-mail/Gov.br/LDAP
+  suap_back:
+    name: suap_back
+    driver: bridge
+
+volumes:
+  suap_media:
+    name: suap_media
+  suap_static:
+    name: suap_static
+  suap_logs:
+    name: suap_logs

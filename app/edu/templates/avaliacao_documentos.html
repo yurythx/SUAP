@@ -1,0 +1,62 @@
+{% extends super_template %}
+
+{% block content %}
+
+        {% autopaginate qs 25 %}
+        {% if qs.exists %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Documentos aguardando validação</caption>
+                    <thead>
+                    <tr>
+                        <th>Aluno</th>
+                        <th>Tipo</th>
+                        <th>Descrição</th>
+                        <th>Origem do documento</th>
+                        <th>Enviado em</th>
+                        <th>Validado</th>
+                        <th>Observação</th>
+                        <th class="no-print">Opções</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for aluno_arquivo in qs %}
+                        {% if aluno_arquivo.descricao != 'Cópia de Laudo Médico nos Últimos 12 Meses' %}
+                        <tr>
+                            <td>{{ aluno_arquivo.aluno }}</td>
+                            <td>{{ aluno_arquivo.tipo|format }}</td>
+                            <td>{{ aluno_arquivo.descricao }}</td>
+                            <td>{{ aluno_arquivo.get_tipo_origem_cadastro_display }}</td>
+                            <td>{{ aluno_arquivo.data_hora_upload }}</td>
+                            <td>{{ aluno_arquivo.validado|format }}</td>
+                            <td>
+                                {% if aluno_arquivo.responsavel_validacao %}
+                                    Avaliado por {{ aluno_arquivo.responsavel_validacao|format }}
+                                    <br> em {{ aluno_arquivo.data_validacao|format }}.
+                                    <br>
+                                {% endif %}
+                                {% if aluno_arquivo.observacao %}
+                                    {{ aluno_arquivo.observacao|format }}
+                                {% endif %}
+                            </td>
+                            <td class="no-print">
+                                {% if aluno_arquivo|method:"can_validate"|call:request.user %}
+                                    <ul class="action-bar">
+                                        <li><a class="btn popup success" href="/edu/avaliar_arquivo_unico/{{ aluno_arquivo.pk }}/">Avaliar Arquivo</a></li>
+                                        <li><a target="_blank" class="btn" href="/rh/arquivo_unico/{{ aluno_arquivo.arquivo_unico.hash_sha512_link_id }}/?filename={{ aluno_arquivo.nome_exibicao }}">Baixar Arquivo</a></li>
+                                        <li><a class="btn default" href="/edu/aluno/{{ aluno_arquivo.aluno.matricula }}/">Visualizar Aluno</a></li>
+                                    </ul>
+                                {% endif %}
+                            </td>
+
+                        </tr>
+                        {% endif %}
+                    {% endfor %}
+                    </tbody>
+                </table>
+                {% paginate %}
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Nenhum documento encontrado.</p>
+        {% endif %}
+{% endblock %}

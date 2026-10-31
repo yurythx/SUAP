@@ -1,0 +1,187 @@
+{% extends "rsc_tae/documentos/_base_pdf.html" %}
+{% load rsc_tae_extras %}
+
+{% block doc_titulo %}DELIBERAÇÃO DA CRSC — RSC-TAE{% endblock %}
+
+{% block doc_style %}
+    .rsc-doc-delib-cabecalho {
+        font-size: 11pt;
+        line-height: 1.6em;
+        margin-bottom: 16px;
+    }
+    .rsc-doc-delib-resultado {
+        text-align: center;
+        font-size: 13pt;
+        font-weight: bold;
+        letter-spacing: 2px;
+        padding: 10px;
+        margin: 14px 0;
+        border: 2px solid #000;
+    }
+    .rsc-doc-delib-deferido { background-color: #d4edda; }
+    .rsc-doc-delib-indeferido { background-color: #f8d7da; }
+    .rsc-doc-delib-secao {
+        font-size: 12pt;
+        font-weight: bold;
+        margin: 20px 0 8px 0;
+    }
+    table.rsc-doc-delib-tab th {
+        background-color: #eee;
+    }
+    .rsc-doc-delib-item {
+        page-break-inside: avoid;
+        margin-bottom: 10px;
+    }
+    .rsc-doc-delib-item-titulo {
+        font-weight: bold;
+        background-color: #f2f2f2;
+        padding: 3px 6px;
+        border: 1px solid #ccc;
+        border-bottom: 0;
+    }
+    .rsc-doc-delib-just {
+        line-height: 1.5em;
+    }
+    .rsc-doc-hash-mini {
+        font-family: monospace;
+        font-size: 7pt;
+        color: #555;
+        word-break: break-all;
+        margin-top: 2px;
+    }
+{% endblock %}
+
+{% block content %}
+    <div class="rsc-doc-corpo">
+        {% with sigla=nivel.ordem_romana %}
+            <div class="rsc-doc-delib-cabecalho">
+                <p><strong>Processo nº</strong> {% if numero_processo_eletronico %}{{ numero_processo_eletronico }}{% else %}nº {{ processo.id }}{% endif %}</p>
+                <p><strong>INTERESSADO(A):</strong> {{ dados.nome }}, matrícula SIAPE nº {{ dados.matricula|default:"—" }}, cargo de {{ dados.cargo|default:"—" }}.</p>
+                <p><strong>ASSUNTO:</strong> Deliberação sobre a concessão de RSC-PCCTAE {{ sigla }}</p>
+            </div>
+
+            <p class="rsc-doc-parecer-corpo">
+                A Comissão para Reconhecimento de Saberes e Competências do PCCTAE do
+                {% get_valor_por_chave "comum" "instituicao_sigla" %}, reunida para deliberar sobre o requerimento de
+                RSC-PCCTAE {{ sigla }} do(a) servidor(a) {{ dados.nome }}, registrou as decisões a seguir.
+            </p>
+
+            {% if deferido %}
+                <div class="rsc-doc-delib-resultado rsc-doc-delib-deferido">DEFERIDO</div>
+            {% else %}
+                <div class="rsc-doc-delib-resultado rsc-doc-delib-indeferido">INDEFERIDO</div>
+            {% endif %}
+
+            <table class="bordered">
+                <tr>
+                    <td><strong>Pontuação consolidada</strong></td>
+                    <td class="text-center nowrap">{{ resumo_final.total_pontos|format }} / {{ resumo_final.pontos_requeridos|format }}</td>
+                    <td><strong>Itens validados</strong></td>
+                    <td class="text-center nowrap">{{ resumo_final.itens_validados }} / mínimo {{ resumo_final.itens_requeridos }}</td>
+                </tr>
+                {% if deliberacao %}
+                    <tr>
+                        <td><strong>Data da deliberação</strong></td>
+                        <td class="nowrap">{{ deliberacao.data_deliberacao|date:"d/m/Y H:i" }}</td>
+                        <td><strong>Autenticação (SHA-256)</strong></td>
+                        <td class="rsc-doc-hash">{{ deliberacao.assinatura_hash|default:"—" }}</td>
+                    </tr>
+                {% endif %}
+            </table>
+
+            <div class="rsc-doc-delib-secao">1. Votos dos membros da CRSC</div>
+            <table class="bordered rsc-doc-delib-tab">
+                <thead>
+                    <tr>
+                        <th>Membro</th>
+                        <th class="text-center">Voto</th>
+                        <th class="text-center">Pontuação</th>
+                        <th>Justificativa</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for voto in votos_finais %}
+                        <tr>
+                            <td>
+                                {{ voto.deliberado_por_vinculo.pessoa.nome|default:voto.deliberado_por_vinculo }}{% if voto.desempate %} <span class="text-muted">(desempate)</span>{% endif %}
+                                {% if voto.assinatura_hash %}<div class="rsc-doc-hash-mini">Assinatura (SHA-256): {{ voto.assinatura_hash }}</div>{% endif %}
+                            </td>
+                            <td class="text-center nowrap">
+                                {% if voto.resultado == 4 %}<span class="status status-success">Deferido</span>
+                                {% elif voto.resultado == 5 %}<span class="status status-danger">Indeferido</span>
+                                {% else %}—{% endif %}
+                            </td>
+                            <td class="text-center nowrap">{{ voto.pontuacao_final|format|default_if_none:"—" }}</td>
+                            <td class="rsc-doc-delib-just">
+                                {% if voto.motivos_indeferimento_display %}
+                                    <ul class="rsc-doc-parecer-bullets">
+                                        {% for motivo in voto.motivos_indeferimento_display %}<li>{{ motivo }}</li>{% endfor %}
+                                    </ul>
+                                    {% if voto.justificativa %}{{ voto.justificativa }}{% endif %}
+                                {% else %}
+                                    {{ voto.justificativa|default:"—" }}
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="4">Nenhum voto final registrado.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <div class="rsc-doc-delib-secao">2. Deliberações por item (divergências)</div>
+            {% if divergencias %}
+                {% for d in divergencias %}
+                    <div class="rsc-doc-delib-item">
+                        <div class="rsc-doc-delib-item-titulo">
+                            {{ d.item.numero }}. {{ d.item.titulo }}
+                            {% if d.requisito %}<span class="text-muted">— Requisito {{ d.requisito.numeral_romano }}</span>{% endif %}
+                        </div>
+                        <table class="bordered rsc-doc-delib-tab">
+                            <thead>
+                                <tr>
+                                    <th>Membro</th>
+                                    <th class="text-center">Decisão</th>
+                                    <th class="text-center">Unid. reconhecidas</th>
+                                    <th>Justificativa</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for voto in d.votos %}
+                                    <tr>
+                                        <td>
+                                            {{ voto.deliberado_por_vinculo.pessoa.nome|default:voto.deliberado_por_vinculo }}{% if voto.desempate %} <span class="text-muted">(desempate)</span>{% endif %}
+                                            {% if voto.assinatura_hash %}<div class="rsc-doc-hash-mini">Assinatura (SHA-256): {{ voto.assinatura_hash }}</div>{% endif %}
+                                        </td>
+                                        <td class="text-center nowrap">{{ voto.get_decisao_display }}</td>
+                                        <td class="text-center nowrap">{{ voto.pontuacao_crsc|format|default_if_none:"—" }}</td>
+                                        <td class="rsc-doc-delib-just">{{ voto.justificativa|default:"—" }}</td>
+                                    </tr>
+                                {% empty %}
+                                    <tr><td colspan="4">Sem votos registrados para este item.</td></tr>
+                                {% endfor %}
+                                <tr>
+                                    <td colspan="3" class="text-end"><strong>Unidades consolidadas (maioria)</strong></td>
+                                    <td class="nowrap">{{ d.status_deliberacao.nota_consolidada|format|default_if_none:"—" }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p class="rsc-doc-parecer-corpo">Não houve divergência entre os avaliadores auxiliares que exigisse deliberação item a item.</p>
+            {% endif %}
+
+            <div class="rsc-doc-data-local">
+                <p>{{ dados.municipio|default:"___________________" }}{% if dados.uf %} – {{ dados.uf }}{% endif %}, {{ hoje|date:"d \d\e F \d\e Y" }}.</p>
+            </div>
+
+            {% for membro in membros_crsc %}
+                <div class="rsc-doc-assinatura">
+                    <div class="rsc-doc-assinatura-linha">{{ membro.nome }}</div>
+                    <p>Membro — Comissão de Reconhecimento de Saberes e Competências (CRSC-PCCTAE){% if membro.desempate %} — voto de desempate{% endif %}</p>
+                </div>
+            {% endfor %}
+        {% endwith %}
+    </div>
+{% endblock %}

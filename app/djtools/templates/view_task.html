@@ -1,0 +1,139 @@
+
+{% extends super_template %}
+{% load tags %}
+
+{% block action-bar %}
+<ul class="action-bar">
+    {% if i.percent == 100 or i.error %}
+        {% if i.start > data_exclusao and i.file %}
+            <li><a href="?download=1" class="btn">Baixar arquivo</a></li>
+        {% endif %}
+    {% elif not i.error %}
+        <li><a href="/djtools/process/{{ i.uuid }}/" class="btn">Acompanhar em Tempo Real</a></li>
+    {% endif %}
+</ul>
+{% endblock %}
+
+{% block content %}
+    {% if not i.user %}
+        <p class="alert alert-warning">Esta tarefa será removida em 24h após o início da execução.</p>
+    {% endif %}
+    {% if i.file %}
+        {% if i.start > data_exclusao %}
+            <p class="alert alert-info">O arquivo gerado por esta tarefa já está disponível.</p>
+        {% else %}
+            <p class="alert alert-danger">O arquivo gerado por esta tarefa já foi excluido.</p>
+        {% endif %}
+        {% if i.user %}
+            <p class="alert alert-warning">O arquivo desta tarefa será removido em 48h após o início da execução.</p>
+        {% endif %}
+    {% else %}
+        {% if i.percent == 100 %}
+            <p class="alert alert-success">Tarefa concluida com sucesso. Esta tarefa não gerou nenhum arquivo.</p>
+        {% elif i.error %}
+            <p class="alert alert-warning">Ocorreu algum erro durante a execução desta tarefa, por favor tente novamente.</p>
+        {% else %}
+            <p class="alert alert-info">Aguarde, esta tarefa ainda está sendo processada.</p>
+        {% endif %}
+    {% endif %}
+
+    {% progressbar i.percent %}
+
+    {% box "Detalhes da Tarefa" %}
+    <dl class="definition-list flex">
+        <div class="list-item flex-basis-100">
+            <dt>Situação</dt>
+            {% if i.error %}
+                <dd>Erro ao processar esta tarefa.</dd>
+            {% else %}
+                <dd>{{ i.message|format }}</dd>
+            {% endif %}
+        </div>
+        {% if user|in_group:"Desenvolvedor" %}
+            <div class="list-item">
+                <dt>Usuário</dt>
+                <dd>{{ i.user|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>ID</dt>
+                <dd>{{ i.id }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>UUID</dt>
+                <dd>{{ i.uuid }}</dd>
+            </div>
+        {% endif %}
+        <div class="list-item">
+            <dt>Tipo</dt>
+            <dd>{{ i.type }}</dd>
+        </div>
+        <div class="list-item flex-basis-50">
+            <dt>Início da Execução</dt>
+            <dd>{{ i.start }}</dd>
+        </div>
+        <div class="list-item flex-basis-50">
+            <dt>Fim da Execução</dt>
+            <dd>{{ i.end }}</dd>
+        </div>
+        {% if request.user.is_superuser %}
+            <div class="list-item">
+                <dt>Total</dt>
+                <dd>{{ i.total }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Parcial</dt>
+                <dd>{{ i.partial }}</dd>
+            </div>
+            {% if i.error %}
+                <div class="list-item flex-basis-100">
+                    <dt>Erro</dt>
+                    <dd><pre>{{ i.error }}</pre></dd>
+                </div>
+            {% endif %}
+            <div class="list-item">
+                <dt>URL de Redirecionamento</dt>
+                <dd>{{ i.url }}</dd>
+            </div>
+        {% endif %}
+        <div class="list-item">
+            <dt>Arquivo</dt>
+            {% if i.start > data_exclusao %}
+                <dd>{% if i.file %}Disponível{% else %}Indisponível{% endif %}</dd>
+            {% else %}
+                <dd>Excluido</dd>
+            {% endif %}
+        </div>
+    </dl>
+    {% endbox %}
+    {% if request.user.is_superuser and i.celery_uuid %}
+        {% box "Detalhes da Tarefa na Fila do Celery" %}
+            {% if result.status == 'PENDING' and not result_details %}
+                <p class="alert alert-warning">Esta tarefa não está mais listada na fila do celery.</p>
+            {% else %}
+                <p class="alert alert-warning">Estes dados contém informações da tarefa na fila do celery.</p>
+                <dl class="definition-list flex">
+                    <div class="list-item">
+                        <dt>UUID da Tarefa no Celery</dt>
+                        <dd>{{ result.id }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Status</dt>
+                        <dd>{{ result.status }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Fila</dt>
+                        <dd>{{ i.celery_queue }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Ações</dt>
+                        <dd><a href="?revoke=1" class="btn danger">Cancelar Execução</a></dd>
+                    </div>
+                    <dt>Detalhes</dt>
+                    <dd><pre>
+                        {{ result_details|format }}
+                    </pre></dd>
+                </dl>
+            {% endif %}
+        {% endbox %}
+    {% endif %}
+{% endblock %}

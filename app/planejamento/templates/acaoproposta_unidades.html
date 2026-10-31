@@ -1,0 +1,99 @@
+{% extends super_template %}
+
+{% block extracss %}
+<link rel="stylesheet" href="/static/planejamento/css/planejamento.css" />
+<link rel="stylesheet" href="/static/comum/deprecated/css/ui-lightness/jquery-ui-1.8.4.custom.css" />
+{% endblock %}
+    
+{% block extrahead %}
+<script src="/static/planejamento/js/MetaUnidadeAcaoPropostaForm.js"></script>
+{% endblock %}
+
+{% block content %}
+    <h1>Unidades Administrativas da Ação Proposta</h1>
+
+	{% box 'Dados gerais' %}
+    <table>
+    	<tr>
+            <td>Objetivo Estratégico</td>
+			<td>{{ acao_proposta.meta.objetivo_estrategico.get_codigo_completo }} - {{ acao_proposta.meta.objetivo_estrategico }}</td>
+		</tr>
+        <tr>
+            <td>Meta</td>
+			<td>{{ acao_proposta.meta.get_codigo_completo }} - {{ acao_proposta.meta }}</td>
+		</tr>
+		<tr>
+            <td>Ação Proposta</td>
+			<td>{{ acao_proposta.get_codigo_completo }} - {{ acao_proposta.titulo }}</td>
+		</tr>
+    </table>
+	{% endbox %}
+	
+	{% if acao_proposta.metaunidadeacaoproposta_set.all %}
+	{% box 'Unidades Administrativas Associadas' %}
+    <table>
+        <thead>
+            <tr>
+            	{% if acao_proposta.meta.objetivo_estrategico.configuracao.periodo_sistemico %}
+            		<th>Ações</th>
+            	{% endif %}
+				<th>Nome</th>
+				<th width="130px">Valor Unitário</th>
+				<th width="100px">Quantidade</th>
+				<th width="130px">Valor Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for unidade_acao_proposta in acao_proposta.metaunidadeacaoproposta_set.all %}
+            <tr>
+            	{% if acao_proposta.meta.objetivo_estrategico.configuracao.periodo_sistemico %}
+                	<td>
+                		<a id="lnk_editar_meta_unidade" href="/planejamento/acaoproposta/{{ acao_proposta.id }}/unidade/{{ unidade_acao_proposta.id }}/" class="icon icon-edit" title="Editar Unidade"><span class="visually-hidden">Editar</span></a>
+						{% icon "delete" "/planejamento/acaoproposta/{{ acao_proposta.id }}/unidade/{{ unidade_acao_proposta.id }}/remover/" %}
+					</td>
+				{% endif %}
+				<td>{{ unidade_acao_proposta.meta_unidade.unidade }}</td>
+				<td class="text-end">{{ unidade_acao_proposta.valor_unitario|mascara_dinheiro }}</td>
+				<td class="text-center">{{ unidade_acao_proposta.quantidade }}</td>
+				<td class="text-end">{{ unidade_acao_proposta.get_valor_total|mascara_dinheiro }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+		<tfoot>				
+			<tr>
+				<td colspan="{% if acao_proposta.meta.objetivo_estrategico.configuracao.periodo_sistemico %}4{% else %}2{% endif %}" class="right_label negrito_label">Total</td>
+				<td style="text-align:center;font-weight:bold;">{{ acao_proposta.get_quantidade_total }}</td>
+				<td class="right_label negrito_label">{{ acao_proposta.get_valor_total|mascara_dinheiro }}</td>
+			</tr>
+		</tfoot>
+    </table>
+	{% endbox %}
+	{% endif %}
+	
+	<a name="fcad" />
+	
+	<div id="botoes" class="botoes">
+		{% with acao_proposta.metaunidadeacaoproposta_set.count as total %}
+		{% if total != metaunidades.count %}
+		<a id="btn_cadastrar" href="#fcad" class="lnk_botao{% if form.instance.pk or not acao_proposta.meta.objetivo_estrategico.configuracao.periodo_sistemico %} invisivel{% endif %}">Associar Unidade Administrativa</a>
+		{% endif %}
+		<a id="btn_reset_form_edicao" href="#fcad" class="lnk_botao{% if not form.instance.pk %} invisivel{% endif %}">Cancelar</a>
+		{% if not total and metaunidades.count %}
+    	<a id="btn_associar_todos_campi" href="#" class="lnk_botao {% if not acao_proposta.meta.objetivo_estrategico.configuracao.periodo_sistemico %}invisivel{% endif %}">Associar Todos os Campi</a>
+		<a id="btn_reset_form_todos_campi" href="#" class="lnk_botao {% if not form_todos_campi.is_valid %}invisivel{% endif %}">Cancelar</a>
+		{% endif %}
+		{% endwith %}
+		
+   	</div>
+	
+	<div {% if not form.instance.pk and not form.errors %}class="invisivel"{% endif %}>
+		{% render_form form %}
+	</div>
+	
+	<div {% if not form_todos_campi.errors %}class="invisivel"{% endif %}>
+		{% if form_todos_campi %} 
+		{% render_form form_todos_campi %}
+		{% endif %}
+	</div>
+
+{% endblock %}

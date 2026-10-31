@@ -1,0 +1,226 @@
+{% extends super_template %}
+
+{% block extrahead %}
+    <script>
+        // Conferir não recarrega a página de propósito: é isso que mantém a planilha escolhida
+        // presa ao campo de arquivo. Confirmar é a submissão normal deste mesmo formulário, que
+        // reenvia o arquivo — assim o SUAP não precisa guardar a planilha em lugar nenhum entre
+        // os dois passos.
+        $(function () {
+            var $formulario = $('#form-migracao');
+            var $resultado = $('#resultado-conferencia');
+            var $arquivo = $formulario.find('input[type="file"]');
+            var $conferir = $formulario.find('input[type="submit"]');
+            var rotuloConferir = $conferir.val();
+            var confirmando = false;
+
+            function marcarPasso(estado) {
+                $('#passo-envio').attr('class', estado === 'valida' ? 'step-success' : 'step-alert active');
+                $('#passo-conferencia').attr('class', estado === 'valida' ? 'step-alert active' : 'step-info');
+            }
+
+            // Trocar de planilha invalida a conferência anterior: o resultado some e o botão de
+            // importar vai junto, porque ele importaria um arquivo que ninguém conferiu.
+            $arquivo.on('change', function () {
+                $resultado.empty();
+                marcarPasso('envio');
+            });
+
+            $(document).on('click', '#confirmar-migracao', function (evento) {
+                if (confirmando) {
+                    // Segundo clique enquanto o primeiro POST ainda navega: reenviaria a mesma
+                    // planilha e o acervo entraria duas vezes.
+                    evento.preventDefault();
+                    return;
+                }
+                confirmando = true;
+                // Desabilitar o botão seria mais direto, mas controle desabilitado não vai no POST
+                // e é dele que sai o `confirmar` que a view exige; então só o rótulo muda.
+                $(this).text('Importando...');
+            });
+
+            $formulario.on('submit', function (evento) {
+                if (confirmando) {
+                    return;
+                }
+                evento.preventDefault();
+                $conferir.prop('disabled', true).val('Conferindo...');
+                $.ajax({
+                    url: window.location.pathname,
+                    type: 'POST',
+                    data: new FormData($formulario[0]),
+                    processData: false,
+                    contentType: false
+                }).done(function (html) {
+                    $resultado.html(html);
+                    marcarPasso($resultado.find('[data-conferencia]').data('conferencia'));
+                }).fail(function () {
+                    $resultado.html('<p class="alert alert-danger"><strong>Atenção:</strong> não foi possível conferir a planilha. Tente novamente.</p>');
+                    marcarPasso('envio');
+                }).always(function () {
+                    $conferir.prop('disabled', false).val(rotuloConferir);
+                });
+            });
+        });
+    </script>
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        <li><a class="btn primary" href="/patrimonio/migracao/modelo/">{% icone "download" %} Baixar planilha modelo</a></li>
+    </ul>
+{% endblock %}
+
+{% block content %}
+    <ul class="steps">
+        <li aria-label="Passo 1" class="hint hint-bottom">
+            {% if conferencia.valida %}
+                <span id="passo-envio" class="step-success">Envio da planilha</span>
+            {% else %}
+                <span id="passo-envio" class="step-alert active">Envio da planilha</span>
+            {% endif %}
+        </li>
+        <li aria-label="Passo 2" class="hint hint-bottom">
+            {% if conferencia.valida %}
+                <span id="passo-conferencia" class="step-alert active">Conferência</span>
+            {% else %}
+                <span id="passo-conferencia" class="step-info">Conferência</span>
+            {% endif %}
+        </li>
+        <li aria-label="Passo 3" class="hint hint-bottom"><span class="step-info">Confirmação</span></li>
+    </ul>
+
+    <div class="alert alert-info">
+        <p>
+            <strong>Informação:</strong> <strong>cada linha da planilha é um bem</strong>, e a migração
+            reconstrói a cadeia patrimonial inteira dele: empenho, entrada, item, tombamento, carga
+            contábil e as movimentações.
+        </p>
+        <p>
+            <strong>As regras aplicadas são estas:</strong>
+        </p>
+        <ul>
+            <li>
+                O número de tombamento é gerado pelo SUAP. Registre o tombo do sistema antigo na coluna
+                <code>observação</code> — ele fica guardado na observação do inventário.
+            </li>
+            <li>O processo informado abaixo fica registrado em todos os empenhos e entradas criados.</li>
+            <li>
+                Bens <strong>com</strong> número de empenho migram como <strong>compra</strong>: o empenho e o
+                item empenhado são criados (ou reaproveitados) e o fornecedor e as demais informações da linha
+                entram como vieram na planilha.
+            </li>
+            <li>
+                Bens <strong>sem</strong> número de empenho migram como <strong>doação</strong>: a entrada é do tipo
+                Doação e não tem item empenhado, mas o CPF/CNPJ e o nome do fornecedor da planilha são preservados
+                — é o doador do bem.
+            </li>
+            <li>
+                As colunas <code>empenho_numero</code> e <code>fornecedor_documento</code> são obrigatórias na
+                planilha e precisam estar no cabeçalho. O <strong>CPF/CNPJ do fornecedor é sempre exigido</strong>,
+                inclusive na doação; o <strong>número do empenho pode ficar em branco</strong>, e é exatamente essa
+                célula vazia que manda o bem entrar como doação.
+            </li>
+            <li>
+                Empenho que já exista no campus com o mesmo número é reaproveitado, e a conferência avisa
+                se o fornecedor divergir. Empenho de material de consumo é recusado.
+            </li>
+            <li>
+                Bens do mesmo empenho com a mesma nota fiscal e a mesma data de entrada entram na mesma entrada;
+                entre eles, os de mesma descrição, valor e elemento de despesa viram um único item de quantidade N.
+                Nas doações, quem separa uma entrada da outra é o fornecedor, já que não há empenho.
+            </li>
+            <li>
+                O fornecedor informado é localizado pelo CPF/CNPJ: havendo cadastro no SUAP, ele é
+                reaproveitado; não havendo, é cadastrado pela migração.
+            </li>
+            <li>
+                Bens <strong>sem</strong> matrícula de responsável entram com situação <em>pendente</em> e sem
+                requisição de transferência. A carga deles pode ser feita depois, pela tela de Carga.
+            </li>
+            <li>
+                Bens <strong>com</strong> responsável entram ativos, com a requisição de carga já deferida — o
+                servidor não precisa aceitar e não recebe e-mail.
+            </li>
+            <li>
+                A coluna <strong>Sala</strong> vira um <strong>rótulo</strong> do inventário, criado no campus
+                se ainda não existir. O campo Sala do bem fica vazio, para receber depois a sala cadastrada no SUAP.
+            </li>
+            <li>Estado de conservação em branco assume <em>bom</em>.</li>
+            <li>
+                Conferir não grava nada e não guarda o arquivo: o SUAP lê o que você enviou e devolve o
+                resultado. Se não houver erro, o botão de importar aparece no fim da página.
+            </li>
+            <li>
+                A importação roda em segundo plano — não há limite de tamanho — e em uma única transação:
+                se algo falhar no meio, nada é gravado. Você acompanha o progresso na tela da tarefa.
+            </li>
+        </ul>
+    </div>
+
+    {% box "Colunas esperadas" %}
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Coluna</th>
+                        <th>Nome</th>
+                        <th>Obrigatória</th>
+                        <th>O que informar</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for coluna in colunas %}
+                        <tr>
+                            <td><code>{{ coluna.nome }}</code></td>
+                            <td>{{ coluna.rotulo }}</td>
+                            <td>
+                                {% if coluna.condicional %}
+                                    <span class="status status-alert">Sim</span>
+                                    <p class="help">Célula {{ coluna.condicional }}.</p>
+                                {% elif coluna.obrigatoria %}
+                                    <span class="status status-error">Sim</span>
+                                {% else %}
+                                    <span class="status status-info">Não</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ coluna.ajuda }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endbox %}
+
+    {% comment %}
+        O formulário é montado aqui, e não pelo `render_form`, por dois motivos: o resultado da
+        conferência precisa caber dentro dele — é o que faz do botão de importar um submit comum,
+        que reenvia a planilha — e assim nada depende do id que o `render_form` inventa para o
+        formulário. A marcação dos campos é a mesma que o `djtools.forms.utils.render_form` produz.
+    {% endcomment %}
+    <form method="post" enctype="multipart/form-data" id="form-migracao">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+
+        <fieldset class="module aligned">
+            {% for campo in form %}
+                <div class="form-row {{ campo.name }}{% if campo.errors %} errors{% endif %}">
+                    <div class="field-box-first{% if campo.field.required %} required{% endif %}">
+                        {{ campo.errors }}
+                        {{ campo.label_tag }}
+                        {{ campo }}
+                        {% if campo.help_text %}<p class="help">{{ campo.help_text }}</p>{% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+        </fieldset>
+
+        <div class="submit-row">
+            <input type="submit" class="btn success" value="Conferir planilha" />
+        </div>
+
+        <div id="resultado-conferencia">
+            {% include "patrimonio/templates/migracao_conferencia.html" %}
+        </div>
+    </form>
+{% endblock %}

@@ -1,0 +1,112 @@
+{% extends "rsc_tae/documentos/_base_pdf.html" %}
+
+{% block doc_titulo %}FORMULÁRIO DE PONTUAÇÃO REQUERIDA — RSC-TAE{% endblock %}
+
+{% block doc_style %}
+    .rsc-doc-form-itens td, .rsc-doc-form-itens th {
+        font-size: 8pt !important;
+    }
+    .rsc-doc-form-itens .col-num { width: 7%; }
+    .rsc-doc-form-itens .col-titulo { width: 48%; }
+    .rsc-doc-form-itens .col-unidade { width: 12%; }
+    .rsc-doc-form-itens .col-qtd { width: 9%; }
+    .rsc-doc-form-itens .col-pu { width: 12%; }
+    .rsc-doc-form-itens .col-total { width: 12%; }
+    .rsc-doc-form-subtotal {
+        background-color: #eee;
+        font-weight: bold;
+    }
+    .rsc-doc-form-resumo th {
+        background-color: #eee;
+    }
+{% endblock %}
+
+{% block content %}
+    <div class="rsc-doc-corpo">
+        <h2>IDENTIFICAÇÃO</h2>
+        <table class="bordered">
+            <tr>
+                <td><strong>Servidor(a):</strong> {{ dados.nome }}</td>
+                <td><strong>Matrícula SIAPE:</strong> {{ dados.matricula|default:"—" }}</td>
+            </tr>
+            <tr>
+                <td><strong>Cargo:</strong> {{ dados.cargo|default:"—" }}</td>
+                <td><strong>Lotação:</strong> {{ dados.lotacao_uo|default:"—" }}</td>
+            </tr>
+            <tr>
+                <td><strong>Nível pretendido:</strong> RSC-{{ nivel.ordem_romana }} — {{ nivel.nome }}</td>
+                <td><strong>Processo nº:</strong> {{ processo.id }}</td>
+            </tr>
+        </table>
+
+        <h2>ITENS DECLARADOS POR REQUISITO</h2>
+        {% for grupo in grupos_requisito %}
+            <h3>{{ grupo.label|default:grupo.requisito.descricao_curta }}</h3>
+            <table class="bordered rsc-doc-form-itens">
+                <thead>
+                    <tr>
+                        <th class="col-num">Nº item</th>
+                        <th class="col-titulo">Título</th>
+                        <th class="col-unidade">Unidade</th>
+                        <th class="col-qtd text-center">Quantidade</th>
+                        <th class="col-pu text-center">Pts/Unid.</th>
+                        <th class="col-total text-center">Pontuação</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for linha in grupo.linhas %}
+                        <tr>
+                            <td>{{ linha.item.numero }}</td>
+                            <td>{{ linha.item.titulo }}</td>
+                            <td>{{ linha.item.unidade_medida|default:"—" }}</td>
+                            <td class="text-center nowrap">{{ linha.quantidade_efetiva|default_if_none:0|format }}</td>
+                            <td class="text-center nowrap">{{ linha.item.pontuacao_unidade|default_if_none:0|format }}</td>
+                            <td class="text-center nowrap">{{ linha.pontuacao_total|default_if_none:0|format }}</td>
+                        </tr>
+                    {% endfor %}
+                    <tr class="rsc-doc-form-subtotal">
+                        <td colspan="5" class="text-end">Subtotal — {{ grupo.label|default:grupo.requisito.descricao_curta }}</td>
+                        <td class="text-center nowrap">{{ grupo.subtotal_pontos|format }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        {% empty %}
+            <table class="bordered">
+                <tr><td>Nenhum item declarado.</td></tr>
+            </table>
+        {% endfor %}
+
+        <h2>RESUMO</h2>
+        <table class="bordered rsc-doc-form-resumo">
+            <tr>
+                <th class="text-end">Total de pontos dos itens declarados</th>
+                <td class="text-center nowrap">{{ total_pontos_itens|format }}</td>
+            </tr>
+            {% if saldo_anterior and saldo_anterior > 0 %}
+                <tr>
+                    <th class="text-end">Saldo de pontuação anterior (Art. 3º, §2º)</th>
+                    <td class="text-center nowrap">{{ saldo_anterior|format }}</td>
+                </tr>
+                <tr>
+                    <th class="text-end">Total geral de pontos</th>
+                    <td class="text-center nowrap"><strong>{{ total_pontos|format }}</strong></td>
+                </tr>
+            {% endif %}
+            <tr>
+                <th class="text-end">Pontuação mínima exigida (RSC-{{ nivel.ordem_romana }})</th>
+                <td class="text-center nowrap">{{ pontos_minimos|format }}</td>
+            </tr>
+            <tr>
+                <th class="text-end">Itens declarados</th>
+                <td class="text-center nowrap">{{ itens_preenchidos }} / mínimo {{ itens_minimos }}</td>
+            </tr>
+        </table>
+
+        <div class="rsc-doc-assinatura">
+            <p>{{ dados.municipio|default:"___________________" }}{% if dados.uf %} – {{ dados.uf }}{% endif %}, {{ hoje|date:"d \d\e F \d\e Y" }}.</p>
+            <div class="rsc-doc-assinatura-linha">{{ dados.nome }}</div>
+            {% if dados.matricula %}<p>Matrícula SIAPE: {{ dados.matricula }}</p>{% endif %}
+            {% if assinatura_hash %}<div class="rsc-doc-hash">Assinatura eletrônica (SHA-256): {{ assinatura_hash }}</div>{% endif %}
+        </div>
+    </div>
+{% endblock %}

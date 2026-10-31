@@ -1,0 +1,256 @@
+{% load demandas_templatetags %}
+
+<div class="tab-pane" data-tab="entregas" data-title="Entregas" data-counter="{{ entregas|length }}">
+    {% if pode_criar_entrega or ambiente_homologacao and pode_ver_ambiente %}
+        <ul class="action-bar inside-container">
+            {% if pode_criar_entrega %}
+                <li>
+                    <a href="{% url 'criar_enrega' demanda.pk %}" class="btn success popup">
+                        {% icone "plus" %} Nova entrega
+                    </a>
+                </li>
+            {% endif %}
+            {% if ambiente_homologacao and pode_ver_ambiente %}
+                {% if not ambiente_homologacao.ativo %}
+                    <li><a class="btn default" href="/demandas/acessar_ambiente_via_demanda/{{ ambiente_homologacao.pk }}/{{ demanda.pk }}/">
+                        {% icone "plus" %} Criar e Acessar Ambiente de Homologação
+                    </a></li>
+                {% else %}
+                    <li><a class="btn default" href="{{ ambiente_homologacao.get_url_homologacao }}">{% icone "sign-in-alt" %} Acessar Ambiente de Homologação</a></li>
+                {% endif %}
+                {% if eh_analista or eh_desenvolvedor %}
+                    <li><a class="btn" href="{{ ambiente_homologacao.get_absolute_url }}">{% icone "cogs" %} Configurar Ambiente de Homologação</a></li>
+                {% endif %}
+            {% endif %}
+        </ul>
+    {% endif %}
+
+    {% if demanda.em_desenvolvimento and pode_criar_entrega %}
+        <p class="alert alert-info">Ao registrar uma entrega, a demanda vai para <strong>Em homologação</strong> até que um demandante a aprove ou reprove.</p>
+    {% endif %}
+
+    {% if entrega_pendente %}
+        {# ── Entrega atual aguardando homologação: é ela que mantém a demanda "Em homologação" ── #}
+        <div class="alert alert-warning">
+            <strong>{% icone "clock" %} Aguardando homologação</strong> —
+            <strong>{{ entrega_pendente.titulo }}</strong>
+            {% if entrega_pendente.prazo_feedback %}
+                &nbsp;· Prazo: <strong>{{ entrega_pendente.prazo_feedback|date:"d/m/Y" }}</strong>
+                {% if entrega_pendente.prazo_vencido %}
+                    <span class="status status-error">{% icone "exclamation-triangle" %} {{ entrega_pendente.dias_em_atraso }} dia{{ entrega_pendente.dias_em_atraso|pluralize }} em atraso</span>
+                {% endif %}
+            {% endif %}
+        </div>
+
+        <dl class="definition-list flex">
+            {% if entrega_pendente.descricao %}
+                <div class="list-item flex-basis-100">
+                    <dt>O que foi entregue</dt>
+                    <dd>{{ entrega_pendente.descricao|linebreaksbr }}</dd>
+                </div>
+            {% endif %}
+            {% if entrega_pendente.notas %}
+                <div class="list-item flex-basis-100">
+                    <dt>Notas para o cliente</dt>
+                    <dd>{{ entrega_pendente.notas|linebreaksbr }}</dd>
+                </div>
+            {% endif %}
+            {% with especs=entrega_pendente.especificacoes.all %}
+                {% if especs %}
+                    <div class="list-item flex-basis-100">
+                        <dt>Especificações entregues</dt>
+                        <dd>
+                            <ul>
+                                {% for espec in especs %}
+                                    <li>{{ espec }}</li>
+                                {% endfor %}
+                            </ul>
+                        </dd>
+                    </div>
+                {% endif %}
+            {% endwith %}
+            {% if entrega_pendente.url_validacao and pode_ver_ambiente %}
+                <div class="list-item">
+                    <dt>Ambiente de validação</dt>
+                    <dd>
+                        <a href="{{ entrega_pendente.url_validacao }}" target="_blank" rel="noopener">
+                            {% icone "external-link-alt" %} {{ entrega_pendente.url_validacao }}
+                        </a>
+                        {% if entrega_pendente.senha_homologacao %}
+                            &nbsp;· Senha: <code>{{ entrega_pendente.senha_homologacao }}</code>
+                        {% endif %}
+                    </dd>
+                </div>
+            {% endif %}
+            {% with ambiente=entrega_pendente.ambiente_homologacao %}
+                {% if ambiente and pode_ver_ambiente %}
+                    {% if ambiente.senha %}
+                        <div class="list-item">
+                            <dt>Senha padrão do ambiente</dt>
+                            <dd data-clipboard="{{ ambiente.senha|format }}">{{ ambiente.senha|format }}</dd>
+                        </div>
+                    {% endif %}
+                    {% if ambiente.usuarios.exists %}
+                        <div class="list-item flex-basis-100">
+                            <dt>Usuários com acesso</dt>
+                            <dd class="d-flex flex-wrap gap-2">
+                                {% for usuario in ambiente.usuarios.all %}
+                                    <div class="person smallest m-0">
+                                        <div class="photo-circle smallest">
+                                            <img alt="{{ usuario.get_profile.nome_usual }}" src="{{ usuario.get_vinculo.get_foto_75x100_url }}">
+                                        </div>
+                                        <dl>
+                                            <dt class="visually-hidden">Nome</dt>
+                                            <dd>{{ usuario|format }}</dd>
+                                        </dl>
+                                    </div>
+                                {% endfor %}
+                            </dd>
+                        </div>
+                    {% endif %}
+                {% endif %}
+            {% endwith %}
+            <div class="list-item">
+                <dt>Enviada em</dt>
+                <dd>{{ entrega_pendente.enviada_em|date:"d/m/Y H:i" }} por {{ entrega_pendente.cadastrada_por }}</dd>
+            </div>
+            {% if entrega_pendente.dias_aguardando is not None %}
+                <div class="list-item">
+                    <dt>Aguardando há</dt>
+                    <dd>{{ entrega_pendente.dias_aguardando }} dia{{ entrega_pendente.dias_aguardando|pluralize }}</dd>
+                </div>
+            {% endif %}
+            {% if entrega_pendente.branch %}
+                <div class="list-item">
+                    <dt>Branch</dt>
+                    <dd><code>{{ entrega_pendente.branch }}</code></dd>
+                </div>
+            {% endif %}
+            {% if entrega_pendente.versionamento %}
+                <div class="list-item">
+                    <dt>Versão / Tag</dt>
+                    <dd><code>{{ entrega_pendente.versionamento }}</code></dd>
+                </div>
+            {% endif %}
+        </dl>
+
+        {% if pode_ver_ambiente and entrega_pendente.ambiente_homologacao or pode_ver_ambiente and entrega_pendente.url_validacao %}
+            <details>
+                <summary>Regras do ambiente de homologação do SUAP</summary>
+                <ul>
+                    <li>Nenhuma ação realizada neste ambiente afetará o ambiente oficial, seja de inclusão, alteração ou exclusão de dados.</li>
+                    <li>Este ambiente não envia notificações por e-mail. Se precisar verificar o envio de e-mail, você pode acessar: <a href="https://webmail.suapdevs.ifrn.edu.br/">https://webmail.suapdevs.ifrn.edu.br</a>.</li>
+                    <li>Este ambiente não possui dados sensíveis dos usuários, como CPF, alguns dados pessoais, algumas respostas a campos de texto longo etc.</li>
+                    <li>Os testes devem ser realizados exaustivamente por todos os usuários envolvidos e interessados.</li>
+                    <li>A qualquer momento é possível reiniciar o banco de dados para uma versão do banco de dados do dia anterior.</li>
+                    <li>Todas as alterações de regras e funcionalidades da demanda devem ser solicitadas durante a homologação. Após implantação da demanda, alterações drásticas podem resultar em perda de informações.</li>
+                </ul>
+            </details>
+        {% endif %}
+        {% if pode_validar_entrega and tem_consolidacao_modificada %}
+            <p class="alert alert-info">A entrega não pode ser aprovada enquanto houver <strong>alterações sem validação</strong> na consolidação.</p>
+        {% endif %}
+        {% if pode_validar_entrega or perms.demandas.atende_demanda %}
+            <ul class="action-bar inside-container">
+                {% if pode_validar_entrega %}
+                    {% if not tem_consolidacao_modificada %}
+                        <li>
+                            <a href="{% url 'entrega_aprovar' entrega_pendente.pk %}"
+                               class="btn success popup">
+                                {% icone "check" %} Aprovar
+                            </a>
+                        </li>
+                    {% endif %}
+                    <li>
+                        <a href="{% url 'entrega_reprovar' entrega_pendente.pk %}"
+                           class="btn danger popup">
+                            {% icone "times" %} Reprovar
+                        </a>
+                    </li>
+                {% endif %}
+                {% if perms.demandas.atende_demanda %}
+                    <li>
+                        <a href="{% url 'entrega_cancelar' entrega_pendente.pk %}"
+                           class="btn confirm"
+                           data-confirm="Cancelar esta entrega devolve a demanda para desenvolvimento. Confirma?">
+                            {% icone "ban" %} Cancelar entrega
+                        </a>
+                    </li>
+                {% endif %}
+            </ul>
+        {% endif %}
+    {% endif %}
+
+    {% if especificacoes_sem_entrega_aprovada %}
+        <div class="alert alert-warning">
+            <p><strong>Especificações ainda sem entrega aprovada</strong> — a demanda só fica <strong>Homologada</strong> quando todas forem aprovadas em alguma entrega:</p>
+            <ul>
+                {% for espec in especificacoes_sem_entrega_aprovada %}
+                    <li>{{ espec }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+
+    {# ── Histórico de entregas anteriores ── #}
+    {% with entregas_anteriores=entregas|slice:"1:" %}
+        {% if entregas_anteriores or not entrega_pendente %}
+            {% if entregas %}
+                <table class="table sm">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Título</th>
+                            <th>Status</th>
+                            <th>Enviada em</th>
+                            <th>Resposta em</th>
+                            <th>Dias</th>
+                            <th>Motivo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for entrega in entregas %}
+                            {% if not entrega.esta_pendente or not entrega_pendente %}
+                                <tr>
+                                    <td>{{ entrega.pk }}</td>
+                                    <td>{{ entrega.titulo }}</td>
+                                    <td>
+                                        {% if entrega.status == 'APROVADA' %}
+                                            <span class="status status-success">{% icone "check" %} Aprovada</span>
+                                        {% elif entrega.status == 'REPROVADA' %}
+                                            <span class="status status-error">{% icone "times" %} Reprovada</span>
+                                        {% elif entrega.status == 'EXPIRADA' %}
+                                            <span class="status status-alert">{% icone "clock" %} Expirada</span>
+                                        {% elif entrega.status == 'CANCELADA' %}
+                                            <span class="status status-default">{% icone "ban" %} Cancelada</span>
+                                        {% elif entrega.status == 'ENVIADA' %}
+                                            <span class="status status-alert">{% icone "hourglass-half" %} Aguardando</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ entrega.enviada_em|date:"d/m/Y" }}</td>
+                                    <td>
+                                        {% if entrega.homologada_em %}{{ entrega.homologada_em|date:"d/m/Y" }}
+                                        {% elif entrega.reprovada_em %}{{ entrega.reprovada_em|date:"d/m/Y" }}
+                                        {% elif entrega.expirada_em %}{{ entrega.expirada_em|date:"d/m/Y" }}
+                                        {% elif entrega.cancelada_em %}{{ entrega.cancelada_em|date:"d/m/Y" }}
+                                        {% else %}—{% endif %}
+                                    </td>
+                                    <td>{{ entrega.dias_aguardando|default:"—" }}</td>
+                                    <td>
+                                        {% if entrega.motivo_rejeicao %}
+                                            <span title="{{ entrega.motivo_rejeicao }}">
+                                                {{ entrega.motivo_rejeicao|truncatewords:8 }}
+                                            </span>
+                                        {% else %}—{% endif %}
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="alert alert-warning">Nenhuma entrega registrada para esta demanda.</p>
+            {% endif %}
+        {% endif %}
+    {% endwith %}
+</div>

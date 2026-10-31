@@ -1,0 +1,281 @@
+<div id="frequencias_pessoa_{{ relatorio.funcionario.pk }}">
+{% if relatorio.semanas %}
+    {% comment %}
+    <!-- {% if relatorio.eh_chefe_periodo and not relatorio.funcionario.eh_liberado_controle_frequencia and relatorio.funcionario.pk != request.user.get_vinculo.relacionamento.pk %} -->
+    {% endcomment %}
+    {% if relatorio.eh_chefe_periodo and not relatorio.eh_liberado_controle_frequencia and relatorio.funcionario.pk != request.user.get_vinculo.relacionamento.pk %}
+        {% if relatorio.tem_horarios_excedentes or relatorio.tem_horarios_inferiores %}
+            <p class="alert alert-info">Para <strong>avaliar em lote</strong>, você pode marcar abaixo todas as datas em que houver frequências excedentes ou inferiores à carga horária a ser cumprida.</p>
+            <form action="/ponto/adicionar_abono_inconsistencia_frequencia_lote/" method="get"
+                  id="frequencias_pessoa_avaliar_lote_{{ relatorio.funcionario.pk }}">
+                <div class="submit-row">
+                    {% if relatorio.tem_horarios_excedentes %}
+                        <button class="btn marcar_todas_frequencias" data-table="frequencias_pessoa_{{ relatorio.funcionario.pk }}" data-checkbox="frequencias_dias" data-type="excedente">
+                            Marcar Registros com Duração Excedente
+                        </button>
+                    {% endif %}
+                    {% if relatorio.tem_horarios_inferiores %}
+                        <button class="btn marcar_todas_frequencias" data-table="frequencias_pessoa_{{ relatorio.funcionario.pk }}" data-checkbox="frequencias_dias" data-type="inferior">
+                            Marcar Registros com Duração Inferior
+                        </button>
+                    {% endif %}
+                    <input class="btn success ms-auto" type="submit" value="Avaliar Frequência em Lote" />
+                </div>
+        {% endif %}
+    {% endif %}
+    {% for semana in relatorio.semanas.values %}
+        <div class="general-box">
+            <div class="primary-info">
+                <h4 class="title">Semana <strong>{{ semana.data_inicial|format }} a {{ semana.data_final|format }}</strong></h4>
+                <div class="extra-info">
+                    <div class="table-responsive">
+                        <table>
+                            <caption>Frequências da semana</caption>
+                            <thead>
+                                <tr>
+                                    {% comment %}
+                                    <!-- {% if relatorio.eh_chefe_periodo and not relatorio.funcionario.eh_liberado_controle_frequencia and relatorio.funcionario.pk != request.user.get_vinculo.relacionamento.pk%} -->
+                                    {% endcomment %}
+                                    {% if relatorio.eh_chefe_periodo and not relatorio.eh_liberado_controle_frequencia and relatorio.funcionario.pk != request.user.get_vinculo.relacionamento.pk %}
+                                        <th rowspan="2"></th>
+                                    {% endif %}
+                                    <th>Data</th>
+                                    <th>Registros</th>
+                                    <th>Detalhes</th>
+                                    <th>Duração</th>
+                                    <th>Observações do Sistema</th>
+                                    <th>Observações Pessoais</th>
+                                    <th>Documentos anexados</th>
+                                    <th>Abono da Chefia</th>
+                                    <th class="no-print">Opções</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for f in semana.dias %}
+                                    <tr>
+                                        {% comment %}
+                                        <!-- {% if relatorio.eh_chefe_periodo and not relatorio.funcionario.eh_liberado_controle_frequencia and relatorio.funcionario.pk != request.user.get_vinculo.relacionamento.pk %} -->
+                                        {% endcomment %}
+                                        {% if relatorio.eh_chefe_periodo and not relatorio.eh_liberado_controle_frequencia and relatorio.funcionario.pk != request.user.get_vinculo.relacionamento.pk %}
+                                            <td class="text-center">
+                                                {% if f.pode_abonar_dia and not f.liberado and not f.abonos_chefia and f.dia < now.date %}
+                                                    {% if f.informacoes_registro %}
+                                                        {% if f.acao_abono_inconsistencia == 'inferior' %}
+                                                            <input type="checkbox" name="frequencias_dias" class="inferior"
+                                                                value="{{ relatorio.funcionario.matricula }}_{{ f.dia|date:'dmY' }}"/>
+                                                        {% elif f.acao_abono_inconsistencia == 'excedente' %}
+                                                            <input type="checkbox" name="frequencias_dias" class="excedente"
+                                                                value="{{ relatorio.funcionario.matricula }}_{{ f.dia|date:'dmY' }}"/>
+                                                        {% else %}
+                                                            <input type="checkbox" name="frequencias_dias"
+                                                                value="{{ relatorio.funcionario.matricula }}_{{ f.dia|date:'dmY' }}"/>
+                                                        {% endif %}
+                                                    {% endif %}
+                                                {% endif %}
+                                            </td>
+                                        {% endif %}
+                                        <td>
+                                            <a name="{{ relatorio.funcionario.matricula }}{{ f.dia }}"></a>{{ f.dia|format }} ({{ f.dia|date:"l" }})
+                                        </td>
+                                        <td>
+                                            {% for h in f.horarios %}
+                                                {% if h.acao == "E" %}
+                                                    <p class="text-nowrap"><strong>{{ h.acao }}</strong>: <span class="true">{{ h.horario|date:"H:i:s" }}</span> ({{ h.maquina }})</p>
+                                                {% else %}
+                                                    <p class="text-nowrap"><strong>{{ h.acao }}</strong>: <span class="false">{{ h.horario|date:"H:i:s" }}</span> ({{ h.maquina }})</p>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </td>
+                                        <td>
+                                            <dl>
+                                                <dt>Carga Horária:</dt>
+                                                <dd>{{ f.motivo_carga_horaria_do_dia }}</dd>
+                                                <dt>Origem da Carga Horária:</dt>
+                                                <dd>{{ f.origem_carga_horaria_do_dia }}</dd>
+                                            </dl>
+                                        </td>
+                                        <td>
+                                            {{ f.duracao }}
+                                        </td>
+                                        <td>
+                                            {% if f.liberacoes or f.afastamentos_siape or f.afastamentos_rh or f.ferias or f.viagens_scdp %}
+                                                {% for l in f.liberacoes %}
+                                                    {% if l.tipo == 1 %}
+                                                        <span class="status status-info text-nowrap-normal">{{ l.descricao }}</span>
+                                                    {% else %}
+                                                        <span class="status status-alert text-nowrap-normal">{{ l.descricao }}</span>
+                                                    {% endif %}
+                                                {% endfor %}
+                                                {% if f.afastamentos_siape %}
+                                                    {% for a_rh in f.afastamentos_siape %}
+                                                        <span class="status status-success text-nowrap-normal">{{ a_rh }}</span>
+                                                    {% endfor %}
+                                                {% endif %}
+                                                {% if f.afastamentos_rh %}
+                                                    {% for a_rh in f.afastamentos_rh %}
+                                                        <span class="status status-success text-nowrap-normal"> {{ a_rh }} </span>
+                                                    {% endfor %}
+                                                {% endif %}
+                                                {% if f.ferias %}
+                                                    <span class="status status-success text-nowrap-normal">Férias</span>
+                                                {% endif %}
+                                                {% if f.viagens_scdp %}
+                                                    {% for viagem_scdp in f.viagens_scdp %}
+                                                        <span class="status status-success text-nowrap-normal">{{ viagem_scdp }}</span>
+                                                    {% endfor %}
+                                                {% endif %}
+                                            {% else %}
+                                                {% if f.dia < now.date and f.informacoes_registro %}
+                                                    {% for info in f.informacoes_registro_display %}
+                                                        <span class="status status-{{ info.status }} text-nowrap-normal">{{ info.short_display|format }}</span>
+                                                    {% endfor %}
+                                                {% endif %}
+                                                {% if f.dia < now.date and f.informacoes_saida_antecipada %}
+                                                    <span class="status status-info text-nowrap-normal">{{ f.informacoes_saida_antecipada|format }}</span>
+                                                {% endif %}
+                                            {% endif %}
+
+                                            {% if f.estah_no_pgd %}
+                                                <span class="status status-success hint hint-top" aria-label="Está no PGD nesta data">
+                                                    {% icone "check" %} PGD
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% for o in f.observacoes %}
+                                                <p>
+                                                    {{ o.descricao|truncatechars:200 }}
+                                                    {% if o.descricao|length > 200 %}
+                                                        <a class="popup" href="/admin/ponto/observacao/{{ o.id }}/view/">Ver mais</a>
+                                                    {% endif %}
+                                                    {% if relatorio.funcionario.pk == request.user.get_vinculo.relacionamento.pk and not f.abonos_chefia %}
+                                                        {% icon "edit" "/ponto/observacao_editar/{{ o.id }}/" "Editar Observação" "popup" %}
+                                                        {% icon "delete" "/ponto/observacao_remover/{{ o.id }}/" %}
+                                                    {% endif %}
+                                                </p>
+                                            {% endfor %}
+                                        </td>
+                                        <td>
+                                            {% if f.anexos %}
+                                                <ul>
+                                                {% for o in f.anexos %}
+                                                    <li>
+                                                        <a href="{{ o.anexo.url }}">{{ o }}</a>
+                                                        {% if relatorio.funcionario.pk == request.user.get_vinculo.relacionamento.pk and not f.ponto_fechado %}
+                                                            {% icon "edit" "/ponto/documento_anexar/{{ o.id }}/change/" "Editar Anexo" "popup" %}
+                                                            {% icon "delete" "/ponto/documento_anexar/{{ o.id }}/delete/" %}
+                                                        {% endif %}
+                                                    </li>
+                                                {% endfor %}
+                                                </ul>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% for abono_chefia in f.abonos_chefia %}
+                                                <span class="status status-{{ abono_chefia.get_acao_abono_display_css }} text-nowrap-normal">
+                                                    {{ abono_chefia.get_acao_abono_display }}: {{ abono_chefia.descricao }} {% if abono_chefia.solicitacao_abono_parcial %} ({{ abono_chefia.solicitacao_abono_parcial.ch_solicitada_display_2 }} parcial){% endif %} {% if abono_chefia.ch_descontada %} ({{ abono_chefia.ch_descontada_display_2 }} desconto){% endif %}
+                                                </span>
+                                            {% empty %}
+                                                -
+                                            {% endfor %}
+                                        </td>
+                                        <td class="no-print">
+                                            <ul class="action-bar">
+                                                {% if relatorio.funcionario.pk == request.user.get_vinculo.relacionamento.pk %}
+                                                    {% if not f.abonos_chefia %}
+                                                        <li><a class="btn success popup" href='/ponto/observacao_adicionar/{{ f.dia|date:"dmY" }}/'>Adicionar Observação</a></li>
+                                                        <li><a class="btn popup" href="/ponto/documento_anexar/{{ f.dia|date:"dmY" }}/add/">Anexar Documento</a></li>
+                                                    {% endif %}
+                                                {% endif %}
+                                                {% comment %}
+                                                <!-- {% if f.pode_abonar_dia and not relatorio.funcionario.eh_liberado_controle_frequencia and relatorio.funcionario.pk != request.user.get_vinculo.relacionamento.pk and f.dia < now.date and f.pode_abonar_dia and not f.liberado %} -->
+                                                {% endcomment %}
+                                                {% if f.pode_abonar_dia and not relatorio.eh_liberado_controle_frequencia and relatorio.funcionario.pk != request.user.get_vinculo.relacionamento.pk and f.dia < now.date and f.pode_abonar_dia and not f.liberado %}
+                                                    {% if f.informacoes_registro %}
+                                                        {% if f.abonos_chefia %}
+                                                            <li><a class="btn primary" href='/ponto/editar_abonos_chefia/{{ relatorio.funcionario.matricula }}/{{ f.dia|date:"dmY" }}/'>Editar avaliação</a></li>
+                                                        {% else %}
+                                                            <li><a class="btn" href='/ponto/adicionar_abono_inconsistencia_frequencia/{{ relatorio.funcionario.matricula }}/{{ f.dia|date:"dmY" }}/'>{% icone "star" %} Avaliar Frequência</a></li>
+                                                        {% endif %}
+                                                    {% endif %}
+                                                {% endif %}
+                                            </ul>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <dl class="secondary-info">
+                <div class="list-item">
+                    <dt>Relógio exigido:</dt>
+                    <dd>{{ semana.relogio_exigido|format_time }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Frequência:</dt>
+                    <dd>{{ semana.frequencia|format_time }}</dd>
+                </div>
+                {% if semana.tempo_nao_abonado %}
+                    <div class="list-item">
+                        <dt>Não Abonado:</dt>
+                        <dd><span>{{ semana.tempo_nao_abonado|format_time }}</span></dd>
+                    </div>
+                {% endif %}
+                {% if semana.hora_extra_nao_justificada %}
+                    <div class="list-item">
+                        <dt>Hora Extra não Justificada:</dt>
+                        <dd><span>{{ semana.hora_extra_nao_justificada|format_time }}</span></dd>
+                    </div>
+                {% endif %}
+                {% if semana.trabalho_fds_nao_permitido %}
+                    <div class="list-item">
+                        <dt>Trabalho no Final de Semana não Permitido:</dt>
+                        <dd><span>{{ semana.trabalho_fds_nao_permitido|format_time }}</span></dd>
+                    </div>
+                {% endif %}
+                <div class="list-item">
+                    <dt>Válido:</dt>
+                    <dd>
+                        <span class="status {% if semana.frequencia >= semana.relogio_exigido %}status-success{% else %}status-error{% endif %}">
+                            {{ semana.total_valido|format_time }}
+                        </span>
+                    </dd>
+                </div>
+                <div class="list-item">
+                    <dt>Informações sobre o PIT:</dt>
+                    <dd>{{ semana.pit_hora_relogio|format_time }} (h/r)</dd>
+                    {% for pit in semana.planos_individuais_trabalho %}
+                        <dd><a href="{{ pit.get_absolute_url }}">{{ pit }}</a></dd>
+                    {% endfor %}
+                </div>
+            </dl>
+        </div>
+    {% endfor %}
+    {% comment %}
+    <!-- {% if relatorio.eh_chefe_periodo and not relatorio.funcionario.eh_liberado_controle_frequencia and relatorio.funcionario.pk != request.user.get_vinculo.relacionamento.pk %} -->
+    {% endcomment %}
+    {% if relatorio.eh_chefe_periodo and not relatorio.eh_liberado_controle_frequencia and relatorio.funcionario.pk != request.user.get_vinculo.relacionamento.pk %}
+        {% if relatorio.tem_horarios_excedentes or relatorio.tem_horarios_inferiores %}
+            <p class="alert alert-info">Para <strong>avaliar em lote</strong>, você pode marcar abaixo todas as datas em que houver frequências excedentes ou inferiores à carga horária a ser cumprida.</p>
+                <div class="submit-row">
+                    {% if relatorio.tem_horarios_excedentes %}
+                        <button class="btn marcar_todas_frequencias" data-table="frequencias_pessoa_{{ relatorio.funcionario.pk }}" data-checkbox="frequencias_dias" data-type="excedente">
+                            Marcar Registros com Duração Excedente
+                        </button>
+                    {% endif %}
+                    {% if relatorio.tem_horarios_inferiores %}
+                        <button class="btn marcar_todas_frequencias" data-table="frequencias_pessoa_{{ relatorio.funcionario.pk }}" data-checkbox="frequencias_dias" data-type="inferior">
+                            Marcar Registros com Duração Inferior
+                        </button>
+                    {% endif %}
+                    <input class="btn success ms-auto" type="submit" value="Avaliar Frequência em Lote" />
+                </div>
+            </form>
+        {% endif %}
+    {% endif %}
+{% else %}
+    <p class="alert alert-warning">Nenhuma frequência {% if so_inconsistentes %}inconsistente{% endif %} encontrada no período.</p>
+{% endif %}
+</div>

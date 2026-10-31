@@ -1,0 +1,160 @@
+{% extends super_template %}
+{% load status_badge %}
+
+{% block extracss %}
+    <style type="text/css">
+        .table-responsive table th, .table-responsive table td {
+            text-align: center !important;
+            vertical-align: middle !important;
+        }
+        /* exceções: a coluna Períodos (alinhada à esquerda) */
+        .table-responsive table th:nth-child(3), .table-responsive table td:nth-child(3) {
+            text-align: left !important;
+        }
+        tfoot tr th { border-top: 2px solid #000; }
+
+        /* tabela mais legível */
+        .table-responsive table td{vertical-align:top}
+        /* fixa uma largura razoável pra “Períodos” em telas médias+ */
+        @media (min-width: 900px){
+            .col-periodos{width:42%}
+        }
+
+        /* lista de períodos: grid com linhas independentes */
+        .periodos{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr;row-gap:.35rem}
+        /* se quiser 2 colunas quando couber, descomente:
+        @media (min-width: 1100px){
+            .periodos{grid-template-columns:repeat(2,minmax(0,1fr));column-gap:1rem}
+        } */
+
+        /* linha de período: link + badge lado a lado */
+        .periodo{display:flex;align-items:center;gap:.5rem;min-width:0}
+        .periodo-link{display:inline-flex;align-items:center;gap:.35rem;white-space:nowrap;text-decoration:none}
+        .periodo-link .tipo{opacity:.85;white-space:normal}
+        .periodo .badge{margin-left:auto;flex:0 0 auto} /* empurra badge pro fim da linha quando esticar */
+        /* quebras elegantes para nomes longos */
+        .periodo, .periodo-link{overflow-wrap:anywhere;word-break:normal}
+    </style>
+{% endblock %}
+{% block action-bar %}
+
+    <ul class="action-bar">
+        {% if planejamento|method:"pode_enviar_para_homologacao"|call:request.user %} 
+            <li>
+                <a href="{% url 'auditoria:enviar_para_homologacao' planejamento.id %}" class="btn success"> 
+                    Requisitar Homologação
+                </a>
+            </li>
+        {% endif %}
+        {% if planejamento|method:"pode_analisar"|call:request.user %} 
+            <li>
+                <a href="{% url 'auditoria:analisar_planejamento' planejamento.id %}" class="btn success"> 
+                    Analisar Planejamento
+                </a>
+            </li>
+        {% endif %}
+        {% if planejamento|method:"pode_concluir"|call:request.user %} 
+            <li>
+                <a href="{% url 'auditoria:deferir_planejamento' planejamento.id %}" class="btn success"> 
+                    Deferir
+                </a>
+            </li>
+            <li>
+                <a href="{% url 'auditoria:indeferir_planejamento' planejamento.id %}" class="btn success"> 
+                    Indeferir
+                </a>
+            </li>
+        {% endif %}
+        {% if planejamento|method:"pode_retornar_para_rascunho"|call:request.user %} 
+            <li>
+                <a href="{% url 'auditoria:retornar_para_rascunho' planejamento.id %}" class="btn warning"> 
+                    Retornar para Rascunho
+                </a>
+            </li>
+        {% endif %}
+    </ul>
+{% endblock %}
+
+{% block content %}
+{% box "Resumo Anual" %}
+<dl class="definition-list flex">
+    <div class="list-item"><dt>Ano</dt><dd>{{ planejamento.paint.ano }}</dd></div>
+    <div class="list-item"><dt>Status</dt><dd>{{ planejamento.get_status_display|status }}</dd></div>
+    <div class="list-item"><dt>Carga Horária Prevista</dt><dd>{{ planejamento.carga_horaria_prevista }}</dd></div>
+    <div class="list-item"><dt>Carga Horária Afastada</dt><dd>{{ planejamento.carga_horaria_afastada }}</dd></div>
+    <div class="list-item"><dt>Carga Horária Líquida</dt><dd>{{ planejamento.carga_horaria_liquida }}</dd></div>
+    <div class="list-item"><dt>Unidade</dt><dd>{{ planejamento.auditor.setor_exercicio.uo|format }}</dd></div>
+</dl>
+{% endbox %}
+
+{% box "Afastamentos Planejados" %}
+<div class="table-responsive">
+    <table>
+        <caption>Detalhamento Mensal</caption>
+        <thead>
+            <tr>
+                <th>Mês</th>
+                <th>CH Prevista</th>
+                <th>Períodos</th>
+                <th>Dias Afastados</th>
+                <th>CH Diária</th>
+                <th>CH Afastada</th>
+                <th>Saldo (H)</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in mensais_com_resumo %}
+                <tr>
+                    <td>{{ item.mensal.get_mes_display }}</td>
+                    <td class="text-center">{{ item.ch_mensal }}</td>
+                    <td class="col-periodos">
+                        {% if item.afastamentos %}
+                            <ul class="periodos">
+                            {% for afastamento in item.afastamentos %}
+                                <li class="periodo">
+                                    {% with afastamento|method:"get_link_para_afastamento"|call:request.user as url %}
+                                        <a class="periodo-link popup" href="{{ url }}">
+                                            <i class="fas fa-calendar-alt"></i>
+                                            {{ afastamento.data_inicio|date:"d/m/Y" }} a {{ afastamento.data_fim|date:"d/m/Y" }}
+                                            <span class="tipo">— {{ afastamento.tipo_afastamento }}</span>
+                                        </a>
+                                        {{ afastamento.status|status_badge|safe }}
+                                    {% endwith %}
+                                </li>
+                            {% endfor %}
+                            </ul>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">{{ item.dias_uteis }}</td>
+                    <td class="text-center">{{ item.horas_dia|default:"-" }}</td>
+                    <td class="text-center">{{ item.horas_afastadas }}</td>
+                    <td class="text-center">{{ item.ch_liquida_mensal }}</td>
+                    <td>
+                        {% if item.mensal|method:"pode_adicionar_afastamento"|call:request.user %}
+                            <a class="btn primary popup" href="{% url 'auditoria:cadastrar_afastamento' item.mensal.id %}">
+                                {% icone "plus" %}Adicionar
+                            </a>
+                        {% else %}
+                            <span class="text-center"> --- </span>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr>
+                <th>Total</th>
+                <th class="text-center">{{ planejamento.carga_horaria_prevista }}</th>
+                <th class="text-center"></th>
+                <th class="text-center">{{ total_dias_afastado }}</th>
+                <th class="text-center">{{ ch_diaria }}</th>
+                <th class="text-center">{{ ch_afastada_total }}</th>
+                <th class="text-center">{{ ch_liquida_prevista_total }}</th>
+                <th class="text-center"></th>
+            </tr>
+        </tfoot>
+    </table>
+</div>
+{% endbox %}
+{% endblock %}

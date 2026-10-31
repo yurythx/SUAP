@@ -1,0 +1,77 @@
+
+{% box 'Registros' %}
+
+    {% if obj.get_situacao != 2 %}
+        <ul class="action-bar">
+            <li><a class="btn success popup" href="/etep/adicionar_registro/{{ obj.pk }}/">Adicionar Registro</a></li>
+        </ul>
+    {% endif %}
+
+    {% if registros %}
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Autor</th>
+                        <th>Descrição</th>
+                        <th>Anexo</th>
+                        <th>Visível para</th>
+                        <th>Cientes</th>
+                        {% if obj.get_situacao != 2 %}
+                            <th class="no-print">Opções</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                {% for registro_acompanhamento in registros %}
+                    <tr>
+                        <td>{{ registro_acompanhamento.usuario|format }}</td>
+                        <td>{{ registro_acompanhamento.descricao|format|linebreaks }}</td>
+                        <td>
+                            {% if registro_acompanhamento.anexo %}
+                                <a href="{{ registro_acompanhamento.anexo.url }}">{{ registro_acompanhamento.anexo|filename }}</a>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>
+                            <ul>
+                            {% for interessado_linha in registro_acompanhamento.registroacompanhamentointeressado_set.all %}
+                                <li>{{ interessado_linha.interessado.vinculo.pessoa|format }}</li>
+                            {% endfor %}
+                            </ul>
+                        </td>
+                        <td>
+                            <ul>
+                                {% for interessado_linha in registro_acompanhamento.registroacompanhamentointeressado_set.all %}
+                                    {% if interessado_linha.data_ciencia %}
+                                        <li>{{ interessado_linha.interessado.vinculo.pessoa|format }} - {{ interessado_linha.data_ciencia }}</li>
+                                    {% endif %}
+                                {% endfor %}
+                            </ul>
+                        </td>
+                        {% if obj.get_situacao != 2 %}
+                            <td class="no-print">
+                                <ul class="action-bar">
+                                    {% for registro_acompanhamento_interessado in registro_acompanhamento.registroacompanhamentointeressado_set.all %}
+                                        {% if registro_acompanhamento_interessado.interessado.vinculo.user == request.user and not registro_acompanhamento_interessado.data_ciencia %}
+                                            <li><a href="/etep/dar_ciencia_acompanhamento/{{ registro_acompanhamento_interessado.pk }}/" class="btn success">Dar ciência</a></li>
+                                        {% endif %}
+                                    {% endfor %}
+                                    {% if request.user == registro_acompanhamento.usuario or tem_permissao_completa %}
+                                        <li><a class="btn primary popup" href="/etep/alterar_registro/{{ registro_acompanhamento.pk }}/">Editar</a></li>
+                                        <li><a class="btn danger no-confirm popup" href="/etep/excluir_registro/{{ registro_acompanhamento.pk }}/">Remover</a></li>
+                                    {% endif %}
+                                </ul>
+                            </td>
+                        {% endif %}
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="alert alert-warning">O aluno não possui nenhum registro neste acompanhamento.</p>
+    {% endif %}
+
+{% endbox %}

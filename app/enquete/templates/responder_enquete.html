@@ -1,0 +1,180 @@
+{% extends super_template %}
+
+{% block extrahead %}
+    <script>
+        $(document).ready(function () {
+            $('input[type=radio]').dblclick(function () {
+                this.checked = false;
+            });
+        });
+    </script>
+{% endblock %}
+
+{% block action-bar %}
+    {% if enquete.instrucoes %}
+        <ul class="action-bar">
+            <li>
+                <a href="{{ enquete.instrucoes.url }}" class="btn default">
+                    {% icone "eye" %}
+                    {% if enquete.descricao_anexo %}
+                        {{ enquete.descricao_anexo }}
+                    {% else %}
+                        Instruções
+                    {% endif %}
+                </a>
+            </li>
+        </ul>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    {% box "Dados gerais" %}
+        <dl class="definition-list">
+            <dt>Nome</dt>
+            <dd>{{ vinculo|format }}</dd>
+            <dt>{% verbose_field_name enquete 'descricao' %}</dt>
+            <dd>{{ enquete.get_descricao|format|linebreaksbr }}</dd>
+            {% if enquete.texto_orientacao %}
+                <dt>Texto de Orientação</dt>
+                <dd>{{ enquete.texto_orientacao|linebreaksbr }}</dd>
+            {% endif %}
+            <dt>Período para Respostas</dt>
+            <dd>{{ enquete.data_inicio|format }} à {{ enquete.data_fim|format }}</dd>
+        </dl>
+    {% endbox %}
+
+    {% if form.errors %}
+        <p class="errornote">Por favor, corrija os erros abaixo.</p>
+    {% endif %}
+
+    <form action="" method="post">
+        {% csrf_token %}
+        {% for categoria_dados in enquete_dados %}
+            {% box categoria_dados.nome %}
+                {% if categoria_dados.orientacao %}
+                    <p class="alert alert-info">{{ categoria_dados.orientacao }}</p>
+                {% endif %}
+                {% for grupo_perguntas in categoria_dados.grupos_perguntas %}
+                    {% for pergunta in grupo_perguntas.perguntas %}
+                        <div class="general-box">
+                            {% if form.errors and not pergunta.resposta and pergunta.obrigatoria %}
+                            <div class="primary-info errors">
+                            {% else %}
+                            <div class="primary-info">
+                            {% endif %}
+                                <h4>
+                                    <small>{{ pergunta.ordem }}</small>
+                                    <strong>
+                                        {% if pergunta.obrigatoria %}
+                                            <label class="required w-100" for="{{ pergunta.id }}" title="Preenchimento obrigatório">{{ pergunta.get_html|safe }}</label>
+                                        {% else %}
+                                            {{ pergunta.get_html|safe }}
+                                        {% endif %}
+                                    </strong>
+                                </h4>
+                                <label class="d-none">#{{ pergunta.ordem }} {{ pergunta.get_html|safe }}:</label>
+                                <div class="extra-info">
+                                    {% if form.errors and not pergunta.resposta and pergunta.obrigatoria %}
+                                        <ul class="errorlist"><li>Este campo é obrigatório.</li></ul>
+                                    {% endif %}
+                                    {% if grupo_perguntas.objetiva %}
+                                        {% if pergunta.layout == 'lista' %}
+                                            <ul class="radiobuttons">
+                                                {% for opcao in pergunta.get_opcoes %}
+                                                    <li>
+                                                        <input
+                                                            type="{% if pergunta.multipla_escolha %}checkbox{% else %}radio{% endif %}"
+                                                            value="{{ opcao.id }}" name="{{ pergunta.id }}" id="resposta-{{ pergunta.id }}-{{ opcao.id }}"
+                                                            {% if read_only %}disabled="disabled"{% endif %}
+                                                            {% if pergunta.resposta == opcao.id or pergunta.multipla_escolha and opcao.id in pergunta.resposta %}checked="checked"{% endif %} />
+                                                        <label for="resposta-{{ pergunta.id }}-{{ opcao.id }}">{{ opcao }}</label>
+                                                        {% if opcao.imagem %}
+                                                            <a href="{{ opcao.imagem.url }}" target="_blank" class="btn default">{% icone "image" %} Imagem</a>
+                                                        {% endif %}
+                                                        {% if opcao.documento %}
+                                                            <a href="{{ opcao.documento.url }}" target="_blank" class="btn default">{% icone "file-pdf" %} Documento PDF</a>
+                                                        {% endif %}
+                                                    </li>
+                                                {% endfor %}
+                                            </ul>
+                                        {% elif pergunta.layout == 'galeria' %}
+                                            <div class="boxes services flex-container">
+                                                {% for opcao in pergunta.get_opcoes %}
+                                                    <div class="box-item">
+                                                        <div class="radiobutton_container">
+                                                            <label for="resposta-{{ pergunta.id }}-{{ opcao.id }}">Opção {{ opcao.ordem }}</label>
+                                                            <input
+                                                                type="{% if pergunta.multipla_escolha %}checkbox{% else %}radio{% endif %}"
+                                                                value="{{ opcao.id }}" name="{{ pergunta.id }}" id="resposta-{{ pergunta.id }}-{{ opcao.id }}"
+                                                                {% if read_only %}disabled="disabled"{% endif %}
+                                                                {% if pergunta.resposta == opcao.id or pergunta.multipla_escolha and opcao.id in pergunta.resposta %}checked="checked"{% endif %} />
+                                                        </div>
+                                                        <p class="alert alert-info">{{ opcao|linebreaksbr }}</p>
+                                                        {% if opcao.documento %}
+                                                            <a href="{{ opcao.documento.url }}" target="_blank" class="btn default mb-4">{% icone "file-pdf" %} Documento PDF</a>
+                                                        {% endif %}
+                                                        {% if opcao.imagem %}
+                                                            <a href="{{ opcao.imagem.url }}" target="_blank">
+                                                                <img class="foto-miniatura" src="{{ opcao.imagem.url }}" alt="Opção de resposta">
+                                                            </a>
+                                                        {% endif %}
+                                                    </div>
+                                                {% endfor %}
+                                            </div>
+                                        {% else %}
+                                            <div class="table-responsive">
+                                                <table>
+                                                    <thead>
+                                                        <tr>
+                                                            {% for opcao in pergunta.get_opcoes %}
+                                                                <th><label for="resposta-{{ pergunta.id }}-{{ opcao.id }}" class="fontWeight400">{{ opcao }}</label></th>
+                                                            {% endfor %}
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <tr>
+                                                            {% for opcao in pergunta.get_opcoes %}
+                                                                <td>
+                                                                    <input
+                                                                        type="{% if pergunta.multipla_escolha %}checkbox{% else %}radio{% endif %}"
+                                                                        value="{{ opcao.id }}" name="{{ pergunta.id }}" id="resposta-{{ pergunta.id }}-{{ opcao.id }}"
+                                                                        {% if read_only %}disabled="disabled"{% endif %}
+                                                                        {% if pergunta.resposta == opcao.id or pergunta.multipla_escolha and opcao.id in pergunta.resposta %}checked="checked"{% endif %} />
+                                                                    {% if opcao.imagem %}
+                                                                        <a href="{{ opcao.imagem.url }}" target="_blank" class="btn default">{% icone "image" %} Imagem</a>
+                                                                    {% endif %}
+                                                                    {% if opcao.documento %}
+                                                                        <a href="{{ opcao.documento.url }}" target="_blank" class="btn default">{% icone "file-pdf" %} Documento PDF</a>
+                                                                    {% endif %}
+                                                                </td>
+                                                            {% endfor %}
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        {% endif %}
+                                    {% else %}
+                                        {% if pergunta.numerico %}
+                                            <input type="number" name="{{ pergunta.id }}" value="{{ pergunta.resposta }}"
+                                                {% if read_only %}disabled="disabled"{% endif %} />
+                                        {% else %}
+                                            <textarea name="{{ pergunta.id }}"
+                                                    {% if read_only %}disabled="disabled"{% endif %}
+                                                    maxlength="8000">{{ pergunta.resposta }}</textarea>
+                                        {% endif %}
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% endfor %}
+            {% endbox %}
+        {% endfor %}
+        {% if not read_only %}
+            <div class="submit-row">
+                <input type="submit" class="default" value="Enviar" name="Enviar">
+            </div>
+        {% endif %}
+    </form>
+
+{% endblock %}

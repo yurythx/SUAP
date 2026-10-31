@@ -1,0 +1,188 @@
+{% extends super_template %}
+
+{% block extrahead %}
+    <script src="/static/djtools/graficos/highcharts.js"></script>
+    <script src="/static/djtools/graficos/exporting.js"></script>
+{% endblock %}
+
+{% block action-bar %}
+	<ul class="action-bar">
+        {% if pode_deferir %}
+            <li><a class="btn popup success" href="/edu/deferir_colacao_grau/{{ obj.pk }}/">Deferir</a></li>
+        {% endif %}
+        {% if pode_cancelar_deferimento %}
+            <li><a href="?cancelar_deferimento" class="btn danger">Cancelar Deferimento</a></li>
+        {% endif %}
+     </ul>
+{% endblock %}
+
+{% block content %}
+
+    {% if tem_aluno_com_diploma %}
+        <p class="alert alert-info">Esta colação de grau possui alunos com diploma emitido.</p>
+    {% endif %}
+    
+    {% if not obj.deferida %}
+        <p class="alert alert-warning">Após o deferimento da colação não será possível adicionar ou remover alunos.</p>
+    {% endif %}
+
+    {% box "Dados gerais" %}
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>Descrição</dt>
+                <dd>{{ obj.descricao }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Diretoria</dt>
+                <dd>{{ obj.diretoria|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Ano/Período Letivo</dt>
+                <dd>{{ obj.ano_letivo }}/{{ obj.periodo_letivo }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Data da Colação</dt>
+                <dd>{{ obj.data_colacao }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Deferida</dt>
+                <dd>{{ obj.deferida|format }}</dd>
+            </div>
+        </dl>
+    {% endbox %}
+
+    <div class="tab-pane ajax-rendered" data-title="Alunos Adicionados" data-tab="adicionados">
+        {% if request.GET.tab == "adicionados" or not request.GET.tab %}
+            {% box "Alunos" %}
+                <ul class="action-bar">
+                    {% if pode_deferir %}
+                        <li><a href="/edu/adicionar_alunos_colacao_grau/{{ obj.pk }}/" class="btn success">Adicionar Alunos</a></li>
+                    {% endif %}
+                    <li><a class="btn" href="?xls=1">Exportar para Excel</a></li>
+                    <li><a class="btn" href="/edu/imprimir_lista_colacao_grau_pdf/{{ obj.pk }}/">Imprimir em PDF</a></li>
+                </ul>
+                <form method="post" action="" id="form1">
+                    {% csrf_token %}
+                    <div class="search-and-filters">
+                        <div class="filter">
+                            <label>Curso:</label>
+                            <select name="curso_campus" onchange="$('#form1').submit()">
+                                <option value="0">-----</option>
+                                {% for curso in cursos %}
+                                    <option value="{{ curso.pk }}" {% if curso.selecionado %}
+                                            selected="selected"{% endif %}>{{ curso }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </form>
+
+                {% if obj.participacaocolacaograu_set.exists %}
+                    <form method="post" action="">
+                        {% csrf_token %}
+                        {% if participacoes.exists %}
+                            <div class="table-responsive">
+                                <table>
+                                    <caption>Lista de alunos nesta colação de grau.</caption>
+                                    <thead>
+                                        <tr>
+                                            {% if is_administrador or perms.edu.add_colacaograu and obj.data_colacao > hoje %}
+                                                <th><input type="checkbox"
+                                                        onchange="var is = this.parentNode.parentNode.parentNode.parentNode.getElementsByTagName('input');for(var i=0; i<is.length; i++){ is[i].checked = this.checked }"/>
+                                                </th>
+                                            {% else %}
+                                                <th>#</th>
+                                            {% endif %}
+                                            <th>
+                                                <a href="?order={% if request.GET.order == 'aluno__matricula' %}-{% endif %}aluno__matricula">Matrícula</a>
+                                            </th>
+                                            <th>
+                                                <a href="?order={% if request.GET.order == 'aluno__pessoa_fisica__nome' %}-{% endif %}aluno__pessoa_fisica__nome">Nome</a>
+                                            </th>
+                                            <th>
+                                                <a href="?order={% if request.GET.order == 'aluno__pessoa_fisica__descricao' %}-{% endif %}aluno__curso_campus__descricao">Curso</a>
+                                            </th>
+                                            <th>
+                                                <a href="?order={% if request.GET.order == 'aluno__ira' %}-{% endif %}aluno__ira">I.R.A.</a>
+                                            </th>
+                                            <th>
+                                                Laureado
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                    {% for participacao in participacoes.all|order:request %}
+                                        <tr>
+                                            <td>
+                                                {% if pode_deferir %}
+                                                    <input value="{{ participacao.pk }}" name="participacao_colacao_grau"
+                                                        type="checkbox"/>
+                                                {% else %}
+                                                    {{ forloop.counter }}
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <a href="{{ participacao.aluno.get_absolute_url }}">{{ participacao.aluno.matricula }}</a>
+                                            </td>
+                                            <td> {{ participacao.aluno.get_nome }} </td>
+                                            <td> {{ participacao.aluno.curso_campus }} </td>
+                                            <td> {{ participacao.aluno.get_ira }} </td>
+                                            <td>{{ participacao.laureado|format }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <p class="alert alert-warning">Nenhum aluno encontrado nesta colação de grau.</p>
+                        {% endif %}
+                        {% if pode_deferir %}
+                            <div class="submit-row">
+                                <input class="confirm danger" type="submit" value="Remover Alunos Selecionados"
+                                    data-confirm="Você tem certeza que deseja remover o(s) aluno(s) selecionado(s)? Isso implicará na exclusão da colação de grau do aluno. Os alunos removidos ficarão com a colação de grau pendente."/>
+                            </div>
+                        {% endif %}
+                    </form>
+                {% else %}
+                    <p class="alert alert-warning">Nenhum aluno nesta colação de grau.</p>
+                {% endif %}
+            {% endbox %}
+        {% endif %}
+    </div>
+
+    <div class="tab-pane ajax-rendered" data-title="Alunos Aptos" data-tab="aptos">
+        {% if request.GET.tab == "aptos" %}
+            {% box "Alunos" %}
+                {% if alunos_aptos %}
+                    <div class="table-responsive">
+                        <table class="mb-2">
+                            <caption>Lista de alunos aptos para esta colação de grau.</caption>
+                            <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Matrícula</th>
+                                <th>Nome</th>
+                                <th>Curso</th>
+                                <th>I.R.A</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for aluno in alunos_aptos %}
+                                <tr>
+                                    <td>{{ forloop.counter }}</td>
+                                    <td><a href="{{ aluno.get_absolute_url }}">{{ aluno.matricula }}</a></td>
+                                    <td>{{ aluno.get_nome_social_composto }}</td>
+                                    <td>{{ aluno.curso_campus.descricao_historico|format }}</td>
+                                    <td>{{ aluno.get_ira }}</td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="alert alert-warning">Nenhum aluno apto para esta colação de grau.</p>
+                {% endif %}
+            {% endbox %}
+        {% endif %}
+    </div>
+{% endblock %}

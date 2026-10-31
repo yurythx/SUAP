@@ -1,0 +1,551 @@
+{% extends super_template %}
+
+{% block extrahead %}
+    <script src="/static/saude/js/odontograma.js"></script>
+{% endblock %}
+
+{% block bodyclass %}hasAsideRight{% endblock %}
+
+{% block action-bar %}
+    {% include "includes/actionbar_atendimento.html" %}
+{% endblock %}
+
+{% block object-status %}
+    {% include "includes/status_atendimento.html" %}
+{% endblock %}
+
+{% block content %}
+
+    {% if avaliacoes_tecidos.get_alteracoes %}
+        <p class="alert alert-warning">O paciente possui as seguintes alterações estomatológicas: <strong>{{ avaliacoes_tecidos.get_alteracoes|format }}</strong>.</p>
+    {% endif %}
+
+    {% include "includes/dados_paciente.html" %}
+
+    {% if not eh_externo %}
+        <div class="tab-pane" data-tab="aba_situacao_clinica" data-checked="{% if avaliacoes_tecidos or exames_periodontais %}True{% endif %}" data-title="Situação Clínica">
+            {% box 'Odontograma' %}
+                <script>permitir_clique = true;</script>
+
+                <form method="post" id="odontograma_form" name="odontograma_form" action="">
+                    {% csrf_token %}
+
+                    <input type="hidden" id="faces_alteradas" value="{{ odontograma.dentes_alterados }}" />
+
+                    <fieldset class="module aligned with-legend">
+                        <legend>Informe a queixa principal do paciente:</legend>
+                        <div class="form-row queixa_principal">
+                            <div class="field-box-first">
+                                {{ form.queixa_principal.label_tag }}
+                                {{ form.queixa_principal }}
+                            </div>
+                        </div>
+                    </fieldset>
+
+                    <fieldset class="module aligned with-legend mt-4">
+                        <legend>Marque os dentes/faces de acordo com a situação clínica selecionada:</legend>
+                        <div class="form-row situacao_clinica">
+                            <div class="field-box-first">
+                                {{ form.situacao_clinica.label_tag }}
+                                {{ form.situacao_clinica }}
+                                {{ form.faces }}
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="field-box-first">
+                                <label>Dentes e/ou faces:</label>
+                                <div id="odontograma_fixo" class="grid-area-input"></div>
+                                <div class="grid-area-extra">
+                                    <p>
+                                        <strong>Arcada:</strong> <span id="arcada">-</span> |
+                                        <strong>Dente / Face:</strong> <span id="n_dente">-</span> - <span id="face">-</span> |
+                                        <strong>Situação clínica:</strong> <span id="sit_clinica">-</span>
+                                    </p>
+                                    {% if situacoes %}
+                                        <div class="legenda flat mt-3">
+                                            <p>Legenda:</p>
+                                            <ul>
+                                                {% for situacao in situacoes %}
+                                                    <li class="{{ situacao.categoria }}">
+                                                        <input type="hidden" name="situacao_clinica_object" value="{{ situacao.id }}/{{ situacao.preenchimento }}-{{ situacao.categoria }}" />
+                                                        {{ situacao.descricao }}
+                                                    </li>
+                                                {% endfor %}
+                                            </ul>
+                                        </div>
+                                    {% endif %}
+                                    <h4 class="mt-0">Índice CPO-D: {{ indice_cpod }}</h4>
+                                    <p>P: {{ indice_p }}, C: {{ indice_c }}, O: {{ indice_o }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </fieldset>
+                    {% if pode_salvar_odontograma %}
+                        <div class="submit-row">
+                            <input type="submit" value="Salvar" class="default" name="odontograma_form">
+                        </div>
+                    {% endif %}
+                </form>
+
+                <script>
+                    desenhar_odontograma();
+                    carregar_categorias();
+                    restaurar_odontograma();
+                </script>
+
+                <p class="obs">{{ odontograma_responsavel }}</p>
+            {% endbox %}
+
+            {% box 'Exame Periodontal' %}
+
+                {% if atendimento.is_aberto %}
+                    {% if is_odontologo and eh_responsavel %}
+                        <ul class="action-bar">
+                            <li><a class="btn success" href="/saude/adicionar_exame_periodontal/{{ atendimento.id }}/">{% icone "plus" %} Adicionar</a></li>
+                        </ul>
+                    {% endif %}
+                {% endif %}
+
+                {% if exames_periodontais.exists %}
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th class="no-print">Ações</th>
+                                    <th>Ocorrência</th>
+                                    <th>Sextante</th>
+                                    <th>Situação</th>
+                                    <th>Atualizado por</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            {% for exame in exames_periodontais %}
+                                <tr>
+                                    <td class="no-print">
+                                        {% if request.user == exame.profissional %}
+                                            {% icon "delete" "/saude/excluir_exame_periodontal/{{ exame.id }}/" %}
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ exame.get_ocorrencia|format }}</td>
+                                    <td>{{ exame.sextante|format }}</td>
+                                    <td>
+                                        {% if exame.resolvido %}
+                                            <span class="status status-success">Resolvido</span>
+                                        {% else %}
+                                            <a href="/saude/resolver_exame_periodontal/{{ exame.id }}/" class="btn success confirm">Resolver</a>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ exame.profissional|format }} em {{ exame.data_cadastro }}</td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="obs">{{ exames_periodontais_responsavel }}</p>
+                {% else %}
+                    <p class="alert alert-warning">Nenhum registro cadastrado.</p>
+                {% endif %}
+            {% endbox %}
+
+            {% box 'Exame Estomatológico' %}
+
+                {% if atendimento.is_aberto %}
+                    {% if is_odontologo and eh_responsavel %}
+                        <ul class="action-bar">
+                            {% if avaliacoes_tecidos %}
+                                <li><a class="btn primary" href="/saude/adicionar_exame_estomatologico/{{ atendimento.id }}/">{% icone "edit" %} Editar</a></li>
+                                <li><a class="btn default popup" href="/saude/historico_exame_estomatologico/{{ atendimento.id }}/">{% icone "eye" %} Histórico</a></li>
+                            {% else %}
+                                <li><a class="btn success" href="/saude/adicionar_exame_estomatologico/{{ atendimento.id }}/">{% icone "plus" %} Adicionar</a></li>
+                            {% endif %}
+                        </ul>
+                    {% endif %}
+                {% endif %}
+
+                {% if avaliacoes_tecidos %}
+                    <dl class="definition-list">
+                        {% if avaliacoes_tecidos.labios %}
+                            <dt>Alteração no Lábio</dt>
+                            <dd>{{ avaliacoes_tecidos.labios|format }}</dd>
+                        {% endif %}
+                        {% if avaliacoes_tecidos.lingua %}
+                            <dt>Alteração na Língua</dt>
+                            <dd>{{ avaliacoes_tecidos.lingua|format }}</dd>
+                        {% endif %}
+                        {% if avaliacoes_tecidos.gengiva %}
+                            <dt>Alteração na Gengiva</dt>
+                            <dd>{{ avaliacoes_tecidos.gengiva|format }}</dd>
+                        {% endif %}
+                        {% if avaliacoes_tecidos.assoalho %}
+                            <dt>Alteração no Assoalho</dt>
+                            <dd>{{ avaliacoes_tecidos.assoalho|format }}</dd>
+                        {% endif %}
+                        {% if avaliacoes_tecidos.mucosa_jugal %}
+                            <dt>Alteração na Mucosa Jugal</dt>
+                            <dd>{{ avaliacoes_tecidos.mucosa_jugal|format }}</dd>
+                        {% endif %}
+                        {% if avaliacoes_tecidos.palato_duro %}
+                            <dt>Alteração no Palato Duro</dt>
+                            <dd>{{ avaliacoes_tecidos.palato_duro|format }}</dd>
+                        {% endif %}
+                        {% if avaliacoes_tecidos.palato_mole %}
+                            <dt>Alteração no Palato Mole</dt>
+                            <dd>{{ avaliacoes_tecidos.palato_mole|format }}</dd>
+                        {% endif %}
+                        {% if avaliacoes_tecidos.rebordo %}
+                            <dt>Alteração no Rebordo</dt>
+                            <dd>{{ avaliacoes_tecidos.rebordo|format }}</dd>
+                        {% endif %}
+                        {% if avaliacoes_tecidos.cadeia_ganglionar %}
+                            <dt>Alteração na Cadeia Ganglionar</dt>
+                            <dd>{{ avaliacoes_tecidos.cadeia_ganglionar|format }}</dd>
+                        {% endif %}
+                        {% if avaliacoes_tecidos.tonsilas_palatinas %}
+                            <dt>Alteração nas Tonsilas Palatinas</dt>
+                            <dd>{{ avaliacoes_tecidos.tonsilas_palatinas|format }}</dd>
+                        {% endif %}
+                        {% if avaliacoes_tecidos.atm %}
+                            <dt>Alteração na ATM</dt>
+                            <dd>{{ avaliacoes_tecidos.atm|format }}</dd>
+                        {% endif %}
+                        {% if avaliacoes_tecidos.oclusao %}
+                            <dt>Alteração na Oclusão</dt>
+                            <dd>{{ avaliacoes_tecidos.oclusao|format }}</dd>
+                        {% endif %}
+                    </dl>
+                    <p class="obs">{{ avaliacoes_tecidos_responsavel }}</p>
+                {% else %}
+                    <p class="alert alert-warning">Nenhum registro cadastrado.</p>
+                {% endif %}
+            {% endbox %}
+        </div>
+    {% endif %}
+
+    <div class="tab-pane" data-tab="aba_antecedentes" data-title="Antecedentes" data-checked="{% if aba_antecedentes_preenchida %}True{% endif %}">
+        {% box 'Processo Saúde-Doença' %}
+            {% include "includes/ficha_processo_saude_doenca.html" %}
+        {% endbox %}
+    </div>
+
+    <div class="tab-pane" data-tab="aba_percepcaosaudebucal" data-title="{{ percepcaosaudebucal_titulo }}" data-checked="{% if percepcaosaudebucal_count > 0 %}True{% endif %}">
+        {% box percepcaosaudebucal_titulo %}
+            <ul class="action-bar">
+                {% if atendimento.is_aberto %}
+                    {% if especialidade.eh_profissional_saude %}
+                        <li><a class="btn success" href="/saude/adicionar_percepcaosaudebucal/{{ atendimento.id }}/2/">{% icone "plus" %} Adicionar</a></li>
+                    {% endif %}
+                {% endif %}
+                {% if percepcaosaudebucal_count > 1 %}
+                    <li><a class="btn default popup" href="/saude/historico_ficha/{{ atendimento.id }}/7/">Histórico</a></li>
+                {% endif %}
+            </ul>
+            {% if percepcaosaudebucal %}
+                <table class="info">
+                    {% if percepcaosaudebucal.frequencia_escovacao is not None %}
+                        <tr>
+                            <td>Quantas vezes você costuma escovar os dentes por dia</td>
+                            <td>{{ percepcaosaudebucal.frequencia_escovacao|format }}</td>
+                        </tr>
+                    {% endif %}
+                    <tr>
+                        <td>Já foi a um dentista anteriormente</td>
+                        <td>{{ percepcaosaudebucal.foi_dentista_anteriormente|format }}</td>
+                        <td>Quanto tempo faz que foi a última vez ao dentista</td>
+                        <td>{{ percepcaosaudebucal.get_tempo_ultima_vez_dentista_display|default:"Não informado" }}</td>
+                    </tr>
+                    <tr>
+                        {% if percepcaosaudebucal.usa_fio_dental is not None %}
+                            <td>Usa fio dental</td>
+                            <td>{{ percepcaosaudebucal.usa_fio_dental|format }}</td>
+                            {% if percepcaosaudebucal.usa_fio_dental %}
+                                <td>Em quantos dias você usou o fio dental nos últimos 7 dias</td>
+                                <td>{{ percepcaosaudebucal.qts_dias_fio_dental_ultima_semana|format }}</td>
+                            {% endif %}
+                        {% else %}
+                            <td>Quantidade de vezes que usou fio dental na última semana</td>
+                            <td>{{ percepcaosaudebucal.qtd_vezes_fio_dental_ultima_semana|format }}</td>
+                        {% endif %}
+                    </tr>
+                    <tr>
+                        {% if percepcaosaudebucal.qtd_por_dia_consome_acucar is not None %}
+                            <td>Quantas vezes por dia você consome alimentos ou bebidas com açúcar</td>
+                            <td>{{ percepcaosaudebucal.qtd_por_dia_consome_acucar|format }}</td>
+                        {% else %}
+                            <td>Quantidade de dias que consumiu doces, balas, bolos ou refrigerantes na última semana</td>
+                            <td>{{ percepcaosaudebucal.qtd_dias_consumiu_doce_ultima_semana|format }}</td>
+                        {% endif %}
+                    </tr>
+                    <tr>
+                        <td>Usa prótese</td>
+                        <td>{{ percepcaosaudebucal.usa_protese|format }}</td>
+                        <td>Usa aparelho ortodôntico</td>
+                        <td>{{ percepcaosaudebucal.usa_aparelho_ortodontico|format }}</td>
+                    </tr>
+                    <tr>
+                        <td>Nos últimos 6 meses teve alguma dificuldade relacionada à boca, dente, prótese ou aparelho
+                            ortodôntico que lhe causou alguma dificuldade
+                        </td>
+                        <td colspan="3">{{ percepcaosaudebucal.dificuldades|format }}</td>
+                    </tr>
+                    {% if percepcaosaudebucal.dificuldades %}
+                        <tr>
+                            <td>Grau de dificuldade em sorrir</td>
+                            <td>{% if percepcaosaudebucal.grau_dificuldade_sorrir %}{{ percepcaosaudebucal.get_grau_dificuldade_sorrir_display|status }}{% elif percepcaosaudebucal.motivo_dificuldade_sorrir %}{{ "Sim"|status }}{% else %}{{ "Não"|status }}{% endif %}</td>
+                            <td>Qual motivo você atribui como responsável</td>
+                            <td>{{ percepcaosaudebucal.motivo_dificuldade_sorrir|format }}</td>
+                        </tr>
+                        <tr>
+                            <td>Grau de dificuldade em falar</td>
+                            <td>{% if percepcaosaudebucal.grau_dificuldade_falar %}{{ percepcaosaudebucal.get_grau_dificuldade_falar_display|status }}{% elif percepcaosaudebucal.motivo_dificuldade_falar %}{{ "Sim"|status }}{% else %}{{ "Não"|status }}{% endif %}</td>
+                            <td>Qual motivo você atribui como responsável</td>
+                            <td>{{ percepcaosaudebucal.motivo_dificuldade_falar|format }}</td>
+                        </tr>
+                        <tr>
+                            <td>Grau de dificuldade em comer</td>
+                            <td>{% if percepcaosaudebucal.grau_dificuldade_comer %}{{ percepcaosaudebucal.get_grau_dificuldade_comer_display|status }}{% elif percepcaosaudebucal.motivo_dificuldade_comer %}{{ "Sim"|status }}{% else %}{{ "Não"|status }}{% endif %}</td>
+                            <td>Qual motivo você atribui como responsável</td>
+                            <td>{{ percepcaosaudebucal.motivo_dificuldade_comer|format }}</td>
+                        </tr>
+                        <tr>
+                            <td>Grau de dificuldade em relacionar-se socialmente</td>
+                            <td>{% if percepcaosaudebucal.grau_dificuldade_relacionar %}{{ percepcaosaudebucal.get_grau_dificuldade_relacionar_display|status }}{% elif percepcaosaudebucal.motivo_dificuldade_relacionar %}{{ "Sim"|status }}{% else %}{{ "Não"|status }}{% endif %}</td>
+                            <td>Qual motivo você atribui como responsável</td>
+                            <td>{{ percepcaosaudebucal.motivo_dificuldade_relacionar|format }}</td>
+                        </tr>
+                        <tr>
+                            <td>Grau de dificuldade em manter humor habitual</td>
+                            <td>{% if percepcaosaudebucal.grau_dificuldade_manter_humor %}{{ percepcaosaudebucal.get_grau_dificuldade_manter_humor_display|status }}{% elif percepcaosaudebucal.motivo_dificuldade_manter_humor %}{{ "Sim"|status }}{% else %}{{ "Não"|status }}{% endif %}</td>
+                            <td>Qual motivo você atribui como responsável</td>
+                            <td>{{ percepcaosaudebucal.motivo_dificuldade_manter_humor|format }}</td>
+                        </tr>
+                        {% if percepcaosaudebucal.grau_dificuldade_estudar or percepcaosaudebucal.grau_dificuldade_trabalhar or percepcaosaudebucal.motivo_dificuldade_estudar or percepcaosaudebucal.motivo_dificuldade_trabalhar %}
+                            <tr>
+                                <td>Grau de dificuldade em estudar</td>
+                                <td>{% if percepcaosaudebucal.grau_dificuldade_estudar %}{{ percepcaosaudebucal.get_grau_dificuldade_estudar_display|status }}{% elif percepcaosaudebucal.motivo_dificuldade_estudar %}{{ "Sim"|status }}{% else %}{{ "Não"|status }}{% endif %}</td>
+                                <td>Qual motivo você atribui como responsável</td>
+                                <td>{{ percepcaosaudebucal.motivo_dificuldade_estudar|format }}</td>
+                            </tr>
+                            <tr>
+                                <td>Grau de dificuldade em trabalhar</td>
+                                <td>{% if percepcaosaudebucal.grau_dificuldade_trabalhar %}{{ percepcaosaudebucal.get_grau_dificuldade_trabalhar_display|status }}{% elif percepcaosaudebucal.motivo_dificuldade_trabalhar %}{{ "Sim"|status }}{% else %}{{ "Não"|status }}{% endif %}</td>
+                                <td>Qual motivo você atribui como responsável</td>
+                                <td>{{ percepcaosaudebucal.motivo_dificuldade_trabalhar|format }}</td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td>Grau de dificuldade em estudar/trabalhar</td>
+                                <td>{% if percepcaosaudebucal.motivo_dificuldade_estudar_trabalhar %}{{ "Sim"|status }}{% else %}{{ "Não"|status }}{% endif %}</td>
+                                <td>Qual motivo você atribui como responsável</td>
+                                <td>{{ percepcaosaudebucal.motivo_dificuldade_estudar_trabalhar|format }}</td>
+                            </tr>
+                        {% endif %}
+                        <tr>
+                            <td>Grau de dificuldade em higienizar a boca</td>
+                            <td>{% if percepcaosaudebucal.grau_dificuldade_higienizar %}{{ percepcaosaudebucal.get_grau_dificuldade_higienizar_display|status }}{% elif percepcaosaudebucal.motivo_dificuldade_higienizar %}{{ "Sim"|status }}{% else %}{{ "Não"|status }}{% endif %}</td>
+                            <td>Qual motivo você atribui como responsável</td>
+                            <td>{{ percepcaosaudebucal.motivo_dificuldade_higienizar|format }}</td>
+                        </tr>
+                        <tr>
+                            <td>Grau de dificuldade em dormir</td>
+                            <td>{% if percepcaosaudebucal.grau_dificuldade_dormir %}{{ percepcaosaudebucal.get_grau_dificuldade_dormir_display|status }}{% elif percepcaosaudebucal.motivo_dificuldade_dormir %}{{ "Sim"|status }}{% else %}{{ "Não"|status }}{% endif %}</td>
+                            <td>Qual motivo você atribui como responsável</td>
+                            <td>{{ percepcaosaudebucal.motivo_dificuldade_dormir|format }}</td>
+                        </tr>
+                    {% endif %}
+                </table>
+                <p class="obs">{{ percepcaosaudebucal_responsavel }}</p>
+            {% else %}
+                <p class="alert alert-warning">Nenhuma avaliação cadastrada.</p>
+            {% endif %}
+        {% endbox %}
+    </div>
+
+    {% if not eh_externo %}
+        <div class="tab-pane" data-tab="aba_plano_tratamento" data-checked="{% if tem_plano_tratamento %}True{% endif %}" data-title="Plano de Tratamento">
+
+            {% if atendimento.is_aberto %}
+                {% if is_odontologo and eh_responsavel %}
+                    <ul class="action-bar">
+                        <li><a class="btn success" href="/saude/adicionar_intervencao/{{ atendimento.id }}/">{% icone "plus" %} Adicionar Registro no Plano de Tratamento</a></li>
+                        <li><a class="btn" href="/saude/gerar_plano_tratamento/{{ odontograma.id }}/">{% icone "circle" %} Gerar Plano de Tratamento Automático</a></li>
+                    </ul>
+                {% endif %}
+            {% endif %}
+
+            {% box "Plano de Tratamento" %}
+                {% if tem_plano_tratamento %}
+                    <form method="post" id="bolsas_form" action="/saude/excluir_intervencao/{{ atendimento.id }}/">
+                        {% csrf_token %}
+                        {% if atendimento.is_aberto and eh_responsavel %}
+                            <div class="actions">
+                                <label>Ação:
+                                    <select name="action">
+                                        <option selected="selected">Ordenar</option>
+                                        <option>Agregar</option>
+                                        <option>Remover</option>
+                                    </select>
+                                </label>
+                                <button value="0" name="index" title="Executar ação selecionada" class="button" type="submit">Aplicar</button>
+                            </div>
+                        {% endif %}
+                        <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th class="no-print">Seleção <input type="checkbox" onchange="var is = this.parentNode.parentNode.parentNode.parentNode.getElementsByTagName('input');for(var i=0; i<is.length; i++){ is[i].checked = this.checked;}" /></th>
+                                    <th class="no-print">Ordem</th>
+                                    <th>Dente/Sextante</th>
+                                    <th>Faces</th>
+                                    <th>Situação Clínica</th>
+                                    <th>Procedimento Indicado</th>
+                                    <th>Realizado</th>
+                                    <th class="no-print">Opções</th>
+                                    <th class="no-print">Ordenar</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in plano_tratamento %}
+                                    <tr>
+                                        <td class="no-print"><INPUT TYPE="checkbox" NAME="registros" value="{{ item.id }}" /></td>
+                                        <td class="no-print"><INPUT type="number" NAME="ordens" value="{{ item.ordem }}" /></td>
+                                        <td>
+                                            {% if item.dente %}
+                                                {{ item.dente }}
+                                            {% else %}
+                                                {{ item.sextante }}
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ item.get_face|format }}</td>
+                                        <td>{{ item.situacao_clinica|format }}</td>
+                                        <td>{{ item.procedimento|format }}</td>
+                                        <td>
+                                            {% if item.realizado %}
+                                                <span class="status status-success">Sim</span>
+                                            {% else %}
+                                                <span class="status status-error">Não</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="no-print">
+                                            <ul class="action-bar">
+                                                {% if atendimento.is_aberto and eh_responsavel %}
+                                                    {% if not item.realizado and item.procedimento %}
+                                                        <li><a href="/saude/obs_registrar_execucao/{{ item.id }}/" class="btn success">Registrar Execução</a></li>
+                                                    {% endif %}
+                                                    {% if not item.procedimento %}
+                                                        <li><a href="/saude/indicar_procedimento/{{ item.id }}/" class="btn popup success">Indicar Procedimento</a></li>
+                                                    {% else %}
+                                                        <li><a href="/saude/indicar_procedimento/{{ item.id }}/" class="btn popup primary">Editar Procedimento</a></li>
+                                                    {% endif %}
+                                                {% endif %}
+                                            </ul>
+                                        </td>
+                                        <td class="no-print">
+                                            <ul class="action-bar">
+                                                {% if atendimento.is_aberto and eh_responsavel %}
+                                                    {% if item.pode_subir %}
+                                                        <li>
+                                                            <a class="btn" href="/saude/ordem_plano_tratamento/{{ item.id }}/1/">
+                                                                <span class="fas fa-level-up-alt" aria-hidden="true"></span> Subir
+                                                            </a>
+                                                        </li>
+                                                    {% endif %}
+                                                    {% if item.pode_descer %}
+                                                        <li>
+                                                            <a class="btn" href="/saude/ordem_plano_tratamento/{{ item.id }}/2/">
+                                                                <span class="fas fa-level-down-alt" aria-hidden="true"></span> Descer
+                                                            </a>
+                                                        </li>
+                                                    {% endif %}
+                                                {% endif %}
+                                            </ul>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        </div>
+                    </form>
+                {% else %}
+                    <p class="alert alert-warning">Nenhum registro cadastrado.</p>
+                {% endif %}
+            {% endbox %}
+        </div>
+    {% endif %}
+
+    <div class="tab-pane" data-tab="aba_procedimento" data-title="Procedimentos" data-checked="{% if procedimento_count > 0 %}True{% endif %}">
+
+        {% if atendimento.is_aberto and pode_adicionar_procedimento %}
+            <ul class="action-bar">
+                <li><a class="btn success" href="/saude/adicionar_procedimento_odontologico/{{ atendimento.id }}/">{% icone "plus" %} Adicionar</a></li>
+                {% if not odontograma.encaminhado_enfermagem and is_odontologo %}
+                    <li><a class="btn success confirm" href="/saude/encaminhar_enfermagem_odonto/{{ atendimento.id }}/" data-confirm="Tem certeza que deseja encaminhar este atendimento à enfermagem?">{% icone "share" %} Encaminhar à Enfermagem</a></li>
+                {% endif %}
+                <li><a href="/saude/alterar_tipo_consulta/{{ atendimento.id }}/" class="btn primary">{% icone "info-circle" %} Informar Tipo de Consulta</a></li>
+            </ul>
+        {% endif %}
+
+        {% if odontograma.tipo_consulta %}
+            <dl>
+                <dt>Tipo de Consulta:</dt>
+                <dd>{{ odontograma.tipo_consulta.all|format }}</dd>
+            </dl>
+        {% endif %}
+
+        {% if odontograma.encaminhado_enfermagem %}
+            <p class="alert alert-info">Este atendimento foi encaminhado à enfermagem.</p>
+        {% endif %}
+
+        {% box "Procedimentos" %}
+            {% if procedimentos.exists %}
+                <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="no-print">Ações</th>
+                            <th>Procedimento</th>
+                            <th>Dentes/Faces</th>
+                            <th>Região Bucal</th>
+                            <th>Observações</th>
+                            <th>Data do Cadastro</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for procedimento in procedimentos %}
+                        <tr>
+                            <td class="no-print">
+                                {% if request.user == procedimento.profissional %}
+                                    {% icon "delete" "/saude/excluir_procedimento_odontologico/{{ procedimento.id }}/" "Remover" "" %}
+                                {% endif %}
+                            </td>
+                            <td>{{ procedimento.procedimento }}</td>
+                            <td>
+                                {% if procedimento.get_elementos %}
+                                    {% for registro in procedimento.get_elementos %}
+                                        <p>{{ registro|safe }}</p>
+                                    {% endfor %}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>{{ procedimento.regiao_bucal|format }}</td>
+                            <td>{{ procedimento.observacao|format }}</td>
+                            <td>{{ procedimento.data_cadastro|format }} por {{ procedimento.profissional|format }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                </div>
+            {% else %}
+                <p class="alert alert-warning">Nenhum procedimento cadastrado.</p>
+            {% endif %}
+        {% endbox %}
+    </div>
+{% endblock %}
+
+{% block asideright %}
+    <aside class="right">
+        {% include "includes/dados_extras_paciente.html" %}
+        
+        {% include "includes/regras_para_fechamento.html" %}
+    </aside>
+{% endblock %}

@@ -1,0 +1,179 @@
+{% extends super_template %}
+{% load static %}
+
+{% block extrahead %}
+    {{ block.super }}
+    {{ TINYMCE_DEFAULT_CONFIG|json_script:"tinymce-default-config" }}
+    <script src="{% static 'tinymce/tinymce.min.js' %}"></script>
+    <script src="{% static 'tinymce/tiny_mce_toolbar.js' %}?v=6"></script>
+    <script>
+        jQuery(document).ready(function () {
+            $('#editardocumento_form').on('submit', function( event ) {
+                // Fail-closed: se o editor/validação não carregou (ex.: falha no
+                // download do tinymce/tiny_mce_toolbar.js), bloqueia o salvamento
+                // em vez de pular a validação silenciosamente (Sentry SUAP-V39/V3G).
+                if (typeof tinymce === 'undefined' || typeof validarTags !== 'function') {
+                    alert('O editor de texto não carregou completamente. Recarregue a página antes de salvar.');
+                    return false;
+                }
+                let editor = tinymce.get('id_corpo');
+                if (validarTags(editor)) {
+                    salvar_tags(editor);
+                } else {
+                    $('#editardocumento_form_salvar').removeAttr('disabled');
+                    $('#editardocumento_form_salvar_visualizar').removeAttr('disabled');
+                    $('#editardocumento_form_salvar').val('Salvar');
+                    $('#editardocumento_form_salvar_visualizar').val('Salvar e Visualizar');
+                    return false;
+                }
+            });
+        });
+    </script>
+    <style>
+        .form-row {
+            width: 100% !important;
+            flex: 1 1 100%;
+            display: block; /* se estiver usando flex ou grid e precisar forçar */
+        }
+        
+        .form-row textarea,
+        .form-row .corpo {
+            width: 100% !important;
+        }
+            /* Garante que a estrutura do TinyMCE ocupe toda a linha */
+        .form-row .tox {
+            width: 100% !important;
+        }
+
+        .form-row .tox .tox-editor-container {
+            width: 100% !important;
+        }
+
+        .form-row .tox .tox-edit-area iframe {
+            width: 100% !important;
+            min-height: 600px;
+        }
+
+        /* Também atua diretamente no <textarea> inicial */
+        .form-row textarea.tinymce {
+            width: 100% !important;
+        }
+        .form-row,
+        .form-row > * {
+            flex-grow: 1 !important;
+            max-width: 100% !important;
+        }
+        .form-row.corpo {
+            display: block !important;
+            width: 100% !important;
+        }
+        .form-row.corpo .tox {
+            width: 100% !important;
+        }
+
+        .form-row.corpo .tox .tox-editor-container {
+            width: 100% !important;
+        }
+
+        .form-row.corpo .tox .tox-edit-area iframe {
+            width: 100% !important;
+            min-height: 600px;
+        }
+        /* Corrige o container do campo inteiro */
+        .form-row.corpo,
+        .form-row.corpo .field-box-first {
+            display: block !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            flex: 1 1 100% !important;
+        }
+
+        /* TinyMCE container */
+        .form-row.corpo .tox,
+        .form-row.corpo .tox .tox-editor-container,
+        .form-row.corpo .tox .tox-edit-area iframe {
+            width: 100% !important;
+        }
+
+        /* Força mínimo de altura */
+        .form-row.corpo .tox .tox-edit-area iframe {
+            min-height: 600px !important;
+        }
+
+        /* Também no <textarea> original */
+        textarea.tinymce {
+            width: 100% !important;
+            min-height: 600px;
+        }
+
+        #showcase {
+            margin: 0 20px;
+            text-align: center;
+        }
+        #range {
+            height: 300px;
+            margin: 0 auto 30px;
+        }
+        #value-span,
+        #value-input {
+            width: 50%;
+            float: left;
+            display: block;
+            text-align: center;
+            margin: 0;
+        }
+    </style>
+
+{% endblock %}
+
+{% block action-bar %}
+<ul class="action-bar">
+    {% help_button %}
+    <li><a class="btn popup default" href="/documento_eletronico/visualizar_variaveis/">Visualizar Variáveis</a></li>
+    <li><a class="btn" href='{% url "editar_documento" documento.id "remontar_corpo" %}'>Remontar Corpo</a></li>
+    {% if documento.pode_imprimir %}
+        <li class="has-child">
+            <a class="btn" href="#"> Imprimir </a>
+            <ul>
+                <li><a href="/documento_eletronico/imprimir_documento_pdf/{{ documento.id }}/carta/">Carta</a></li>
+                <li><a href="/documento_eletronico/imprimir_documento_pdf/{{ documento.id }}/paisagem/">Paisagem</a></li>
+            </ul>
+        </li>
+    {% endif %}
+</ul>
+{% endblock %}
+
+{% block content %}
+
+{% if form.errors %}
+    <p class="errornote">Por favor, corrija os erros abaixo.</p>
+{% endif %}
+
+<form method="post" id="editardocumento_form" name="editardocumento_form" action="">
+    {% csrf_token %}
+    {{ form.media }}
+
+    {% box 'Corpo do Documento' %}
+        <input type="hidden" value="{{ documento.data_ultima_modificacao.isoformat }}" name="data_ultima_modificacao__isoformat" id="id_data_ultima_modificacao__isoformat"/>
+        <div id="top"></div>
+        {% render_form form_corpo False %}
+        <p class="obs" id="bottom">Tamanho atual: {{ documento.tamanho_em_mb }} MB</p>
+        <p class="obs" id="bottom">Tamanho máximo permitido: {{ documento_texto_tamanho_maximo_em_mb }} MB</p>
+    {% endbox %}
+
+    <div class="submit-row">
+        <input type="submit" value="Salvar" class="default dontdisable" id="editardocumento_form_salvar">
+        <input type="submit" value="Salvar e Visualizar" name="_salvar_e_visualizar" class="default dontdisable" id="editardocumento_form_salvar_visualizar">
+
+{# TODO: Remover ou se for pertinente transferir pra página de visualização do documento #}
+{#        {% if documento.estah_em_minuta%}#}
+{#            <input type="submit" value="Salvar e concluir" name="_salvar_e_concluir" class="default">#}
+{#        {% endif %}#}
+{##}
+{#        {% if documento.sou_revisor and documento.estah_em_revisao %}#}
+{#                <a class="btn success" href="{% url 'revisar_documento' documento.id %}">Marcar como Revisado</a>#}
+{#        {% endif %}#}
+    </div>
+</form>
+
+{% endblock %}

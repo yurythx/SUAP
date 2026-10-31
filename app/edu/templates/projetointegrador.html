@@ -1,0 +1,347 @@
+{% extends super_template %}
+
+{% block object-status %}
+        <span>{{ obj.get_situacao_display|status }}</span>
+{% endblock %}
+
+{% block action-bar %}
+    {% if is_professor %}
+        <ul class="action-bar">
+            {% if obj.finalizado %}
+                <li><a class="btn danger" href="?finalizar=0">Reabrir projeto integrador</a></li>
+            {% else %}
+                <li><a class="btn success" href="?finalizar=1">{% icone "check" %} Encerrar projeto integrador</a></li>
+            {% endif %}
+        </ul>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    
+    <dl class="definition-list flex">
+        <div class="list-item flex-basis-100">
+            <dt>Diário</dt>
+            <dd>{{ obj.diario }}</dd>
+        </div>
+        <div class="list-item flex-basis-100">
+            <dt>Tema</dt>
+            <dd>{{ obj.tema }}</dd>
+        </div>
+        <div class="list-item flex-basis-50">
+            <dt>Carga Horária</dt>
+            <dd>{{ obj.diario.componente_curricular.ch_projeto_integrador }}h</dd>
+        </div>
+        <div class="list-item flex-basis-50">
+            <dt>Professores</dt>
+            <dd>
+                {% if obj.professores.exists %}
+                    <ul>
+                        {% for professor in obj.professores.all %}
+                            <li>{{ professor|format }}</li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <ul>
+                        {% for professor_diario in obj.diario.professordiario_set.all %}
+                            <li>{{ professor_diario.professor|format }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </dd>
+        </div>
+    </dl>
+
+    {% box "Planejamento" %}
+
+        {% if obj.atividadeprojetointegrador_set.exists %}
+        {% progressbar obj.get_progresso_atividades %}
+        <div class="table-responsive mt-3">
+            <table>
+                <caption>Atividades planejadas</caption>
+                <thead>
+                <tr>
+                    <th>Nome</th>
+                    <th>Descrição</th>
+                    <th>Data prevista para início</th>
+                    <th>Data prevista para término</th>
+                    <th>Avaliação</th>
+                    {% if pode_registrar_atividade %}
+                    <th>Opções</th>
+                    {% endif %}
+                </tr>
+                </thead>
+                <tbody>
+                {% for atividade in obj.get_atividades %}
+                    <tr>
+                        <td>{{ atividade.nome|format }}</td>
+                        <td>{{ atividade.descricao|format }}</td>
+                        <td>{{ atividade.data_prevista_inicio|format }}</td>
+                        <td>{{ atividade.data_prevista_termino|format }}</td>
+                        <td>
+                            {% if atividade.avaliacaoatividadeprojetointegrador_set.exists %}
+                                <ul>
+                                    {% for avaliacao in atividade.avaliacaoatividadeprojetointegrador_set.all %}
+                                        {% if matricula_diario is None or avaliacao.participante.id == matricula_diario.id %}
+                                        <li>{{ avaliacao.participante.matricula_periodo.aluno.pessoa_fisica.nome }}: <strong>{{ avaliacao.get_situacao_display }}</strong></li>
+                                        {% endif %}
+                                    {% endfor %}
+                                </ul>
+                                {% if atividade.observacao %}
+                                    <hr/>{{ atividade.observacao }}
+                                {% endif %}
+                            {% else %}
+                                <span class="status status-warning">Pendente de Registro</span>
+                            {% endif %}
+                        </td>
+                        {% if pode_registrar_atividade %}
+                        <td>
+                            <a href="/edu/avaliar_atividade_projeto_integrador/{{ atividade.pk }}/" class="btn primary popup">Registrar</a>
+                        </td>
+                        {% endif %}
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+            <p class="alert alert-warning">Nenhuma atividade planejada até o momento.</p>
+        {% endif %}
+    {% endbox %}
+
+    {% box "Participantes" %}
+        <div class="mt-1">
+            {% if pode_gerenciar and not obj.finalizado %}
+                <ul class="action-bar">
+                    <li><a href="/edu/adicionar_aluno_projetointegrador/{{ obj.pk }}/" class="btn success popup">Adicionar</a></li>
+                </ul>
+            {% endif %}
+        </div>
+        {% if obj.participantes.exists %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Alunos participantes</caption>
+                    <thead>
+                    <tr>
+                        <th>Ações</th>
+                        <th>Matrícula</th>
+                        <th>Nome</th>
+                        <th>Diário</th>
+                        <th>Nota da avaliação 1</th>
+                        {% if obj.diario.componente_curricular.qtd_avaliacoes > 1 %}
+                            <th>Nota da avaliação 2</th>
+                        {% endif %}
+                        {% if obj.diario.componente_curricular.qtd_avaliacoes > 2 %}
+                            <th>Nota da avaliação 3</th>
+                            <th>Nota da avaliação 4</th>
+                        {% endif %}
+                        <th>Média final</th>
+                        <th>Situação</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for avaliacao in obj.get_avaliacoes %}
+                        {% if matricula_diario is None or avaliacao.participante.id == matricula_diario.id %}
+                        <tr>
+                            <td>
+                                {% if avaliacao.participante.id in ids_participantes_sem_registro %}
+                                    {% icon "delete" "?del_participante={{ avaliacao.participante.id }}" %}
+                                {% endif %}
+                            </td>
+                            <td>{{ avaliacao.participante.matricula_periodo.aluno.matricula|format }}</td>
+                            <td>{{ avaliacao.participante.matricula_periodo.aluno.pessoa_fisica.nome|format }}</td>
+                            <td>{{ avaliacao.participante.diario_id }}</td>
+                            <td><strong>{{ avaliacao.nota|format }}</strong></td>
+                            {% if obj.diario.componente_curricular.qtd_avaliacoes > 1 %}
+                                <td><strong>{{ avaliacao.nota2|format }}</strong></td>
+                            {% endif %}
+                            {% if obj.diario.componente_curricular.qtd_avaliacoes > 2 %}
+                                <td><strong>{{ avaliacao.nota3|format }}</strong></td>
+                                <td><strong>{{ avaliacao.nota4|format }}</strong></td>
+                            {% endif %}
+                            <td>
+                                <strong>{{ avaliacao.get_media_final|format }}</strong>
+                            </td>
+                            <td>
+                                {% with situacao=avaliacao.get_situacao %}
+                                    <span class="status status-{{ situacao.1 }}">{{ situacao.0 }}</span>
+                                {% endwith %}
+                            </td>
+                        </tr>
+                        {% endif %}
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Nenhum participante adicionado.</p>
+        {% endif %}
+    {% endbox %}
+
+    {% box 'Avaliação 1' %}
+        {% if perms.edu.change_projetointegrador and not obj.finalizado %}
+
+        <ul class="action-bar">
+            <li><a href="/edu/avaliar_projeto_integrador/{{ obj.pk }}/1/" class="btn popup">Registrar primeira avaliação</a></li>
+        </ul>
+
+        {% endif %}
+        <dl class="definition-list flex">
+            <div class="list-item flex-basis-50">
+                <dt>Data/hora da defesa</dt>
+                <dd>{{ obj.data_hora_defesa|format }}</dd>
+            </div>
+            <div class="list-item flex-basis-50">
+                <dt>Presidente da banca</dt>
+                <dd>{{ obj.presidente_banca|format }}</dd>
+            </div>
+            <div class="list-item flex-basis-100">
+                <dt>Membros da banca</dt>
+                <dd>
+                    <ul>
+                    {% for professor in obj.membros_banca.all %}
+                        <li>{{ professor|format  }}</li>
+                    {% endfor %}
+                    </ul>
+                </dd>
+            </div>
+            <div class="list-item flex-basis-50">
+                <dt>Arquivo</dt>
+                <dd>
+                    {% if obj.arquivo %}
+                        <a href="{{ obj.arquivo.url }}">
+                            {{ obj.arquivo.name|format }}
+                        </a>
+                    {% else %}
+                        -
+                    {% endif %}
+                </dd>
+            </div>
+        </dl>
+    {% endbox %}
+
+    {% if obj.diario.componente_curricular.qtd_avaliacoes > 1 %}
+        {% box 'Avaliação 2' %}
+            {% if perms.edu.change_projetointegrador and not obj.finalizado %}
+            <ul class="action-bar">
+                <li><a href="/edu/avaliar_projeto_integrador/{{ obj.pk }}/2/" class="btn popup">Registrar segunda avaliação</a></li>
+            </ul>
+            {% endif %}
+            <dl class="definition-list flex">
+                <div class="list-item flex-basis-50">
+                    <dt>Data/Hora da Defesa</dt>
+                    <dd>{{ obj.data_hora_defesa2|format }}</dd>
+                </div>
+                <div class="list-item flex-basis-50">
+                    <dt>Presidente da Banca</dt>
+                    <dd>{{ obj.presidente_banca2|format }}</dd>
+                </div>
+                <div class="list-item flex-basis-100">
+                    <dt>Membros da Banca</dt>
+                    <dd>
+                        <ul>
+                            {% for professor in obj.membros_banca2.all %}
+                                <li>{{ professor|format  }}</li>
+                            {% endfor %}
+                        </ul>
+                    </dd>
+                </div>
+                <div class="list-item flex-basis-50">
+                    <dt>Arquivo Final</dt>
+                    <dd>
+                        {% if obj.arquivo2 %}
+                            <a href="{{ obj.arquivo2.url }}">
+                                {{ obj.arquivo2.name|format }}
+                            </a>
+                        {% else %}
+                            -
+                        {% endif %}
+                    </dd>
+                </div>
+            </dl>
+        {% endbox %}
+    {% endif %}
+
+    {% if obj.diario.componente_curricular.qtd_avaliacoes > 2 %}
+
+        {% box 'Avaliação 3' %}
+            {% if perms.edu.change_projetointegrador and not obj.finalizado %}
+            <ul class="action-bar">
+                <li><a href="/edu/avaliar_projeto_integrador/{{ obj.pk }}/3/" class="btn popup">Registrar terceira avaliação</a></li>
+            </ul>
+            {% endif %}
+            <dl class="definition-list flex">
+                <div class="list-item flex-basis-50">
+                    <dt>Data/Hora da Defesa</dt>
+                    <dd>{{ obj.data_hora_defesa3|format }}</dd>
+                </div>
+                <div class="list-item flex-basis-50">
+                    <dt>Presidente da Banca</dt>
+                    <dd>{{ obj.presidente_banca3|format }}</dd>
+                </div>
+                <div class="list-item flex-basis-100">
+                    <dt>Membros da Banca</dt>
+                    <dd>
+                        <ul>
+                            {% for professor in obj.membros_banca3.all %}
+                                <li>{{ professor|format  }}</li>
+                            {% endfor %}
+                        </ul>
+                    </dd>
+                </div>
+                <div class="list-item flex-basis-50">
+                    <dt>Arquivo Final</dt>
+                    <dd>
+                        {% if obj.arquivo3 %}
+                            <a href="{{ obj.arquivo3.url }}">
+                                {{ obj.arquivo3.name|format }}
+                            </a>
+                        {% else %}
+                            -
+                        {% endif %}
+                    </dd>
+                </div>
+            </dl>
+        {% endbox %}
+
+        {% box 'Avaliação 4' %}
+            {% if perms.edu.change_projetointegrador and not obj.finalizado %}
+            <ul class="action-bar">
+                <li><a href="/edu/avaliar_projeto_integrador/{{ obj.pk }}/4/" class="btn popup">Registrar quarta avaliação</a></li>
+            </ul>
+            {% endif %}
+            <dl class="definition-list flex">
+                <div class="list-item flex-basis-50">
+                    <dt>Data/Hora da Defesa</dt>
+                    <dd>{{ obj.data_hora_defesa4|format }}</dd>
+                </div>
+                <div class="list-item flex-basis-50">
+                    <dt>Presidente da Banca</dt>
+                    <dd>{{ obj.presidente_banca4|format }}</dd>
+                </div>
+                <div class="list-item flex-basis-100">
+                    <dt>Membros da Banca</dt>
+                    <dd>
+                        <ul>
+                            {% for professor in obj.membros_banca4.all %}
+                                <li>{{ professor|format  }}</li>
+                            {% endfor %}
+                        </ul>
+                    </dd>
+                </div>
+                <div class="list-item flex-basis-50">
+                    <dt>Arquivo Final</dt>
+                    <dd>
+                        {% if obj.arquivo4 %}
+                            <a href="{{ obj.arquivo4.url }}">
+                                {{ obj.arquivo4.name|format }}
+                            </a>
+                        {% else %}
+                            -
+                        {% endif %}
+                    </dd>
+                </div>
+            </dl>
+        {% endbox %}
+    {% endif %}
+
+{% endblock %}

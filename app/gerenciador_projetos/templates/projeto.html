@@ -1,0 +1,131 @@
+{% extends super_template %}
+{% load gerenciador_projetos_templatetags %}
+
+{% block bodyclass %}hasAsideRight{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if pode_editar_projeto %}
+            <li><a class="btn primary" href="{% url 'clonar_projeto' projeto.id %}">{% icone "clone" %} Clonar projeto</a></li>
+        {% endif %}
+        {% include "includes/acoes_visualizacao.html" %}
+    </ul>
+{% endblock %}
+
+{% block object-status %}
+    {% include "includes/situacoes_projeto.html" %}
+{% endblock %}
+
+{% block content %}
+
+    {% include "includes/dados_gerais.html" %}
+
+    <div class="tab-pane" id="tabs-tarefas" data-tab="tarefas" data-title="Tarefas" data-counter="{{ qtd_tarefas }}">
+        {% if pode_adicionar_tarefas %}
+            <ul class="action-bar">
+                <li><a class="btn success" href="{% url 'adicionar_tarefa' projeto.id %}">{% icone "plus" %} <span class="visually-hidden">Adicionar</span> Tarefa</a></li>
+            </ul>
+        {% endif %}
+
+        <div class="search-and-filters">
+            {% render_form tarefa_projeto_filtro_form %}
+        </div>
+
+        {% if tarefas.exists %}
+            {% montar_arvore_tarefas tarefas %}
+        {% else %}
+            <p class="alert alert-warning">Não há tarefas cadastradas para esse projeto.</p>
+        {% endif %}
+
+        {% if tarefas_canceladas.exists %}
+            {% box "Tarefas canceladas" %}
+                {% montar_arvore_tarefas tarefas_canceladas %}
+            {% endbox %}
+        {% endif %}
+    </div>
+
+    <div class="tab-pane" id="tabs-comentarios" data-tab="comentarios" data-title="Comentários" data-counter="{{ qtd_comentarios }}">
+        {% comentarios projeto 'Não há comentários cadastrados para esse projeto.' %}
+    </div>
+
+    <div class="tab-pane" id="tabs-listas" data-tab="listas" data-title="Listas" data-counter="{{ projeto.listas_do_projeto.count }}">
+        {% if pode_adicionar_listas %}
+            <ul class="action-bar">
+                <li><a class="btn success popup" href="{% url 'adicionar_ou_vincular_lista_projeto' projeto.id %}">{% icone "plus" %} Adicionar Lista</a></li>
+            </ul>
+        {% endif %}
+        {% if projeto.listas_do_projeto.exists %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Listas para exibição no Dashboard</caption>
+                    <thead>
+                        <tr>
+                            <th>Posição</th>
+                            <th>Lista</th>
+                            {% if perms.gerenciador_projetos.change_projeto %}
+                                <th class="no-print">Opções</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for listaprojeto in projeto.listas_do_projeto %}
+                            <tr>
+                                <td>{{ listaprojeto.posicao }}</td>
+                                <td>{{ listaprojeto.lista }}</td>
+                                {% if perms.gerenciador_projetos.change_projeto %}
+                                    <td class="no-print">
+                                        <a href="{% url 'atualizar_posicao_lista_projeto' listaprojeto.id %}"
+                                            class="btn popup">{% icone "arrows-alt-v" %} Atualizar Posição</a>
+                                    </td>
+                                {% endif %}
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Não há listas cadastradas para esse projeto</p>
+        {% endif %}
+    </div>
+
+    <div class="tab-pane" id="tabs-tags" data-tab="tags" data-title="Tags" data-counter="{{ projeto.tag_set.count }}">
+        {% if pode_editar_tags %}
+            <ul class="action-bar">
+                <li><a class="btn success popup" href="{% url 'adicionar_tag' projeto.id %}"><span class="fas fa-plus" aria-hidden="true"></span> Adicionar Tag</a></li>
+            </ul>
+        {% endif %}
+        {% if projeto.tag_set.exists %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Tags para tarefas</caption>
+                    <thead>
+                        <tr>
+                            <th class="no-print">Ações</th>
+                            <th>Nome</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for tag in projeto.tag_set.all %}
+                            <tr>
+                                <td class="no-print">
+                                    {% if pode_editar_tags %}
+                                        {% icon "edit" "/gerenciador_projetos/editar_tag/{{ tag.pk }}/" "Editar" "popup" %}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="status status-{{ tag.cor }}">{{ tag.nome }}</span>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Não há tags cadastradas para esse projeto.</p>
+        {% endif %}
+    </div>
+{% endblock %}
+
+{% block asideright %}
+    {% include "includes/dados_projeto.html" %}
+{% endblock %}

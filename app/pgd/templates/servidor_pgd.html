@@ -1,0 +1,180 @@
+{% extends "base_super_pgd.html" %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if eh_proprio_servidor %}
+            {% if perms.pgd.add_solicitacaoadesaoservidor %}
+                <li><a class="btn success" href="{% url 'solicitar_adesao' %}">Solicitar Adesão ao PGD</a></li>
+            {% endif %}
+            {% if perms.pgd.add_solicitacaoadesaoptsservidor %}
+                <li><a class="btn success" href="/admin/pgd/planotrabalhosetorialselecionar/">Solicitar Adesão ao PTS</a></li>
+            {% endif %}
+            <li><a class="btn success" href="/pgd/cadastrar_pit/">Adicionar PIT</a></li>
+        {% endif %}
+    </ul>
+{% endblock %}
+
+{% block content %} {{ block.super }}
+
+    {% include "includes/dados_servidor.html" %}
+
+    {% if pits_pendencias_lista or rits_pendencias_lista %}
+        {% box 'Pendências' %}
+            
+            {% if pits_pendencias_lista %}
+                <h4>Criar ou Solicitar Aprovação/homologação dos seguintes PITs:</h4>
+                {% for pend in pits_pendencias_lista %}
+                    <p class="checklist error">  
+                        {{ pend }}
+                    </p>
+                {% endfor %}
+            {% endif %}
+
+            {% if rits_pendencias_lista %}
+                <h4>Envio para Aprovação/Homologação dos seguintes RITs:</h4>
+                {% for pend in rits_pendencias_lista %}
+                    <p class="checklist error">  
+                        {{ pend }}
+                    </p>
+                {% endfor %}   
+            {% endif %}
+
+        {% endbox %}
+    {% endif %}
+
+    {% for adesao in adesoes_pgd %}
+        <div class="tab-pane" data-title="{{ adesao.get_verbose_simples }}" data-tab="adesoes_ao_pgd_{{ adesao.id }}" data-checked="{% if adesao.estah_deferida and not adesao.estah_desligado %}True{% else %}False{% endif %}">
+
+            <ul class="action-bar">
+                <li><a class="btn" href="/pgd/servidor_pgd_horas/{{ adesao.id }}">Visualizar horas</a></li>
+                <li><a class="btn default" href="/pgd/visualizar_solicitacao_adesao/{{ adesao.id }}">Visualizar adesão ao PGD</a></li>
+            </ul>
+
+            {% if adesao.data_desligamento_efeitos_a_partir_de %}
+                <div class="alert alert-warning">
+                    <p>Desligamento com efeitos a partir de {{ adesao.data_desligamento_efeitos_a_partir_de|format }}.</p>
+                    {% if adesao.get_carencia_ate %}
+                        <p>Após {{ adesao.data_desligamento_efeitos_a_partir_de|format }} terá carência até {{ adesao.get_carencia_ate|format }} (para algumas operações no PIT/RIT).</p>
+                    {% endif %}
+                    {% if adesao.data_pode_solicitar_nova_adesao %}
+                        <p>Após {{ adesao.data_pode_solicitar_nova_adesao|format }} dias você poderá solicitar nova adesão.</p>    
+                    {% endif %}
+                </div>
+            {% endif %}
+
+            <dl class="definition-list flex mb-4">
+                <div class="list-item">
+                    <dt>Situação de adesão ao PGD</dt>
+                    <dd>{{ adesao.get_situacao_display|status }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Data/Hora da solicitação da adesão ao PGD</dt>
+                    <dd>{{ adesao.get_data_situacao_atual }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Telefone para contato PGD</dt>
+                    <dd>{{ adesao.telefone|format }}</dd>
+                </div>
+            </dl>
+
+            {% if adesao.get_adesoes_pts %}
+                {% box 'Adesões ao PTS' %}
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th class="no-print">Ações</th>
+                                    <th>Data/Hora da Solicitação</th>
+                                    <th>Setor</th>
+                                    <th>Descrição</th>
+                                    <th>Situação</th>
+                                    <th class="no-print">Opções</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for adesao in adesao.get_adesoes_pts %}
+                                <tr>
+                                    <td class="no-print">
+                                        {% icon "view" "/pgd/visualizar_solicitacao_adesao_pts/{{ adesao.id }}" %}
+                                    </td>
+                                    <td>{{ adesao.get_data_situacao_atual }}</td>
+                                    <td>{{ adesao.plano_trabalho_setorial.setor }}</td>
+                                    <td>{{ adesao.plano_trabalho_setorial }}</td>
+                                    <td>
+                                        {{ adesao.get_situacao_display|status }}
+                                        {% if adesao.data_desligamento %}
+                                            <p class="alert alert-warning">Desligamento em {{ adesao.data_desligamento|format }} </p>    
+                                        {% endif %}
+                                    </td>
+                                    <td class="no-print">
+                                        <a href="{{ adesao.plano_trabalho_setorial.get_absolute_url }}" class="btn default">Visualizar PTS</a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endbox %}
+            {% endif %}
+
+            {% if adesao.get_rits %}
+                {% box 'PITs/RITs' %}
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th rowspan="2" class="no-print">Ações</th>
+                                    <th colspan="2">PIT</th>
+                                    <th colspan="5">RIT</th>
+                                </tr>
+                                <tr>
+                                    <th>Período</th>
+                                    <th>Situação</th>
+
+                                    <th>Etapa</th>
+                                    <th>Entregue</th>
+                                    <th>Aprovado</th>
+                                    <th>Homologado</th>
+                                    <th class="no-print">Opções</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for rit in adesao.get_rits %}
+                                <tr>
+                                    <td class="no-print">
+                                        {% if not rit.pit.homologado_definitivo %}
+                                            {% icon "view" "/pgd/visualizar_plano_individual_trabalho/{{ rit.pit.id }}" %}
+                                        {% else %}
+                                            {% icon "view" "/pgd/visualizar_pit_completo/{{ rit.pit.id }}" %}
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ rit.pit.get_verbose_periodo }}</td>
+                                    <td>
+                                        {{ rit.pit.get_situacao_virtual.1|status }}
+                                    </td>
+
+                                    <td>{{ rit.get_verbose_planejamento }}</td>
+                                    <td>{{ rit.entregue|format }}</td>
+                                    <td>{{ rit.aprovado_definitivo|format }}</td>
+                                    <td>{{ rit.homologado_definitivo|format }}</td>
+                                    <td class="no-print">
+                                        <ul class="action-bar">
+                                            {% if rit.pit.pode_visualizar %}
+                                                <li><a href="/pgd/visualizar_planejamento/{{ rit.id }}" class="btn">{% icone "eye" %} Planejamento (PIT)</a></li>
+                                            {% endif %}
+                                            {% if rit.pit.pode_visualizar and not rit.foi_avaliado %}
+                                                <li><a href="/admin/pgd/relatorioindividualtrabalhoatividadeentregaservidorregistrar/?rit_atividade__rit={{ rit.id }}" class="btn">{% icone "eye" %} Execução (RIT - Entregas)</a></li>
+                                            {% endif %}
+                                        </ul>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endbox %}
+            {% endif %}
+        </div>
+    {% endfor %}
+
+{% endblock %}

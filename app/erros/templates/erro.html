@@ -1,0 +1,278 @@
+{% extends super_template %}
+
+{% block extrahead %}
+    <script>
+        jQuery(document).ready(function() {
+            jQuery(".pills button").click(function() {
+                jQuery(".pills button").removeClass("active");
+                jQuery(this).addClass("active");
+            });
+
+            jQuery(".timeline-only-comments").click(function() {
+                jQuery(".timeline .obs").addClass("d-none");
+                return false;
+            });
+
+            jQuery(".timeline-details").click(function() {
+                jQuery(".timeline .obs").removeClass("d-none");
+                return false;
+            });
+        });
+    </script>
+{% endblock %}
+
+{% block bodyclass %}{% if pode_ver_comentarios %}hasAsideRight{% endif %}{% endblock %}
+
+{% block object-status %}
+    {% if obj.estah_no_fluxo %}
+        <ul class="steps">
+            <li aria-label="O Erro foi reportado para a equipe de desenvolvimento do Suap" class="hint hint-bottom"><span class="step-info {% if obj.get_situacao_display == 'Reportado' %}active{% endif %}">Reportado</span></li>
+            <li aria-label="A equipe de desenvolvimento já começou a analisar este Erro" class="hint hint-bottom"><span class="step-warning {% if obj.get_situacao_display == 'Em análise' %}active{% endif %}">Em análise</span></li>
+            <li aria-label="A solução já foi encontrada e o Suap será atualizado em breve com a correção" class="hint hint-bottom"><span class="step-warning {% if obj.get_situacao_display == 'Em correção' %}active{% endif %}">Em correção</span></li>
+            <li aria-label="O Suap foi atualizado com a correção deste erro" class="hint hint-bottom"><span class="step-success {% if obj.get_situacao_display == 'Resolvido' %}active{% endif %}">Resolvido</span></li>
+        </ul>
+    {% else %}
+        {{ obj.get_situacao_display|status }}
+    {% endif %}
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if pode_assumir %}
+            <li><a href="?assumir=1" class="btn success">Assumir</a></li>
+        {% endif %}
+        {% if pode_se_interessar %}
+            <li><a href="?interessar=1" class="btn success">Tornar-se interessado</a></li>
+        {% endif %}
+        {% if situacoes_disponiveis %}
+            <li class="has-child">
+                <a href="#" class="btn primary">Alterar situação</a>
+                <ul>
+                    {% if obj.SITUACAO_EM_ANALISE in situacoes_disponiveis %}
+                        <li><a href="/erros/alterar_situacao_erro/{{ obj.id }}/?situacao=2">Em análise</a></li>
+                    {% endif %}
+                    {% if obj.SITUACAO_EM_CORRECAO in situacoes_disponiveis %}
+                        <li><a class="{% if not eh_atendente %}popup{% endif %}" href="/erros/alterar_situacao_erro/{{ obj.id }}/?situacao=7">Em correção</a></li>
+                    {% endif %}
+                    {% if obj.SITUACAO_RESOLVIDO in situacoes_disponiveis %}
+                        <li><a class="popup" href="/erros/alterar_situacao_erro/{{ obj.id }}/?situacao=3">Resolvido</a></li>
+                    {% endif %}
+                    {% if obj.SITUACAO_AGUARDANDO_FEEDBACK in situacoes_disponiveis %}
+                        <li><a class="{% if not eh_atendente %}popup{% endif %}" href="/erros/alterar_situacao_erro/{{ obj.id }}/?situacao=4">Aguardando feedback</a></li>
+                    {% endif %}
+                    {% if obj.SITUACAO_CANCELADO in situacoes_disponiveis %}
+                        <li><a class="{% if not eh_atendente %}popup{% endif %} confirm" href="/erros/alterar_situacao_erro/{{ obj.id }}/?situacao=5">Cancelado</a></li>
+                    {% endif %}                    
+                </ul>
+            </li>
+            {% if obj.SITUACAO_REABERTO in situacoes_disponiveis %}
+                <li><a class="btn warning {% if not eh_atendente %}popup{% endif %} confirm" href="/erros/alterar_situacao_erro/{{ obj.id }}/?situacao=6" data-confirm="Deseja reabrir este erro para que seja reavaliado pela equipe de desenvolvimento?">O erro persiste?</a></li>
+            {% endif %}
+        {% endif %}
+        {% if pode_alterar_url or pode_atribuir or pode_unificar or pode_sincronizar_gitlab or pode_criar_issue_gitlab or pode_cancelar_por_erro_de_abertura %}
+            <li class="has-child">
+                <a href="#" class="btn">Opções</a>
+                <ul>
+                    {% if pode_criar_issue_gitlab %}
+                        <li><a href="?criar_issue_gitlab=1">Criar Issue no Gitlab</a></li>
+                    {% endif %}
+                    {% if pode_sincronizar_gitlab %}
+                        <li><a href="?sincronizar_gitlab=1">Sincronizar Issue do Gitlab</a></li>
+                    {% endif %}
+                    {% if pode_alterar_url %}
+                        <li><a href="/erros/alterar_url/{{ obj.pk }}/?tipo=erro" class="popup">Editar URL do Erro</a></li>
+                        <li><a href="/erros/alterar_url/{{ obj.pk }}/?tipo=sentry" class="popup">Editar URL do Sentry</a></li>
+                        <li><a href="/erros/alterar_url/{{ obj.pk }}/?tipo=gitlab" class="popup">Editar URL do Gitlab</a></li>
+                    {% endif %}
+                    {% if pode_atribuir %}
+                        <li><a href="/erros/atribuir_atendente/{{ obj.pk }}/" class="popup">Atribuir atendente</a></li>
+                    {% endif %}
+                    {% if pode_unificar %}
+                        <li><a href="/erros/unificar_erros/{{ obj.pk }}/" class="popup">Unificar erros</a></li>
+                    {% endif %}
+                    {% if pode_cancelar_por_erro_de_abertura %}
+                        <li><a href="?cancelar_por_erro_de_abertura=1" class="confirm">Cancelar por erro de abertura</a></li>
+                    {% endif %}
+                </ul>
+            </li>
+        {% endif %}
+        {% if pode_se_desinteressar %}
+            <li><a href="?desinteressar=1" class="btn warning">Remover interesse</a></li>
+        {% endif %}
+        {% if pode_devolver %}
+            <li><a href="?devolver=1" class="btn warning">Devolver</a></li>
+        {% endif %}
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+    {% box 'Dados gerais' %}
+        <dl class="definition-list flex">
+            <div class="list-item flex-basis-100">
+                <dt>Descrição</dt>
+                <dd class="text-break-word">{{ obj.descricao|linebreaksbr }}</dd>
+            </div>
+            <div class="list-item flex-basis-100">
+                <dt>URL com Erro</dt>
+                <dd><a href="{{ obj.url }}" class="text-break-word">{{ obj.url }}</a></dd>
+            </div>
+            {% if eh_atendente %}
+                {% if obj.url_sentry %}
+                    <div class="list-item">
+                        <dt>URL do Sentry</dt>
+                        <dd><a href="{{ obj.url_sentry }}" class="text-break-word">{{ obj.url_sentry }}</a></dd>
+                    </div>
+                {% endif %}
+                {% if obj.gitlab_issue_url %}
+                    <div class="list-item flex-basis-100">
+                        <dt>URL do Gitlab</dt>
+                        <dd><a href="{{ obj.gitlab_issue_url|format }}" class="text-break-word">{{ obj.gitlab_issue_url|format }}</a></dd>
+                    </div>
+                {% endif %}
+                <div class="list-item">
+                    <dt>Módulo</dt>
+                    <dd><a href="/admin/erros/erro/?modulo_afetado={{ obj.modulo_afetado }}">{{ obj.modulo_afetado }}</a></dd>
+                </div>
+                <div class="list-item">
+                    <dt>View</dt>
+                    <dd><a href="/admin/erros/erro/?q={{ obj.view }}" class="text-break-word">{{ obj.view }}</a>{% if erros_mesma_view > 0 %} <span class="badge">+ {{ erros_mesma_view }}</span>{% endif %}</dd>
+                </div>
+                <div class="list-item flex-basis-50">
+                    <dt>User Agent</dt>
+                    <dd>{{ obj.agent|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Endereço IP</dt>
+                    <dd>{{ obj.ip_address|format }}</dd>
+                </div>
+                {% if obj.maquina %}
+                    <div class="list-item">
+                        <dt>Máquina</dt>
+                        <dd>{{ obj.maquina }}</dd>
+                    </div>
+                {% endif %}
+                {% if obj.get_temas_e_contadores_erro %}
+                    <div class="list-item">
+                        <dt>Temas utilizados</dt>
+                        {% for tema, total in obj.get_temas_e_contadores_erro %}
+                            <dd>{{ tema }} <span class="badge">{{ total }}</span></dd>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endif %}
+        </dl>
+    {% endbox %}
+
+    {% if pode_ver_comentarios %}
+        {% include "abas/comentarios.html" %}
+        {% include "abas/anexos.html" %}
+        {% if pode_ver_nota_interna %}
+            {% include "abas/notasinternas.html" %}
+        {% endif %}
+        {% if eh_atendente %}
+            {% include "abas/atualizacao.html" %}
+        {% endif %}
+    {% endif %}
+{% endblock %}
+
+{% block asideright %}
+
+    {% if pode_ver_comentarios %}
+        <aside class="right">
+            <details open="open">
+                <summary>Reportado por</summary>
+                <div class="details-container">
+                    <div class="person sm">
+                        <div class="photo-circle sm">
+                            <img alt="{{ obj.informante.pessoa.pessoafisica.nome_usual }}"
+                                src="{{ obj.informante.get_foto_75x100_url }}">
+                        </div>
+                        <dl>
+                            <dt class="visually-hidden">Nome:</dt>
+                            <dd>{{ obj.informante.user|format }} ({{ obj.informante.user.username }})</dd>
+                            {% if eh_atendente and obj.informante.eh_funcionario %}
+                                <dt class="visually-hidden">Opções:</dt>
+                                <dd class="mt-2">
+                                    <a href="/comum/grupos_usuario/{{ obj.informante.user.pk }}/" class="btn default popup" title="Grupos do Usuário">{% icone "users" %}<span class="visually-hidden">Grupos do Usuário</span></a>
+                                    {% if outros_erros_informante %}
+                                        <a href="/erros/erros_informante/{{ obj.informante.pk }}/" class="btn default" title="Visualizar +{{ outros_erros_informante.count }} erro{{ outros_erros_informante|pluralize }}">+{{ outros_erros_informante.count }}</a>
+                                    {% endif %}
+                                </dd>
+                            {% endif %}
+                        </dl>
+                    </div>
+                    <p class="obs {% if obj.mais_de_quinze_dias and not obj.situacao in obj.SITUACOES_FINAIS %}false{% endif %}">Há {{ obj.data_criacao|timesince }}.</p>
+                </div>
+            </details>
+
+            {% if outros_interessados %}
+                <details open="open">
+                    <summary>Interessados</summary>
+                    <div class="details-container">
+                        {% autopaginate outros_interessados 10 %}
+                        {% paginate %}
+                        {% for interessado in outros_interessados %}
+                            <div class="person smallest {% if not interessado.ativo %}error{% endif %}">
+                                <div class="photo-circle smallest">
+                                    <img alt="{{ interessado.vinculo.pessoa.pessoafisica.nome_usual }}"
+                                        src="{{ interessado.vinculo.get_foto_75x100_url }}" />
+                                </div>
+                                <dl>
+                                    <dt class="visually-hidden">Nome:</dt>
+                                    <dd>{{ interessado.vinculo.user|format }} ({{ interessado.vinculo.user.username }})</dd>
+                                </dl>
+                            </div>
+                        {% endfor %}
+                        {% paginate %}
+                    </div>
+                </details>
+            {% endif %}
+
+            {% if obj.atendente_atual %}
+                <details open="open">
+                    <summary>Atendente principal</summary>
+                    <div class="details-container">
+                        <div class="person sm">
+                            <div class="photo-circle sm">
+                                <img alt="{{ obj.atendente_atual.pessoa.pessoafisica.nome_usual }}"
+                                    src="{{ obj.atendente_atual.get_foto_75x100_url }}" />
+                            </div>
+                            <dl>
+                                <dt class="visually-hidden">Nome:</dt>
+                                <dd>{{ obj.atendente_atual.user|format }} ({{ obj.atendente_atual.user.username }})</dd>
+                            </dl>
+                        </div>
+                    </div>
+                </details>
+            {% endif %}
+
+            {% if outros_atendentes %}
+                <details open="open">
+                    <summary>Outros atendentes</summary>
+                    <div class="details-container">
+                        <ul class="action-list">
+                            {% for atendente in outros_atendentes %}
+                                <li>
+                                    <div class="photo-circle smallest">
+                                        <img alt="{{ atendente.vinculo.pessoa.pessoafisica.nome_usual }}"
+                                            src="{{ atendente.vinculo.get_foto_75x100_url }}" />
+                                    </div>
+                                    {{ atendente.vinculo.user|format }}
+                                    {% if atendente.vinculo.user.username == request.user.username %}
+                                        <a href="/erros/remover_atendente/{{ obj.pk }}/{{ atendente.vinculo.pk }}/" class="btn danger" title="Me remover do atendimento">
+                                            {% icone "trash" %} <span class="visually-hidden">Me remover do atendimento</span>
+                                        </a>
+                                    {% endif %}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </details>
+            {% endif %}
+        </aside>
+    {% endif %}
+
+{% endblock %}
+
+{% block action-links %}<li>Última atualização em {{ obj.data_ultima_alteracao }}</li>{% endblock %}

@@ -1,0 +1,139 @@
+{% extends super_template %}
+
+{% block content %}
+<style>
+  /* Local styles for diagnostics template to avoid inline styles */
+  .diag-summary .text-improved { color: #198754; }
+  .diag-summary .text-worsened { color: #dc3545; }
+  .declared-block { font-size: 0.85em; color: #226; }
+  .declared-note { font-size: 0.8em; color: #666; }
+  .sql-diff-modal { display: none; max-width: 1100px; }
+  .sql-diff-columns { display: flex; gap: 12px; }
+  .sql-col { flex: 1; min-width: 0; }
+  .sql-box { background: #f8f9fa; border: 1px solid #e9ecef; padding: 8px; overflow: auto; max-height: 400px; }
+  .sql-diff-box { background: #fff7e6; border: 1px solid #ffe8a1; padding: 8px; overflow: auto; max-height: 300px; }
+</style>
+
+<h1>Diagnóstico completo de Autocompletes</h1>
+<p>Relatório rápido — por padrão mostra 1 objeto por modelo para facilitar identificar os piores casos. Ajuste o campo "Limite por modelo" se quiser mais amostras.</p>
+
+<form method="get" class="mb-3">
+  <div class="form-row align-items-end">
+    <div class="col-auto">
+      {{ form.app.label_tag }}
+      {{ form.app }}
+    </div>
+    <div class="col-auto">
+      {{ form.declared.label_tag }}
+      {{ form.declared }}
+    </div>
+    <div class="col-auto">
+      {{ form.limit.label_tag }}
+      {{ form.limit }}
+    </div>
+    <div class="col-auto">
+      {{ form.only_special.label_tag }}
+      {{ form.only_special }}
+    </div>
+    <div class="col-auto">
+      <button class="btn success" type="submit">Aplicar</button>
+    </div>
+  </div>
+</form>
+
+<div class="mb-2 diag-summary">
+  <strong>Sumário:</strong>
+  Verificados: {{ summary.total }} modelos — Melhoraram: <span class="text-improved">{{ summary.improved }}</span>, Pioraram: <span class="text-worsened">{{ summary.worsened }}</span>, Inalterados: {{ summary.unchanged }}
+  {% if summary.average_pct is not none %}- Δ% médio: {{ summary.average_pct }}%{% endif %}
+</div>
+<div class="table-responsive">
+  <table class="table table-sm table-striped">
+    <caption>Diagnóstico de autocompletes — comparando consultas sem e com EXT_COMBO_RELATED</caption>
+    <thead>
+      <tr>
+        <th>App.Model</th>
+        
+        <th>Declared</th>
+        <th>Raw Q</th>
+        <th>Opt Q</th>
+        <th>Δ (raw - opt)</th>
+        <th>Sample</th>
+        <th>SQL Diff</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in report %}
+      <tr>
+        <td>
+          {{ r.app }}.{{ r.model }}
+          {% if r.user_type %}
+            &nbsp;*&nbsp;<strong>{{ r.user_type|capfirst }}</strong>
+          {% endif %}
+        </td>
+        
+        <td>
+          {% if r.has_declared %}
+            <div class="declared-block">
+              <strong>S:</strong> {{ r.declared_select|join:', ' }}<br/>
+              <strong>P:</strong> {{ r.declared_prefetch|join:', ' }}
+            </div>
+          {% else %}
+            -
+          {% endif %}
+        </td>
+        <td>{{ r.raw_queries|default:'-' }}</td>
+        <td>{{ r.opt_queries|default:'-' }}</td>
+        <td>
+          {% if r.delta is not none %}
+            {% if r.delta > 0 %}
+              <span class="text-improved">+{{ r.delta }} ({{ r.delta_pct }}%)</span>
+            {% elif r.delta < 0 %}
+              <span class="text-worsened">{{ r.delta }} ({{ r.delta_pct }}%)</span>
+            {% else %}
+              <span>{{ r.delta }}</span>
+            {% endif %}
+          {% else %}
+            -
+          {% endif %}
+          {% if r.has_declared %}
+            <div class="declared-note">declared</div>
+          {% endif %}
+        </td>
+        <td>
+          {% for s in r.sample_rendered_opt %}
+            <div>{{ s|safe }}</div>
+          {% endfor %}
+        </td>
+        <td>
+          {% if r.sql_diff %}
+            <a href="#" class="btn btn-sm btn-outline-secondary" onclick="$.fancybox.open({src: '#sqlDiffContent{{ forloop.counter }}', type: 'inline'}); return false;">Ver SQL</a>
+            <div id="sqlDiffContent{{ forloop.counter }}" class="sql-diff-modal">
+              <div class="p-2">
+                <h5>SQL (Raw vs Opt)</h5>
+                <div class="sql-diff-columns">
+                  <div class="sql-col">
+                    <h6>Raw</h6>
+                    <div class="sql-box">{{ r.raw_sql_html|safe }}</div>
+                  </div>
+                  <div class="sql-col">
+                    <h6>Optimized</h6>
+                    <div class="sql-box">{{ r.opt_sql_html|safe }}</div>
+                  </div>
+                </div>
+                {% if r.sql_diff %}
+                  <hr/>
+                  <h6>Diff</h6>
+                  <div class="sql-diff-box">{{ r.sql_diff|safe }}</div>
+                {% endif %}
+              </div>
+            </div>
+          {% else %}
+            -
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

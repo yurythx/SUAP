@@ -1,0 +1,76 @@
+{% load admin_list i18n tags %}
+
+{% if cl.formset.errors %}
+    <p class="errornote">
+        {% if cl.formset.errors.count > 1 %}
+            Por favor, corrija os erros abaixo.
+        {% else %}
+            Por favor, corrija o erro abaixo.
+        {% endif %}
+    </p>
+    {{ cl.formset.non_form_errors }}
+{% endif %}
+{% if cl.has_filters or cl.search_fields %}
+    {% if not cl.model_admin.no_filters %}
+        <div class="search-and-filters">
+            <form action="" id="search-and-filters-form">
+                {% dt_search_form cl %}
+                {% if cl.has_filters %}
+                    {% for spec in cl.filter_specs %}
+                        {% if cl.model_admin.hidden_filters and spec.parameter_name in cl.model_admin.hidden_filters %}
+                            <div class="d-none">
+                                {% if not spec.parameter_name == 'tab' %}
+                                    {% admin_list_filter cl spec %}
+                                {% endif %}
+                            </div>
+                        {% else %}
+                            {% if not spec.parameter_name == 'tab' %}
+                                {% admin_list_filter cl spec %}
+                            {% endif %}
+                        {% endif %}
+                    {% endfor %}
+                {% endif %}
+                <div class="submit-button">
+                    <button id="button_filter" class="btn default" type="submit">Filtrar</button>
+                </div>
+                <script>
+                    $(document).ready(function(){
+                        $("#search-and-filters-form").on('submit', function(event) {
+                            ajaxUpdateFilters();
+                            event.preventDefault();
+                        });
+                    });
+                </script>
+            </form>
+        </div>
+    {% endif %}    
+    {% for spec in cl.filter_specs %}
+        {% if spec.parameter_name == 'tab' %}
+            {% admin_list_filter cl spec %}
+        {% endif %}
+    {% endfor %}
+{% endif %}
+
+{% block date_hierarchy %}{% dt_date_hierarchy cl %}{% endblock %}
+
+<div class="module{% if cl.has_filters %} filtered{% endif %}" id="changelist">
+
+    <form id="changelist-form" action="" method="post"{% if cl.formset.is_multipart %}
+          enctype="multipart/form-data"{% endif %}>{% csrf_token %}
+        {% if cl.formset %}
+            <div>{{ cl.formset.management_form }}</div>
+        {% endif %}
+        {% if cl.result_count %}
+            {% block pagination_top %}{% dt_pagination cl %}{% endblock %}
+        {% endif %}
+        {% block result_list %}
+            {% if action_form and actions_on_top and cl.full_result_count %}{% admin_actions %}{% endif %}
+            {% if cl.model_admin.queryset_list_template %}{% include cl.model_admin.queryset_list_template with queryset=cl.result_list %}{% else %}{% result_list cl %}{% endif %}
+            {% if action_form and actions_on_bottom and cl.full_result_count %}{% admin_actions %}{% endif %}
+        {% endblock %}
+        {% block pagination %}{% dt_pagination cl %}{% endblock %}
+    </form>
+</div>
+{% include "skeleton/tabela.html" %}
+
+{% block after_holder %}{% endblock %}

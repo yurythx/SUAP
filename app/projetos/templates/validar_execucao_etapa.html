@@ -1,0 +1,283 @@
+{% extends super_template %}
+
+{% block content %}
+    <ul class="action-bar">
+        <li><a class="btn default" href="/projetos/projeto/{{ projeto.id }}/">Visualizar Projeto</a></li>
+    </ul>
+
+     <dl class="definition-list flex">
+        <div class="list-item flex-basis-100">
+            <dt>Edital</dt>
+            <dd>{{ projeto.edital.titulo }}</dd>
+        </div>
+        <div class="list-item flex-basis-100">
+            <dt>Título do Projeto</dt>
+            <dd>{{ projeto.titulo }}</dd>
+        </div>
+        <div class="list-item flex-basis-50">
+            <dt>Coordenador do Projeto</dt>
+            <dd>{{ projeto.vinculo_coordenador.user|format }}</dd>
+        </div>
+
+        <div class="list-item flex-basis-50">
+            <dt>Campus do Projeto</dt>
+            <dd>{{ projeto.uo }}</dd>
+        </div>
+        <div class="list-item flex-basis-50">
+            <dt>Situação do Projeto</dt>
+            <dd>{{ status }}</dd>
+        </div>
+        <div class="list-item flex-basis-50">
+            <dt>Monitor do Projeto</dt>
+            <dd>{{ projeto.vinculo_monitor.user|format }}</dd>
+        </div>
+     </dl>
+    <div class="tab-pane" data-title="Metas" data-tab="metas">
+        {% if projeto.meta_set.all.count %}
+            {% for meta in projeto.get_metas %}
+                {% box 'Meta {{ meta.ordem }} - {{ meta.descricao }}' %}
+                    {% if meta.etapa_set.all.count %}
+                        <div class="table-responsive">
+                            <table>
+                                <caption>Atividades</caption>
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Ordem</th>
+                                        <th>Descrição</th>
+                                        <th>Indicador Quantitativo</th>
+                                        <th>Indicador(es) Qualitativo(s)</th>
+                                        <th>Qtd Prevista</th>
+                                        <th>Qtd Executada</th>
+                                        <th>Período Previsto</th>
+                                        <th>Período Executado</th>
+                                        <th>Data de Registro da Execução</th>
+                                        <th>Resultado Esperado</th>
+                                        <th>Observação</th>
+                                        <th>Comprovante</th>
+                                        <th>Avaliação</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for etapa in meta.get_etapas %}
+                                        <tr>
+                                            <td><a href="javascript:" style="cursor:default" class="status_{{ etapa.get_status_execucao }}" title="Avaliado em {{ etapa.get_registro_execucao.dt_avaliacao|format }}"></a></td>
+                                            <td>{{ etapa.ordem }}</td>
+                                            <td>{{ etapa.descricao }}</td>
+                                            <td>{{ etapa.unidade_medida }}</td>
+                                            <td>{{ etapa.indicadores_qualitativos }}{% if etapa.get_registro_execucao %}: <strong>{{ etapa.get_registro_execucao.info_ind_qualitativo }}</strong> {% endif %}</td>
+                                            <td align="center">{{ etapa.qtd }}</td>
+                                            {% if etapa.get_registro_execucao %}
+                                                <td align="center">{{ etapa.get_registro_execucao.qtd }}</td>
+                                            {% else %}
+                                                <td align="center">-</td>
+                                            {% endif %}
+                                                <td>De {{ etapa.inicio_execucao|date:"d/m/Y" }} até {{ etapa.fim_execucao|date:"d/m/Y" }}</td>
+                                            {% if etapa.get_registro_execucao %}
+                                                <td>De {{ etapa.get_registro_execucao.inicio_execucao|date:"d/m/Y" }} até {{ etapa.get_registro_execucao.fim_execucao|date:"d/m/Y" }}</td>
+                                            {% else %}
+                                                <td align="center">-</td>
+                                            {% endif %}
+                                            <td>{{ etapa.get_registro_execucao.data_cadastro_execucao|format }}</td>
+                                            <td><b>{{ etapa.get_registro_execucao.get_tipo_indicador_qualitativo_display }}</b></td>
+                                            <td>{{ etapa.get_registro_execucao.obs|format }}</td>
+                                            <td>
+                                                {% if etapa.get_registro_execucao.arquivo %}
+                                                    <a href="{{ etapa.get_registro_execucao.arquivo.url }}" class="btn default">Visualizar Arquivo</a>
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if pode_validar and etapa.get_registro_execucao %}
+                                                    {% if etapa.get_registro_execucao.dt_avaliacao %}
+                                                        {{ etapa.get_registro_execucao.get_mensagem_avaliacao|safe }}
+                                                        {% if not projeto.eh_somente_leitura and pode_validar %}
+                                                            <a class="btn danger" href="/projetos/cancelar_avaliacao_etapa/{{ etapa.get_registro_execucao.pk }}/">Cancelar Avaliação</a></li>
+                                                        {% endif %}
+                                                    {% else %}
+                                                        {% if not status == projeto.STATUS_CONCLUIDO %}
+                                                            <ul class="action-bar">
+                                                                <li><a class="btn success confirm" href="?registro_id={{ etapa.get_registro_execucao.pk }}">Aprovar</a></li>
+                                                                <li><a class="btn popup" href="/projetos/reprovar_execucao_etapa/{{ etapa.get_registro_execucao.pk }}/">Não Aprovar</a></li>
+                                                            </ul>
+                                                        {% else %}
+                                                            <span class="status status-error">Não aprovado</span>
+                                                        {% endif %}
+                                                    {% endif %}
+                                                {% else %}
+                                                    {% if not etapa.get_registro_execucao %}
+                                                        <span class="status status-alert">Não executado</span>
+                                                    {% else %}
+                                                        {% if etapa.get_registro_execucao.dt_avaliacao %}
+                                                            {{ etapa.get_registro_execucao.get_mensagem_avaliacao|safe }}
+
+                                                        {% else %}
+                                                            {% if not status == projeto.STATUS_CONCLUIDO %}
+                                                                <span class="status status-alert">Aguardando avaliação</span>
+                                                            {% else %}
+                                                                <span class="status status-error">Não executado</span>
+                                                            {% endif %}
+                                                        {% endif %}
+                                                    {% endif %}
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="alert alert-warning">Nenhuma atividade cadastrada.</p>
+                    {% endif %}
+                {% endbox %}
+            {% endfor %}
+        {% else %}
+            <p class="alert alert-warning">Nenhuma meta cadastrada.</p>
+        {% endif %}
+    </div>
+
+    <div class="tab-pane" data-title="Gastos" data-tab="gastos">
+        {% if tem_gastos %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Gastos</caption>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Ano</th>
+                            <th>Mês</th>
+                            <th>Descrição</th>
+                            <th>Observação</th>
+                            <th>Quantidade</th>
+                            <th>Valor Unitário (R$)</th>
+                            <th>Subtotal (R$)</th>
+                            <th>Comprovante</th>
+                            <th>Avaliação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in projeto.itemmemoriacalculo_set.all %}
+                            {% for registro in item.get_registros_gastos %}
+                                <tr>
+                                    <td>
+                                        <a href="javascript:" style="cursor:default" class="status_{{ registro.get_status }}" title="Avaliado em {{ registro.dt_avaliacao|format }}"></a>
+                                    </td>
+                                    <td>{{ registro.ano }}</td>
+                                    <td>{{ registro.mes }}</td>
+                                    <td>{{ registro.descricao }}</td>
+                                    <td>{{ registro.observacao|format }}</td>
+                                    <td>{{ registro.qtd }}</td>
+                                    <td align="right">{{ registro.valor_unitario|format }}</td>
+                                    <td align="right">{{ registro.get_subtotal|format }}</td>
+                                    <td>
+                                        <ul class="action-bar">
+                                            {% if registro.arquivo %}
+                                                <li><a href='{{ registro.arquivo.url }}' class="btn">Nota Fiscal / Cupom</a></li>
+                                            {% endif %}
+                                            {% if registro.cotacao_precos %}
+                                                <li><a href='{{ registro.cotacao_precos.url }}' class="btn">Cotação de Preços</a></li>
+                                            {% endif %}
+                                        </ul>
+                                    </td>
+                                    <td>
+                                    {% if pode_validar and not registro.dt_avaliacao %}
+                                        {% if not status == projeto.STATUS_CONCLUIDO %}
+                                            <ul class="action-bar">
+                                                <li><a class="btn success confirm" href="?item_id={{ registro.pk }}">Aprovar</a></li>
+                                                <li><a class="btn popup" href="/projetos/reprovar_execucao_gasto/{{ registro.pk }}/">Não Aprovar</a></li>
+                                            </ul>
+                                        {% else %}
+                                            <span class="status status-error">Não aprovado</span>
+                                        {% endif %}
+                                        </td>
+                                    {% else %}
+                                        {% if registro.dt_avaliacao %}
+                                            {{ registro.get_mensagem_avaliacao|safe }}
+                                            {% if not projeto.eh_somente_leitura and pode_validar %}
+                                                <a class="btn danger" href="/projetos/cancelar_avaliacao_gasto/{{ registro.pk }}/">Cancelar Avaliação</a></li>
+                                            {% endif %}
+                                        {% else %}
+                                            {% if status == projeto.STATUS_CONCLUIDO %}
+                                                <span class="status status-error">Não aprovado</span>
+                                            {% else %}
+                                                <span class="status status-alert">Aguardando avaliação</span>
+                                            {% endif %}
+                                        {% endif %}
+                                    {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Nenhum gasto cadastrado.</p>
+        {% endif %}
+        <br><br>
+        {% if projeto.arquivo_comprovante_gru %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Comprovante de Pagamento de GRU</caption>
+                    <thead>
+                        <tr>
+                            <th>Descrição</th>
+                            <th>Comprovante</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>{{ projeto.descricao_comprovante_gru }}</td>
+                            <td><a href="{{ projeto.arquivo_comprovante_gru.url }}" class="btn">Visualizar</a></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Nenhum comprovante de GRU cadastrado.</p>
+        {% endif %}
+
+    </div>
+    {% if projeto.get_registro_conclusao %}
+        <div class="tab-pane" data-title="Conclusão do Projeto" data-tab="conclusao">
+            <h3>Validação da Conclusão do Projeto</h3>
+            <table class="info">
+                <tr>
+                    <td>Resultados Alcançados</td>
+                    <td>{{ projeto.get_registro_conclusao.resultados_alcancados|format|sanitize }}</td>
+                </tr>
+                <tr>
+                    <td>Disseminação de resultados</td>
+                    <td>{{ projeto.get_registro_conclusao.disseminacao_resultados|format|sanitize }}</td>
+                </tr>
+                <tr>
+                    <td>Observação</td>
+                    <td>{{ projeto.get_registro_conclusao.obs|format|sanitize }}</td>
+                </tr>
+                <tr>
+                    <td>Avaliação</td>
+                    <td>
+                        {% if pode_validar %}
+                            {% if projeto.pode_emitir_parecer %}
+                                <p><a class="btn popup success" href="/projetos/avaliar_conclusao_projeto/{{ projeto.get_registro_conclusao.pk }}/">Emitir Parecer</a></p>
+                            {% elif projeto.get_registro_conclusao.dt_avaliacao %}
+                                <p>Avaliado em {{ projeto.get_registro_conclusao.dt_avaliacao }} por {{ projeto.get_registro_conclusao.avaliador }}</p>
+                                <p><strong>{{ projeto.get_registro_conclusao.obs_avaliador }}</strong></p>
+                            {% else %}
+                                <span class="status status-alert">Aguardando Finalização do Projeto</span>
+                            {% endif %}
+                        {% else %}
+                            {% if projeto.get_registro_conclusao.dt_avaliacao %}
+                                <p>Avaliado em {{ projeto.get_registro_conclusao.dt_avaliacao }} por {{ projeto.get_registro_conclusao.avaliador }}</p>
+                                <p><strong>{{ projeto.get_registro_conclusao.obs_avaliador }}</strong></p>
+                            {% else %}
+                                <span class="status status-alert">Aguardando Finalização do Projeto</span>
+                            {% endif %}
+                        {% endif %}
+                    </td>
+                </tr>
+            </table>
+        </div>
+    {% endif %}
+{% endblock %}

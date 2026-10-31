@@ -1,0 +1,211 @@
+{% extends super_template|default:"admin/base_site.html" %}
+
+{% block object-status %}
+{{ empenho.get_status_display|status }}
+{% endblock %}
+
+{% block action-bar %}
+<ul class="action-bar">
+    <li><button onclick="$('div#empenhar-novo-item-container').toggleClass('d-none');" class="btn success">Empenhar novo item</button>
+	<li><a class="btn primary" href="{{ link_editar }}">Editar</a></li>
+	{% if empenho.can_delete and user|in_group:"Coordenador de Almoxarifado Sistêmico,Coordenador de Almoxarifado" %}
+        <li><a class="btn danger" href={{ link_excluir }}>Remover</a></li>
+    {% endif %}
+</ul>
+{% endblock %}
+
+{% block content %}
+
+<div id="empenhar-novo-item-container" {% if not form.is_bound and not continuar_cadastrando %}class="d-none"{% endif %}>
+	{% box "Empenhar novo item" %}
+		{% render_form form %}
+	{% endbox %}
+</div>
+
+{% box "Dados gerais" %}
+	<dl class="definition-list flex">
+		<div class="list-item">
+			<dt>Unidade Gestora</dt>
+			<dd>{{ empenho.uo|format }}</dd>
+		</div>
+		<div class="list-item">
+			<dt>Número do Empenho</dt>
+			<dd>{{ empenho.numero }}</dd>
+		</div>
+		<div class="list-item">
+			<dt>Processo</dt>
+			<dd>
+				<a href="{{ empenho.processo.get_absolute_url }}">
+					{{ empenho.processo|format }}
+				</a>
+			</dd>
+		</div>
+		<div class="list-item">
+			<dt>Tipo do Material</dt>
+			<dd>{{ empenho.tipo_material }}</dd>
+		</div>
+		<div class="list-item">
+			<dt>Modalidade da Licitação</dt>
+			<dd>{{ empenho.tipo_licitacao|format }}</dd>
+		</div>
+		<div class="list-item">
+			<dt>Nº da Licitação</dt>
+			<dd>{{ empenho.numero_pregao|format }}</dd>
+		</div>
+		<div class="list-item">
+			<dt>Fornecedor</dt>
+			<dd>
+				{% if empenho.vinculo_fornecedor.pessoa.pessoajuridica %}
+					<a href="{{ empenho.vinculo_fornecedor.pessoa.pessoajuridica.get_absolute_url }}">{{ empenho.vinculo_fornecedor.pessoa }}</a>
+				{% elif empenho.vinculo_fornecedor.pessoa.pessoafisica %}
+					<a href="{{ empenho.vinculo_fornecedor.pessoa.pessoafisica.get_absolute_url }}">{{ empenho.vinculo_fornecedor.pessoa }}</a>
+				{% else %}
+					{{ empenho.vinculo_fornecedor.pessoa }}
+				{% endif %}
+			</dd>
+		</div>
+		<div class="list-item">
+			<dt>Data do Recebimento no Fornecedor</dt>
+			<dd>{{ empenho.data_recebimento_empenho|date:"d/m/Y"|format }} ({{ empenho.prazo|format }} dias para entrega)</dd>
+		</div>
+		<div class="list-item">
+			<dt>Prazo Final para Entrega</dt>
+			<dd>{{ empenho.data_prazo|date:"d/m/Y"|format }}</dd>
+		</div>
+		<div class="list-item">
+			<dt>Nota sobre o prazo</dt>
+			<dd>{{ empenho.get_info_prazo|safe }}</dd>
+		</div>
+		<div class="list-item">
+			<dt>Observação</dt>
+			<dd>{{ empenho.observacao|format }}</dd>
+		</div>
+	</dl>
+{% endbox %}
+
+{% if resumo_ed %}
+	{% box "Resumo por Elemento de Despesa" %}
+		<table>
+			<thead>
+				<tr>
+					<th>Descrição</th>
+					<th class="text-end">Valor</th>
+				</tr>
+			</thead>
+			<tbody>
+				{% for resumo in resumo_ed %}
+					<tr>
+				        <td>{{ resumo.categoria }} </td>
+				        <td class="text-end">{{ resumo.valor }}</td>
+	    			</tr>
+			    {% endfor %}
+	    	</tbody>
+	    	<tfoot>
+	    	    <tr>
+                    <td>Total:</td>
+                    <td>{{ total }}</td>
+                </tr>
+	    	</tfoot>
+		</table>
+	{% endbox %}
+{% endif %}
+
+{% box "Itens Empenhados" %}
+	{% if empenho.get_itens %}
+		<div class="table-responsive">
+		<table>
+		    <thead>
+		        <tr>
+					<th>#</th>
+					<th class="no-print">Ações</th>
+		        	<th>ED</th>
+		            <th>Cód. Mat</th>
+		            <th>Material / Descrição</th>
+		            <th class="text-end">Qtd. Empenhada</th>
+					<th class="text-end">Qtd. Adquirida</th>
+		            <th class="text-end">Valor Unitário</th>
+		            <th class="text-end">Valor Total</th>
+		        </tr>
+		    </thead>
+			<tbody>
+		    	{% for i in empenho.get_itens %}
+			        <tr>
+						<td>{{ forloop.counter }}</td>
+						<td class="no-print">
+							{% if i.can_change %}
+								{% icon "edit" "{{ i.get_absolute_url }}" %}
+							{% endif %}
+							{% if i.can_delete %}
+								{% icon "delete" "{{ i.get_delete_url }}" %}
+							{% endif %}
+						</td>
+						{# Tratando consumo e permanente #}
+			        	<td>{{ i.material.categoria }}{{ i.categoria }}</td>
+			            <td>{{ i.material.codigo }}</td>
+			            <td>{{ i.material }}{{ i.descricao }}</td>
+			            <td class="text-end">{{ i.qtd_empenhada|format_quantity }}</td>
+						<td class="text-end">{{ i.qtd_adquirida|format_quantity }}</td>
+			            <td class="text-end">{{ i.get_valor }}</td>
+			            <td class="text-end">{{ i.get_valor_empenhado }}</td>
+			        </tr>
+		        {% endfor %}
+		    </tbody>
+		    <tfoot>
+		        <tr>
+                    <td colspan="10">{{ empenho.get_valor_total }}</td>
+                </tr>
+		    </tfoot>
+		</table>
+		</div>
+	{% else %}
+		<p class="alert alert-warning">Nenhum item empenhado.</p>
+	{% endif %}
+{% endbox %}
+
+{% if empenho.get_entradas %}
+	{% box "Entradas de Nota Fiscal deste Empenho" %}
+		<div class="table-responsive">
+		<table>
+		    <thead>
+		        <tr>
+					{% if e.numero_nota_fiscal is not None %}
+			        	<th>Nota Fiscal</th>
+					{% else %}	
+						<th>Entrada</th>
+					{% endif %}	
+		        	<th>Data</th>
+		            <th>Campus</th>
+		            <th>Fornecedor</th>
+		            <th class="text-end">Valor</th>
+		        </tr>
+		    </thead>
+			<tbody>
+		    	{% for e in empenho.get_entradas %}
+			        <tr>
+			        	<td>
+			        		<a href="{{ e.get_absolute_url }}">
+								{% if e.numero_nota_fiscal is not None %}
+			        				{{ e.numero_nota_fiscal }}
+								{% else %}
+									{{ e.id }}
+								{% endif %}	
+			        		</a>
+			        	</td>
+			            <td>{{ e.data|date:"d/m/Y" }}</td>
+						<td>{{ e.uo }}</td>
+			            <td>{{ e.vinculo_fornecedor.pessoa }}</td>
+			            <td class="text-end">{{ e.get_valor }}</td>
+			        </tr>
+		        {% endfor %}
+		    </tbody>
+		    <tfoot>
+		        <tr>
+                    <td colspan="9">{{ empenho.get_total_entradas }}</td>
+                </tr>
+		    </tfoot>
+		</table>
+		</div>
+	{% endbox %}
+{% endif %}
+
+{% endblock %}

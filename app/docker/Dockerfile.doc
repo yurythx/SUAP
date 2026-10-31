@@ -1,0 +1,65 @@
+# Imagem autocontida do site de documentação de usuário do SUAP (#17004).
+#
+# Multi-stage: o builder monta `site-src/` a partir dos `<modulo>/docs/usuario.md` e roda o
+# mkdocs; o estágio final é só nginx servindo o resultado. Sem Python, sem banco e sem build
+# em runtime na imagem publicada — é o que faz o deploy da doc caber no mesmo `make` dos
+# outros containers.
+#
+# Montar DENTRO do build, e não num job separado, tem uma consequência que é o ponto:
+# `mkdocs build --strict` falhando aborta o `docker build`. A imagem não chega a existir com
+# o site quebrado — antes ela podia existir vazia.
+#
+# As capturas (#16999) não estão no git: chegam ao contexto de build como artifact do job
+# `gerar-doc`, que aterrissa em `$CI_PROJECT_DIR` antes do `docker build .`.
+#
+#   docker build -f docker/Dockerfile.doc \
+#     --build-arg DOC_COMMIT="$CI_COMMIT_SHORT_SHA" \
+#     -t "$CI_REGISTRY_IMAGE/doc:latest" .
+
+# Builder deliberadamente magro: montar o site precisa de Python, PyYAML e mkdocs — e de
+# mais nada. Usar a imagem de CI arrastaria Django, psycopg e a dependência git `oscrypto`
+# para construir HTML estático, e amarraria o build da doc à árvore de dependências do SUAP.
+# As versões espelham o `dev` do `pyproject.toml`.
+FROM python:3.14-slim AS builder
+
+# `.dockerignore` exclui `.git`, então `git rev-parse` não funciona aqui: o carimbo do commit
+# publicado — único sinal de site velho (#17000) — vem por variável.
+ARG DOC_COMMIT=""
+ENV DOC_COMMIT=${DOC_COMMIT}
+
+RUN pip install --no-cache-dir "mkdocs>=1.6.1" "mkdocs-material>=9.7.7" "pyyaml>=6.0.3"
+
+WORKDIR /src
+COPY . /src
+RUN python bin/scripts/montar_site_doc.py && mkdocs build --strict
+
+# `nginx-unprivileged` e não `nginx`: a imagem oficial precisa de root no master para criar
+# `/var/cache/nginx`, então um `USER nginx` nela derruba o container com "Permission denied".
+# Esta variante já nasce sem root e já escuta em 8080.
+FROM nginxinc/nginx-unprivileged:1.29-alpine
+
+LABEL org.opencontainers.image.title="SUAP — Documentação de usuário"
+LABEL org.opencontainers.image.source="https://gitlab.ifrn.edu.br/cosinf/suap"
+
+# O site é público por decisão registrada (#16998): descreve telas, não dados. A garantia de
+# que dado real não entra aqui está antes, na geração — o subagente navega apenas o banco
+# semeado, nunca homologação ou produção.
+COPY --from=builder /src/site/ /usr/share/nginx/html/
+
+# `try_files ... =404` em vez do fallback para index: o mkdocs gera `use_directory_urls`, então
+# cada página é um `index.html` real e um 404 de verdade é a resposta certa para caminho que
+# não existe — fallback silencioso esconderia link quebrado do próprio site.
+USER root
+RUN printf '%s\n' \
+  'server {' \
+  '  listen 8080;' \
+  '  root /usr/share/nginx/html;' \
+  '  index index.html;' \
+  '  location / { try_files $uri $uri/ $uri/index.html =404; }' \
+  '  location = /healthz { access_log off; return 200 "ok\\n"; }' \
+  '}' > /etc/nginx/conf.d/default.conf
+
+USER nginx
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://127.0.0.1:8080/healthz || exit 1

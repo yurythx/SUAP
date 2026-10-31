@@ -1,0 +1,225 @@
+{% extends super_template %}
+
+{% block action-bar %}
+    <ol class="action-bar">
+        <li><a href="{% url 'ver_resumo_plano' plano_atividade.id %}" class="btn default">Plano de Atividades Original</a></li>
+        <li><a href="{% url 'realocacoes' plano_atividade.id %}" class=" btn default">Realocações</a></li>
+        <li><a href="{% url 'plano_concluido' plano_atividade.id %}" class=" btn default">Execução</a></li>
+    </ol>
+{% endblock %}
+{% block content %}
+     <div class="search-and-filters">
+        {% render_form resumoplano_form %}
+    </div>
+    <ul class="action-bar">
+        <!-- Botões de cadastro de movimentações de crédito removidos temporariamente
+     até implementação do método de verificação -->
+        {% comment %}
+            {% if plano_vigente and plano_atividades_encerrado %}
+                <li class="has-child">
+                    <a class="btn success" href="#">Adicionar requisição de movimentação</a>
+                    <ul>
+                        {% if eh_gestor_projeto %}
+                            <li><a href="{% url 'requisitar_movimentacaocredito' plano_atividade.id %}">
+                                Movimentação de crédito
+                            </a></li>
+                        {% endif %}
+                        {% if eh_gestor_projeto or eh_gestor_orcamentario_sistemico or eh_gestor_orcamentario_ua %}
+                            <li><a href="{% url 'requisitar_estornocredito' plano_atividade.id %}">
+                                Estorno de crédito
+                            </a></li>
+                        {% endif %}
+                        {% if eh_gestor_orcamentario_ua %}
+                            <li><a href="{% url 'requisitar_ajusteinterno' plano_atividade.id %}">
+                                Ajuste interno
+                            </a></li>
+                        {% endif %}
+                    </ul>
+                </li>
+            {% endif %}
+        {% endcomment %}    
+        {% if plano_concluido %}
+            <li><a href="/admin/plan_estrategico/movimentacaocredito/?ano_cadastro={{ plano_atividade.ano_base }}" class=" btn default">Requisições de movimentação</a></li>
+        {% endif %}
+    </ul>
+    {% box 'Legenda' %}
+        <div class="legenda">
+            <p><strong>Legenda:</strong></p>
+            <ul>
+                <li class="warning">{% icone "circle" %} Atividades complementares</li>
+
+            </ul>
+        </div>
+    {% endbox %}
+    {% if lista_projetos %}
+        {% for item in lista_projetos %}
+            <div class="box">
+                <h2>{{ item.projeto_plano.projeto.codigo }} - {{ item.projeto_plano.projeto.nome }}</h2>
+                {% if item.atividades %}
+                    <table id="table_{{ item.projeto_plano.projeto.codigo }}">
+                        <thead>
+                            <tr>
+                                <th>Unidade Gestora</th>
+                                <th>Origem de Recurso</th>
+                                <th>Plano Interno</th>
+                                <th>Componente funcional</th>
+                                <th>Atividade</th>
+                                <th>Valor disponível da Atividade</th>
+                                <th>Valor total da origem de recurso (R$)</th>
+                                <th>Valor total do plano interno (R$)</th>
+                                <th>Valor movimentado do plano interno (R$)</th>
+                                <th>Valor em devolução do plano interno (R$) </th>
+                                <th>Valor em movimentação do plano interno (R$)</th>
+                                <th>Valor a receber do plano interno (R$)</th>
+                                <th>Valor movimentado disponível do plano interno (R$)</th>
+                                <th>Opções</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for atividade in item.atividades %}
+                                {% if atividade.atividade_complementar %}
+                                    <tr class="highlight">
+                                {% else %}
+                                    <tr>
+                                {% endif %}
+                                    <td class="text-end">{{ atividade.unidade_gestora.setor_equivalente.sigla }}</td>
+                                    <td>{{ atividade.origem_recurso_etapa|format }}</td>
+                                    <td>{{ atividade.plano_interno|format }}</td>
+                                    <td>{{ atividade.etapa_projeto_plano_atividade.etapa.codigo }} - {{ atividade.etapa_projeto_plano_atividade.etapa.descricao }}</td>
+                                    <td>{{ atividade.nome }}</td>
+                                    <td class="text-end">{{ atividade.get_valor_disponivel_realocacao|format_money }}</td>
+                                    <td class="text-end">{{ atividade|method:"get_valor_disponivel_movimentacao"|call:atividade.unidade_gestora|format }}</td>
+                                    {% if atividade.plano_interno %}
+                                        <td class="text-end">{{ atividade.plano_interno|method:"get_disponivel_plano_interno"|call:atividade.unidade_gestora|format }}</td>
+                                        <td class="text-end">{{ atividade.plano_interno|method:"get_total_movimentado_plano_interno"|call:atividade.unidade_gestora|format }}</td>
+                                        <td class="text-end">{{ atividade.plano_interno|method:"get_total_devolucao_plano_interno"|call:atividade.unidade_gestora|format }}</td>
+                                        <td class="text-end">{{ atividade.plano_interno|method:"get_total_em_movimentacao_plano_interno"|call:atividade.unidade_gestora|format }}</td>
+                                        <td class="text-end">{{ atividade.plano_interno|method:"saldo_plano_interno"|call:atividade.unidade_gestora|format }}</td>
+                                        <td class="text-end">{{ atividade.plano_interno|method:"valor_disponivel_movimentado"|call:atividade.unidade_gestora|format }}</td>
+                                        <td class="text-end">
+                                            <ul class="action-bar">
+                                                <li>
+                                                    <a href="{% url 'detalhar_movimentacoes' atividade.plano_interno.id atividade.unidade_gestora.id %}" class=" btn default popup">Detalhar RM</a>
+                                                </li>
+                                                <li>
+                                                    <a href="{% url 'detalhar_notas_requisicao' atividade.plano_interno.id atividade.unidade_gestora.id %}" class=" btn default popup">Detalhar NC/ND</a>
+                                                </li>
+                                            </ul>    
+                                        </td>
+                                    {% else %}
+                                        <td class="text-end">0,00</td>
+                                        <td class="text-end">0,00</td>
+                                        <td class="text-end">0,00</td>
+                                        <td class="text-end">0,00</td>
+                                        <td class="text-end">0,00</td>
+                                        <td class="text-end">0,00</td>
+                                        <td class="text-end"></td>
+                                    {% endif %}
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p class="alert alert-warning">Nenhuma atividade neste macroprocesso conforme o filtro aplicado.</p>
+                {% endif %}
+            </div>
+            <script>
+        function mergeColumnByRef(tableId, refColIdx, targetColIdx) {
+    var table = document.getElementById(tableId);
+    if (!table) return;
+
+    var rowCount = table.rows.length;
+    if (rowCount <= 1) return;
+
+    var groupValue = null;
+    var groupStartRow = 1;  // pula o header
+    var groupSize = 0;
+
+    for (var i = 1; i < rowCount; i++) {
+        var refCell = table.rows[i].cells[refColIdx];
+        if (!refCell) continue;
+
+        var currentValue = refCell.textContent.trim();
+
+        if (groupValue === null) {
+            // inicia o primeiro grupo
+            groupValue = currentValue;
+            groupStartRow = i;
+            groupSize = 1;
+        } else if (currentValue === groupValue) {
+            // continua no mesmo grupo
+            groupSize++;
+            // esconde a célula da coluna alvo nas linhas seguintes
+            var targetCell = table.rows[i].cells[targetColIdx];
+            if (targetCell) targetCell.style.display = "none";
+        } else {
+            // finaliza o grupo anterior aplicando o rowspan
+            var startTargetCell = table.rows[groupStartRow].cells[targetColIdx];
+            if (startTargetCell) startTargetCell.setAttribute("rowspan", groupSize);
+
+            // inicia novo grupo
+            groupValue = currentValue;
+            groupStartRow = i;
+            groupSize = 1;
+        }
+    }
+
+    // aplica o rowspan no último grupo
+    var lastTargetCell = table.rows[groupStartRow].cells[targetColIdx];
+    if (lastTargetCell) lastTargetCell.setAttribute("rowspan", groupSize);
+}        
+        // JavaScript para mesclar células com a mesma Origem de Recurso e Plano Interno após a renderização da página
+        function mergeCells(tableId, colOrigemIdx, colPlanInternoIdx) {
+            var table = document.getElementById(tableId);
+            // A tabela pode não existir nesta página (ex.: filtro sem resultados); sem
+            // o guard, table.rows estoura "reading 'rows'" (Sentry SUAP-TFK). Espelha
+            // o guard já presente em mergeColumnByRef.
+            if (!table) return;
+            var rowCount = table.rows.length;
+            var prevOrigemCellValue = null;
+            var prevPlanInternoCellValue = null;
+            var origemCount = 1;
+            var planInternoCount = 1;
+            for (var i = 1; i < rowCount; i++) {
+                var currentOrigemCell = table.rows[i].cells[colOrigemIdx];
+                var currentPlanInternoCell = table.rows[i].cells[colPlanInternoIdx];
+
+                var origemCellValue = currentOrigemCell.textContent.trim();
+                var planInternoCellValue = currentPlanInternoCell.textContent.trim();
+
+                if (origemCellValue === prevOrigemCellValue) {
+                    origemCount++;
+                    currentOrigemCell.style.display = "none";
+                    prevOrigemCellValue = origemCellValue;
+                    table.rows[i - origemCount + 1].cells[colOrigemIdx].setAttribute("rowspan", origemCount);
+                } else {
+                    origemCount = 1;
+                    prevOrigemCellValue = origemCellValue;
+                }
+
+                if (planInternoCellValue === prevPlanInternoCellValue) {
+                    planInternoCount++;
+                    currentPlanInternoCell.style.display = "none";
+                    prevPlanInternoCellValue = planInternoCellValue;
+                    table.rows[i - planInternoCount + 1].cells[colPlanInternoIdx].setAttribute("rowspan", planInternoCount);
+                } else {
+                    planInternoCount = 1;
+                    prevPlanInternoCellValue = planInternoCellValue;
+                }
+            }
+        }
+
+        mergeCells("table_{{ item.projeto_plano.projeto.codigo }}", 1, 2);
+        mergeColumnByRef("table_{{ item.projeto_plano.projeto.codigo }}", 2, 13);
+        mergeCells("table_{{ item.projeto_plano.projeto.codigo }}", 6, 7);
+        mergeCells("table_{{ item.projeto_plano.projeto.codigo }}", 6, 8);
+        mergeCells("table_{{ item.projeto_plano.projeto.codigo }}", 6, 9);
+        mergeCells("table_{{ item.projeto_plano.projeto.codigo }}", 6, 10);
+        mergeCells("table_{{ item.projeto_plano.projeto.codigo }}", 6, 11);
+        mergeCells("table_{{ item.projeto_plano.projeto.codigo }}", 6, 12);
+    </script>
+        {% endfor %}
+    {% else %}
+        <p class="alert alert-warning">Utilize o filtro para gerar o relatório.</p>
+    {% endif %}
+{% endblock %}

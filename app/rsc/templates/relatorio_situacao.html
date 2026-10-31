@@ -1,0 +1,111 @@
+{% extends super_template %}
+{% block action-bar %}
+    <ul class="action-bar">
+        <li>
+            <a class="btn" href="{{ url_xls }}">{% icone "download" %} Exportar para XLS</a>
+        </li>
+        <li>
+            <a class="btn default" href="/rsc/dashboard/">Painel RSC</a>
+        </li>
+    </ul>
+{% endblock %}
+{% block content %}
+    <div id="formbox" class="mb-4">{% render_form form %}</div>
+    <p class="alert alert-info">
+        Processos {% if tipo_rsc %}de <strong>{{ tipo_rsc }}</strong> {% endif %}que entraram em <strong>{{ ano }}</strong> (data de envio à CPPD).
+        Processos ainda não enviados, em validação, em ajustes ou rejeitados não são listados.
+    </p>
+    <ul class="flex-container boxes infos mb-4">
+        {% for grupo in grupos %}
+            <li class="box-item">
+                <p class="stat">{{ grupo.itens|length }}</p>
+                <p class="title">{{ grupo.secao.titulo }}</p>
+            </li>
+        {% endfor %}
+    </ul>
+    {% for grupo in grupos %}
+        <div class="tab-pane"
+             data-title="{{ grupo.secao.titulo }}"
+             data-tab="{{ grupo.secao.chave }}"
+             data-counter="{{ grupo.itens|length }}">
+            {% if grupo.itens %}
+                <div class="table-responsive">
+                    <table>
+                        <caption class="hidden">{{ grupo.secao.titulo }}</caption>
+                        <thead>
+                            <tr>
+                                <th>Processo</th>
+                                <th>Docente</th>
+                                <th>Tipo de RSC</th>
+                                <th>Data de entrada</th>
+                                <th>Situação</th>
+                                {% if grupo.secao.chave == 'em_analise' %}
+                                    <th>Avaliações</th>
+                                    <th>Banca avaliadora</th>
+                                {% endif %}
+                                {% if grupo.secao.chave == 'finalizados' %}<th>Data de finalização</th>{% endif %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in grupo.itens %}
+                                <tr>
+                                    <td>{{ item.numero|default:"-" }}</td>
+                                    <td>{{ item.processo.servidor }}</td>
+                                    <td>{{ item.processo.tipo_rsc }}</td>
+                                    <td>{{ item.processo.data_entrada|date:"d/m/Y" }}</td>
+                                    <td>{{ item.processo.status_estilizado|safe }}</td>
+                                    {% if grupo.secao.chave == 'em_analise' %}
+                                        <td>
+                                            <dl class="definition-list">
+                                                <dt>Finalizadas</dt>
+                                                <dd>
+                                                    {{ item.banca.finalizadas }}
+                                                </dd>
+                                                <dt>Faltam</dt>
+                                                <dd>
+                                                    {{ item.banca.faltam }}
+                                                </dd>
+                                                <dt>Reservas</dt>
+                                                <dd>
+                                                    {{ item.banca.reservas }}
+                                                </dd>
+                                            </dl>
+                                        </td>
+                                        <td>
+                                            {% if item.banca.avaliadores %}
+                                                <ul>
+                                                    {% for avaliador in item.banca.avaliadores %}
+                                                        <li>
+                                                            <strong>{{ avaliador.avaliador }}</strong>
+                                                            <small>({{ avaliador.tipo }})</small>:
+                                                            {{ avaliador.situacao }}
+                                                            {% if avaliador.data_limite %}
+                                                                — prazo {{ avaliador.data_limite }}
+                                                                {% if avaliador.dias_restantes is not None and avaliador.dias_restantes < 0 %}
+                                                                    <span class="status status-error">Vencido</span>
+                                                                {% elif avaliador.dias_restantes is not None and avaliador.dias_restantes <= 3 %}
+                                                                    <span class="status status-alert">{{ avaliador.dias_restantes }} dia(s)</span>
+                                                                {% endif %}
+                                                            {% endif %}
+                                                        </li>
+                                                    {% endfor %}
+                                                </ul>
+                                            {% else %}
+                                                <span class="status status-alert">Nenhum avaliador na banca</span>
+                                            {% endif %}
+                                        </td>
+                                    {% endif %}
+                                    {% if grupo.secao.chave == 'finalizados' %}
+                                        <td>{{ item.processo.data_finalizacao_processo|date:"d/m/Y"|default:"-" }}</td>
+                                    {% endif %}
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="alert alert-info">Nenhum processo nesta situação.</p>
+            {% endif %}
+        </div>
+    {% endfor %}
+{% endblock %}

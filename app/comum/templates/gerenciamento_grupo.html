@@ -1,0 +1,226 @@
+{% extends super_template %}
+
+{% block extrahead %}
+    <script>
+        jQuery(document).ready(function() {
+            $('select[name=modulo]').select2();
+        });
+    </script>
+{% endblock %}
+
+{% block action-bar %}
+    {% if perms.comum.view_gerenciamentogrupo %}
+        <ul class="action-bar">
+            <li><a class="btn" href="/admin/comum/gerenciamentogrupo/">Definir Gerenciamento de grupos</a></li>
+        </ul>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    {% if grupos_gerenciados.exists %}
+        <form action="" id="filtro" method="get">
+            <div class="search-and-filters">
+                <div class="filter show-condition-or">
+                    <label>Módulo:</label>
+                    <select name="modulo">
+                        <option value="">---------</option>
+                        {% for app_name, app in apps_names.items %}
+                            <option {% if app == current_app %} selected {% endif %}
+                                                                value="{{ app }}">{{ app_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="filter">
+                    <label>Nome/Usuário:</label>
+                    <input type="text" name="usuario" value='{{ usuario|default:"" }}'/>
+                </div>
+                <div class="filter separator">
+                    <label>Exibir somente Grupos existentes {{ nomenclatura.no_campus }}:</label>
+                    <select name="campus">
+                        <option value="">---------</option>
+                        {% for campus_choice in campus_choices %}
+                            <option {% if campus_choice.sigla == campus %}
+                                selected {% endif %}>{{ campus_choice.sigla }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="submit-button">
+                    <input type="submit" value="Filtrar">
+                </div>
+            </div>
+
+            {% if current_app and grupo_escolhido %}
+                <ul class="nav nav-tabs">
+                    {% for grupo in grupos_gerenciados %}
+                        <li class="nav-item">
+                            <a href="{{ url_filters }}grupo={{ grupo.pk }}" class="nav-link {% if grupo_escolhido == grupo %}active{% endif %}">{{ grupo.name }}
+                                <span class="badge">{{ contador_dict |getkey:grupo }}</span>
+                            </a>
+                        </li>
+                    {% endfor %}
+                </ul>
+
+                <div class="tab-pane" data-titled-tab="true">
+                    <ul class="action-bar">
+                        {% if grupo_escolhido %}
+                        <li><a class="btn success popup" href="/comum/adicionar_usuario_grupo/{{ grupo_escolhido.pk }}/">Adicionar usuário ao grupo</a></li>
+                        <li><a class="btn" href="{% url 'automatizacao_grupo_listar' grupo_escolhido.pk %}">Automatizar grupo em setores</a></li>
+                        {% endif %}
+                        {% if usuarios_grupo.exists %}
+                            <li><a class="btn" href="/djtools/notificar_grupo/{{ grupo_escolhido.pk }}/">Enviar mensagem para grupo</a></li>
+                        {% endif %}
+                        <li><a class="btn default popup" href="{% url 'visualizar_menus_do_grupo' grupo_escolhido.pk %}">Menus do grupo</a></li>
+                    </ul>
+                    {% include "includes/grupo_detalhes.html" %}
+
+                    {% box 'Usuários do grupo' %}
+                        {% if usuarios_grupo.exists %}
+                            {% autopaginate usuarios_grupo 32 %}
+                            {% paginate %}
+                            <div class="card-container">
+                                {% for usuario_grupo in usuarios_grupo %}
+                                    <div class="card {% if not usuario_grupo.user.last_login %}error{% endif %}">
+                                        <div class="photo">
+                                            <img alt="{{ usuario_grupo.user.get_profile.nome_usual }}"
+                                                  src="{{ usuario_grupo.user.get_vinculo.get_foto_75x100_url }}"/>
+                                        </div>
+                                        {% if usuario_grupo.user.get_profile.nome_usual or usuario_grupo.user.get_profile.nome %}
+                                            <h5>{{ usuario_grupo.user.get_profile.nome_usual|default:usuario_grupo.user.get_profile.nome }}</h5>
+                                        {% endif %}
+                                        <dl>
+                                            <dt>Cargo/Setor:</dt>
+                                            <dd>{% if usuario_grupo.eh_estagiario %}Estagiário{% else %}{{ usuario_grupo.user.get_relacionamento_title }}{% endif %} <span
+                                                    title="{{ usuario_grupo.user.get_vinculo.setor.nome }}">({{ usuario_grupo.user.get_vinculo.setor|format }})</span>
+                                            </dd>
+                                            {% if usuario_grupo.user.get_vinculo.eh_prestador %}
+                                                <dt>CPF:</dt>
+                                                <dd>{{ usuario_grupo.user.username }}</dd>
+                                            {% else %}
+                                                <dt>Matrícula:</dt>
+                                                <dd>
+                                                    <a href="{{ usuario_grupo.user.get_relacionamento.get_absolute_url }}">{{ usuario_grupo.user.username }}</a>
+                                                </dd>
+                                            {% endif %}
+                                            {% if usuario_grupo.ultimo_motivo %}
+                                                <dt>Motivo da inclusão:</dt>
+                                                <dd>{{ usuario_grupo.ultimo_motivo }}</dd>
+                                            {% endif %}
+                                            {% if usuario_grupo.setores.exists %}
+                                                <dt>Setores Vinculados:</dt>
+                                                <dd>{{ usuario_grupo.setores.all|join:", " }}</dd>
+                                            {% endif %}
+                                        </dl>
+                                        <div class="content">
+                                            {% if not usuario_grupo.user.last_login %}
+                                                <div class="alert alert-danger">
+                                                    <p>Nunca acessou o sistema.</p>
+                                                </div>
+                                            {% endif %}
+                                            <ul class="action-bar">
+                                                {% if pode_vincular_setores %}
+                                                    <li><a class="btn primary popup"
+                                                        href="/comum/adicionar_setor_usuario_grupo/{{ usuario_grupo.pk }}/">{% icone "edit" %} Vincular setor</a></li>
+                                                {% endif %}
+                                                <li><a class="btn popup default"
+                                                    href="/comum/grupos_usuario/{{ usuario_grupo.user.pk }}/">{% icone "eye" %} Preferências e grupos</a></li>
+                                                <li><a class="btn popup default"
+                                                    href="/comum/usuario/{{ usuario_grupo.user.pk }}/historico_grupos/">{% icone "eye" %} Histórico</a>
+                                                </li>
+                                                {% if not gerenciamento_do_grupo_eh_local or request.user.get_vinculo.setor.uo == usuario_grupo.user.get_vinculo.setor.uo %}
+                                                    <li>
+                                                        <a class="btn danger"
+                                                        href="/comum/remover_usuario_grupo/{{ usuario_grupo.pk }}/">{% icone "trash" %} Remover
+                                                            deste Grupo</a>
+                                                    </li>
+                                                {% endif %}
+                                            </ul>
+                                        </div>
+                                        {% if usuario_grupo.user.last_login %}
+                                            <footer>Último acesso há {{ usuario_grupo.user.last_login|timesince }}.</footer>
+                                        {% endif %}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                            {% paginate %}
+                        {% else %}
+                            <p class="alert alert-warning">Nenhum usuário encontrado nesse grupo.</p>
+                        {% endif %}
+                    {% endbox %}
+
+                    {% box 'Permissões Relacionadas ao Grupo' %}
+                        {% include "includes/grupo_permissoes.html" with grupo=grupo_escolhido %}
+                    {% endbox %}
+                </div>
+
+            {% elif usuario %}
+
+                {% if usuarios.exists %}
+                    {% autopaginate usuarios 32 %}
+                    {% paginate %}
+                    <div class="card-container">
+                        {% for usuario_grupo in usuarios %}
+                            <div class="card {% if not usuario_grupo.last_login %}error{% endif %}">
+                                <div class="photo"><img alt="{{ usuario_grupo.get_profile.nome_usual }}"
+                                          src="{{ usuario_grupo.get_vinculo.get_foto_75x100_url }}"/></div>
+                                <h5>
+                                    {{ usuario_grupo.get_profile.nome_usual|default:usuario_grupo.get_profile.nome }}</h5>
+                                <dl>
+                                    <dt>Cargo/Setor:</dt>
+                                    <dd>{{ usuario_grupo.get_relacionamento_title }} <span
+                                            title="{{ usuario_grupo.get_vinculo.setor.nome }}">({{ usuario_grupo.get_vinculo.setor|format }})</span>
+                                    </dd>
+                                    {% if usuario_grupo.get_vinculo.eh_prestador %}
+                                        <dt>CPF:</dt>
+                                        <dd>{{ usuario_grupo.username }}</dd>
+                                    {% else %}
+                                        <dt>Matrícula:</dt>
+                                        <dd>
+                                            <a href="{{ usuario_grupo.get_relacionamento.get_absolute_url }}">{{ usuario_grupo.username }}</a>
+                                        </dd>
+                                    {% endif %}
+                                    {% if usuario_grupo.setores.exists %}
+                                        <dt>Setores Vinculados:</dt>
+                                        {% for setor in usuario_grupo.setores.all %}
+                                            <dd>{{ setor }}</dd>
+                                        {% endfor %}
+                                    {% endif %}
+                                </dl>
+                                <div class="content">
+                                    {% if not usuario_grupo.last_login %}
+                                        <div class="alert alert-danger">
+                                            <p>Nunca acessou o sistema.</p>
+                                        </div>
+                                    {% endif %}
+                                    <ul class="action-bar">
+                                        <li><a class="btn popup default" href="/comum/grupos_usuario/{{ usuario_grupo.pk }}/">Preferências e Grupos
+                                            do Usuário</a></li>
+                                        {% if usuario_grupo.tem_historico_grupos %}
+                                            <li><a class="btn popup default"
+                                                href="/comum/usuario/{{ usuario_grupo.pk }}/historico_grupos/">Histórico</a>
+                                            </li>
+                                        {% endif %}
+                                    </ul>
+                                </div>
+                                {% if usuario_grupo.last_login %}
+                                    <footer>Último acesso há {{ usuario_grupo.last_login|timesince }}</footer>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                    {% paginate %}
+                {% else %}
+                    <p class="alert alert-warning">Não foi encontrado nenhum usuário de grupos com esse nome ou matrícula.</p>
+                {% endif %}
+
+            {% elif not buscar_usuario and not current_app %}
+                <p class="alert alert-warning">Você precisa filtrar por um Módulo ou Nome/Usuário.</p>
+            {% elif buscar_usuario and not current_app %}
+                <p class="alert alert-warning">Por favor, digite o nome ou usuário.</p>
+            {% else %}
+                <p class="alert alert-warning">Os filtros selecionados são inválidos. Por favor limpe-os e tente novamente.</p>
+            {% endif %}
+        </form>
+    {% else %}
+        <p class="alert alert-warning">Não há associação de grupos gerenciados.</p>
+    {% endif %}
+{% endblock %}

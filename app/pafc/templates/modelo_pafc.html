@@ -1,0 +1,220 @@
+{% extends super_template %}
+
+{% block extrahead %}
+    <script>
+        $( document ).on("click", ".tab-changer", (evento) => {
+            evento.preventDefault();
+            change_tab($(evento.currentTarget).attr("data-tab-destino"));
+        })
+
+        function change_tab(aba){
+            if (aba.includes("/")) {
+                window.location.href = aba
+            } else {
+                if (aba.includes("#")) {
+                    a = aba.substring(0, aba.indexOf("#"));
+                    ancora = aba.substring(aba.indexOf("#")+1);
+                    changeTabs(a);
+                    const elemAncora = document.getElementById(ancora);
+                    if (elemAncora) elemAncora.scrollIntoView();
+                }
+                else{
+                    changeTabs(aba)
+                }
+            }
+        };
+    </script>
+{% endblock %}
+
+{% block object-status %}
+    {% if modelo.ativo %}
+        <span class="status status-success">Ativo</span>
+    {% else %}
+        <span class="status status-error">Inativo</span>
+    {% endif %}
+{% endblock %}
+
+{% block action-bar %}
+    {% if perms.pafc.view_modelopafc or perms.pafc.add_modelopafc %}
+        <ul class="action-bar">
+            {% if perms.pafc.add_modelopafc %}
+                <li><a class="btn primary" href="/admin/pafc/modelopafc/{{ modelo.pk }}/change/">{% icone "edit" %} Editar</a></li>
+                <li><a class="btn primary" href="/pafc/replicar_modelo_pafc/{{ modelo.pk }}/">{% icone "copy" %} Replicar</a></li>
+            {% endif %}
+            <li><a class="btn default" href="/pafc/modelo_pafc/{{ modelo.pk }}/minuta/">{% icone "file-pdf" %} Gerar minuta</a></li>
+        </ul>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+
+    {% box "Dados gerais" %}
+        <dl class="definition-list flex">
+            <div class="list-item flex-basis-100">
+                <dt>Descrição</dt>
+                <dd>{{ modelo.descricao }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Tipo de oferta</dt>
+                <dd>{{ modelo.tipo_oferta }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Versão</dt>
+                <dd>{{ modelo.get_versao_modelo_display }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Data de criação</dt>
+                <dd>{{ modelo.data_criacao }}</dd>
+            </div>
+        </dl>
+    {% endbox %}
+
+    <div class="tab-pane" data-title="Seções" data-tab="secao" data-counter="{{ modelo.secao_set.count }}">
+        {% if perms.pafc.add_modelopafc %}
+            <ul class="action-bar">
+                <li><a class="btn success popup" href="/pafc/adicionar_secao/{{ modelo.pk }}/">Adicionar seção</a></li>
+            </ul>
+        {% endif %}
+
+        {% if possui_secoes %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Seções cadastradas</caption>
+                    <thead>
+                        <tr>
+                            {% if perms.pafc.add_modelopafc %}
+                                <th class="no-print">Ações</th>
+                            {% endif %}
+                            <th>Título</th>
+                            <th>Ordem de exibição</th>
+                            <th>É subseção</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for secao in secoes %}
+                            <tr>
+                                {% if perms.pafc.add_modelopafc %}
+                                    <td class="no-print field-get_acoes">
+                                        {% icon "edit" "/pafc/editar_secao/{{ secao.pk }}/" "Editar" "popup" %}
+                                        {% if perms.pafc.delete_modelopafc %}
+                                            {% icon "delete" "/comum/excluir/pafc/secao/{{ secao.pk }}/" "Excluir" "no-confirm popup" %}
+                                        {% endif %}
+                                    </td>
+                                {% endif %}
+                                <td>{{ secao.titulo|format }}</td>
+                                <td>{{ secao.ordem_exibicao }}</td>
+                                <td>{{ secao.subsecao|format }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Nenhuma seção adicionada.</p>
+        {% endif %}
+    </div>
+
+    <div class="tab-pane" data-title="Conteúdos" data-tab="conteudo" data-counter="{{ qtd_conteudos }}">
+        <ul class="action-bar">
+        {% if perms.pafc.add_modelopafc and possui_secoes %}
+            <li><a class="btn success popup" href="/pafc/adicionar_conteudo/{{ modelo.pk }}/">{% icone "plus" %} Adicionar conteúdo</a></li>
+        {% endif %}
+            <li><a class="btn default popup" href="/pafc/modelo_pafc/{{ modelo.pk }}/visualizar/">{% icone "eye" %} Pré-visualizar</a></li>
+        </ul>
+
+        <div class="alert alert-info">
+            <p>
+                Você pode usar os seguintes marcadores para gerar conteúdo dinamicamente:
+            </p>
+            <ul>
+                {% for marcador, descricao in marcadores.items %}
+                    {% with marcador_display='{{ '|add:marcador|add:' }}' %}
+                        <li>{{ marcador_display }}: {{ descricao }}</li>
+                    {% endwith %}
+                {% endfor %}
+            </ul>
+        </div>
+
+        {% if qtd_conteudos > 0 %}
+            <ul class="pills">
+                {% for secao in secoes %}
+                    <li><a href="#" class="tab-changer" data-tab-destino="conteudo#secao_{{ secao.id }}">{{ secao.titulo|upper }}</a></li>
+                {% endfor %}
+            </ul>
+            {% for secao in secoes %}
+                <div class="boards flex-container">
+                    <div class="board-container">
+                        <h4 id="secao_{{ secao.id }}">{{ secao.titulo|upper }}</h4>
+                        {% for conteudo in secao.conteudos %}
+                            <div class="general-box">
+                                <div class="primary-info">
+                                    <div class="status-info-container">
+                                        <span class="status status-{{ conteudo.editavel|yesno:'success,error' }}">
+                                            {{ conteudo.editavel|yesno:"Editável,Não editável" }}
+                                        </span>
+                                    </div>
+                                    <h4 class="title">
+                                        <small>{{ conteudo.ordem_exibicao }}</small>
+                                    </h4>
+                                    {% if perms.pafc.add_modelopafc %}
+                                        <ul class="action-bar">
+                                            <li><a href="/pafc/editar_conteudo/{{ conteudo.pk }}/" class="btn primary popup">{% icone "edit" %} Editar</a></li>
+                                            {% if perms.pafc.delete_conteudo and not modelo.pafc_set.exists %}
+                                                <li><a href="/comum/excluir/pafc/conteudo/{{ conteudo.pk }}/" class="btn danger no-confirm popup">{% icone "trash" %} Remover</a></li>
+                                            {% endif %}
+                                        </ul>
+                                    {% endif %}
+                                    <div class="extra-info">
+                                        {{ conteudo.texto|safe }}
+                                    </div>
+                                </div>
+                                {% if conteudo.editavel %}
+                                    <dl class="secondary-info definition-list">
+                                        <div class="list-item">
+                                            <dt>Orientações de preenchimento</dt>
+                                            <dd>{{ conteudo.orientacao_preenchimento|linebreaks|default:"Sem orientações de prenchimento." }}</dd>
+                                        </div>
+                                    </dl>
+                                {% endif %}
+                            </div>
+                        {% empty %}
+                            <p class="alert alert-warning">Nenhum conteúdo cadastrado nesta seção.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% empty %}
+                <p class="alert alert-warning">Cadastre uma seção para habilitar o cadastro de conteúdo.</p>
+            {% endfor %}
+        {% else %}
+            <p class="alert alert-warning">Nenhum conteúdo adicionado.</p>
+        {% endif %}
+    </div>
+
+    <div class="tab-pane" data-title="PAFCs vinculados" data-tab="pafcs" data-counter="{{ modelo.pafc_set.count }}">
+
+        {% if modelo.pafc_set.count %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Relação de PAFCs</caption>
+                    <thead>
+                        <tr>
+                            <th>PAFC</th>
+                            <th>Situação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for pafc in modelo.pafc_set.all %}
+                            <tr>
+                                <td><a href="{% url 'pafc' pafc.pk %}">{{ pafc }}</a></td>
+                                <td>{{ pafc.get_situacao_display|status }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Nenhum PAFC vinculado.</p>
+        {% endif %}
+    </div>
+
+{% endblock %}

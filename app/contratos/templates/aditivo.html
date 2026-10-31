@@ -1,0 +1,173 @@
+{% extends super_template %}
+
+{% block action-bar %}
+	{% if pode_atualizar_contrato %}
+		<ul class="action-bar">
+			<li><a class="btn primary" href="/admin/contratos/aditivo/{{ aditivo.pk }}/">Editar Termo Aditivo</a></li>
+		</ul>
+	{% endif %}
+{% endblock %}
+
+{% block content %}
+
+{% box "Dados gerais" %}
+	<dl class="definition-list flex">
+		<div class="list-item">
+	        <dt>Contrato</dt>
+	        <dd><a href="/contratos/contrato/{{ aditivo.contrato.pk }}/">{{ aditivo.contrato.numero }}</a></dd>
+	    </div>		
+		<div class="list-item">
+	        <dt>Tipo de aditivo</dt>
+	        <dd>
+	        	{% if aditivo.de_fiscal %}<p>Aditivo de Fiscal</p>{% endif %}
+				{% if aditivo.de_prazo %}<p>Aditivo de Prazo</p>{% endif %}
+				{% if aditivo.de_valor %}<p>Aditivo de Valor</p>{% endif %}
+                {% if aditivo.de_outro %}<p>Aditivo de Outro</p>{% endif %}
+			</dd>
+	    </div>
+		<div class="list-item">
+	        <dt>Data de início</dt>
+		    <dd>{{ aditivo.data_inicio|date:"d/m/Y" }}</dd>
+	    </div>
+		<div class="list-item">
+	        <dt>Data de vencimento</dt>
+	        <dd>{{ aditivo.data_fim|date:"d/m/Y" }}</dd>
+	    </div>
+		<div class="list-item">
+	        <dt>Valor</dt>
+	        <dd>R$ {{ aditivo.valor|mascara_dinheiro }}</dd>
+	    </div>
+	    {% if aditivo.processo %}
+			<div class="list-item">
+		    	<dt>Processo</dt>
+		    	<dd>
+		    		<a href="{{ aditivo.processo.get_absolute_url }}">
+						{{ aditivo.processo.get_numero }}
+					</a>
+				</dd>
+			</div>
+		{% endif %}
+		{% if aditivo.empenho %}
+			<div class="list-item">
+				<dt>Empenho</dt>
+		    	<dd>
+		    		<a href="/almoxarifado/empenho/{{ aditivo.empenho.pk }}">
+		    			{{ aditivo.empenho.numero }}
+					</a>
+				</dd>
+			</div>
+		{% endif %}
+		{% if pode_visualizar_arquivo %}
+			<div class="list-item">
+		    	<dt>Arquivo digitalizado</dt>
+				<dd>
+					{% if pode_visualizar_arquivo and aditivo.arquivo %}
+						<a href="/contratos/visualizar_arquivo/{{ aditivo.arquivo.id }}/">{{ aditivo.arquivo.nome }}</a>
+					{% else %}
+						<span class="status status-alert">Aguardando submissão do arquivo.</span>
+					{% endif %}
+					{% if pode_submeter_arquivo %}
+						<a href="/contratos/upload_aditivo/{{ aditivo.id }}/" class="btn">Upload</a>
+					{% endif %}
+				</dd>
+			</div>
+		{% endif %}		
+	</dl>
+{% endbox %}
+
+{% box "Publicações" %}
+	{% if pode_adicionar_publicacao %}
+		<ul class="action-bar">
+	    	<li><a class="btn success" href="/contratos/adicionar_publicacao_aditivo/{{ aditivo.pk }}/">Adicionar Publicação</a></li>
+		</ul>
+	{% endif %}
+	{% with publicacoes=aditivo.publicacoes.all %}
+		{% if publicacoes %}
+			<table>
+				<thead>
+					<tr>
+						{% if pode_adicionar_publicacao %}
+							<th class="no-print">Ações</th>
+						{% endif %}
+						<th>Tipo</th>
+						<th>Número</th>
+						<th>Data</th>
+						<th>Descrição</th>
+						<th>Arquivo Digitalizado</th>
+						{% if pode_submeter_publicacao %}
+							<th class="no-print">Opções</th>
+						{% endif %}
+					</tr>
+				</thead>
+				<tbody>
+					{% for pub in publicacoes %}
+						<tr>
+							{% if pode_adicionar_publicacao %}
+								<td class="no-print">{% icon "edit" "/contratos/editar_publicacao_aditivo/{{ pub.id }}/" %}</td>
+							{% endif %}
+							<td>{{ pub.tipo }}</td>
+							<td>{{ pub.numero }}</td>
+							<td>{{ pub.data|date:"d/m/y" }}</td>
+							<td>{{ pub.descricao }}</td>
+							<td>
+								{% if pode_visualizar_publicacao and pub.arquivo %}
+									<a href="/contratos/visualizar_arquivo/{{ pub.arquivo.id }}/">{{ pub.arquivo.nome }}</a>
+								{% else %}
+									<span class="status status-alert">Aguardando submissão do arquivo.</span>
+								{% endif %}
+							</td>
+							{% if pode_submeter_publicacao %}
+								<td class="no-print">
+									<a href="/contratos/upload_publicacao_aditivo/{{ pub.id }}/{{ aditivo.id }}/" class="btn success">Adicionar arquivo</a>
+								</td>
+							{% endif %}			
+						</tr>
+					{% endfor %}
+				</tbody>
+			</table>
+		{% else %}
+			<p class="alert alert-warning">Nenhuma publicação cadastrada.</p>
+		{% endif %}
+	{% endwith %}
+{% endbox %}
+
+{% box "Fiscais" %}
+	{% if pode_adicionar_fiscal %}
+	<ul class="action-bar">
+		<li><a class="btn success popup" href="/contratos/adicionar_fiscal_aditivo/{{ aditivo.pk }}/">Adicionar Fiscal</a></li>
+	</ul>
+	{% endif %}
+	{% if aditivo.get_fiscais.count %}
+		<table>
+	        <thead>
+				<tr>
+	            	<th>Servidor</th>
+					<th>Portaria</th>
+					<th>{{ nomenclatura.campus }}</th>
+					<th>Data da Nomeação</th>
+					<th>Situação</th>
+	        	</tr>
+			</thead>
+	        <tbody>
+	            {% for fiscal in aditivo.get_fiscais %}
+	                <tr>
+						<td><a href="/rh/servidor/{{ fiscal.servidor.matricula }}/">{{ fiscal.servidor.matricula }}</a> - {{ fiscal.servidor.pessoa_fisica.nome }} </td>
+	                	<td>{{ fiscal.numero_portaria }}</td>
+						<td>{{ fiscal.campus }}</td>
+						<td>{{ fiscal.data_nomeacao|date:"d/m/y" }}</td>
+						{% if fiscal.data_exclusao %}
+							<td><span class="status status-error">Inativo desde {{ fiscal.data_exclusao|date:"d/m/y" }}</span></td>
+							<td></td>
+						{% else %}
+							<td><span class="status status-success">Ativo</span></td>
+						{% endif %}
+					</tr>
+	            {% endfor %}
+	        </tbody>
+	    </table>
+	{% else %}
+		<p class="alert alert-warning">Nenhum fiscal cadastrado.</p>
+	{% endif %}
+{% endbox %}
+
+{% endblock %}

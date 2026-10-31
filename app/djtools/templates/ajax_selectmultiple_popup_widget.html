@@ -1,0 +1,104 @@
+<div class="grid-area-input d-flex align-items-center gap-3">
+    <input type="hidden" id="id_{{ name }}" name="{{ name }}" value="{{ s }}">
+    <input type="text" value="{{ ss }}" id="__{{ name }}__" readonly="readonly">
+
+    {% if not disabled %}
+        <a class="btn as_button" href="#" onclick="buscar(); return false;">Buscar</a>
+    {% endif %}
+</div>
+<script>
+    if (!window['options']) {
+        options = {};
+    }
+    options["{{name}}"] = {{ options|safe }};
+
+    function get_params() {
+        if (options["{{name}}"]["extraParams"]["form_parameter_names"] != undefined) {
+            var vetor = options["{{name}}"]["extraParams"]["form_parameter_names"].split(",");
+            var vetor_pks = [];
+            for (i in vetor) {
+                if (i == 2) {
+                    if ($("select[name$=" + vetor[i].toString() + "]").length == 2) {
+                        vetor_pks[i] = $("#hidden_" + vetor[i].toString()).val();
+                    }
+                    if ($("select[name$=" + vetor[i].toString() + "]").length == 1) {
+                        vetor_pks[i] = $("select[name$=" + vetor[i].toString() + "]").val().toString();
+                    }
+                } else {
+                    if ($("input[name$=" + vetor[i].toString() + "]").length == 2) {
+                        vetor_pks[i] = $("#hidden_" + vetor[i].toString()).val();
+                    }
+                    if ($("input[name$=" + vetor[i].toString() + "]").length == 1) {
+                        vetor_pks[i] = $("input[name$=" + vetor[i].toString() + "]").val().toString();
+                    }
+                }
+                if(vetor_pks[i]){
+                    var date = vetor_pks[i].match(/(\d{2})\/(\d{2})\/(\d{4})/);
+                    if (date) {
+                        vetor_pks[i] = date[3] + '-' + date[2] + '-' + date[1]
+                    }
+                }
+            }
+            options["{{name}}"]["extraParams"]["filter_pks"] = vetor_pks.toString();
+        }
+        params = '';
+        if (options["{{name}}"]["extraParams"]["filter_pks"] && options["{{name}}"]["extraParams"]["django_filter_names"]) {
+            params += 'filter_pks=' + options["{{name}}"]["extraParams"]["filter_pks"];
+            params += '&django_filter_names=' + options["{{name}}"]["extraParams"]["django_filter_names"];
+        }
+        return params;
+    }
+
+    function get_{{ name }}_qs() {
+        return '{{ control }}';
+    }
+
+    function buscar() {
+        if (options["{{name}}"]["extraParams"]["required_form_filters"]) {
+            vetor = options["{{name}}"]["extraParams"]["form_parameter_names"].split(",");
+            errors = '';
+            for (i in vetor) {
+                if (i == 2 && $("input[name$=" + vetor[i].toString() + "]").length == 0) {
+                    if (!($("select[name$=" + vetor[i].toString() + "]").length == 2 && $("#hidden_" + vetor[i].toString()).val() || $("select[name$=" + vetor[i].toString() + "]").length == 1 && $("select[name$=" + vetor[i].toString() + "]").val()?.toString())) {
+
+                        label = $("label[for$=id_" + vetor[i].toString() + "]").text()
+                        label = label.substring(0, label.length - 1)
+
+                        errors = errors + '\n- ' + label
+                    }
+                } else {
+                    if (!($("input[name$=" + vetor[i].toString() + "]").length == 2 && $("#hidden_" + vetor[i].toString()).val() || $("input[name$=" + vetor[i].toString() + "]").length == 1 && $("input[name$=" + vetor[i].toString() + "]").val()?.toString())) {
+
+                        label = $("label[for$=id_" + vetor[i].toString() + "]").text()
+                        label = label.substring(0, label.length - 1)
+
+                        errors = errors + '\n- ' + label
+                    }
+                }
+            }
+            if (errors) {
+                alert('Primeiro preencha os seguintes campos: ' + errors)
+            } else {
+                let url = '/djtools/popup_choice_field/{{ name }}/';
+                if (document.getElementById('id_{{ name }}').value) {
+                    url += document.getElementById('id_{{ name }}').value + '/';
+                }
+                url += '?_popup=1&' + get_params();
+                $.fancybox.open({
+                    src: url,
+                    type: 'ajax',
+                    ajax: {
+                        settings: {
+                            method: 'POST',
+                            data: {
+                                template: '{{ list_template }}',
+                                qs: '{{ control }}',
+                                multiple: true,
+                            }
+                        }
+                    },
+                });
+            }
+        }
+    }
+</script>

@@ -1,0 +1,113 @@
+{% extends super_template %}
+
+{% block extrahead %}
+<script>
+jQuery(document).ready(function() {
+    jQuery(".relatorio-details").click(function() {
+        jQuery(".doc-error").toggleClass("d-none");
+        jQuery(this).toggleClass("active");
+        if (jQuery(this).hasClass("active")) {
+            jQuery(this).text("Mostrar documentos removidos ");
+        } else {
+            jQuery(this).text("Esconder documentos removidos");
+        }
+        return false;
+    });
+});
+</script>
+{% endblock %}
+{% block object-status %}
+    {% if steps %}
+        {{ steps|safe }}
+    {% else %}
+        {{ recomendacao.get_status_display|status }}
+    {% endif %}
+{% endblock %}
+
+
+{% block action-bar %}
+
+    <ul class="action-bar">
+        {% if recomendacao|method:"pode_revisar"|call:request.user %} 
+            <li><a href="{% url 'auditoria:revisar_recomendacao' recomendacao.id %}" class="btn primary">Editar descrição </a></li>
+        {% endif %}
+        {% if recomendacao|method:"pode_iniciar_monitoramento"|call:request.user %} 
+            <li><a href="{% url 'auditoria:monitorar_recomendacao' recomendacao.id %}" class="btn">Monitorar</a></li>
+        {% endif %}
+        {% if recomendacao|method:"pode_reiniciar"|call:request.user %} 
+            <li>
+                <a href="{% url 'auditoria:reiniciar_monitoramento' recomendacao.id %}" class="btn primary"> 
+                    Reiniciar recomendação
+                </a>
+            </li>
+        {% endif %}
+        {% if recomendacao|method:"pode_cancelar"|call:request.user %} 
+            <li><a href="{% url 'auditoria:cancelar_recomendacao' recomendacao.id %}" class="btn danger popup">Cancelar</a></li>
+        {% endif %}
+        {% if recomendacao|method:"pode_remover"|call:request.user %} 
+            <li><a href="{% url 'admin:auditoria_recomendacao_delete' recomendacao.id %}" class="btn danger">Remover</a></li>
+        {% endif %}
+    </ul>
+
+{% endblock %}
+
+{% block content %}
+    
+    {% box "Dados gerais" %}
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>Relatório</dt>
+                <dd><a href="{{ recomendacao.relatorio.get_absolute_url}}">{{ recomendacao.relatorio }} </a></dd>
+            </div>  
+            <div class="list-item">
+                <dt>Ação</dt>
+                <dd>{{ recomendacao.relatorio.acao }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Ano/PAINT</dt>
+                <dd>{{ recomendacao.relatorio.ano_paint }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Núcleo executor</dt>
+                <dd>{{ recomendacao.nucleo }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Monitor</dt>
+                <dd>{{ recomendacao.monitor|format }}</dd>
+            </div>
+            {% if recomendacao.revisor %}
+                <div class="list-item">
+                    <dt>Revisor</dt>
+                    <dd>{{ recomendacao.revisor|format }}</dd>
+                </div>
+            {% endif %}
+            <div class="list-item">
+                <dt>Data limite</dt>
+                <dd>{{ recomendacao.data_limite }}</dd>
+            </div>
+            <div class="list-item flex flex-basis-100">
+                <dt>Descrição</dt>
+                <dd>{{ recomendacao.descricao|safe }}</dd>
+            </div>
+            {% if recomendacao.cancelada %}
+                <div class="list-item flex-basis-100">
+                    <dt>Justificativa do cancelamento</dt>
+                    <dd>{{ recomendacao.justificativa }}</dd>
+                </div> 
+            {% endif %}
+            <dd>{% progressbar recomendacao.get_progresso %}</dd>
+        </dl>
+    {% endbox %}
+
+    {% for unidade in recomendacao.unidades.all %}
+        {% with monitoramentos|getval:unidade.id as monitoramento %} 
+            {% include 'recomendacao/tabs/plano_providencias.html' with monitoramento=monitoramento %}
+        {% endwith %}
+    {% endfor %}
+    {% include "recomendacao/tabs/relatorios.html" %}
+    {% include "recomendacao/tabs/comentarios.html" %}
+    {% include "recomendacao/tabs/historico.html" %}
+    {% include "recomendacao/tabs/descricoes.html" %}
+    {% include "recomendacao/tabs/beneficios.html" %}
+
+{% endblock %}

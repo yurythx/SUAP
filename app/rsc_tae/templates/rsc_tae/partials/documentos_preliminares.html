@@ -1,0 +1,95 @@
+{% if servidor and servidor.titulacao %}
+    <div class="alert alert-info">
+        <p><strong>Informações:</strong></p>
+        <ul>
+            <li>Anexe o documento que comprova a titulação que habilita ao RSC pretendido.</li>
+            <li>Titulação atual cadastrada: <strong>{{ servidor.titulacao }}</strong>.</li>
+            <li>Em caso de documento emitido por instituição estrangeira, deverá ser anexada no mesmo PDF a documentação de validação em instituição nacional.</li>
+        </ul>
+    </div>
+{% else %}
+    <div class="alert alert-info">
+        <p><strong>Informações:</strong></p>
+        <ul>
+            <li>Anexe o documento que comprova a titulação que habilita ao RSC pretendido.</li>
+            <li>Em caso de documento emitido por instituição estrangeira, deverá ser anexada no mesmo PDF a documentação de validação em instituição nacional.</li>
+        </ul>
+    </div>
+{% endif %}
+
+<div class="boards flex-container">
+    {% for secao in documentos_preliminares_secoes %}
+        <div class="board-container js-doc-preliminar-card" data-tipo="{{ secao.tipo }}">
+            <div class="d-flex align-items-center flex-wrap gap-4 justify-content-between mb-4">
+                <h3 class="title">{{ secao.label }}</h3>
+                <span class="status {{ secao.situacao_classe }} js-doc-preliminar-situacao">{{ secao.situacao_label }}</span>
+            </div>
+
+            <div class="js-doc-preliminar-conteudo">
+                {% if secao.documento_atual %}
+                    <div class="rsc-doc-card__arquivo">
+                        {% icone "file-alt" %}
+                        <a class="rsc-doc-card__arquivo-nome no-confirm" href="{{ secao.documento_atual.arquivo.url }}" target="_blank" rel="noopener">
+                            {{ secao.documento_atual.nome_original|default:secao.documento_atual.arquivo.name }}
+                        </a>
+                    </div>
+
+                    {% if pode_editar_documento_preliminar %}
+                        <label class="rsc-doc-card__campo-data my-4 required">
+                            <span>Data de obtenção/homologação:</span>
+                            <input type="date" required class="js-doc-preliminar-data rsc-data-input"
+                                    data-documento-id="{{ secao.documento_atual.id }}"
+                                    value="{{ secao.documento_atual.data_obtencao_titulacao|date:'Y-m-d' }}" />
+                        </label>
+                    {% else %}
+                        <div class="text-muted pt-3">Data: {{ secao.documento_atual.data_obtencao_titulacao|date:"d/m/Y"|default:"—" }}</div>
+                    {% endif %}
+                {% else %}
+                    <p class="alert alert-warning my-4">Nenhum arquivo enviado ainda. São aceitos apenas arquivos em formato PDF.</p>
+                {% endif %}
+            </div>
+
+            {% if pode_editar_documento_preliminar %}
+                <button type="button" class="btn {% if secao.documento_atual %}primary{% endif %} js-doc-preliminar-selecionar" data-tipo="{{ secao.tipo }}">
+                    {% icone "paperclip" %} {% if secao.documento_atual %}Substituir arquivo{% else %}Selecionar arquivo{% endif %}
+                </button>
+            {% endif %}
+        </div>
+    {% endfor %}
+</div>
+
+{% if pode_editar_documento_preliminar %}
+    <div class="submit-row justify-content-end">
+        <span class="rsc-autosave-status" id="js-docs-preliminares-status"></span>
+        <button type="button" class="btn success" id="js-salvar-docs-preliminares">Salvar</button>
+    </div>
+{% endif %}
+
+{% if documentos_preliminares_log %}
+    <hr />
+    <div class="table-responsive">
+        <table>
+            <caption>Log de movimentações</caption>
+            <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Documento</th>
+                    <th>Ação</th>
+                    <th>Executado por</th>
+                    <th>Observação</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for lg in documentos_preliminares_log %}
+                    <tr>
+                        <td>{{ lg.data_cadastro|date:"d/m/Y H:i" }}</td>
+                        <td>{{ lg.documento.get_tipo_display|default:"—" }}</td>
+                        <td>{{ lg.get_acao_display }}</td>
+                        <td>{{ lg.executado_por_vinculo|default:"—" }}</td>
+                        <td class="rsc-pre-wrap">{{ lg.observacao|default:"" }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endif %}

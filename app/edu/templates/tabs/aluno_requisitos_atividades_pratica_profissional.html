@@ -1,0 +1,43 @@
+<div class="table-responsive">
+    <table>
+        <caption>Atividades {{ title|lower }}</caption>
+        <thead>
+            <tr>
+                <th rowspan="2">Modalidade</th>
+                <th rowspan="2">Período</th>
+                <th colspan="3" class="text-center">Carga horária</th>
+                {% if pode_cadastrar_atividade_pratica_profissional %}
+                <th rowspan="2" class="no-print">Opções</th>
+                {% endif %}
+            </tr>
+            <tr>
+                <th>Requerida</th>
+                <th>Realizada</th>
+                <th>Contabilizada</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for modalidade_pp_ppc in modalidades %}
+            {% with ch_requerida_pendente=obj|method:"get_ch_atividade_pratica_profissional_pendente"|call:modalidade_pp_ppc.modalidade_pratica_profissional_id modalidade_integrada=modalidade_pp_ppc.modalidade_pratica_profissional.possui_integracao modalidade_periodo_habilitado=obj|method:"pode_cadastrar_atividade_modalidadepraticaprofissional"|call:modalidade_pp_ppc %}
+            <tr {% if not modalidade_periodo_habilitado or modalidade_integrada %}class="disabled"{% endif %}>
+                <td>{{ modalidade_pp_ppc.modalidade_pratica_profissional.nome }}</td>
+                <td>{{ modalidade_pp_ppc.get_periodo }}</td>
+                <td>{% if modalidade_pp_ppc.ch_requerida == None %}-{% else %}{{ modalidade_pp_ppc.ch_requerida }}h{% endif %}</td>
+                <td>{{ obj|method:"get_ch_atividade_pratica_profissional_realizada"|call:modalidade_pp_ppc.modalidade_pratica_profissional_id }}h</td>
+                <td {% if ch_requerida_pendente %}class="false text hint hint-top" aria-label="A carga horária requerida ainda não foi cumprida."{% endif %}>{{ obj|method:"get_ch_atividade_pratica_profissional_contabilizada"|call:modalidade_pp_ppc.modalidade_pratica_profissional_id }}h {% if ch_requerida_pendente %}{% icone "question-circle" %}{% endif %}</td>
+                {% if pode_cadastrar_atividade_pratica_profissional %}
+                <td class="no-print{% if modalidade_integrada or not modalidade_periodo_habilitado %} text hint hint-top{% endif %}" {% if modalidade_integrada %}aria-label="Atividade vinculada de forma automática no módulo: {{ modalidade_pp_ppc.modalidade_pratica_profissional.get_nome_app_integracao }}."{% elif not modalidade_periodo_habilitado %}aria-label="Esta atividade não é permitida para o período de referência do aluno."{% endif %}>
+                    {% if modalidade_integrada or not modalidade_periodo_habilitado %}{% icone "question-circle" %}{% endif %}
+                    <ul class="action-list">
+                        {% if not modalidade_integrada and modalidade_periodo_habilitado %}
+                            <li><a class="btn success popup" href="{% url 'cadastrar_atividadepraticaprofissional_aluno' obj.id modalidade_pp_ppc.modalidade_pratica_profissional_id %}">{% icone "plus" %} Cadastrar atividade</a></li>
+                        {% endif %}
+                    </ul>
+                </td>
+                {% endif %}
+            </tr>
+            {% endwith %}
+        {% endfor %}
+        </tbody>
+    </table>
+</div>

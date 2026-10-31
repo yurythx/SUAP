@@ -1,0 +1,62 @@
+<script>
+    if(!window['options']){
+        options = {};
+    }
+    options["{{ name }}"] = {{ options|safe }};
+    function get_params{{ name }}(){
+        if(options["{{ name }}"]["form_parameter_names"] != undefined){
+            vetor = options["{{ name }}"]["form_parameter_names"].split(",");
+            vetor_pks = [];
+            for ( i in vetor ){
+                //Autocomplete tem dois inputs com mesmo name, um deles hidden
+                if($("input[name$="+vetor[i].toString()+"]").length==2){
+                    vetor_pks[i] = $("#hidden_"+vetor[i].toString()).val();
+                }
+                //input comum
+                if($("input[name$="+vetor[i].toString()+"]").length==1){
+                    vetor_pks[i] = $("input[name$="+vetor[i].toString()+"]").val().toString();
+                }
+                //para funcionar com um select
+                if($("select[name$="+vetor[i].toString()+"]").length==1){
+                    vetor_pks[i] = $("select[name$="+vetor[i].toString()+"]").val().toString();
+                }
+            }
+            options["{{name}}"]["filter_pks"] = vetor_pks.toString();
+        }
+        params = '';
+        if(options["{{name}}"]["filter_pks"] && options["{{name}}"]["django_filter_names"]){
+            params += 'filter_pks='+options["{{name}}"]["filter_pks"];
+            params += '&django_filter_names='+options["{{name}}"]["django_filter_names"];
+        }
+        return params;
+    }
+
+    function abrir_popup{{ name }}(){
+        let url = '';
+        let valor = document.getElementById('id_{{ name }}').value;
+        if(valor !== '') {
+            url = '/djtools/popup_choice_field/{{ name }}/' + valor + '/?_popup=1&' + get_params{{ name }}();
+        } else {
+            url = '/djtools/popup_choice_field/{{ name }}/?_popup=1&' + get_params{{ name }}();
+        }
+        $.fancybox.open({
+            src  : url,
+            type : 'ajax',
+            ajax: {
+                settings: {
+                    method: 'POST',
+                    data: {
+                        template: '{{ list_template }}',
+                        qs: '{{ qs }}'
+                    }
+                }
+            },
+        });
+    }
+</script>
+
+<div class="grid-area-input">
+    <input type="hidden" id="id_{{ name }}" name="{{ name }}" value="{{ s }}">
+    <input type="text" value="{{ ss }}" id="__{{ name }}__" readonly="true" onclick="abrir_popup{{ name }}();" class="popupChoiceFieldWidget w-75">
+    <a class="btn" href="#" onclick="abrir_popup{{ name }}(); return false;">Buscar</a>
+</div>

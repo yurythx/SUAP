@@ -1,0 +1,87 @@
+{% extends super_template %}
+{% load i18n %}
+
+{% block object-status %}
+    <span class="status status-info">{{ recurso.formato }}</span>
+    {% if recurso.sincronizado_em %}
+        <span class="status status-success">{% trans "Publicado no CKAN" %}</span>
+    {% else %}
+        <span class="status status-alert">{% trans "Nunca sincronizado" %}</span>
+    {% endif %}
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if v.pode_editar %}
+            <li><a class="btn primary" href="{% url 'admin:dados_abertos_recursodados_change' recurso.pk %}">{% icone "edit" %} {% trans "Editar" %}</a></li>
+        {% endif %}
+        <li><a class="btn default" href="{{ recurso.dataset.get_absolute_url }}">{% icone "database" %} {% trans "Visualizar a base de dados" %}</a></li>
+        {% if recurso.arquivo %}
+            <li><a class="btn default" href="{{ recurso.arquivo.url }}">{% icone "download" %} {% trans "Baixar arquivo" %}</a></li>
+        {% endif %}
+        {% if v.url_portal %}
+            <li><a class="btn default" href="{{ v.url_portal }}" target="_blank" rel="noopener">{% icone "external-link-alt" %} {% trans "Visualizar no portal" %}</a></li>
+        {% endif %}
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+{% box "Dados do recurso" %}
+    <dl class="definition-list">
+        <dt>{% trans "Base de dados" %}</dt><dd><a href="{{ recurso.dataset.get_absolute_url }}">{{ recurso.dataset }}</a></dd>
+        <dt>{% trans "Descrição" %}</dt><dd>{{ recurso.descricao|linebreaksbr|default:"-" }}</dd>
+        <dt>{% trans "Formato" %}</dt><dd>{{ recurso.formato }}{% if recurso.mimetype %} ({{ recurso.mimetype }}){% endif %}</dd>
+        <dt>{% trans "Fonte" %}</dt>
+        <dd>
+            {% if recurso.derivado_de %}
+                {% trans "Espelho CSV de" %} <a href="{{ recurso.derivado_de.get_absolute_url }}">{{ recurso.derivado_de }}</a>, {% trans "regravado sempre que a origem muda." %}
+            {% elif recurso.url %}
+                {% trans "Coleta automática de" %} <a href="{{ recurso.url }}" target="_blank" rel="noopener">{{ recurso.url }}</a>
+            {% elif recurso.arquivo %}
+                {% trans "Arquivo enviado manualmente." %}
+            {% else %}-{% endif %}
+        </dd>
+        {% if v.espelhos %}
+            <dt>{% trans "Espelho CSV" %}</dt>
+            <dd>{% for e in v.espelhos %}<a href="{{ e.get_absolute_url }}">{{ e.nome }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}</dd>
+        {% endif %}
+        <dt>{% trans "ID remoto" %}</dt><dd>{{ recurso.id_remoto|default:"-" }}</dd>
+        <dt>{% trans "Última sincronização" %}</dt><dd>{{ recurso.sincronizado_em|date:"d/m/Y H:i"|default:"Nunca" }}</dd>
+        <dt>{% trans "Última alteração" %}</dt><dd>{{ recurso.data_atualizacao|date:"d/m/Y H:i"|default:"-" }}</dd>
+    </dl>
+{% endbox %}
+
+{% box "Esquema" badge=recurso.esquema|length %}
+    {% if recurso.esquema %}
+        <ul>{% for coluna in recurso.esquema %}<li><code>{{ coluna }}</code></li>{% endfor %}</ul>
+    {% else %}
+        <p class="alert alert-info">{% trans "Esquema ainda não registrado: ele é preenchido na primeira coleta automática ou na geração do espelho CSV." %}</p>
+    {% endif %}
+{% endbox %}
+
+{% box "Prévia dos dados" %}
+    {% if v.previa.colunas %}
+        <div class="table-responsive">
+            <table>
+                <caption>
+                    {% blocktrans count counter=v.previa.linhas|length %}Primeiro registro do arquivo{% plural %}Primeiros {{ counter }} registros do arquivo{% endblocktrans %}
+                </caption>
+                <thead>
+                    <tr>{% for c in v.previa.colunas %}<th>{{ c }}</th>{% endfor %}</tr>
+                </thead>
+                <tbody>
+                    {% for linha in v.previa.linhas %}
+                        <tr>{% for celula in linha %}<td>{{ celula }}</td>{% endfor %}</tr>
+                    {% empty %}
+                        <tr class="disabled"><td colspan="{{ v.previa.colunas|length }}">{% trans "O arquivo não tem registros." %}</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="alert alert-warning">{% if v.previa.erro %}{{ v.previa.erro }}{% else %}{% trans "Sem registros para prévia." %}{% endif %}</p>
+    {% endif %}
+{% endbox %}
+
+{% endblock %}

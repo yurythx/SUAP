@@ -1,0 +1,75 @@
+{% extends super_template %}
+
+{% block extrahead %}
+	{% media_filter_box %}
+{% endblock %}
+
+{% block content %}
+
+{% if mensagem %}
+	<p class="alert alert-warning">
+		{{ mensagem }}
+	</p>
+{% else %}
+	{% if user|in_group:"Coordenador de Planejamento" %}
+		<div class="search-and-filters">
+			<form method="get">
+				<label>{{ configuracao_form.configuracao.label }}:</label>
+				{{ configuracao_form.configuracao }}
+			</form>
+		</div>
+	{% endif %}
+
+	{% if not user|in_group:"Coordenador de Planejamento" %}
+		{% box 'Dados gerais' %}
+			<table class="info">
+				<tr>
+					<td>Ano Base</td>
+					<td>{{ unidade_administrativa.configuracao }}</td>
+				</tr>
+				<tr>
+					<td>Unid. Administrativa</td>
+					<td>{{ unidade_administrativa }}</td>
+				</tr>
+			</table>
+		{% endbox %}
+	{% endif %}
+
+	{% if objs_estrategicos %}
+		{% box 'Objetivos Estratégicos' %}
+			<table>
+				<thead>
+					<tr>
+						<th>Objetivo Estratégico</th>
+						<th>Execução</th>
+						<th>Opções</th>
+					</tr>
+				</thead>
+				<tbody>
+					{% regroup objs_estrategicos|dictsort:"descricao" by id as obj_list %}
+					{% for obj in obj_list %}
+						<tr>
+							<td>{{ obj.list.0.codigo }} - {{ obj.list.0.descricao }}</td>
+							<td>
+								{% with obj.list|length as n_acoes %}
+									{% with obj.list|count_entries_in_dictlist:"acao_executada;true" as n_acoes_executadas %}
+										<!-- <span class="progressbar" title="{{ n_acoes_executadas }}/{{ n_acoes }}">{{ n_acoes_executadas|percentage:n_acoes }}</span> -->
+										<div class="progress">
+											<p>{{ n_acoes_executadas|percentage:n_acoes }}%</p>
+										</div>
+									{% endwith %}
+								{% endwith %}
+							</td>
+							<td><a href="/planejamento/acompanhamento/objetivoestrategico/{{ obj.list.0.id }}/{% if not gerente_campus %}?und={{ unidade_administrativa.id }}{% endif %}" class="btn">Metas</a>
+							</td>
+						</tr>
+					{% endfor %}
+				</tbody>
+			</table>
+		{% endbox %}
+	{% else %}
+		<p class="alert alert-warning">Não existem ações deferidas até o momento.</p>
+	{% endif %}
+{% endif %}
+
+{% endblock %}

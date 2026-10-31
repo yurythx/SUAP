@@ -1,0 +1,341 @@
+{% extends super_template %}
+{% block extrahead %}
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if pode_criar_atendimento or eh_dentista or eh_psicologo or eh_fisioterapeuta %}
+            <li><a class="btn success" href="/saude/cadastrar_pessoa_externa/">{% icone "plus" %} Adicionar Atendimento Externo</a></li>
+        {% endif %}
+        {% if perms.rh.eh_servidor %}
+            <li><a class="btn primary" href="/saude/acompanhamento_anotacoes_interdisciplinares/">Acompanhamento das anotações interdisciplinares</a></li>
+        {% endif %}
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+    <div class="tab-pane" data-title="Buscar prontuário" data-tab="buscar_prontuario">
+
+        <div class="search-and-filters">
+            {% render_form form %}
+        </div>
+
+        {% if pessoas %}
+            {% autopaginate pessoas 30 'page_prontuario' %}
+            {% paginate %}
+            <div class="card-container">
+                {% for pessoa in pessoas %}
+                    <div class="card {% if vinculo == vinculos.ALUNO and not pessoa.situacao.ativo %}danger{% endif %}">
+                        {% if vinculo == vinculos.ALUNO %}
+                            <div class="photo">
+                                <img alt="{{ pessoa.pessoa_fisica.nome }}"
+                                     src="{{ pessoa.get_foto_75x100_url }}"/>
+                            </div>
+                            <h4>{{ pessoa.pessoa_fisica.nome }}</h4>
+                            <dl>
+                                <dt>Matrícula:</dt>
+                                <dd>{{ pessoa.matricula }}</dd>
+                                <dt>Situação:</dt>
+                                <dd>{% if not pessoa.situacao.ativo %}<span class="false">{{ pessoa.situacao }}</span>{% else %}{{ pessoa.situacao }}{% endif %}</dd>
+                                <dt>Curso/Campus:</dt>
+                                <dd>{{ pessoa.curso_campus }}</dd>
+                            </dl>
+                            {% if pode_ver_prontuarios %}
+                                <ul class="content action-bar">
+                                    <li><a href="/saude/prontuario/{{ pessoa.get_vinculo.id }}/" class="btn default">{% icone "eye" %} Prontuário</a></li>
+                                    {% if pode_criar_atendimento %}
+                                        {% with aberto=pessoa.get_atendimento_enf_aberto %}
+                                            {% if aberto %}
+                                                <li><a class="btn" href="/saude/atendimento_medico_enfermagem/{{ aberto }}/">{% icone "undo" %} Retomar atendimento</a></li>
+                                            {% endif %}
+                                        {% endwith %}
+                                    {% elif eh_dentista %}
+                                        {% with aberto=pessoa.get_atendimento_odonto_aberto %}
+                                            {% if aberto %}
+                                                <li><a class="btn" href="/saude/atendimento_odontologico/{{ aberto }}/">{% icone "undo" %} Retomar atendimento</a></li>
+                                            {% endif %}
+                                        {% endwith %}
+                                    {% endif %}
+                                </ul>
+                            {% endif %}
+                        {% else %}
+                            <div class="photo">
+                                <img alt="{{ pessoa.nome }}" src="{{ pessoa.get_foto_75x100_url }}"/>
+                            </div>
+                            <h4>{{ pessoa.nome }}</h4>
+                            <dl>
+                                {% if vinculo == vinculos.COMUNIDADE_EXTERNA %}
+                                    <dt>CPF:</dt>
+                                    <dd>{{ pessoa.cpf }}</dd>
+                                {% else %}
+                                    <dt>Matrícula:</dt>
+                                    <dd>{{ pessoa.get_user.username }}</dd>
+                                    <dt>Cargo:</dt>
+                                    <dd>{{ pessoa.get_user.get_relacionamento_title }}</dd>
+                                {% endif %}
+                            </dl>
+                            {% if pode_ver_prontuarios %}
+                                <div class="content">
+                                    <ul class="action-bar">
+                                        <li><a href="/saude/prontuario/{{ pessoa.get_vinculo.id }}/" class="btn default">{% icone "eye" %} Prontuário</a></li>
+                                        {% if pode_criar_atendimento %}
+                                            {% with aberto=pessoa.get_atendimento_enf_aberto %}
+                                                {% if aberto %}
+                                                    <li><a class="btn" href="/saude/atendimento_medico_enfermagem/{{ aberto }}/">{% icone "undo" %} Retomar atendimento</a></li>
+                                                {% endif %}
+                                            {% endwith %}
+                                        {% elif eh_dentista %}
+                                            {% with aberto=pessoa.get_atendimento_odonto_aberto %}
+                                                {% if aberto and aberto.usuario_aberto == request.user %}
+                                                    <li><a class="btn" href="/saude/atendimento_odontologico/{{ aberto.id }}/">{% icone "undo" %} Retomar atendimento</a></li>
+                                                {% endif %}
+                                            {% endwith %}
+                                        {% endif %}
+                                    </ul>
+                                </div>
+                            {% endif %}
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+            {% paginate %}
+        {% elif form.is_bound %}
+            <p class="alert alert-warning">Nenhuma pessoa encontrada.</p>
+        {% endif %}
+    </div>
+    {% if not eh_assistente_social %}
+        {% if prontuarios_encaminhados.exists and pode_criar_atendimento %}
+            <div class="tab-pane" data-title="Atendimentos encaminhados para Enfermagem" data-counter="{{ prontuarios_encaminhados.count }}" data-tab="atendimento_encaminhado_enfermagem">
+                <div class="table-responsive">
+                    <table>
+                        <caption>Atendimentos encaminhados para Enfermagem</caption>
+                        <thead>
+                            <tr>
+                                <th>Paciente</th>
+                                <th>Aberto em</th>
+                                <th class="no-print">Opções</th>
+                            </tr>
+                        </thead>
+                        {% autopaginate prontuarios_encaminhados 30 'page_encaminhados' %}
+                        {% paginate %}
+                        {% for prontuario in prontuarios_encaminhados %}
+                            <tr>
+                                <td>{{ prontuario.prontuario.vinculo }}</td>
+                                <td>{{ prontuario.data_aberto|format }} por {{ prontuario.usuario_aberto|format }}</td>
+                                <td class="no-print">
+                                    <ul class="action-bar">
+                                        <li><a class="btn success" href="/saude/adicionar_intervencao_enfermagem/{{ prontuario.id }}/">{% icone "plus" %} Adicionar Intervenção</a></li>
+                                    </ul>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </table>
+                </div>
+            </div>
+        {% endif %}
+
+        {% if prontuarios_encaminhados_fisioterapia.exists and eh_fisioterapeuta %}
+            <div class="tab-pane" data-title="Atendimentos encaminhados para Fisioterapia" data-counter="{{ prontuarios_encaminhados_fisioterapia.count }}" data-tab="atendimento_encaminhado_fisioterapia">
+                <div class="table-responsive">
+                    <table>
+                        <caption>Atendimentos encaminhados para Fisioterapia</caption>
+                        <thead>
+                            <tr>
+                                <th>Paciente</th>
+                                <th>Aberto em</th>
+                                <th class="no-print">Opções</th>
+                            </tr>
+                        </thead>
+                        {% autopaginate prontuarios_encaminhados_fisioterapia 30 'page_encaminhados_fisioterapia' %}
+                        {% paginate %}
+                        {% for prontuario in prontuarios_encaminhados_fisioterapia %}
+                            <tr>
+                                <td>{{ prontuario.prontuario.vinculo }}</td>
+                                <td>{{ prontuario.data_aberto|format }} por {{ prontuario.usuario_aberto|format }}</td>
+                                <td class="no-print">
+                                    <ul class="action-bar">
+                                        <li><a class="btn success" href="/saude/adicionar_intervencao_fisioterapia/{{ prontuario.id }}/">{% icone "plus" %} Adicionar Intervenção</a></li>
+                                    </ul>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </table>
+                </div>
+            </div>
+        {% endif %}
+
+        {% if atendimentos_fisioterapia_encaminhados.exists and eh_medico %}
+            <div class="tab-pane" data-title="Atendimentos encaminhados da Fisioterapia" data-counter="{{ atendimentos_fisioterapia_encaminhados.count }}" data-tab="atendimentos_fisioterapia_encaminhados">
+                <div class="table-responsive">
+                    <table>
+                        <caption>Atendimentos encaminhados da Fisioterapia</caption>
+                        <thead>
+                            <tr>
+                                <th>Paciente</th>
+                                <th>Aberto em</th>
+                                <th class="no-print">Opções</th>
+                            </tr>
+                        </thead>
+                        {% autopaginate atendimentos_fisioterapia_encaminhados 30 'page_atendimentos_fisio_encaminhados' %}
+                        {% paginate %}
+                        {% for prontuario in atendimentos_fisioterapia_encaminhados %}
+                            <tr>
+                                <td>{{ prontuario.prontuario.vinculo }}</td>
+                                <td>{{ prontuario.data_aberto|format }} por {{ prontuario.usuario_aberto|format }}</td>
+                                <td class="no-print">
+                                    <ul class="action-bar">
+                                        <li><a class="btn success" href="/saude/avaliar_encaminhamento_fisioterapia/{{ prontuario.id }}/">Avaliar</a></li>
+                                    </ul>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </table>
+                </div>
+            </div>
+        {% endif %}
+
+        {% if prontuarios_abertos.exists and pode_ver_prontuarios %}
+            <div class="tab-pane" data-title="Atendimentos abertos" data-counter="{{ prontuarios_abertos.count }}" data-tab="atendimentos_abertos">
+                <div class="table-responsive">
+                    <table>
+                        <caption>Atendimentos abertos</caption>
+                        <thead>
+                            <tr>
+                                <th>Paciente</th>
+                                <th>Aberto em</th>
+                                <th class="no-print">Opções</th>
+                            </tr>
+                        </thead>
+                        {% autopaginate prontuarios_abertos 15 'page_abertos' %}
+                        {% paginate %}
+                        {% for prontuario in prontuarios_abertos %}
+                            <tr>
+                                <td>{{ prontuario.prontuario.vinculo }}</td>
+                                <td>{{ prontuario.data_aberto|format }} por {{ prontuario.usuario_aberto|format }}</td>
+                                <td class="no-print">
+                                    {% if pode_criar_atendimento %}
+                                        <a class="btn" href="/saude/atendimento_medico_enfermagem/{{ prontuario.id }}/">{% icone "undo" %} Retomar atendimento</a>
+                                    {% elif eh_dentista %}
+                                        <a class="btn" href="/saude/atendimento_odontologico/{{ prontuario.id }}/">{% icone "undo" %} Retomar atendimento</a>
+                                    {% elif eh_psicologo %}
+                                        <a class="btn" href="/saude/atendimento_psicologico/{{ prontuario.id }}/">{% icone "undo" %} Retomar atendimento</a>
+                                    {% elif eh_nutricionista %}
+                                        <a class="btn" href="/saude/atendimento_nutricional/{{ prontuario.id }}/">{% icone "undo" %} Retomar atendimento</a>
+                                    {% elif eh_fisioterapeuta %}
+                                        <a class="btn" href="/saude/atendimento_fisioterapia/{{ prontuario.id }}/">{% icone "undo" %} Retomar atendimento</a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </table>
+                </div>
+            </div>
+        {% endif %}
+
+        {% if avaliacoes_biomedicas_pendentes.exists %}
+            <div class="tab-pane" data-title="Avaliações Biomédicas abertas" data-counter="{{ avaliacoes_biomedicas_pendentes.count }}" data-tab="avaliacoes_biomedicas_abertas">
+                <div class="table-responsive">
+                    <table>
+                        <caption>Avaliações Biomédicas abertas</caption>
+                        <thead>
+                            <tr>
+                                <th>Paciente</th>
+                                <th>Aberto em</th>
+                                <th class="no-print">Opções</th>
+                            </tr>
+                        </thead>
+                        {% autopaginate avaliacoes_biomedicas_pendentes 15 'page_biomedicas_abertas' %}
+                        {% paginate %}
+                        {% for prontuario in avaliacoes_biomedicas_pendentes %}
+                            <tr>
+                                <td>{{ prontuario.prontuario.vinculo }}</td>
+                                <td>{{ prontuario.data_aberto|format }} por {{ prontuario.usuario_aberto|format }}</td>
+                                <td class="no-print"><a class="btn" href="/saude/avaliacao_biomedica/{{ prontuario.id }}/">{% icone "undo" %} Retomar atendimento</a></td>
+                            </tr>
+                        {% endfor %}
+                    </table>
+                </div>
+            </div>
+        {% endif %}
+
+        {% if eh_enfermagem and atendimento_odonto_encaminhado %}
+            <div class="tab-pane" data-title="Atendimentos Odontológicos encaminhados à Enfermagem" data-counter="{{ atendimento_odonto_encaminhado.count }}" data-tab="atendimentos_odontologicos_encaminhados">
+                <div class="table-responsive">
+                    <table>
+                        <caption>Atendimentos Odontológicos encaminhados à Enfermagem</caption>
+                        <thead>
+                            <tr>
+                                <th>Paciente</th>
+                                <th>Aberto em</th>
+                                <th class="no-print">Opções</th>
+                            </tr>
+                        </thead>
+                        {% autopaginate atendimento_odonto_encaminhado 15 'page_odonto_encaminhados' %}
+                        {% paginate %}
+                        {% for prontuario in atendimento_odonto_encaminhado %}
+                            <tr>
+                                <td>{{ prontuario.prontuario.vinculo }}</td>
+                                <td>{{ prontuario.data_aberto|format }} por {{ prontuario.usuario_aberto|format }}</td>
+                                <td class="no-print">
+                                    <a class="btn success" href="/saude/abrir_atendimento/2/{{ prontuario.prontuario.id }}/{{ prontuario.get_id_vinculo }}/{{ prontuario.get_vinculo.id }}/">{% icone "plus" %} Adicionar Atendimento Médico/Enfermagem</a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </table>
+                </div>
+            </div>
+        {% endif %}
+
+        {% if atendimentos_multidisciplinares_abertos and pode_gerenciar_atend_multidisciplinar %}
+            <div class="tab-pane" data-title="Atendimentos Multidisciplinares abertos" data-counter="{{ atendimentos_multidisciplinares_abertos.count }}" data-tab="atendimentos_multidisciplinares">
+                <div class="table-responsive">
+                    <table>
+                        <caption>Atendimentos Multidisciplinares abertos</caption>
+                        <thead>
+                            <tr>
+                                <th>Paciente</th>
+                                <th>Aberto em</th>
+                                <th class="no-print">Opções</th>
+                            </tr>
+                        </thead>
+                        {% autopaginate atendimentos_multidisciplinares_abertos 15 'page_multidisciplinares_abertos' %}
+                        {% paginate %}
+                        {% for prontuario in atendimentos_multidisciplinares_abertos %}
+                            <tr>
+                                <td>{{ prontuario.prontuario.vinculo }}</td>
+                                <td>{{ prontuario.data_aberto|format }} por {{ prontuario.usuario_aberto|format }}</td>
+                                <td class="no-print"><a class="btn" href="/saude/atendimento_multidisciplinar/{{ prontuario.id }}/">{% icone "undo" %} Retomar atendimento</a></td>
+                            </tr>
+                        {% endfor %}
+                    </table>
+                </div>
+            </div>
+        {% endif %}
+        {% if atendimentos_encaminhados.exists %}
+            <div class="tab-pane" data-title="Atendimentos encaminhados" data-counter="{{ atendimentos_encaminhados.count }}" data-tab="atendimentos_encaminhados">
+                <div class="table-responsive">
+                    <table>
+                        <caption>Atendimentos encaminhados</caption>
+                        <thead>
+                            <tr>
+                                <th>Paciente</th>
+                                <th>Aberto em</th>
+                                <th class="no-print">Opções</th>
+                            </tr>
+                        </thead>
+                        {% autopaginate atendimentos_encaminhados 15 'page_atendimentos_encaminhados' %}
+                        {% paginate %}
+                        {% for atendimento in atendimentos_encaminhados %}
+                            <tr>
+                                <td>{{ atendimento.prontuario.vinculo }}</td>
+                                <td>{{ atendimento.cadastrado_em|format }} por {{ atendimento.cadastrado_por|format }}</td>
+                                <td class="no-print"><a class="btn default" href="/saude/prontuario/{{ atendimento.prontuario.vinculo.id }}/?tab=aba_encaminhamentos">Consultar</a></td>
+                            </tr>
+                        {% endfor %}
+                    </table>
+                </div>
+            </div>
+        {% endif %}
+    {% endif %}
+{% endblock %}

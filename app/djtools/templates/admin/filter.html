@@ -1,0 +1,107 @@
+<div class="filter {% if spec.allow_multiple_choices %}multiple{% endif %}">
+    <script>
+        /*
+            Ordena os resultados pela qualidade da correspondência, não apenas alfabeticamente. 
+            Ao digitar RE, a ordem seria:
+                1. RE — correspondência exata
+                2. Siglas iniciadas por RE
+                3. Siglas contendo o segmento /RE
+                4. Demais ocorrências contendo RE
+
+            Por exemplo,ao pesquisar "RE", o setor "RE" deve aparecer antes de "PROJU/RE".
+        */        
+        window.djtListFilterMatcher = window.djtListFilterMatcher || function (params, data) {
+            // Ignora diferenças entre maiúsculas, minúsculas e caracteres acentuados.
+            const normalize = function (value) {
+                return (value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toUpperCase();
+            };
+            const term = normalize(params.term);
+            const text = normalize(data.text);
+
+            if (!term) {
+                data.djtMatchPriority = 0;
+                return data;
+            }
+            if (!text.includes(term)) {
+                return null;
+            }
+
+            // Quanto menor a prioridade, mais cedo o resultado será exibido:
+            // correspondência exata, início do texto, segmento exato e ocorrência parcial.
+            if (text === term) {
+                data.djtMatchPriority = 0;
+            } else if (text.startsWith(term)) {
+                data.djtMatchPriority = 1;
+            } else if (text.split(/[^A-Z0-9]+/).includes(term)) {
+                data.djtMatchPriority = 2;
+            } else {
+                data.djtMatchPriority = 3;
+            }
+            return data;
+        };
+        // Mantém a ordem original entre resultados com a mesma prioridade.
+        window.djtListFilterSorter = window.djtListFilterSorter || function (items) {
+            return items.sort(function (first, second) {
+                return (first.djtMatchPriority || 0) - (second.djtMatchPriority || 0);
+            });
+        };
+    </script>
+    {% if spec.parameter_name %}
+        {% with parametro_filtro=spec.parameter_name %}
+            <label for="{{ parametro_filtro }}_select">{{ title }}:</label>
+            <select {% if spec.allow_multiple_choices %}multiple{% endif %}
+               id="{{ parametro_filtro }}_select"
+               name="{{ parametro_filtro }}__djt_filter_ac{% if spec.allow_multiple_choices %}m{% endif %}">
+                {% for choice in choices %}
+                    <option
+                        {% if choice.selected %}
+                            selected="selected"
+                            {% if choice.display != "Todos" %}
+                                class="filled"
+                            {% endif %}
+                        {% endif %}
+                        value="{{ choice.query_string|iriencode|tratar_parametros_filter:parametro_filtro }}">
+                            {{ choice.display }}
+                    </option>
+                {% endfor %}
+            </select>
+            <script>
+                $("#{{ parametro_filtro }}_select").select2({
+                    placeholder: 'Todos',
+                    allowClear: true,
+                    matcher: window.djtListFilterMatcher,
+                    sorter: window.djtListFilterSorter
+                });
+            </script>
+        {% endwith %}
+    {% endif %}
+    {% if spec.field_path %}
+        {% with parametro_filtro=spec.expected_parameters|join:'_' %}
+            <label for="{{ parametro_filtro }}_select">{{ title }}:</label>
+            <select {% if spec.allow_multiple_choices %}multiple{% endif %}
+               id="{{ parametro_filtro }}_select"
+               name="{{ parametro_filtro }}__djt_filter_ac">
+                {% for choice in choices %}
+                    <option
+                        {% if choice.selected %}
+                            selected="selected"
+                            {% if choice.display != "Todos" %}
+                                class="filled"
+                            {% endif %}
+                        {% endif %}
+                        value="{{ choice.query_string|iriencode|tratar_list_filter:spec }}">
+                            {{ choice.display }}
+                    </option>
+                {% endfor %}
+            </select>
+            <script>
+                $("#{{ parametro_filtro }}_select").select2({
+                    placeholder: 'Todos',
+                    allowClear: true,
+                    matcher: window.djtListFilterMatcher,
+                    sorter: window.djtListFilterSorter
+                });
+            </script>
+        {% endwith %}
+    {% endif %}
+</div>

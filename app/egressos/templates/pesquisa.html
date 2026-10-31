@@ -1,0 +1,219 @@
+{% extends super_template %}
+
+{% block content %}
+
+    {% if obj.ha_pergunta_objetiva_sem_opcoes %}
+        <p class="alert alert-warning">Há perguntas com cadastro incompleto. Esta pesquisa só pode ser publicada se todas as
+            perguntas objetivas tiverem suas opções de resposta cadastradas.</p>
+    {% endif %}
+
+    {% if obj.ha_pergunta_objetiva_com_opcao_subjetiva_sem_opcao_complementacao_definida %}
+        <p class="alert alert-warning">Há perguntas objetivas com complementação subjetiva sem a opção correspondente
+            cadastrada. É necessário que uma das opções seja marcada como de complementação subjetiva para que esta
+            pesquisa possa ser publicada.</p>
+    {% endif %}
+
+    <ul class="action-bar">
+        {% if obj.publicada %}
+            <li><a href="/egressos/publicar_pesquisa/{{ obj.pk }}/" class="btn primary">Editar Intervalo de Publicação</a></li>
+            <li><a class="btn" href="/egressos/reenviar_convites_alunos_nao_respondentes/{{ obj.pk }}/">Reenviar Convites para Alunos não Respondentes</a></li>
+        {% else %}
+            <li><a class="btn" href="/egressos/publicar_pesquisa/{{ obj.pk }}/">Publicar Pesquisa</a></li>
+        {% endif %}
+        <li><a href="/egressos/clonar_pesquisa/{{ obj.pk }}/" class="btn primary">Clonar Pesquisa</a></li>
+        <li><a class="btn" href="/egressos/exportar_respostas/{{ obj.pk }}/">Exportar Respostas</a></li>
+    </ul>
+
+    <table class="info">
+        <tr>
+            <td>Descrição</td>
+            <td>{{ obj.descricao }}</td>
+        </tr>
+        <tr>
+            <td>Período</td>
+            <td>{{ obj.inicio|format }} a {{ obj.fim|format }}</td>
+        </tr>
+        <tr>
+            <td>Publicada</td>
+            <td>{% if obj.publicada %}<span class="status status-success">Sim</span>{% else %}<span class="status status-error">Não</span>{% endif %}</td>
+        </tr>
+    </table>
+
+    <div class="tab-pane ajax-rendered" data-title="Público Alvo" data-tab="publico">
+        {% if request.GET.tab == "publico" or not request.GET.tab %}
+            {% if perms.egressos.add_pesquisa %}
+                <ul class="action-bar">
+                    <li><a class="btn" href="/egressos/gerar_planilha_alunos_alvo/{{ obj.pk }}">Gerar Planilha com Alunos Alvo</a></li>
+                </ul>
+            {% endif %}
+            <table class="info">
+                <tr>
+                    <td>Modalidade</td>
+                    <td>{{ obj.modalidade|format }}</td>
+                </tr>
+                <tr>
+                    <td>Ano de Conclusão</td>
+                    <td>{{ obj.conclusao|format }}</td>
+                </tr>
+                <tr>
+                    <td>Campus</td>
+                    <td>{{ obj.uo|format }}</td>
+                </tr>
+                <tr>
+                    <td>Cursos</td>
+                    <td>{{ obj.curso_campus|format }}</td>
+                </tr>
+            </table>
+        {% endif %}
+    </div>
+
+    <div class="tab-pane ajax-rendered" data-title="Categorias" data-tab="categorias" data-counter="{{ obj.categoria_set.count }}">
+        {% if request.GET.tab == "categorias" %}
+            {% box 'Categorias' %}
+                {% if perms.egressos.add_pesquisa %}
+                    <ul class="action-bar">
+                        <li><a class="btn popup success" href="/egressos/cadastrar_categoria/{{ obj.pk }}/">Adicionar Categoria</a></li>
+                    </ul>
+                {% endif %}
+                {% if obj.categoria_set.exists %}
+                    <table>
+                        <thead>
+                            <tr>
+                                <th class="no-print">Ações</th>
+                                <th>Ordem</th>
+                                <th>Categoria</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for categoria in obj.categoria_set.all %}
+                                <tr>
+                                    <td class="no-print">
+                                        {% icon "edit" "/egressos/cadastrar_categoria/{{ obj.pk }}/{{ categoria.pk }}/" "Editar Categoria" "popup" %}
+                                        {% icon "delete" "/comum/excluir/egressos/categoria/{{ categoria.pk }}/" "Remover Categoria" "no-confirm popup" %}
+                                    </td>
+                                    <td>{{ categoria.ordem }}º bloco</td>
+                                    <td>{{ categoria.titulo }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p class="alert alert-warning">Nenhuma categoria cadastrada.</p>
+                {% endif %}
+            {% endbox %}
+        {% endif %}
+    </div>
+
+    <div class="tab-pane ajax-rendered" data-title="Perguntas" data-tab="perguntas" data-counter="{{ obj.pergunta_set.count }}">
+        {% if request.GET.tab == "perguntas" %}
+            {% if perms.egressos.add_pesquisa %}
+                <ul class="action-bar">
+                    <li><a class="btn popup success" href="/egressos/cadastrar_pergunta/{{ obj.pk }}/">Adicionar Pergunta</a></li>
+                </ul>
+            {% endif %}
+            {% if obj.pergunta_set.exists %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="no-print">Ações</th>
+                            <th>Conteúdo</th>
+                            <th>Categoria</th>
+                            <th>Tipo</th>
+                            <th>Obritatória</th>
+                            <th>Opções de Respostas</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for pergunta in obj.pergunta_set.all %}
+                            <tr>
+                                <td class="no-print">
+                                    {% icon "edit" "/egressos/cadastrar_pergunta/{{ obj.pk }}/{{ pergunta.pk }}/" "Editar Pergunta" "popup" %}
+                                    {% icon "delete" "/comum/excluir/egressos/pergunta/{{ pergunta.pk }}/" "Remover Pergunta" "no-confirm popup" %}
+                                </td>
+                                <td>{{ pergunta.conteudo|safe|linebreaksbr }}</td>
+                                <td>{{ pergunta.categoria }}</td>
+                                <td>{{ pergunta.get_tipo_display }}</td>
+                                <td>{{ pergunta.preenchimento_obrigatorio|format }}</td>
+                                <td>
+                                    {% if perms.egressos.add_pesquisa and pergunta.eh_objetiva %}
+                                        <ul class="action-bar">
+                                            <li><a class="btn popup success" href="/egressos/cadastrar_opcao/{{ pergunta.pk }}/">Adicionar Opção de Resposta</a></li>
+                                            <li><a class="btn popup primary" href="/egressos/copiar_opcoes/{{ pergunta.pk }}/">Copiar Opções de Resposta de uma pergunta anterior</a></li>
+                                        </ul>
+                                    {% endif %}
+                                    {% if pergunta.opcao_set.exists %}
+                                        <table>
+                                            <thead>
+                                            <tr>
+                                                <th class="no-print">Ações</th>
+                                                <th>Conteúdo</th>
+                                                <th>Direcionamento</th>
+                                                {% if pergunta.tipo == pergunta.OBJETIVA_RESPOSTA_UNICA_COM_OPCAO_SUBJETIVA %}<th>Complementação Subjetiva</th>{% endif %}
+                                            </tr>
+                                            </thead>
+                                            <tbody>
+                                            {% for opcao in pergunta.opcao_set.all %}
+                                                <tr>
+                                                    <td class="no-print">
+                                                        {% icon "edit" "/egressos/cadastrar_opcao/{{ pergunta.pk }}/{{ opcao.pk }}/" "Editar Opção" "popup" %}
+                                                        {% icon "delete" "/comum/excluir/egressos/opcao/{{ opcao.pk }}/" "Remover Opção" "no-confirm popup" %}
+                                                    </td>
+                                                    <td>{{ opcao.conteudo }}</td>
+                                                    <td>{{ opcao.direcionamento_categoria|format }}</td>
+                                                    {% if pergunta.tipo == pergunta.OBJETIVA_RESPOSTA_UNICA_COM_OPCAO_SUBJETIVA %}<td>{{ opcao.complementacao_subjetiva|format }}</td>{% endif %}
+                                                </tr>
+                                            {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    {% elif perms.egressos.add_pesquisa and pergunta.eh_objetiva %}
+                                        <p class="alert alert-warning">Crie as opções de resposta para esta pergunta.</p>
+                                    {% endif %}
+                                    {% if pergunta.tipo == pergunta.OBJETIVA_RESPOSTA_UNICA_COM_OPCAO_SUBJETIVA and pergunta.tem_opcao_complementacao_pendente %}
+                                        <p class="alert alert-warning">É necessário cadastrar uma opcao como de complementação subjetiva.</p>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                 <p class="alert alert-warning">Nenhuma pergunta cadastrada.</p>
+            {% endif %}
+            {% if perms.egressos.add_pesquisa %}
+                <ul class="action-bar">
+                    <li><a class="btn popup success" href="/egressos/cadastrar_pergunta/{{ obj.pk }}/">Adicionar Pergunta</a></li>
+                </ul>
+            {% endif %}
+        {% endif %}
+    </div>
+
+    <div class="tab-pane ajax-rendered" data-title="E-mails Enviados" data-tab="emails" data-counter="{{ obj.emailenviado_set.count }}">
+        {% if request.GET.tab == "emails" %}
+            {% if obj.emailenviado_set.exists %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Destinatários</th>
+                            <th>E-mail</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for email_enviado in obj.emailenviado_set.all %}
+                            <tr>
+                                <td>
+                                    {{ email_enviado.destinatarios }}
+                                </td>
+                                <td>
+                                    {{ email_enviado.mensagem|safe|linebreaksbr }}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="alert alert-warning">Nenhum e-mail foi enviado.</p>
+            {% endif %}
+        {% endif %}
+    </div>
+
+{% endblock %}

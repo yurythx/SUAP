@@ -1,0 +1,846 @@
+{% extends super_template %}
+
+{% block extracss %}
+<style>
+.cv-workers { display: block; }
+.cv-name {
+    font-weight: 600;
+    font-size: 1.05rem;
+    margin: 0;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+    word-break: normal;
+}
+.cv-editor {
+    display: none;
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid #d9e2db;
+}
+.cv-editor.is-open { display: block; }
+.cv-editor .alert {
+    margin-bottom: 0.75rem;
+}
+.cv-editor .form-row {
+    display: grid;
+    gap: 1rem;
+    margin-top: 0.75rem;
+}
+.cv-editor .form-row > div {
+    min-width: 220px;
+}
+.cv-editor .cv-editor-base {
+    grid-template-columns: minmax(220px, 320px);
+}
+.cv-editor .cv-editor-manual {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    align-items: end;
+}
+.cv-editor .cv-justificativa {
+    margin-top: 1rem;
+}
+.cv-action-bar {
+    margin-top: 0.75rem;
+}
+.cv-editor-base-hidden,
+.cv-editor-manual-hidden {
+    display: none;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+    <form method="post" action="">
+        {% csrf_token %}
+        {{ formset.management_form }}
+        <input type="hidden" name="overrides" id="overrides-input">
+        <input type="hidden" name="maos" id="maos-input">
+        {{ initial_cv_state|json_script:"cv-initial-state" }}
+
+        {% if usa_fluxo_recebimento_definitivo_com_documentos and contrato.maosdeobra.exists %}
+            {% box 'Ajuste de Conta Vinculada para Mão de obra' %}
+                <div class="alert alert-info">
+                    <p><strong>Como funciona:</strong></p>
+                    <p>Selecione os trabalhadores para os quais deseja confirmar o recebimento.</p>
+                    <p>Se necessário, é possível editar os dados por trabalhador. Use o botão <strong>Editar base de cálculo</strong> para alterar apenas o salário base e recalcular automaticamente os percentuais. Use o botão <strong>Editar valores</strong> para ajustar qualquer campo individualmente. Alterações exigem justificativa.</p>
+                </div>
+
+                <div class="search-and-filters">
+                    <div class="filter">
+                        <label for="cv-worker-filter">Filtrar por nome do funcionário:</label>
+                        <input type="search" id="cv-worker-filter" class="form-control" placeholder="Busque pelo nome do trabalhador" autocomplete="off">
+                        <p id="cv-filter-summary" class="help"></p>
+                    </div>
+                    <ul class="action-bar cv-action-bar">
+                        <li>
+                            <button type="button" class="btn default" id="btn-toggle-inativos">
+                                <span class="btn-toggle-inativos-label">Mostrar inativos</span>
+                                <span class="badge" id="badge-inativos">0</span>
+                            </button>
+                        </li>
+                        <li><button type="button" class="btn" id="btn-marcar-todos">Marcar Todos</button></li>
+                        <li><button type="button" class="btn default" id="btn-desmarcar-todos">Desmarcar Todos</button></li>
+                    </ul>
+                </div>
+
+                <dl class="definition-list mb-0">
+                    <dt>Total</dt>
+                    <dd id="maos-total">R$ 0.00</dd>
+                </dl>
+
+                <div id="cv-workers" data-perc13="{{ perc_13 }}" data-percferias="{{ perc_ferias }}" data-percfgts="{{ perc_fgts }}" data-percsub="{{ perc_sub }}">
+                    {% for m in contrato.maosdeobra.all %}
+                        <div class="general-box{% if m.desligamento %} d-none{% endif %}" data-id="{{ m.id }}" data-mode="" data-dirty="0" data-worker-name="{{ m.prestador_servico.pessoa_fisica.nome|lower }}" data-collapsed="0" data-ativo="{% if m.desligamento %}0{% else %}1{% endif %}">
+                            <div class="custom-checkbox">
+                                <input type="checkbox" id="maodeobra-{{ m.id }}" class="maodeobra-checkbox" data-id="{{ m.id }}"{% if not m.desligamento %} checked{% endif %}>
+                                <label for="maodeobra-{{ m.id }}"></label>
+                            </div>
+                            <div class="primary-info">
+                                <h4 class="title"><strong>{{ m.prestador_servico.pessoa_fisica.nome }}</strong> ({{ m.prestador_servico.cpf|format }} - {{ m.funcao }})</h4>
+                                {% if m.desligamento %}
+                                    <p class="alert alert-warning">Profissional inativo desde {{ m.desligamento|format }}</p>
+                                {% endif %}
+
+                                <ul class="action-bar">
+                                    <li><button type="button" class="btn primary worker-edit-base" title="Editar base de cálculo">{% icone "edit" %} Base de cálculo</button></li>
+                                    <li><button type="button" class="btn primary worker-edit-manual" title="Editar valores">{% icone "edit" %} Valores</button></li>
+                                    <li><button type="button" class="btn worker-restore d-none">Restaurar</button></li>
+                                </ul>
+
+                                <div class="extra-info cv-editor d-none">
+                                    <p class="alert alert-info cv-mode-hint"></p>
+                                    <p class="alert alert-info changed-fields d-none"></p>
+
+                                    <div class="form-row cv-editor-base cv-editor-base-hidden">
+                                        <div>
+                                            <label>Base de cálculo</label>
+                                            <input type="text" inputmode="decimal" autocomplete="off" class="form-control edit-salario">
+                                        </div>
+                                    </div>
+
+                                    <div class="form-row cv-editor-manual cv-editor-manual-hidden">
+                                        <div>
+                                            <label>Base de cálculo</label>
+                                            <input type="text" inputmode="decimal" autocomplete="off" class="form-control manual-salario">
+                                        </div>
+                                        <div>
+                                            <label>13º</label>
+                                            <input type="text" inputmode="decimal" autocomplete="off" class="form-control edit-13">
+                                        </div>
+                                        <div>
+                                            <label>Férias</label>
+                                            <input type="text" inputmode="decimal" autocomplete="off" class="form-control edit-ferias">
+                                        </div>
+                                        <div>
+                                            <label>FGTS</label>
+                                            <input type="text" inputmode="decimal" autocomplete="off" class="form-control edit-fgts">
+                                        </div>
+                                        <div>
+                                            <label>Submódulo 4.1</label>
+                                            <input type="text" inputmode="decimal" autocomplete="off" class="form-control edit-sub">
+                                        </div>
+                                    </div>
+
+                                    <div class="cv-justificativa d-none">
+                                        <label>Justificativa das alterações</label>
+                                        <textarea class="form-control maodeobra-just" rows="2"></textarea>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <dl class="secondary-info">
+                                <div class="list-item">
+                                    <dt>{% icone "square" %} Base de cálculo</dt>
+                                    <dd class="display-salario">{{ m.salario_bruto|default:m.valor_total_das_verbas }}</dd>
+                                </div>
+                                <div class="list-item">
+                                    <dt>{% icone "dollar-sign" %} 13º ({{ perc_13_display }})</dt>
+                                    <dd class="display-13">0.00</dd>
+                                </div>
+                                <div class="list-item">
+                                    <dt>{% icone "dollar-sign" %} Férias ({{ perc_ferias_display }})</dt>
+                                    <dd>R$ <span class="display-ferias">0.00</span></dd>
+                                </div>
+                                <div class="list-item">
+                                    <dt>{% icone "dollar-sign" %} FGTS ({{ perc_fgts_display }})</dt>
+                                    <dd>R$ <span class="display-fgts">0.00</span></dd>
+                                </div>
+                                <div class="list-item">
+                                    <dt>{% icone "square" %} Submódulo 4.1 ({{ perc_sub_display }})</dt>
+                                    <dd><span class="display-sub">0.00</span></dd>
+                                </div>
+                                <div class="list-item">
+                                    <dt>{% icone "square" %} Modo de ajuste</dt>
+                                    <dd class="mode-badge">Sem ajuste</dd>
+                                </div>
+                                <div class="list-item">
+                                    <dt>{% icone "dollar-sign" %} Total a recolher</dt>
+                                    <dd>R$ <strong class="display-total">0.00</strong></dd>
+                                </div>
+                            </dl>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endbox %}
+        {% endif %}
+
+        {% if usa_fluxo_recebimento_definitivo_com_documentos and contas_ativas %}
+            {% box 'Conta vinculada para retencao' %}
+                {% if conta_ativa_unica %}
+                    <p class="alert alert-info">A retencao sera lancada automaticamente na conta ativa {{ conta_ativa_unica.descricao }}.</p>
+                    <input type="hidden" name="conta_vinculada_id" value="{{ conta_ativa_unica.id }}">
+                {% else %}
+                    <p class="alert alert-info">Selecione a conta vinculada que recebera a retencao desta medicao.</p>
+                    {% render_form conta_retencao_form False False %}
+                {% endif %}
+            {% endbox %}
+        {% endif %}
+
+        {% if usa_fluxo_recebimento_definitivo_com_documentos %}
+            {% box 'Documentos comprobatórios' %}
+                <div class="alert alert-info">
+                    <p>
+                        Selecione e registre a situação dos documentos abaixo. Campos:
+                        <ul>
+                            <li><strong>Tipo documento</strong>: tipo do documento comprobatório.</li>
+                            <li><strong>Incluído no Processo / Recebimento</strong>: marque se foi incluído no processo e o recebimento pelo gerente, inclusive quando <em>Não se aplica</em>.</li>
+                            <li><strong>Descrição da Pendência</strong>: informe justificativa quando marcar <em>Pendente</em> (obrigatório).</li>
+                        </ul>
+                    </p>
+                </div>
+                {% for form in formset.forms %}
+                    <fieldset class="form-group">
+                        <legend>Documento #{{ forloop.counter }}</legend>
+                        {% if forloop.first %}
+                            {% for hidden in form.hidden_fields %}
+                                {{ hidden }}
+                            {% endfor %}
+                        {% endif %}
+                        {% render_form form False False %}
+                    </fieldset>
+                {% endfor %}
+            {% endbox %}
+
+            <p class="alert alert-warning mt-4 mb-0">
+                <strong>Atenção:</strong> Caso seja informada alguma pendência, será enviada uma notificação para o Fiscal com o detalhamento das pendências.
+            </p>
+        {% endif %}
+        <div class="submit-row">
+            <input class="default" value="Confirmar e Receber Definitivamente" type="submit" id="btn-submit-receber">
+        </div>
+    </form>
+{% endblock %}
+
+{% block scripts %}
+    <script>
+        (function () {
+            function getCsrfToken() {
+                var name = 'csrftoken';
+                if (document.cookie && document.cookie !== '') {
+                    var parts = document.cookie.split(';');
+                    for (var i = 0; i < parts.length; i++) {
+                        var cookie = parts[i].trim();
+                        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                            return decodeURIComponent(cookie.substring(name.length + 1));
+                        }
+                    }
+                }
+                var input = document.querySelector('input[name="csrfmiddlewaretoken"]');
+                return input ? input.value : null;
+            }
+
+            function parseNum(value) {
+                var num = parseFloat((value || '').toString().replace(/[^0-9,.-]/g, '').replace(',', '.'));
+                return isNaN(num) ? 0 : num;
+            }
+
+            function formatNum(value) {
+                return parseNum(value).toFixed(2);
+            }
+
+            function parseInitialState() {
+                var node = document.getElementById('cv-initial-state');
+                if (!node || !node.textContent) return null;
+                try {
+                    return JSON.parse(node.textContent);
+                } catch (error) {
+                    console.warn('Estado inicial inválido:', error);
+                    return null;
+                }
+            }
+
+            function getPercs() {
+                var container = document.getElementById('cv-workers');
+                return {
+                    perc13: parseNum(container.dataset.perc13 || 0),
+                    percFerias: parseNum(container.dataset.percferias || 0),
+                    percFgts: parseNum(container.dataset.percfgts || 0),
+                    percSub: parseNum(container.dataset.percsub || 0)
+                };
+            }
+
+            function gatherSelectedMaos() {
+                var ids = [];
+                document.querySelectorAll('.general-box').forEach(function (card) {
+                    var checkbox = card.querySelector('.maodeobra-checkbox');
+                    if (checkbox && checkbox.checked) {
+                        ids.push(card.dataset.id);
+                    }
+                });
+                return ids;
+            }
+
+            function setAllWorkersChecked(checked) {
+                document.querySelectorAll('.general-box').forEach(function (card) {
+                    var checkbox = card.querySelector('.maodeobra-checkbox');
+                    if (!checkbox) return;
+                    if (card.dataset.hiddenByStatus === '1') return;
+                    checkbox.checked = checked;
+                    updateCardEnabled(card);
+                });
+                doCalculate().then(renderResultado).catch(function (error) { console.warn(error.message); });
+            }
+
+            function cardHasChanges(card) {
+                return card.dataset.dirty === '1';
+            }
+
+            function getCardValues(card) {
+                return {
+                    salario: parseNum(card.querySelector('.display-salario').textContent),
+                    valor13: parseNum(card.querySelector('.display-13').textContent),
+                    valorFerias: parseNum(card.querySelector('.display-ferias').textContent),
+                    valorFgts: parseNum(card.querySelector('.display-fgts').textContent),
+                    valorSub: parseNum(card.querySelector('.display-sub').textContent)
+                };
+            }
+
+            function setDisplayValues(card, values) {
+                card.querySelector('.display-salario').textContent = formatNum(values.salario);
+                card.querySelector('.display-13').textContent = formatNum(values.valor13);
+                card.querySelector('.display-ferias').textContent = formatNum(values.valorFerias);
+                card.querySelector('.display-fgts').textContent = formatNum(values.valorFgts);
+                card.querySelector('.display-sub').textContent = formatNum(values.valorSub);
+                card.querySelector('.display-total').textContent = formatNum(values.valor13 + values.valorFerias + values.valorFgts + values.valorSub);
+            }
+
+            function setOriginalValues(card, values) {
+                card.dataset.origSalario = formatNum(values.salario);
+                card.dataset.orig13 = formatNum(values.valor13);
+                card.dataset.origFerias = formatNum(values.valorFerias);
+                card.dataset.origFgts = formatNum(values.valorFgts);
+                card.dataset.origSub = formatNum(values.valorSub);
+            }
+
+            function getOriginalValues(card) {
+                return {
+                    salario: parseNum(card.dataset.origSalario),
+                    valor13: parseNum(card.dataset.orig13),
+                    valorFerias: parseNum(card.dataset.origFerias),
+                    valorFgts: parseNum(card.dataset.origFgts),
+                    valorSub: parseNum(card.dataset.origSub)
+                };
+            }
+
+            function fillEditors(card, values) {
+                var salaryBase = card.querySelector('.edit-salario');
+                var salaryManual = card.querySelector('.manual-salario');
+                if (salaryBase) salaryBase.value = formatNum(values.salario);
+                if (salaryManual) salaryManual.value = formatNum(values.salario);
+                card.querySelector('.edit-13').value = formatNum(values.valor13);
+                card.querySelector('.edit-ferias').value = formatNum(values.valorFerias);
+                card.querySelector('.edit-fgts').value = formatNum(values.valorFgts);
+                card.querySelector('.edit-sub').value = formatNum(values.valorSub);
+            }
+
+            function updateSummaryMode(card, text) {
+                card.querySelector('.mode-badge').textContent = text;
+            }
+
+            function updateCardAppearance(card) {
+                var isDirty = card.dataset.dirty === '1';
+                card.classList.toggle('warning', isDirty);
+            }
+
+            function filterCards() {
+                var filterInput = document.getElementById('cv-worker-filter');
+                var summary = document.getElementById('cv-filter-summary');
+                var term = (filterInput ? filterInput.value : '').toLowerCase().trim();
+                var shown = 0;
+                var hidden = 0;
+
+                document.querySelectorAll('.general-box').forEach(function (card) {
+                    var workerName = (card.dataset.workerName || '').toLowerCase();
+                    var hiddenByStatus = card.dataset.hiddenByStatus === '1';
+                    var matches = (!term || workerName.indexOf(term) !== -1) && !hiddenByStatus;
+                    card.classList.toggle('d-none', !matches);
+                    if (matches) {
+                        shown += 1;
+                    } else {
+                        hidden += 1;
+                    }
+                });
+
+                if (summary) {
+                    summary.textContent = shown + ' exibido(s) · ' + hidden + ' oculto(s)';
+                }
+            }
+
+            function selectedHasInactive(state) {
+                if (!state || !Array.isArray(state.selected)) return false;
+                return state.selected.some(function (workerId) {
+                    var card = document.querySelector('.general-box[data-id="' + workerId + '"]');
+                    return card && card.dataset.ativo === '0';
+                });
+            }
+
+            function applyInactiveVisibility(showInactive) {
+                var inactiveCount = 0;
+                document.querySelectorAll('.general-box').forEach(function (card) {
+                    if (card.dataset.ativo === '0') {
+                        inactiveCount += 1;
+                    }
+                    var hiddenByStatus = !showInactive && card.dataset.ativo === '0';
+                    card.dataset.hiddenByStatus = hiddenByStatus ? '1' : '0';
+                    if (hiddenByStatus) {
+                        var checkbox = card.querySelector('.maodeobra-checkbox');
+                        if (checkbox && checkbox.checked) {
+                            checkbox.checked = false;
+                            updateCardEnabled(card);
+                        }
+                    }
+                });
+
+                var toggleButton = document.getElementById('btn-toggle-inativos');
+                var toggleLabel = toggleButton ? toggleButton.querySelector('.btn-toggle-inativos-label') : null;
+                var inactiveBadge = document.getElementById('badge-inativos');
+                if (toggleButton) {
+                    if (toggleLabel) {
+                        toggleLabel.textContent = showInactive ? 'Ocultar inativos' : 'Mostrar inativos';
+                    }
+                    if (inactiveBadge) {
+                        inactiveBadge.textContent = inactiveCount;
+                    }
+                }
+
+                filterCards();
+                doCalculate().then(renderResultado).catch(function (error) { console.warn(error.message); });
+            }
+
+            function updateActionButtons(card) {
+                var baseButton = card.querySelector('.worker-edit-base');
+                var manualButton = card.querySelector('.worker-edit-manual');
+                var mode = card.dataset.mode;
+                var isEditorOpen = !card.querySelector('.cv-editor').classList.contains('d-none');
+                var isChecked = card.querySelector('.maodeobra-checkbox').checked;
+
+                baseButton.disabled = !isChecked || (isEditorOpen && mode === 'base');
+                manualButton.disabled = !isChecked || (isEditorOpen && mode === 'manual');
+
+                baseButton.className = isChecked
+                    ? (isEditorOpen && mode === 'base' ? 'btn primary worker-edit-base' : 'btn worker-edit-base')
+                    : 'btn disabled worker-edit-base';
+                manualButton.className = isChecked
+                    ? (isEditorOpen && mode === 'manual' ? 'btn primary worker-edit-manual' : 'btn worker-edit-manual')
+                    : 'btn disabled worker-edit-manual';
+            }
+
+            function updateRestoreButton(card) {
+                var restoreButton = card.querySelector('.worker-restore');
+                var isEditorOpen = !card.querySelector('.cv-editor').classList.contains('d-none');
+                var isChecked = card.querySelector('.maodeobra-checkbox').checked;
+                var shouldShow = isChecked && (isEditorOpen || card.dataset.dirty === '1');
+                if (shouldShow) {
+                    restoreButton.classList.remove('d-none');
+                } else {
+                    restoreButton.classList.add('d-none');
+                }
+            }
+
+            function updateCardStatus(card) {
+                var current = getCardValues(card);
+                var original = getOriginalValues(card);
+                var changed = [];
+
+                if (current.salario !== original.salario) changed.push('base de cálculo');
+                if (current.valor13 !== original.valor13) changed.push('13º');
+                if (current.valorFerias !== original.valorFerias) changed.push('férias');
+                if (current.valorFgts !== original.valorFgts) changed.push('FGTS');
+                if (current.valorSub !== original.valorSub) changed.push('submódulo 4.1');
+
+                var changedFields = card.querySelector('.changed-fields');
+                var justWrapper = card.querySelector('.cv-justificativa');
+                var just = card.querySelector('.maodeobra-just');
+
+                if (changed.length) {
+                    card.dataset.dirty = '1';
+                    changedFields.textContent = 'Alterado: ' + changed.join(', ') + '.';
+                    changedFields.classList.remove('d-none');
+                    justWrapper.classList.remove('d-none');
+                    just.required = true;
+                    updateSummaryMode(card, card.dataset.mode === 'base' ? 'Ajuste por base de cálculo' : 'Ajuste manual');
+                } else {
+                    card.dataset.dirty = '0';
+                    if (card.querySelector('.cv-editor').classList.contains('d-none')) {
+                        card.dataset.mode = '';
+                    }
+                    changedFields.textContent = '';
+                    changedFields.classList.add('d-none');
+                    justWrapper.classList.add('d-none');
+                    just.required = false;
+                    just.value = '';
+                    updateSummaryMode(card, 'Sem ajuste');
+                }
+                updateCardAppearance(card);
+                updateRestoreButton(card);
+                updateActionButtons(card);
+                updateTotal();
+            }
+
+            function openEditor(card, mode) {
+                var editor = card.querySelector('.cv-editor');
+                editor.classList.remove('d-none');
+                editor.classList.add('is-open');
+                card.dataset.mode = mode;
+                card.querySelectorAll('.cv-editor-base').forEach(function (row) {
+                    row.style.display = mode === 'base' ? 'grid' : 'none';
+                });
+                card.querySelectorAll('.cv-editor-manual').forEach(function (row) {
+                    row.style.display = mode === 'manual' ? 'grid' : 'none';
+                });
+                card.querySelector('.cv-mode-hint').textContent = mode === 'base'
+                    ? 'Edite apenas a base de cálculo. Os percentuais serão recalculados automaticamente.'
+                    : 'Edite qualquer valor individualmente. Use este modo para ajustes finos.';
+                fillEditors(card, getCardValues(card));
+                if (mode === 'base') {
+                    applyBaseEdit(card);
+                }
+                updateRestoreButton(card);
+                updateActionButtons(card);
+            }
+
+            function closeEditor(card) {
+                var editor = card.querySelector('.cv-editor');
+                editor.classList.remove('is-open');
+                editor.classList.add('d-none');
+                card.querySelectorAll('.cv-editor-base, .cv-editor-manual').forEach(function (row) {
+                    row.style.display = 'none';
+                });
+                updateRestoreButton(card);
+                updateActionButtons(card);
+            }
+
+            function applyBaseEdit(card) {
+                var percs = getPercs();
+                var salary = parseNum(card.querySelector('.edit-salario').value);
+                var values = {
+                    salario: salary,
+                    valor13: salary * percs.perc13,
+                    valorFerias: salary * percs.percFerias,
+                    valorFgts: salary * percs.percFgts,
+                    valorSub: salary * percs.percSub
+                };
+                setDisplayValues(card, values);
+                updateCardStatus(card);
+            }
+
+            function applyManualEdit(card) {
+                var values = {
+                    salario: parseNum(card.querySelector('.manual-salario').value),
+                    valor13: parseNum(card.querySelector('.edit-13').value),
+                    valorFerias: parseNum(card.querySelector('.edit-ferias').value),
+                    valorFgts: parseNum(card.querySelector('.edit-fgts').value),
+                    valorSub: parseNum(card.querySelector('.edit-sub').value)
+                };
+                setDisplayValues(card, values);
+                updateCardStatus(card);
+            }
+
+            function restoreCard(card) {
+                var original = getOriginalValues(card);
+                setDisplayValues(card, original);
+                fillEditors(card, original);
+                closeEditor(card);
+                updateCardStatus(card);
+            }
+
+            function updateCardEnabled(card) {
+                var checkbox = card.querySelector('.maodeobra-checkbox');
+                if (checkbox.checked) {
+                    card.classList.remove('disabled');
+                    if (card.dataset.dirty !== '1') {
+                        setDisplayValues(card, getOriginalValues(card));
+                    }
+                } else {
+                    card.classList.add('disabled');
+                    closeEditor(card);
+                    setDisplayValues(card, { salario: getCardValues(card).salario, valor13: 0, valorFerias: 0, valorFgts: 0, valorSub: 0 });
+                }
+                if (card.dataset.dirty !== '1') {
+                    card.dataset.mode = '';
+                }
+                updateRestoreButton(card);
+                updateActionButtons(card);
+                updateTotal();
+            }
+
+            function updateTotal() {
+                var total = 0;
+                document.querySelectorAll('.general-box').forEach(function (card) {
+                    var checkbox = card.querySelector('.maodeobra-checkbox');
+                    if (checkbox && checkbox.checked) {
+                        total += parseNum(card.querySelector('.display-total').textContent);
+                    }
+                });
+                document.getElementById('maos-total').textContent = 'R$ ' + formatNum(total);
+            }
+
+            function renderResultado(response) {
+                if (!response || response.status !== 'ok') return;
+                (response.resultado.itens || []).forEach(function (item) {
+                    var card = document.querySelector('.general-box[data-id="' + item.maodeobra_id + '"]');
+                    if (!card || card.dataset.dirty === '1') return;
+                    var values = {
+                        salario: parseNum(item.salario || item.salario_bruto || 0),
+                        valor13: parseNum(item.valor_13 || 0),
+                        valorFerias: parseNum(item.valor_ferias || 0),
+                        valorFgts: parseNum(item.valor_fgts || 0),
+                        valorSub: parseNum(item.valor_submodulo || 0)
+                    };
+                    setOriginalValues(card, values);
+                    setDisplayValues(card, values);
+                    fillEditors(card, values);
+                    updateCardAppearance(card);
+                    updateSummaryMode(card, 'Sem ajuste');
+                    updateActionButtons(card);
+                });
+                updateTotal();
+            }
+
+            function applyPersistedState(state) {
+                if (!state || !state.overrides) return;
+
+                Object.keys(state.overrides).forEach(function (workerId) {
+                    var item = state.overrides[workerId] || {};
+                    var card = document.querySelector('.general-box[data-id="' + workerId + '"]');
+                    if (!card) return;
+
+                    var values = {
+                        salario: parseNum(item.salario),
+                        valor13: parseNum(item.valor_13),
+                        valorFerias: parseNum(item.valor_ferias),
+                        valorFgts: parseNum(item.valor_fgts),
+                        valorSub: parseNum(item.valor_submodulo)
+                    };
+
+                    setDisplayValues(card, values);
+                    fillEditors(card, values);
+                    card.dataset.mode = item.modo === 'base' ? 'base' : (item.modo === 'manual' ? 'manual' : '');
+                    card.querySelector('.maodeobra-just').value = item.justificativa || '';
+                    if (card.dataset.mode === 'base' || card.dataset.mode === 'manual') {
+                        openEditor(card, card.dataset.mode);
+                    }
+                    updateCardStatus(card);
+                });
+            }
+
+            function applyInitialSelection(state) {
+                if (!state || !Array.isArray(state.selected)) return;
+                document.querySelectorAll('.general-box').forEach(function (card) {
+                    var checkbox = card.querySelector('.maodeobra-checkbox');
+                    checkbox.checked = state.selected.indexOf(card.dataset.id) !== -1;
+                });
+                document.querySelectorAll('.general-box').forEach(function (card) {
+                    updateCardEnabled(card);
+                });
+            }
+
+            function doCalculate() {
+                var maos = gatherSelectedMaos();
+                var body = 'maos=' + encodeURIComponent(maos.join(',')) + '&persist=0&overrides=' + encodeURIComponent(JSON.stringify({}));
+                return fetch('/contratos/calcular_conta_vinculada/{{ medicao.id }}/', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCsrfToken(),
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: body
+                }).then(function (response) {
+                    if (!response.ok) {
+                        return response.text().then(function (text) {
+                            throw new Error('Erro ' + response.status + ': ' + text);
+                        });
+                    }
+                    return response.json();
+                });
+            }
+
+            document.querySelectorAll('.general-box').forEach(function (card) {
+                card.querySelector('.worker-edit-base').addEventListener('click', function () {
+                    openEditor(card, 'base');
+                });
+                card.querySelector('.worker-edit-manual').addEventListener('click', function () {
+                    openEditor(card, 'manual');
+                });
+                card.querySelector('.worker-restore').addEventListener('click', function () {
+                    restoreCard(card);
+                });
+                card.querySelector('.edit-salario').addEventListener('input', function () {
+                    card.dataset.mode = 'base';
+                    applyBaseEdit(card);
+                });
+                card.querySelector('.manual-salario').addEventListener('input', function () {
+                    card.dataset.mode = 'manual';
+                    applyManualEdit(card);
+                });
+                ['.edit-13', '.edit-ferias', '.edit-fgts', '.edit-sub'].forEach(function (selector) {
+                    card.querySelector(selector).addEventListener('input', function () {
+                        card.dataset.mode = 'manual';
+                        applyManualEdit(card);
+                    });
+                });
+                ['.edit-salario', '.manual-salario', '.edit-13', '.edit-ferias', '.edit-fgts', '.edit-sub'].forEach(function (selector) {
+                    var input = card.querySelector(selector);
+                    input.addEventListener('blur', function () {
+                        var numeric = parseNum(input.value);
+                        input.value = formatNum(numeric);
+                    });
+                });
+                card.querySelector('.maodeobra-checkbox').addEventListener('change', function () {
+                    updateCardEnabled(card);
+                    doCalculate().then(renderResultado).catch(function (error) { console.warn(error.message); });
+                });
+                updateCardAppearance(card);
+            });
+
+            var workerFilter = document.getElementById('cv-worker-filter');
+            if (workerFilter) {
+                workerFilter.addEventListener('input', filterCards);
+                filterCards();
+            }
+
+            var buttonMarcarTodos = document.getElementById('btn-marcar-todos');
+            if (buttonMarcarTodos) {
+                buttonMarcarTodos.addEventListener('click', function () {
+                    setAllWorkersChecked(true);
+                });
+            }
+
+            var buttonDesmarcarTodos = document.getElementById('btn-desmarcar-todos');
+            if (buttonDesmarcarTodos) {
+                buttonDesmarcarTodos.addEventListener('click', function () {
+                    setAllWorkersChecked(false);
+                });
+            }
+
+            var buttonToggleInativos = document.getElementById('btn-toggle-inativos');
+            var initialState = parseInitialState();
+            var showInactive = selectedHasInactive(initialState);
+
+            if (buttonToggleInativos) {
+                buttonToggleInativos.addEventListener('click', function () {
+                    showInactive = !showInactive;
+                    applyInactiveVisibility(showInactive);
+                });
+            }
+
+            if (initialState) {
+                applyInitialSelection(initialState);
+            }
+
+            applyInactiveVisibility(showInactive);
+
+            doCalculate().then(function (response) {
+                renderResultado(response);
+                if (initialState) {
+                    applyPersistedState(initialState);
+                }
+            }).catch(function (error) { console.warn(error.message); });
+
+            function buildSubmissionPayload() {
+                var overrides = {};
+                var invalidCard = null;
+
+                document.querySelectorAll('.general-box').forEach(function (card) {
+                    var checkbox = card.querySelector('.maodeobra-checkbox');
+                    if (!checkbox || !checkbox.checked || !cardHasChanges(card)) return;
+
+                    var current = getCardValues(card);
+                    var original = getOriginalValues(card);
+                    var changed = {};
+
+                    if (current.salario !== original.salario) changed.salario = formatNum(current.salario);
+                    if (current.valor13 !== original.valor13) changed.valor_13 = formatNum(current.valor13);
+                    if (current.valorFerias !== original.valorFerias) changed.valor_ferias = formatNum(current.valorFerias);
+                    if (current.valorFgts !== original.valorFgts) changed.valor_fgts = formatNum(current.valorFgts);
+                    if (current.valorSub !== original.valorSub) changed.valor_submodulo = formatNum(current.valorSub);
+
+                    var justField = card.querySelector('.maodeobra-just');
+                    var just = justField.value;
+                    if (!just || !just.trim()) {
+                        invalidCard = invalidCard || card;
+                        justField.setCustomValidity('Justificativa obrigatória.');
+                    } else {
+                        justField.setCustomValidity('');
+                    }
+
+                    changed.modo = card.dataset.mode || 'manual';
+                    changed.justificativa = just;
+                    if (changed.modo === 'base' || changed.modo === 'manual') {
+                        changed.tipo = 'manual';
+                    }
+                    overrides[card.dataset.id] = changed;
+                });
+
+                return {
+                    overrides: overrides,
+                    invalidCard: invalidCard,
+                    maos: gatherSelectedMaos().join(',')
+                };
+            }
+
+            function prepareSubmit() {
+                var payload = buildSubmissionPayload();
+                if (payload.invalidCard) {
+                    alert('Existem alterações sem justificativa. Preencha a justificativa antes de enviar.');
+                    var invalidJust = payload.invalidCard.querySelector('.maodeobra-just');
+                    if (invalidJust) {
+                        invalidJust.focus();
+                        invalidJust.reportValidity();
+                    }
+                    return false;
+                }
+                document.getElementById('overrides-input').value = JSON.stringify(payload.overrides);
+                document.getElementById('maos-input').value = payload.maos;
+                return true;
+            }
+
+            var form = document.querySelector('form');
+            var submitButton = document.getElementById('btn-submit-receber');
+
+            if (submitButton) {
+                submitButton.addEventListener('click', function (event) {
+                    if (!prepareSubmit()) {
+                        event.preventDefault();
+                        event.stopImmediatePropagation();
+                        return false;
+                    }
+                    return true;
+                });
+            }
+
+            if (form) {
+                form.addEventListener('submit', function (event) {
+                    if (!prepareSubmit()) {
+                        event.preventDefault();
+                        event.stopImmediatePropagation();
+                        return false;
+                    }
+                    return true;
+                });
+            }
+        })();
+    </script>
+{% endblock %}

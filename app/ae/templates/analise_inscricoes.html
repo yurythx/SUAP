@@ -1,0 +1,77 @@
+{% extends super_template %}
+
+{% block action-bar %}
+    {% if tem_registro_inscricao %}
+        <ul class="action-bar mt-2 mb-4">
+            <li><a href="/ae/gerar_analise_inscricoes/{{ edital.id }}/{{ programa.id }}/{{ ordenar }}/" class="btn confirm" data-confirm="Ao importar, a data de geração do relatório será a atual. Deseja prosseguir?">Importar novas inscrições</a></li>
+             <li class="has-child">
+                <a href="#" class="btn default">Exportar para PDF</a>
+                <ul>
+                    {% if tem_inscricoes_deferidas %}
+                        <li><a href="/ae/exportar_analises_deferidas_pdf/{{ edital.id }}/{{ programa.id }}/1/" class="btn default" target="_blank">Análises Deferidas</a></li>
+                    {% endif %}
+                    {% if tem_inscricoes_indeferidas %}
+                        <li><a href="/ae/exportar_analises_deferidas_pdf/{{ edital.id }}/{{ programa.id }}/2/" class="btn default" target="_blank">Análises Indeferidas</a></li>
+                    {% endif %}
+                </ul>
+            </li>
+        </ul>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+
+    {% if not tem_registro_inscricao %}
+        {% if form.is_bound %}
+            {% if existem_inscricoes %}
+                <p class="alert alert-warning">
+                    A análise para o edital e programa selecionados ainda não foi gerada.
+                    {% if pode_gerar_analises %}
+                        <a href="/ae/gerar_analise_inscricoes/{{ edital.id }}/{{ programa.id }}/{{ ordenar }}/" class="btn success">Gerar análise</a>.
+                    {% else %}
+                        As inscrições deste Edital ainda não terminaram.
+                    {% endif %}
+                </p>
+            {% else %}
+                <p class="alert alert-warning">Sem inscrições para o edital e o programa selecionados.</p>
+            {% endif %}
+        {% else %}
+            <p class="alert alert-warning">Informe, no mínimo, o <strong>Edital</strong> e o <strong>Programa</strong> nos filtros para visualizar as análises das inscrições.</p>
+        {% endif %}
+    {% endif %}
+
+    {% box "Filtros" class=tem_registro_inscricao|yesno:"collapsed," %}
+        {% render_form form %}
+    {% endbox %}
+
+    {% if tem_registro_inscricao %}
+        {% box "Análise das inscrições" badge="{{ inscricoes.count }} inscrições" extra="Gerada em {{ gerado_em }}" %}
+            <dl class="definition-list flex">
+                <div class="list-item">
+                    <dt>Programa</dt>
+                    <dd>{{ programa }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Edital</dt>
+                    <dd>{{ edital }}</dd>
+                </div>
+            </dl>
+            <div class="tab-pane ajax-rendered" data-title="Documentação entregue" data-tab="doc_entregue" data-counter="{{ doc_entregue.count }}">
+                {% include "includes/analise_inscricoes_lista.html" with inscricoes=doc_entregue contador=contador contadores_finais=contador_entregue tipo='entregue' %}
+                <br>
+                {% box "Parecer indeferido" %}
+                    {% include "includes/analise_inscricoes_lista.html" with inscricoes=parecer_indeferido_doc_entregue contador=contador contadores_finais=contador_indeferido_doc_entregue tipo='indeferido doc entregue' %}
+                {% endbox %}
+            </div>
+            <div class="tab-pane ajax-rendered" data-title="Documentação não entregue " data-tab="doc_nao_entregue" data-counter="{{ doc_nao_entregue.count }}">
+                {% include "includes/analise_inscricoes_lista.html" with inscricoes=doc_nao_entregue contador=contador contadores_finais=contador_nao_entregue tipo='nao_entregue' %}
+                <br>
+                {% box "Parecer indeferido" %}
+                    {% include "includes/analise_inscricoes_lista.html" with inscricoes=parecer_indeferido_doc_nao_entregue contador=contador contadores_finais=contador_indeferido tipo='indeferido doc nao entregue' %}
+                {% endbox %}
+            </div>
+
+        {% endbox %}
+    {% endif %}
+
+{% endblock %}

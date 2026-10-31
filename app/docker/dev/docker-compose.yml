@@ -1,0 +1,295 @@
+services:
+  vpn:
+    extends:
+      file: $DOCKER_VPN_WORKDIR/docker-compose.yaml
+      service: vpn
+    env_file:
+      - ./.env
+    networks:
+      suap-network:
+        ipv4_address: ${DOCKER_VPN_IP}  # Definir o endereço IP do contêiner
+
+  suap-base-builder:
+    env_file:
+      - .env
+    image: ${SUAP_IMAGE}:base # Tag que será usada no FROM do web
+    build:
+      context: ../..
+      dockerfile: ./docker/Dockerfile.base
+    # Faz container rodar e imediatamente sair com sucesso
+    command: ["true"]
+
+  suap-base-pull-image:
+    image: docker:24  # Usa imagem oficial do Docker CLI
+    entrypoint: /bin/sh
+    command:
+      - -c # argumento "-c" para o /bin/sh
+      - |  # Permite um string multi-linha para o comando
+        echo "$GITLAB_PASSWORD" | docker login gitlab.ifrn.edu.br:4567 -u $GITLAB_USER --password-stdin && \
+        docker pull gitlab.ifrn.edu.br:4567/cosinf/suap
+    environment:
+      - GITLAB_USER
+      - GITLAB_PASSWORD
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock  # Necessário para controlar o Docker do host
+
+  suap-dev-builder:
+    env_file:
+      - .env
+    image: suap-local:dev
+    build:
+      context: ../..
+      dockerfile: ./docker/Dockerfile
+      target: suap-dev
+      args:
+        - BASE_IMAGE=${SUAP_IMAGE}:base
+    depends_on:
+      suap-base-pull-image:
+        condition: service_completed_successfully
+    # Faz container rodar e imediatamente sair com sucesso
+    command: ["true"]
+
+  web:
+    restart: always
+    env_file:
+      - .env
+    image: ${DEV_IMAGE:-suap-local:dev}
+#    user: "${USER_UID}:${USER_GID}"
+    build:
+      context: ../..
+      dockerfile: ./docker/dev/Dockerfile
+#      target: suap-dev-user
+      args:
+        - USER_BASE_DIR_NAME=${USER_BASE_DIR_NAME:-home}
+        - USER_NAME=${USER_NAME}
+        - DEV_IMAGE=${DEV_IMAGE:-suap-local:dev}
+        - USER_UID=${USER_UID:-1000}
+        - USER_GID=${USER_GID:-1000}
+        - WORK_DIR=${WORK_DIR:-/opt/suap}
+    command: >
+      bash -c '
+        uv sync --dev
+        python manage.py migrate
+        python manage.py runserver 0.0.0.0:${APP_PORT:-8000}
+      '
+    ports:
+      - ${APP_PORT:-8000}:${APP_PORT:-8000}
+    environment:
+      - USER_UID=${USER_UID}
+      - USER_GID=${USER_GID}
+      - USER_NAME=${USER_NAME}
+    volumes:
+      - ../../:${WORK_DIR:-/opt/suap}
+      - /${USER_BASE_DIR_NAME}/${USER_NAME}/.ssh/:/${USER_BASE_DIR_NAME}/${USER_NAME}/.ssh/
+    stdin_open: true
+    tty: true
+    ulimits:
+      memlock: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    healthcheck:
+      test: curl --fail -s http://localhost:${APP_PORT:-8000}/accounts/login/
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    depends_on:
+      suap-dev-builder:
+        condition: service_completed_successfully
+      vpn:
+        condition: service_started
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - suap-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  celery-dev:
+    restart: always
+    stdin_open: true
+    tty: true
+    user: "33:33"
+    env_file:
+      - .env
+    image: "${DEV_IMAGE}"
+    build:
+      context: ..
+      dockerfile: ./docker/Dockerfile
+      target: suap-dev
+    command: ./bin/celery.sh $CELERY_QUEUE
+    profiles:
+      - celery
+    ulimits:
+      memlock: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - type: bind
+        source: ../
+        target: /opt/suap
+    networks:
+      - suap-network
+    healthcheck:
+      test: celery -A suap inspect ping
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # não utilizado em produção
+  redis:
+    restart: always
+    env_file:
+      - .env
+    networks:
+      - suap-network
+    image: redis:latest
+    ports:
+      - ${REDIS_EXTERNAL_PORT:-6379}:${REDIS_PORT:-6379}
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  db:
+    restart: always
+    env_file:
+      - .env
+    build:
+      context: ../..
+      dockerfile: ./docker/dev/Dockerfile-db
+      args:
+        - POSTGRES_IMAGE=${POSTGRES_IMAGE:-postgres:16.3}
+    ports:
+      - ${DATABASE_EXTERNAL_PORT:-5432}:${DATABASE_PORT:-5432}
+    cap_add:
+      - NET_ADMIN  # Adiciona a capacidade de manipulação de rede
+    environment:
+      POSTGRES_USER: ${DATABASE_USER:-postgres}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-postgres}
+      POSTGRES_DB: ${DATABASE_NAME:-suap}
+      POSTGRES_HOST: ${DATABASE_HOST:-localhost}
+      POSTGRES_PORT: ${DATABASE_PORT:-5432}
+      POSTGRES_MAX_LOCKS_PER_TRANSACTION: 128
+#      PGDATA: /var/lib/postgresql/data
+    entrypoint: [ "/bin/sh", "-c", "chmod 600 /tmp/dbuser.pem && exec /scripts/db_entrypoint.sh" ]
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ${SDOCKER_WORKDIR}/scripts/db_entrypoint.sh:/docker-entrypoint-initdb.d/db_entrypoint.sh
+      - ${SDOCKER_WORKDIR}/scripts:/scripts/
+      - ${LOCAL_DBUSER_PEM_PATH:-../../../scripts/config/dbuser.pem}:${DBUSER_PEM_PATH:-/tmp/dbuser.pem}
+      - ${DATABASE_DUMP_DIR:-./dump}:/dump
+    shm_size: 512mb # definir o tamanho do espaço de memória compartilhada (/dev/shm). Melhorar o desempenho em operações que dependem intensivamente dessa memória
+    ulimits:        # São frequentemente usadas em contêineres que executam serviços que podem exigir muitos arquivos abertos simultaneamente,
+      memlock: -1   # "ilimitado", ou seja, não há limite para a quantidade de memória que o processo pode bloquear.
+      nofile:       # Número máximo de arquivos que podem ser abertos simultaneamente por um processo.
+        soft: 65536 # Define o limite "soft", que é o valor padrão do limite de arquivos abertos. Ele pode ser temporariamente aumentado até o valor "hard".
+        hard: 65536 # Define o limite "hard", que é o valor máximo absoluto que o limite "soft" pode alcançar.
+    networks:
+      - suap-network
+    healthcheck:
+      test: ['CMD-SHELL', '
+        if [ "$DATABASE_HOST" = "localhost" ] || [ "$DATABASE_HOST" = "127.0.0.1" ]; then
+          pg_isready -U "${DATABASE_USER:-postgres}" -d "${DATABASE_NAME:-suap}" -h "${DATABASE_HOST:-localhost}";
+        else
+          PGPASSWORD="${DATABASE_PASSWORD}" psql -h "${DATABASE_HOST}" -p "${DATABASE_PORT:-5432}" -U "${DATABASE_USER}" -d "${DATABASE_NAME}" -c "\q";
+        fi
+      ']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      vpn:
+        condition: service_started
+
+  pgadmin:
+    env_file:
+      - .env
+    image: dpage/pgadmin4:latest
+    environment:
+      PGADMIN_DEFAULT_EMAIL: "admin@pgadmin.org"
+      PGADMIN_DEFAULT_PASSWORD: "admin"
+      PGADMIN_CONFIG_SERVER_MODE: "False"               # disables the pgadmin4 login screen.
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"  #  removes the need to enter the master password when the login screen is disabled.
+    ports:
+      - ${PGADMIN_EXTERNAL_PORT:-8001}:${PGADMIN_PORT:-8001}
+    networks:
+      - suap-network
+    entrypoint: /bin/sh -c "chmod 600 /pgpass; /entrypoint.sh;"
+    user: root
+    depends_on:
+      db:
+        condition: service_started
+      vpn:
+        condition: service_started
+    configs:
+      - source: servers.json
+        target: /pgadmin4/servers.json
+      - source: pgpass
+        target: /pgpass
+
+  selenium_grid:
+    image: selenium/standalone-chrome:latest
+    shm_size: 2gb
+    ports:
+      - "4444:4444"
+    volumes:
+      - /dev/shm:/dev/shm
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - suap-network
+
+networks:
+  suap-network:
+    driver: bridge
+    enable_ipv6: false
+    ipam:
+      config:
+        - subnet: $DOCKER_IPAM_CONFIG_SUBNET
+          gateway: $DOCKER_IPAM_CONFIG_GATEWAY_IP
+
+volumes:
+    db_data:
+
+configs:
+  pgpass:
+    content: db:${DATABASE_PORT:-5432}:*:${DATABASE_USER:-postgres}:${DATABASE_PASSWORD:-postgres}
+
+  servers.json:
+    content: |
+      {"Servers": 
+        {
+          "1": {
+            "Name": "suap@docker.localhost",
+            "Group": "Servers",          
+            "Host": "db",
+            "Port": ${DATABASE_PORT:-5432},
+            "MaintenanceDB": "postgres",
+            "Username": "${DATABASE_USER:-postgres}",
+            "PassFile": "/pgpass",
+            "ConnectionParameters": {
+                "sslmode": "prefer",
+                "connect_timeout": 10
+            }
+          },
+          "2": {
+            "Name": "suap@vpn.suap_pequeno_mascarado",
+            "Group": "Servers",                
+            "Host": "vpn",
+            "Port": 25432,
+            "MaintenanceDB": "suap_pequeno_mascarado",
+            "Username": "dev",
+            "ConnectionParameters": {
+                "sslmode": "prefer",
+                "connect_timeout": 10
+            }
+          }     
+        }
+      }

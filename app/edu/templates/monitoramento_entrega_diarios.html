@@ -1,0 +1,145 @@
+{% extends super_template %}
+
+
+
+{% block extrahead %}
+    <script src="/static/djtools/graficos/highcharts.js"></script>
+    <script src="/static/djtools/graficos/exporting.js"></script>
+{% endblock %}
+
+{% block content %}
+
+    {% box 'Filtros' %}
+        {% render_form form %}
+    {% endbox %}
+
+    {% if form.is_valid %}
+        {% box 'Resultado da Pesquisa ({{ qtd_professores }} professores em {{ qtd_diarios }} diários)' %}
+
+            {% if professores_diario.exists %}
+                {% for grafico in graficos %}
+                    <script>
+                        {{ grafico | safe }}
+                    </script>
+                    <div id="{{ grafico.id }}"></div>
+                {% endfor %}
+
+                {% autopaginate professores_diario 25 %}
+
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Código</th>
+                        <th>Diario</th>
+                        <th>Data Fechamento Período</th>
+                        <th>Etapas</th>
+                    </tr>
+                    </thead>
+
+                    <tbody>
+                    {% if agrupamento == 'Data de Fechamento Período' %}
+                        {% regroup professores_diario by diario.calendario_academico.data_fechamento_periodo as professores_diario_agrupados %}
+                    {% else %}
+                        {% regroup professores_diario by professor as professores_diario_agrupados %}
+                    {% endif %}
+
+                    {% for item_professor_diario in professores_diario_agrupados %}
+                        <tr>
+                            <td colspan="5">
+                                <strong>{{ item_professor_diario.grouper }}</strong>
+                            </td>
+                        </tr>
+
+                        {% for professor_diario in item_professor_diario.list %}
+
+                            <tr>
+                                <td>
+                                    <a href="/edu/diario/{{ professor_diario.diario.pk }}/">{{ professor_diario.diario.pk }}</a>
+                                </td>
+                                <td>{{ professor_diario.diario.componente_curricular.componente }}</td>
+                                <td>{{ professor_diario.diario.calendario_academico.data_fechamento_periodo }}</td>
+                                <td>
+
+                                    <table>
+                                        <tr>
+                                            <td style="border:none; width:20%">1ª</td>
+                                            <td style="border:none;">
+                                                {% if professor_diario.diario.etapa_1_em_posse_do_registro %}
+                                                    <span class="status status-success">Entregue</span>
+                                                {% else %}
+                                                    <span class="status status-alert">Não entregue</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% if professor_diario.diario.componente_curricular.qtd_avaliacoes > 1 %}
+                                            <tr>
+                                                <td style="border:none;">2ª</td>
+                                                <td style="border:none;">
+                                                    {% if professor_diario.diario.etapa_2_em_posse_do_registro %}
+                                                        <span class="status status-success">Entregue</span>
+                                                    {% else %}
+                                                        <span class="status status-alert">Não entregue</span>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                        {% endif %}
+
+                                        {% if professor_diario.diario.componente_curricular.qtd_avaliacoes > 2 %}
+                                            <tr>
+                                                <td style="border:none;">3ª</td>
+                                                <td style="border:none;">
+                                                    {% if professor_diario.diario.etapa_3_em_posse_do_registro %}
+                                                        <span class="status status-success">Entregue</span>
+                                                    {% else %}
+                                                        <span class="status status-alert">Não entregue</span>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                        {% endif %}
+
+                                        {% if professor_diario.diario.componente_curricular.qtd_avaliacoes > 3 %}
+                                            <tr>
+                                                <td style="border:none;">4ª</td>
+                                                <td style="border:none;">
+                                                    {% if professor_diario.diario.etapa_4_em_posse_do_registro %}
+                                                        <span class="status status-success">Entregue</span>
+                                                    {% else %}
+                                                        <span class="status status-alert">Não entregue</span>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                        {% endif %}
+
+                                        <tr>
+                                            <td style="border:none;">Final</td>
+                                            <td style="border:none;">
+                                                {% if professor_diario.diario.etapa_5_em_posse_do_registro %}
+                                                    <span class="status status-success">Entregue</span>
+                                                {% else %}
+                                                    <span class="status status-alert">Não entregue</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    </table>
+
+                                </td>
+                            </tr>
+
+                        {% endfor %}
+
+                    {% endfor %}
+
+                    </tbody>
+                </table>
+
+                {% paginate %}
+
+            {% else %}
+                <p class="alert alert-info">Todos os diários encontram-se entregues nos seus respectivos prazos.</p>
+            {% endif %}
+
+        {% endbox %}
+    {% endif %}
+
+
+{% endblock %}

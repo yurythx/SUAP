@@ -1,0 +1,256 @@
+{% extends super_template %}
+
+{% block extrahead %}
+    {% if not eh_previsualizacao %}
+        <script>
+            function salvar_parcialmente() {
+                var form = $('form', '#content');
+                var dados_serializados = $(form).serialize();
+
+                $.ajax({
+                  method: "POST",
+                  data: dados_serializados
+                }).done(function(msg) {
+                    $('#content').append('<p id="msgSucesso" class="alert alert-success">Dados parcialmente salvos com Sucesso!</p>');
+                    $('#msgSucesso').delay(3000).fadeOut(500, function(){
+                        $('#msgSucesso').remove();
+                    });
+                }).fail(function (error) {
+                    $('#content').append('<p id="msgErro" class="alert alert-danger">Ocorreu um erro ao salvar parcialmente os dados!</p>');
+                    $('#msgErro').delay(3000).fadeOut(500, function(){
+                        $('#msgErro').remove();
+                    });
+                });
+            };
+
+            $(document).ready(function () {
+               $('p.alert.alert-success').delay(3000).fadeOut(500, function(){
+                    $('p.alert.alert-success').remove();
+               });
+            });
+
+            setInterval(salvar_parcialmente, 120000);
+        </script>
+    {% endif %}
+{% endblock %}
+
+{% block extracss %}
+    <style type="text/css">
+        @media only screen and (min-width : 992px) {
+            form .submit-row.floated {
+                background: rgba(0, 0, 0, 0.1);
+                border-radius: 2px 0 0 2px;
+                bottom: 50px;
+                padding: 10px 40px 10px 10px;
+                position: fixed;
+                right: 0;
+                width: auto;
+            }
+
+            form .submit-row.floated input:last-child {
+                margin: 0;
+            }
+        }
+
+        form li {
+            margin-left: 250px;
+        }
+
+        form ul li {
+            margin-bottom: 10px;
+        }
+
+        form ul li label {
+            float:none;
+        }
+
+        .checkboxes li {
+            width: 100%;
+        }
+
+        .checkbutton.btn {
+            display: none !important;
+        }
+
+        tbody td{
+            padding-top: 2px;
+            padding-bottom: 2px;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    {% if obj.questionario.avaliacao.explicacao_introducao %}
+        <div class="alert alert-info">{{ obj.questionario.avaliacao.explicacao_introducao|linebreaks }}</div>
+    {% endif %}
+
+    {% box "Progresso" True %}
+        <dl>
+            <dt>Percentual Respondido:</dt>
+            <dd>{% progressbar percentual %}</dd>
+        </dl>
+    {% endbox %}
+
+    {% if form.non_field_errors %}
+        <ul class="errorlist">
+            {% for error in form.non_field_errors %}
+                <li>{{ error }}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    <form method="post" action="">
+        {% csrf_token %}
+
+        {% if matrizes %}
+            <h2>Parte 1</h2>
+            {% if obj.questionario.avaliacao.explicacao_parte_1 %}
+                <div class="alert alert-info">{{ obj.questionario.avaliacao.explicacao_parte_1|linebreaks }}</div>
+            {% endif %}
+
+            {% for matriz, nucleos, anual in matrizes %}
+                <div class="tab-pane" data-title="{{ matriz }}">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th class="text-center" rowspan="2">Disciplinas Obrigatórias {{ dado.itens }}</th>
+                                <th class="text-center" colspan="{{ periodos|length }}">Número de aulas semanal por Período/Semestre</th>
+                                <th class="text-center" colspan="5">Critérios de avaliação processual do Curso</th>
+                            </tr>
+                            <tr>
+                                {% for periodo in periodos %}
+                                    <th class="text-center" colspan="1">{{ periodo }}º</th>
+                                {% endfor %}
+                                <th class="text-center">Carga Horária Total da Disciplina</th>
+                                <th class="text-center">Sequência Didática<br/>(Ordem da disciplina no curso )</th>
+                                <th class="text-center">Ementa e Programa de Disciplina</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for nucleo, componentes in nucleos %}
+                                <tr><th colspan="{{ colspan }}"><strong>{{ nucleo }}</strong></th></tr>
+                                {% for componente_curricular in componentes %}
+                                 <tr>
+                                    <td>{{ componente_curricular.componente.descricao_historico }} ({{ componente_curricular.componente.get_ch_hora_aula }}h/aula)</td>
+                                     {% for periodo in periodos %}
+                                        <td colspan="1" class="text-center negrito">
+                                            {% if componente_curricular.periodo_letivo == periodo %}
+                                                {% if anual and componente_curricular.qtd_avaliacoes == 2 %}
+                                                    {% if componente_curricular.segundo_semestre %}
+                                                       {{ componente_curricular.componente.ch_qtd_creditos }}
+                                                    {% else %}
+                                                        {{ componente_curricular.componente.ch_qtd_creditos }}
+                                                    {% endif %}
+                                                {% else %}
+                                                    {{ componente_curricular.componente.ch_qtd_creditos }}
+                                                {% endif %}
+                                            {% endif %}
+                                        </td>
+                                    {% endfor %}
+                                    <td class="text-center">
+                                        {{ form|getval:componente_curricular.carga_horaria }}
+                                        <p>{% if componente_curricular.justificativa_1 %}{{ componente_curricular.justificativa_1 }}{% endif %}</p>
+                                    </td>
+                                    <td class="text-center">
+                                        {{ form|getval:componente_curricular.sequencia_didatica }}
+                                        <p>{% if componente_curricular.justificativa_2 %}{{ componente_curricular.justificativa_2 }}{% endif %}</p>
+                                    </td>
+                                    <td class="text-center">
+                                        {{ form|getval:componente_curricular.ementa_programa }}
+                                        <p>{% if componente_curricular.justificativa_3 %}{{ componente_curricular.justificativa_3 }}{% endif %}</p>
+                                    </td>
+                                 </tr>
+                                {% endfor %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <br/>
+        <br/>
+        <br/>
+
+        {% if grupos_pergunta %}
+            {% if matrizes %}
+                <h2>Parte 2</h2>
+                {% if obj.questionario.avaliacao.explicacao_parte_2 %}
+                    <div class="alert alert-info">{{ obj.questionario.avaliacao.explicacao_parte_2|linebreaks }}</div>
+                {% endif %}
+            {% else %}
+                <h2>Parte 1</h2>
+                {% if obj.questionario.avaliacao.explicacao_parte_1 %}
+                    <div class="alert alert-info">{{ obj.questionario.avaliacao.explicacao_parte_1|linebreaks }}</div>
+                {% endif %}
+            {% endif %}
+
+            {% for grupo_pergunta in grupos_pergunta %}
+                {% box "{{ forloop.counter }} - {{ grupo_pergunta.descricao }}" %}
+                    <fieldset class="module aligned">
+                        {% for pergunta in grupo_pergunta.perguntas %}
+                            {% with form_field=form|getval:pergunta.form_field_name %}
+                                <div class="form-row {% if form_field.errors %}errors{% endif %}">
+                                    <div class="field-box">
+                                        {% if form_field.errors %}
+                                        <ul class="errorlist">
+                                            {% for error in form_field.errors %}
+                                                <li>{{ error }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                        {% endif %}
+                                        <label {% if form_field.field.required %}class="required"{% endif %}
+                                               for="{{ form_field.id_for_label }}"
+                                               title="{{ form_field.label }}">{{ form_field.label }}</label>
+                                        {{ form_field }}
+                                    </div>
+                                </div>
+                            {% endwith %}
+                        {% endfor %}
+                    </fieldset>
+                {% endbox %}
+            {% endfor %}
+        {% endif %}
+
+        {% if not eh_previsualizacao %}
+            <div class="submit-row floated">
+                <input type="submit" value="Salvar e Continuar" class="default" name="_save">
+                <input type="submit" value="Finalizar" class="default" name="_save_and_finalize">
+            </div>
+        {% endif %}
+
+        <script>
+            {% for x in ids_perguntas_obrigatorias %}
+                var widget = $('#id_{{ x }}');
+                widget.after( "&nbsp;&nbsp;&nbsp;<strong>Obrigatório para a finalização da avaliação.</strong>" );
+            {% endfor %}
+        </script>
+    </form>
+
+    <script>
+        $('td.text-center select').change(function(){
+            var campo = this.name.split(':::')[1];
+            if(campo=='carga_horaria') campo = 1;
+            if(campo=='sequencia_didatica') campo = 2;
+            if(campo=='ementa_programa') campo = 3;
+            var justificativa = null;
+            if($(this).val()=='Insuficiente') justificativa = window.prompt('Justificativa');
+            var salvar = justificativa || $(this).parent().find('p').html();
+            if(justificativa){
+                $(this).parent().find('p').html(justificativa);
+            } else {
+                if($(this).val()=='Insuficiente'){
+                    alert('A resposta "Insuficiente" requer uma justificativa.');
+                    $(this).val('');
+                }
+                $(this).parent().find('p').html('');
+            }
+            if(salvar){
+                if(justificativa==null) justificativa = '';
+                $.get("/avaliacao_cursos/justificar_avaliacao_componente_ajax/{{ obj.pk }}/" + campo + "/" + this.name.split(':::')[0] + "/?justificativa=" + justificativa, function(data, status){
+                    if(justificativa) alert('Justificativa salva com sucesso');
+                });
+            }
+        });
+    </script>
+{% endblock %}

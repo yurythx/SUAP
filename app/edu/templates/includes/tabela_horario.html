@@ -1,0 +1,228 @@
+{% load edu_templatetags %}
+{% if impressao %}
+    <style>
+        .tabela-horario-impressao {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 8px 0;
+            font-size: 7.5pt;
+            empty-cells: show;
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+        .tabela-horario-impressao tr {
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+        .tabela-horario-impressao th,
+        .tabela-horario-impressao td {
+            border: 1px solid #aaa;
+            padding: 2px 3px;
+            text-align: center;
+            line-height: 1.15;
+            font-size: 7pt;
+        }
+        .tabela-horario-impressao th {
+            background-color: #e6e6e6;
+            font-weight: bold;
+            font-size: 7.5pt;
+            padding: 3px 2px;
+        }
+        .tabela-horario-impressao .horario-rotulo {
+            font-weight: bold;
+            font-size: 6.5pt;
+            white-space: nowrap;
+            vertical-align: middle;
+        }
+        .tabela-horario-impressao .celula-impressao {
+            vertical-align: top;
+        }
+        .tabela-horario-impressao .item-horario {
+            margin: 0;
+            padding: 1px 0;
+        }
+        .tabela-horario-impressao .item-horario + .item-horario {
+            border-top: 1px dashed #bbb;
+            margin-top: 2px;
+            padding-top: 2px;
+        }
+        .tabela-horario-impressao .item-sigla {
+            font-size: 6.5pt;
+            color: #333;
+            display: block;
+        }
+        .tabela-horario-impressao .item-nome {
+            font-size: 7pt;
+            line-height: 1.1;
+            display: block;
+        }
+        .tabela-horario-impressao .item-detalhe {
+            font-size: 6pt;
+            color: #555;
+            line-height: 1.1;
+            display: block;
+        }
+        .tabela-horario-impressao .item-conflito {
+            font-size: 6pt;
+            color: #c00;
+            font-weight: bold;
+            display: block;
+        }
+    </style>
+{% endif %}
+
+{% if turnos and turnos.as_form or turnos and not turnos.vazio %}
+    {% if not impressao %}
+            {% if turnos.as_form %}
+                <form action="" method="post">
+                    {% csrf_token %}
+            {% endif %}
+            <div class="legenda">
+                <p>Legenda:</p>
+                <ul>
+                    <li class="info">Aula</li>
+                    {% if not turnos.as_form %}<li class="danger">Conflito de horários</li>{% endif %}
+                    <li class="warning">Atividade de lazer</li>
+                    <li class="extra">Atividade de estudo</li>
+                </ul>
+            </div>
+        {% endif %}
+
+        {% for turno in turnos %}
+            {% if turnos.as_form or not turno.vazio and turno|tem_disciplinas %}
+                <div class="{% if impressao %}tabela-horario-impressao-container{% else %}calendario calendario-mensal table-responsive p-0{% endif %}">
+                    <table class="{% if impressao %}bordered tabela-horario-impressao{% endif %}">
+                        {% if not impressao %}
+                            <caption>Horários de aula - {{ turno }}</caption>
+                        {% endif %}
+                        <thead>
+                            <tr>
+                                <th width="{% if impressao %}12%{% else %}10%{% endif %}" class="text-center">{{ turno }}</th>
+                                {% for dia_semana in turno.dias_semana %}
+                                    <th class="text-center" width="{% if impressao %}14%{% else %}10%{% endif %}">{{ dia_semana.1 }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for horario_aula in turno.horarios_aula %}
+                                {% if not horario_aula.vazio %}
+                                    <tr>
+                                        <td class="text-center {% if impressao %}horario-rotulo{% endif %}">
+                                            <strong>{{ horario_aula }}</strong>
+                                        </td>
+                                        {% for dia_semana in horario_aula.dias_semana %}
+                                            {% if turnos.as_form and not impressao %}
+                                                <td class="text-center">
+                                                    <input value="{{ horario_aula.pk }};{{ dia_semana.numero }}"
+                                                        type="checkbox"
+                                                        name="horario"
+                                                        class="pq"
+                                                        {% if dia_semana.marcado %}checked="checked"{% endif %}>
+                                                </td>
+                                            {% else %}
+                                                <td class="{% if impressao %}text-center celula-impressao{% endif %}">
+                                                    {% if dia_semana.marcado %}
+                                                        {% if impressao %}
+                                                            {% for horario_aula_diario in dia_semana.horarios %}
+                                                                <div class="item-horario">
+                                                                    {% if horario_aula_diario.0 == 'diario' %}
+                                                                        {% if horario_aula_diario.3 %}
+                                                                            <span class="item-sigla">{{ horario_aula_diario.3 }}</span>
+                                                                        {% endif %}
+                                                                        <span class="item-nome"><strong>{{ horario_aula_diario.2|truncatechars:"30" }}</strong></span>
+                                                                        {% if horario_aula_diario.4 %}
+                                                                            <span class="item-detalhe">
+                                                                                {% for professor in horario_aula_diario.4 %}
+                                                                                    {{ professor.professor.get_nome_usual|format }}{% if not forloop.last %}, {% endif %}
+                                                                                {% endfor %}
+                                                                            </span>
+                                                                        {% endif %}
+                                                                        {% if horario_aula_diario.5 %}
+                                                                            <span class="item-detalhe">{{ horario_aula_diario.5 }}</span>
+                                                                        {% endif %}
+                                                                        {% if horario_aula_diario.6 %}
+                                                                            <span class="item-detalhe">{{ horario_aula_diario.6 }}</span>
+                                                                        {% endif %}
+                                                                    {% else %}
+                                                                        <span class="item-sigla">{{ horario_aula_diario.2 }}</span>
+                                                                        {% if horario_aula_diario.3 %}
+                                                                            <span class="item-nome"><strong>{{ horario_aula_diario.3|truncatechars:"30" }}</strong></span>
+                                                                        {% endif %}
+                                                                    {% endif %}
+                                                                    {% if dia_semana.conflito %}
+                                                                        <span class="item-conflito">(Conflito)</span>
+                                                                    {% endif %}
+                                                                </div>
+                                                            {% endfor %}
+                                                        {% else %}
+                                                            <ul class="calendario-eventos">
+                                                                {% for horario_aula_diario in dia_semana.horarios %}
+                                                                    <li class="calendario-item {% if dia_semana.conflito %} danger {% else %} {% if horario_aula_diario.0 == 'atividade' and horario_aula_diario.2 == 'Atividade de Estudo' %}extra {% elif horario_aula_diario.0 == 'atividade' and horario_aula_diario.2 == 'Atividade de Lazer' %} alert {% else %} info {% endif %} {% endif %}"
+                                                                        title="{{ horario_aula_diario.2 }}">
+                                                                        {% if perms.edu.add_professordiario and horario_aula_diario.0 == 'diario' %}
+                                                                            <a href="/edu/diario/{{ horario_aula_diario.1 }}/">
+                                                                        {% elif perms.edu.add_horarioatividadeextra and horario_aula_diario.0 == 'atividade' %}
+                                                                            <a class="popup"
+                                                                            href="/edu/editar_horario_atividade_extra/{{ obj.pk }}/{{ periodo_letivo_atual.ano }}/{{ periodo_letivo_atual.periodo }}/{{ horario_aula_diario.1 }}/">
+                                                                        {% endif %}
+                                                                        <dl>
+                                                                            <dt class="visually-hidden">Sigla do Componente</dt>
+                                                                            <dd>
+                                                                                <small>{{ horario_aula_diario.3|default:"X" }}</small>
+                                                                            </dd>
+                                                                            <dt class="visually-hidden">Disciplina</dt>
+                                                                            <dd>
+                                                                                <strong>{{ horario_aula_diario.2|truncatechars:"30" }}</strong>
+                                                                            </dd>
+                                                                            {% if horario_aula_diario.4 %}
+                                                                                <dt class="visually-hidden">Professores</dt>
+                                                                                {% for professor in horario_aula_diario.4 %}
+                                                                                    <dd>
+                                                                                        {{ professor.professor.get_nome_usual|format }}
+                                                                                    </dd>
+                                                                                {% endfor %}
+                                                                            {% endif %}
+                                                                            {% if horario_aula_diario.5 %}
+                                                                                <dt class="visually-hidden">Sala de Aula</dt>
+                                                                                <dd>
+                                                                                    {{ horario_aula_diario.5 }}
+                                                                                </dd>
+                                                                            {% endif %}
+                                                                            {% if horario_aula_diario.6 %}
+                                                                                <dt class="visually-hidden">Semestral</dt>
+                                                                                <dd>
+                                                                                    {{ horario_aula_diario.6 }}
+                                                                                </dd>
+                                                                            {% endif %}
+                                                                        </dl>
+                                                                        {% if perms.edu.add_professordiario and horario_aula_diario.0 == 'diario' or perms.edu.add_horarioatividadeextra and horario_aula_diario.0 == 'atividade' %}
+                                                                            </a>
+                                                                        {% endif %}
+                                                                    </li>
+                                                                {% endfor %}
+                                                            </ul>
+                                                        {% endif %}
+                                                    {% else %}
+                                                        {% if impressao %}&nbsp;{% endif %}
+                                                    {% endif %}
+                                                </td>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </tr>
+                                {% endif %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
+        {% endfor %}
+
+        {% if turnos.as_form and not impressao %}
+            <div class="submit-row">
+                <input type="submit" value="Salvar">
+            </div>
+            </form>
+        {% endif %}
+{% else %}
+    <p class="alert alert-warning"><strong>Atenção:</strong> Nenhum horário de aula definido no período letivo.</p>
+{% endif %}

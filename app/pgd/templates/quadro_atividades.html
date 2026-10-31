@@ -1,0 +1,284 @@
+{% extends "base_super_pgd.html" %}
+
+{% block action-bar %}
+    {% if pode_cadastrar or pode_solicitar_cadastro_alteracao %}
+        <ul class="action-bar">
+            <li>
+                <a class="btn success" href="/pgd/selecionar_hierarquia_atividade/{{ atividade.id }}">
+                    {% if pode_cadastrar %}
+                        Adicionar Atividade
+                    {% else %}
+                        Solicitar Cadastro de Nova Atividade
+                    {% endif %}
+                </a>
+            </li>
+        </ul>
+    {% endif %}
+
+{% endblock %}
+
+{% block content %} {{ block.super }}
+
+    {% if pode_solicitar_cadastro_alteracao %}
+        <div class="alert alert-info">
+            <p>Você está apto a solicitar cadastro de novas atividades ou alteração de atividades existentes.</p>
+            <p>Para solicitar cadastro deu uma nova atividade você deve acessar a opção "Solicitar Cadastro de Nova Atividade".</p>
+            <p>Para solicitar alteração você deve visualizar a atividade desejada e acessar a opção "Solicitar Alteração".</p>
+            <p>Para visualizar/remover suas solicitações você deve ir em "Minhas Solicitações de Cadastro/Alteração de Atividades".</p>
+        </div>
+    {% endif %}
+
+    {% if pode_solicitar_cadastro_alteracao %}
+        {% box "Minhas Solicitações de Cadastro/Alteração de Atividades" class="collapsed" %}
+            {% if minhas_solicitacoes %}
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th class="no-print">Ações</th>
+                                <th>Temática</th>
+                                <th>Macroprocesso</th>
+                                <th>Serviço</th>
+                                <th>Atividade</th>
+                                <th>Pode ser executada na modalidade Teletrabalho?</th>
+                                <th>Ativo?</th>
+                                <th>Situação</th>
+                                <th>Solicitação de</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for atividade in minhas_solicitacoes %}
+                                <tr>
+                                    <td class="no-print">
+                                        {% icon "view" "/pgd/visualizar_atividade/{{ atividade.id }}" "Visualizar" %}
+                                        {% icon "delete" "/pgd/remover_solicitacao_atividade/{{ atividade.id }}" %}
+                                    </td>
+                                    <td>{{ atividade.tematica.titulo }}</td>
+                                    <td>{{ atividade.subtematica.titulo }}</td>
+                                    <td>{{ atividade.servico.titulo }}</td>
+                                    <td>
+                                        <dl>
+                                            <dt>Atividade:</dt><dd>{{ atividade.titulo|format }}</dd>
+                                            {% if atividade.descricao %}
+                                                <dt>Descrição:</dt><dd>{{ atividade.descricao|format }}</dd>
+                                            {% endif %}
+                                            <dt>Descrição das entregas:</dt><dd>{{ atividade.descricao_entregas }}</dd>
+                                            <dt>Ganho de Produtividade:</dt><dd>{{ atividade.ganho_produtividade|format }}%</dd>
+                                        </dl>
+                                    </td>
+                                    <td>{{ atividade.pode_ser_teletrabalho|format }}</td>
+                                    <td>
+                                        {{ atividade.estah_ativa|format }}
+                                        {% if atividade.estah_ativa %}
+                                            {% if atividade.data_inativacao_efeitos_a_partir_de %}
+                                                Inativa a partir de {{ atividade.data_inativacao_efeitos_a_partir_de|format }}
+                                            {% endif %}
+                                        {% else %}
+                                            {% if atividade.data_inativacao_efeitos_a_partir_de %}
+                                                Inativa desde {{ atividade.data_inativacao_efeitos_a_partir_de|format }}
+                                            {% endif %}
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {{ atividade.get_situacao_cadastro_display|status }}
+                                        {% if atividade.solicitado_por %}
+                                            Solicitado por: {{ atividade.solicitado_por|format }}
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {{ atividade.tipo_solicitacao|format }} <br>
+                                        {% if atividade.original %}
+                                            <a href="/pgd/visualizar_atividade/{{ atividade.original.id }}">Atividade original</a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="alert alert-warning">Nenhuma solicitação foi cadastrada.</p>            
+            {% endif %}
+        {% endbox %}    
+    {% endif %}
+
+    <div class="search-and-filters">
+        {% render_form form %}
+        {% if limpar_filtro %}
+            <a href="/pgd/quadro_atividades/">Limpar filtros</a>
+        {% endif %}
+    </div>
+
+    {% if action_form %}
+        <form method="get" action="{{ action_form }}" id="form_action_quadro_atividades">
+        {% csrf_token %}
+    {% endif %}
+
+    {% if action_form %}
+        <input type="submit" name="submeter_atividades_selecionadas" value="Vincular selecionadas" class="btn success">
+    {% endif %}
+
+    {% if organizacao == 'aba_por_tematica' %}
+        {% for dado in lista_dados %}
+            {% if dado.atividades %}
+                <div class="tab-pane" data-title="{{ dado.tematica }}" data-counter="{{ dado.atividades.count }}">
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    {% if action_form %}
+                                        <th rowspan="2" scope="col" class="action-checkbox-column">
+                                            <input type="checkbox" id="action-toggle" name="{{ dado.tematica.id }}">
+                                        </th>
+                                    {% endif %}
+                                    <th class="no-print">Ações</th>
+                                    <th>Temática</th>
+                                    <th>Macroprocesso</th>
+                                    <th>Serviço</th>
+                                    <th>Atividade</th>
+                                    <th>Pode ser executada na modalidade Teletrabalho?</th>
+                                    <th>Ativo?</th>
+                                    <th>Situação</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for atividade in dado.atividades %}
+                                    <tr>
+                                        {% if action_form %}
+                                            <td>
+                                                <input type="checkbox" name="checks[]" value="{{ atividade.id }}" class="{{ atividade.tematica.id }}">
+                                            </td>
+                                        {% endif %}
+                                        <td class="no-print">
+                                            {% icon "view" "/pgd/visualizar_atividade/{{ atividade.id }}?action={{ action }}" "Visualizar" %}
+                                        </td>
+                                        <td>{{ atividade.tematica.titulo }}</td>
+                                        <td>{{ atividade.subtematica.titulo }}</td>
+                                        <td>{{ atividade.servico.titulo }}</td>
+                                        <td>
+                                            <dl>
+                                                <dt>Atividade:</dt><dd>{{ atividade.titulo|format }}</dd>
+                                                {% if atividade.descricao %}
+                                                    <dt>Descrição:</dt><dd>{{ atividade.descricao|format }}</dd>
+                                                {% endif %}
+                                                <dt>Descrição das entregas:</dt><dd>{{ atividade.descricao_entregas }}</dd>
+                                                <dt>Ganho de Produtividade:</dt><dd>{{ atividade.ganho_produtividade|format }}%</dd>
+                                            </dl>
+                                        </td>
+                                        <td>{{ atividade.pode_ser_teletrabalho|format }}</td>
+                                        <td>
+                                            {{ atividade.estah_ativa|format }}
+                                            {% if atividade.estah_ativa %}
+                                                {% if atividade.data_inativacao_efeitos_a_partir_de %}
+                                                    Inativa a partir de {{ atividade.data_inativacao_efeitos_a_partir_de|format }}
+                                                {% endif %}
+                                            {% else %}
+                                                {% if atividade.data_inativacao_efeitos_a_partir_de %}
+                                                    Inativa desde {{ atividade.data_inativacao_efeitos_a_partir_de|format }}
+                                                {% endif %}
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {{ atividade.get_situacao_cadastro_display|status }}
+                                            {% if atividade.solicitado_por %}
+                                                Solicitado por: {{ atividade.solicitado_por|format }}
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+
+    {% if organizacao == 'lista_paginada' %}
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        {% if action_form %}
+                            <th rowspan="2" scope="col" class="action-checkbox-column">
+                                <input type="checkbox" id="action-toggle" name="check_atividade">
+                            </th>
+                        {% endif %}
+                        <th class="no-print">Ações</th>
+                        <th>Temática</th>
+                        <th>Macroprocesso</th>
+                        <th>Serviço</th>
+                        <th>Atividade</th>
+                        <th>Pode ser executada na modalidade Teletrabalho?</th>
+                        <th>Ativo?</th>
+                        <th>Situação</th>
+                    </tr>
+                </thead>
+                {% autopaginate atividades 25 %}
+                {% paginate %}
+                <tbody>
+                    {% for atividade in atividades %}
+                        <tr>
+                            {% if action_form %}
+                                <td>
+                                    <input type="checkbox" name="checks[]" value="{{ atividade.id }}" class="check_atividade">
+                                </td>
+                            {% endif %}
+                            <td class="no-print">
+                                {% icon "view" "/pgd/visualizar_atividade/{{ atividade.id }}?action={{ action }}" "Visualizar" %}
+                            </td>
+                            <td>{{ atividade.tematica.titulo }}</td>
+                            <td>{{ atividade.subtematica.titulo }}</td>
+                            <td>{{ atividade.servico.titulo }}</td>
+                            <td>
+                                <dl>
+                                    <dt>Atividade:</dt><dd>{{ atividade.titulo|format }}</dd>
+                                    {% if atividade.descricao %}
+                                        <dt>Descrição:</dt><dd>{{ atividade.descricao|format }}</dd>
+                                    {% endif %}
+                                    <dt>Descrição das entregas:</dt><dd>{{ atividade.descricao_entregas }}</dd>
+                                    <dt>Ganho de Produtividade:</dt><dd>{{ atividade.ganho_produtividade|format }}%</dd>
+                                </dl>
+                            </td>
+                            <td>{{ atividade.pode_ser_teletrabalho|format }}</td>
+                            <td>
+                                {{ atividade.estah_ativa|format }}
+                                {% if atividade.estah_ativa %}
+                                    {% if atividade.data_inativacao_efeitos_a_partir_de %}
+                                        Inativa a partir de {{ atividade.data_inativacao_efeitos_a_partir_de|format }}
+                                    {% endif %}
+                                {% else %}
+                                    {% if atividade.data_inativacao_efeitos_a_partir_de %}
+                                        Inativa desde {{ atividade.data_inativacao_efeitos_a_partir_de|format }}
+                                    {% endif %}
+                                {% endif %}
+                            </td>
+                            <td>
+                                {{ atividade.get_situacao_cadastro_display|status }}
+                                {% if atividade.solicitado_por %}
+                                    Solicitado por: {{ atividade.solicitado_por|format }}
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+
+    {% if action_form %}
+        <script>
+            (function ($) {
+                $(document).on('click', '#action-toggle', function() {
+                    var c = $(this).attr("name");
+                    $("."+c).not(this).prop('checked', this.checked);
+                });
+            })(django.jQuery);
+        </script>
+    {% endif %}
+
+    {% if action_form %}
+        </form>
+    {% endif %}
+
+{% endblock %}

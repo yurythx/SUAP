@@ -1,0 +1,126 @@
+{% load pipeline %}
+{% load static %}
+{% load tags %}
+{% javascript 'jquery' %}
+
+<script>
+    $(".sobre").each(function (index) {
+        $(this).on("click", function () {
+            m_aplicacao = $(this).data("aplicacao");
+            document.getElementById("buscarDoc").value = $(this)[0].textContent;
+            buscar();
+            $.ajax("/comum/documentacao/about/" + m_aplicacao + "/")
+                .done(function (data) {
+                    $("main").html(data);
+                });
+        });
+    });
+    $(".sobre_funcionalidade").each(function (index) {
+        $(this).on("click", function () {
+            m_aplicacao = $(this).data("aplicacao");
+            m_funcionalidade = $(this).data("funcionalidade");
+            $.ajax("/comum/documentacao/about_feature/" + m_aplicacao + "/" + m_funcionalidade + "/")
+                .done(function (data) {
+                    $("main").html(data);
+                });
+        });
+    });
+    $(".proxima_funcionalidade").each(function (index) {
+        $(this).on("click", function () {
+            m_aplicacao = $(this).data("aplicacao");
+            m_funcionalidade = $(this).data("funcionalidade");
+            m_cenario = $(this).data("cenario");
+            $.ajax("/comum/documentacao/cenario/" + m_aplicacao + "/" + m_funcionalidade + "/" + m_cenario + "/")
+                .done(function (data) {
+                    let ancora = $("aside a[data-aplicacao='" + m_aplicacao + "'][data-funcionalidade='"+ m_funcionalidade+"'][data-cenario='"+ m_cenario +"']");
+                    $("main").html(data);
+                    $("aside a").removeClass("active");
+                    ancora.parent().parent().parent().removeClass("hide");
+                    ancora.addClass("active");
+                });
+        });
+    });
+</script>
+
+<div class="title-container">
+    <div>
+        <a href="#" class="badge sobre" data-aplicacao="{{ aplicacao_sigla }}">{{ aplicacao_nome }}</a>
+        <span class="badge">{{ cenario.passos|length }} passos</span>
+        <h2 class="title">{{ cenario.nome }}</h2>
+        {% if cenario.descricao %}
+            {% for descricao in cenario.descricao %}
+                <p class="description">{{ descricao }}</p>
+            {% endfor %}
+        {% endif %}
+    </div>
+    <div class="appendix">
+        <p><a class="sobre_funcionalidade" href="#" data-aplicacao="{{ aplicacao_sigla }}"
+              data-funcionalidade="{{ funcionalidade.chave }}" data-cenario="sobre">{{ funcionalidade.nome }}</a></p>
+        {% if funcionalidade.descricao %}
+            {% for descricao in funcionalidade.descricao %}
+                <p class="description">{{ descricao }}</p>
+            {% endfor %}
+        {% endif %}
+    </div>
+</div>
+
+{% if has_bpmn_workflow %}
+    <script src="/static/djtools/bpmn-js/bpmn-viewer.production.min.js"></script>
+    <div class="canvas">
+        <h3>Fluxograma:</h3>
+        <div id="canvas"></div>
+    </div>
+    <script>
+        $(document).ready(function () {
+            jQuery(document).ready(function () {
+                var diagramUrl = '/comum/documentacao/bpmn/{{ aplicacao_sigla }}/{{ cenario.nome |slugify }}.bpmn/';
+                var bpmnViewer = new BpmnJS({
+                    container: '#canvas',
+                    height: 300
+                });
+
+                async function openDiagram(bpmnXML) {
+                    try {
+                        await bpmnViewer.importXML(bpmnXML);
+                        bpmnViewer.get('canvas').zoom('fit-viewport');
+                    } catch (err) {
+                        console.error('could not import BPMN 2.0 diagram', err);
+                    }
+                }
+
+                $.get(diagramUrl, openDiagram, 'text');
+            })
+        })
+    </script>
+{% endif %}
+
+{% if workflow %}
+    <div class="alert alert-info">
+        <img class="workflow" src="/comum/documentacao/imagem/?i={{ workflow|addslashes }}&app={{ aplicacao_sigla }}">
+    </div>
+{% endif %}
+
+<ul class="passo-a-passo">
+    {% for passo in cenario.passos %}
+        <li id="passo-{{ forloop.counter0 }}" class="passo">
+            <h4>
+                <span>{{ passo.nome }}</span>
+                {% if not forloop.last %}
+                    <a href="#passo-{{ forloop.counter }}" class="btn"><span class="fas fa-angle-double-right" aria-hidden="true"></span> Próximo</a>
+                {% else %}
+                    {% if proximo_cenario and proxima_funcionalidade %}
+                        <a class="btn proxima_funcionalidade" href="#" data-aplicacao="{{ proxima_aplicacao }}" data-funcionalidade="{{ proxima_funcionalidade }}" data-cenario="{{ proximo_cenario }}"><span class="fas fa-angle-double-down" aria-hidden="true"></span> Próxima Funcionalidade</a>
+                    {% endif %}
+                    <a href="#passo-0" class="btn"><span class="fas fa-angle-double-up" aria-hidden="true"></span> Início</a>
+                {% endif %}
+            </h4>
+            <small>{{ forloop.counter }}</small>
+            {% if passo.descricao %}
+                <p class="description">{{ passo.descricao }}</p>
+            {% endif %}
+            <a href="/comum/documentacao/imagem/?i={{ passo.imagem|addslashes }}&app={{ aplicacao_sigla }}" data-lightbox="passos" data-title="{{ passo.nome }}">
+                <img src="/comum/documentacao/imagem/?i={{ passo.imagem|addslashes }}&app={{ aplicacao_sigla }}"
+                     alt="Imagem da tela do passo: {{ passo.nome }}"></a>
+        </li>
+    {% endfor %}
+</ul>

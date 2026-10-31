@@ -1,0 +1,71 @@
+{% extends super_template %}
+
+{% block content %}
+    {% box 'Formulário de Pesquisa' %}
+        {% render_form form %}
+    {% endbox %}
+    {% if alunos %}
+        {% box 'Resultado da Pesquisa' %}
+            <p>{{ alunos.count }} aluno(s) encontrado(s).</p>
+            <form method="post" id="form_evadir_aluno" action="/edu/evadir_alunos_selecionados/">
+                {% csrf_token %}
+                <ul class="action-bar submit-row">
+                    <li>
+                        <a class="btn" href="/edu/evasao_em_lote/?{{ request.META.QUERY_STRING }}&xls=1">Exportar para XLS</a>
+                    </li>
+                </ul>
+                <table>
+                    <thead>
+                    <tr>
+                        <th>
+                            <input type="checkbox" onchange="var is = this.parentNode.parentNode.parentNode.parentNode.parentNode.getElementsByTagName('input');for(var i=0; i<is.length; i++) is[i].checked = this.checked"/>
+                        </th>
+                        <th>Matrícula</th>
+                        <th>Nome</th>
+                        <th>Situação do Aluno</th>
+                        <th>Situação da Matrícula Período</th>
+                        <th>Percentual de C.H. Cumprida</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% regroup alunos by curso_campus as alunos_agrupados %}
+                    {% for item_aluno in alunos_agrupados %}
+                        <tr>
+                            <td colspan="6"><strong>{{ item_aluno.grouper }}</strong></td>
+                        </tr>
+                        {% for aluno in item_aluno.list %}
+                            <tr>
+                                <td><input value="{{ aluno.pk }}" name="alunos_selecionados" type="checkbox"/></td>
+                                <td>
+                                    <a href="{{ aluno.get_absolute_url }}?tab=dados_academicos">{{ aluno.matricula }}</a>
+                                </td>
+                                <td>{{ aluno.get_nome|normalizar }}</td>
+                                <td>{{ aluno.situacao }}</td>
+                                <td>{{ aluno.get_ultima_matricula_periodo.situacao }}</td>
+                                <td>{% progressbar aluno.get_percentual_carga_horaria_cumprida|floatformat:0 %}</td>
+                            </tr>
+                        {% endfor %}
+                    {% endfor %}
+                    </tbody>
+                </table>
+                <div class="submit-row">
+                    <input type="button" class="danger no-confirm" id="btn_evadir" value="Evadir Alunos Selecionados"/>
+                </div>
+            </form>
+        {% endbox %}
+    {% else %}
+        {% if request.META.QUERY_STRING %}
+            <p class="alert alert-info">Nenhum aluno encontrado com os critérios informados.</p>
+        {% endif %}
+    {% endif %}
+    <script>
+        $("#btn_evadir").click(function (ev) {
+            ids = $("input[name='alunos_selecionados']:checked").map(function () {
+                return this.value;
+            }).get().join("_");
+            if (ids && confirm("Você tem certeza que deseja evadir o(s) aluno(s) selecionado(s)?")) {
+                $('#form_evadir_aluno').submit();
+            }
+        });
+    </script>
+{% endblock %}

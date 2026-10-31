@@ -1,0 +1,153 @@
+{% extends super_template %}
+{% block bodyclass %}{% if object.avaliador %} hasAsideRight{% endif %}{% endblock %}
+
+{% block content %}
+<ul class="action-bar">
+    {% if pode_avaliar %}
+        {% if object.pode_deferir %}
+            <li><a class="btn success" href="{% url 'labfisico:deferir_solicitacao' object.pk %}">Deferir</a></li>
+        {% endif %}
+        <li><a class="btn danger no-confirm" href="{% url 'labfisico:indeferir_solicitacao' object.pk %}"> Indeferir</a></li>
+    {% endif %}
+    {% if object.pode_cancelar %}
+        <li><a class="btn danger no-confirm" href="{% url 'labfisico:cancelar_solicitacao' object.pk %}"> Cancelar</a></li>
+    {% endif %}
+    {% if object.pode_adicionar_membro %}
+        <li><a class="btn success" href="{% url 'labfisico:procurar_usuario' object.pk %}">Adicionar Membro</a></li>
+    {% endif %}
+</ul>
+
+{% if object.estah_pendente or object.deferida %}
+    {% if not object.laboratorio.is_sync_ldap %}
+        <h4 class="alert alert-info"> 
+            O laboratório <strong>{{object.laboratorio }}</strong> está inativo. Verifique a sincronização com o Active Directory.
+        </h4>
+    {% endif %}
+{% endif %}
+
+{% box "Dados da Solicitação" %}
+    <table class="info">
+        <tbody>
+            <tr>
+                <td>Número: </td>
+                <td>#{{object.id }} </td>
+                <td>Laboratorio:</td>
+                <td colspan="2">{{ object.laboratorio }}</td>
+            </tr>
+            <tr>
+                <td>Solicitante:</td>
+                <td>{{ object.solicitante|format }}</td>
+                <td>Data da Solicitação:</td>
+                <td>{{ object.created }}</td>
+            </tr>
+            <tr>
+                <td>Período Solicitado:</td>
+                <td>{{ object.get_periodo }}</td>
+                <td>Recorrência:</td>
+                <td>
+                    {{ object.get_recorrencia_display }}
+                    {% if object.get_recorrencias %}
+                        {{ object.get_recorrencias }}
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
+                <td>Diário:</td>
+                <td>{{object.diario|default:"Sem diário associado" }}</td>
+                <td>Status:</td>
+                <td>{{object.get_formated_status}}</td>
+            </tr>
+            <tr>
+        </tbody>
+    </table>
+{% endbox %}
+
+{% if calendario %}
+<div class="tab-pane  ajax-rendered"  data-title="Dados gerais" data-tab="dados_gerais">
+    {% box 'Agenda Atual do Laboratório {{object.laboratorio }}' %}
+        <div class="legenda">
+            <p>Legenda:</p>
+            <ul>
+                <li class="hoje">Hoje</li>
+                <li class="warning">Solicitação de reserva</li>
+                <li class="info">Esta solicitação</li>
+                <li class="danger">Esta Solicitação em conflito</li>
+                <li class="success">Reservas deferidas</li>
+                <li class="conflito">Conflito</li>
+            </ul>
+        </div>
+        {% for mes in calendario %}
+            {{ mes|safe }}
+        {% endfor %}
+    {% endbox %}
+</div>
+{% endif %}
+<div class="tab-pane" data-title="Membros" data-tab="dados_membros">
+    {% box 'Membros' %}
+    <table>
+        <thead>
+            <tr>
+                <th>Matricula</th>
+                <th>Nome</th>
+                <th>Categoria</th>
+                <th>Ativo</th>
+                <th class="no-print">Opções</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for membro in object.get_membros_status.values %}
+            <tr>
+                <td> {{membro|get_value_dict:"matricula" }}</td>
+                <td> {{membro|get_value_dict:"nome" }}</td>
+                <td> {{membro|get_value_dict:"tipo" }}</td>
+                <td> {{membro|get_value_dict:"status"|format }}</td>
+                <td class="no-print">
+                    {% with membro_pk=membro|get_value_dict:"id" %}
+                    <a class="btn danger" href="{% url 'labfisico:remover_membro' object.id membro_pk %}">Remover Membro</a>
+                    {% endwith %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endbox %}
+</div>
+{% endblock %}
+ 
+{% block asideright %}
+
+{% if object.avaliador %}
+    <aside class="right">
+        <details open="open">
+            <summary>Dados da Avaliação</summary>
+            <dl class="details-container">
+                <dt>Avaliador:</dt>
+                <dd>{{ object.avaliador|format }}</dd>
+                <dt>Data da Avaliação:</dt>
+                <dd>{{ object.data_avaliacao }}</dd>
+                {% if object.observacao_avaliador %}
+                    <dt>Observação do Avaliador:</dt>
+                    <dd>{{ object.observacao_avaliador }}</dd>
+                {% endif %}
+            </dl>
+        </details>
+    </aside>
+{% endif %}
+{% if object.cancelada_por %}
+    <aside class="right">
+        <details open="open">
+            <summary>Dados da Avaliação</summary>
+            <dl class="details-container">
+                <dt>Cancelada por:</dt>
+                <dd>{{ object.cancelada_por|format }}</dd>
+                <dt>Data do Cancelamento:</dt>
+                <dd>{{ object.data_cancelamento }}</dd>
+                <dt>Observação do Avaliador:</dt>
+                <dd>{{ object.justificativa_cancelamento }}</dd>
+            </dl>
+        </details>
+    </aside>
+{% endif %}
+
+
+{% endblock %}

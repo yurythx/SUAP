@@ -1,0 +1,100 @@
+{% extends super_template %}
+
+
+{% block bodyclass %}hasAsideRight{% endblock %}
+
+{% block content %}
+
+    {% if perms.edu.add_mensagem and is_remetente %}
+        <ul class="action-bar">
+            <li><a href="/edu/enviar_mensagem_complementar/{{ obj.pk }}/" class="btn success popup">Enviar Mensagem Complementar</a></li>
+        </ul>
+        <br />
+    {% endif %}
+
+    <div class="richtext">{{ obj.conteudo|sanitize }}</div>
+
+    {% if is_remetente or is_administrador %}
+        {% box "Dados do Envio" %}
+            <h4>Destinatários que visualizaram no SUAP ({{ registros_leitura.count }})</h4>
+            <table>
+                <thead>
+                <tr>
+                    <th>Matrícula</th>
+                    <th>Destinatário</th>
+                    <th>Data da Leitura</th>
+                </tr>
+                </thead>
+                <tbody>
+                    {% autopaginate registros_leitura 20 %}
+                    {% for registro in registros_leitura %}
+                        <tr>
+                            <td>{{ registro.destinatario.username }}</td>
+                            <td>{{ registro.destinatario.get_profile.nome|normalizar|format }}
+                                {% if registro.destinatario.get_vinculo.cursocampus_set.exists or registro.destinatario.get_vinculo.cursocampus_vicecoordenador_set.exists %} - Coordenador(a) de Curso{% endif %}</td>
+                            <td>{{ registro.data_leitura|format }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="3">
+                                <p class="alert alert-info">Até o momento nenhum destinário leu a mensagem. </p>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% paginate %}
+
+            <h4>Destinatários que não visualizaram no SUAP ({{ outros_destinatarios.count }})</h4>
+            <table>
+                <thead>
+                <tr>
+                    <th>Matrícula</th>
+                    <th>Destinatário</th>
+                </tr>
+                </thead>
+                <tbody>
+                    {% autopaginate outros_destinatarios 20 %}
+                    {% for destinatario in outros_destinatarios %}
+                        <tr>
+                            <td>{{ destinatario.username }}</td>
+                            <td>{{ destinatario.get_profile.nome|normalizar|format }}
+                                {% if destinatario.get_vinculo.cursocampus_set.exists or destinatario.get_vinculo.cursocampus_vicecoordenador_set.exists %} - Coordenador(a) de Curso{% endif %}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="3">
+                                <p class="alert alert-info">Lida por todos destinários.</p>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% paginate %}
+        {% endbox %}
+    {% endif %}
+{% endblock %}
+
+{% block asideright %}
+
+<aside class="right">
+    <details open="open">
+        <summary>Dados gerais</summary>
+        <dl class="details-container">
+            <dt>{{ obj|verbose:'remetente' }}:</dt>
+            <dd>{{ obj.remetente|format }}</dd>
+            <dt>Data de Envio:</dt>
+            <dd>{{ obj.data_envio|format }}</dd>
+            {% if obj.anexo %}
+                <dt>{{ obj|verbose:'anexo' }}:</dt>
+                <dd><a href="{{ obj.anexo.url }}">{{ obj.anexo|filename }}</a></dd>
+            {% endif %}
+            <dt>{{ obj|verbose:'via_suap' }}:</dt>
+            <dd>{{ obj.via_suap|format }}</dd>
+            <dt>{{ obj|verbose:'via_email' }}:</dt>
+            <dd>{{ obj.via_email|format }}</dd>
+        </dl>
+    </details>
+</aside>
+
+{% endblock %}

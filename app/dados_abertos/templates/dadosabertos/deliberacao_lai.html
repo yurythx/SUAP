@@ -1,0 +1,189 @@
+{% extends super_template %}
+{% load i18n static %}
+
+{% block extracss %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static 'dados_abertos/css/formularios.css' %}">
+{% endblock %}
+
+{% block content %}
+
+<form method="get" class="mb-3">
+    <label for="pda-select">{% trans "Plano de Dados Abertos" %}</label>
+    <select id="pda-select" name="pda" class="form-control" onchange="this.form.submit()">
+        {% for p in pdas %}
+            <option value="{{ p.pk }}" {% if pda and p.pk == pda.pk %}selected{% endif %}>{{ p }}</option>
+        {% endfor %}
+    </select>
+</form>
+
+{% if not fila %}
+    <span class="status status-info">{% trans "Nenhum dataset em análise do LAI neste PDA." %}</span>
+{% else %}
+
+    {% progressbar progresso.percentual %}
+    <p class="progress-description">
+        {% blocktrans with liberadas=progresso.liberadas total=progresso.total %}{{ liberadas }} de {{ total }} bases do PDA já liberadas.{% endblocktrans %}
+        {% blocktrans with posicao=posicao restantes=fila|length %}Analisando o {{ posicao }}º de {{ restantes }} em análise.{% endblocktrans %}
+    </p>
+
+    {% box "Fila de análise" "collapsed" badge=fila|length %}
+        <ul>
+            {% for item in fila %}
+                <li>
+                    {% if item.pk == detalhe.relacao.pk %}
+                        <strong>{{ item.base_dados.titulo }}</strong>
+                        <span class="status status-info">{% trans "em foco" %}</span>
+                    {% else %}
+                        <a href="?pda={{ pda.pk }}&amp;rel={{ item.pk }}">{{ item.base_dados.titulo }}</a>
+                    {% endif %}
+                    <span class="text-muted">
+                        {% blocktrans count counter=item.qtd_recursos %}{{ counter }} recurso{% plural %}{{ counter }} recursos{% endblocktrans %}
+                        {% if item.devolucoes %}
+                            &middot; {% blocktrans with rodada=item.devolucoes|add:1 %}{{ rodada }}ª rodada{% endblocktrans %}
+                        {% endif %}
+                    </span>
+                </li>
+            {% endfor %}
+        </ul>
+    {% endbox %}
+
+    {% with relacao=detalhe.relacao %}
+    {% box relacao.base_dados.titulo badge=detalhe.recursos|length %}
+
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>{% trans "Organização" %}</dt>
+                <dd>{{ relacao.base_dados.organizacao|default:"—" }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>{% trans "Situação LAI" %}</dt>
+                <dd><span class="status {{ relacao.classe_situacao_lai }}">{{ relacao.get_situacao_lai_display }}</span></dd>
+            </div>
+            <div class="list-item">
+                <dt>{% trans "Rodada de análise" %}</dt>
+                <dd>{% blocktrans with rodada=relacao.rodada_atual %}{{ rodada }}ª{% endblocktrans %}</dd>
+            </div>
+        </dl>
+
+        {% if relacao.base_dados.notas %}
+            <p>{{ relacao.base_dados.notas }}</p>
+        {% endif %}
+
+        {% if relacao.motivo_reabertura %}
+            <span class="status status-warning">{{ relacao.motivo_reabertura }}</span>
+        {% endif %}
+
+        {% if detalhe.ultimo_parecer %}
+            <h3>{% trans "O que foi pedido e o que foi respondido" %}</h3>
+            <dl class="definition-list">
+                <dt>
+                    {% trans "Parecer anterior" %}
+                    <span class="text-muted">{{ detalhe.ultimo_parecer.data|date:"d/m/Y" }}</span>
+                </dt>
+                <dd>{{ detalhe.ultimo_parecer.texto|linebreaksbr }}</dd>
+                {% if detalhe.ultima_resposta %}
+                    <dt>
+                        {% trans "Resposta do gestor" %}
+                        <span class="text-muted">{{ detalhe.ultima_resposta.data|date:"d/m/Y" }}</span>
+                    </dt>
+                    <dd>{{ detalhe.ultima_resposta.texto|linebreaksbr }}</dd>
+                {% else %}
+                    <dt>{% trans "Resposta do gestor" %}</dt>
+                    <dd><span class="status status-alert">{% trans "Reenviado sem descrição dos ajustes." %}</span></dd>
+                {% endif %}
+            </dl>
+        {% endif %}
+
+        {% box "Histórico" "collapsed" badge=detalhe.eventos|length %}
+            <ul class="timeline">
+                {% for evento in detalhe.eventos %}
+                    <li class="{{ evento.classe_timeline }}">
+                        <div class="timeline-date">{{ evento.data|date:"d/m/Y H:i" }}</div>
+                        <div class="timeline-icon"></div>
+                        <div class="timeline-content">
+                            <h4>
+                                {{ evento.get_tipo_display }}
+                                <small>
+                                    {% if evento.autor %}
+                                        {% blocktrans with autor=evento.autor %}por {{ autor }}{% endblocktrans %}
+                                    {% else %}
+                                        {% trans "registro automático do sistema" %}
+                                    {% endif %}
+                                </small>
+                            </h4>
+                            {% if evento.texto %}<p>{{ evento.texto|linebreaksbr }}</p>{% endif %}
+                        </div>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% endbox %}
+
+        <h3>{% trans "Recursos e prévia dos dados" %}</h3>
+        {% for r in detalhe.recursos %}
+            {% if r.preview.colunas %}
+                <div class="table-responsive">
+                    <table>
+                        <caption class="pt-0">
+                            {{ r.nome }} <span class="text-muted">({{ r.formato }})</span> &mdash;
+                            {% blocktrans count counter=r.preview.linhas|length %}prévia de {{ counter }} registro{% plural %}prévia dos primeiros {{ counter }} registros{% endblocktrans %}
+                        </caption>
+                        <thead>
+                            <tr>
+                                {% for c in r.preview.colunas %}<th>{{ c }}</th>{% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for linha in r.preview.linhas %}
+                                <tr>
+                                    {% for celula in linha %}<td>{{ celula }}</td>{% endfor %}
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p>
+                    <strong>{{ r.nome }}</strong> <span class="text-muted">({{ r.formato }})</span>
+                    <span class="status status-alert">{% if r.preview.erro %}{{ r.preview.erro }}{% else %}{% trans "Sem registros para prévia." %}{% endif %}</span>
+                </p>
+            {% endif %}
+        {% endfor %}
+
+        <form method="post" class="mt-3">
+            {% csrf_token %}
+            <input type="hidden" name="pda" value="{{ pda.pk }}">
+            <input type="hidden" name="relacao_id" value="{{ relacao.pk }}">
+            <label for="parecer_{{ relacao.pk }}">
+                {% trans "Parecer" %} <span class="text-muted">({% trans "obrigatório ao devolver" %})</span>
+            </label>
+            <textarea id="parecer_{{ relacao.pk }}" name="parecer" class="form-control" rows="3">{{ parecer_digitado }}</textarea>
+            <div class="mt-2">
+                <button type="submit" name="decisao" value="{{ SituacaoLAI.LIBERADO }}" class="btn success">
+                    {% icone "check" %} {% trans "Liberar" %}
+                </button>
+                <button type="submit" name="decisao" value="{{ SituacaoLAI.DEVOLVIDO }}" class="btn warning">
+                    {% icone "reply" %} {% trans "Devolver para ajustes" %}
+                </button>
+            </div>
+        </form>
+
+    {% endbox %}
+    {% endwith %}
+
+    <div class="mt-2">
+        {% if anterior %}
+            <a href="?pda={{ pda.pk }}&amp;rel={{ anterior.pk }}" class="btn">
+                {% icone "arrow-left" %} {% trans "Anterior" %}
+            </a>
+        {% endif %}
+        {% if proximo %}
+            <a href="?pda={{ pda.pk }}&amp;rel={{ proximo.pk }}" class="btn">
+                {% trans "Próximo" %} {% icone "arrow-right" %}
+            </a>
+        {% endif %}
+    </div>
+
+{% endif %}
+
+{% endblock %}

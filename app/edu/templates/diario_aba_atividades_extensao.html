@@ -1,0 +1,97 @@
+{% with pode_avaliar=obj|method:"pode_avaliar_atividade_extensao"|call:request.user %}
+<div class="table-responsive">
+    <table>
+        <caption>Atividades de extensão dos alunos</caption>
+        <thead>
+        <tr>
+            <th>Aluno</th>
+            <th>Atividades</th>
+            <th class="text-center">CH cumprida</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for md in obj.matriculadiario_set.all %}
+            <tr>
+                <td>
+                    <div class="person borderless">
+                        <div class="photo-circle responsive">
+                            <img src="{{ md.matricula_periodo.aluno.get_foto_75x100_url }}" alt="Foto de {{ md.matricula_periodo.aluno.get_nome }}">
+                        </div>
+                        <dl>
+                            <dt class="visually-hidden">Aluno:</dt>
+                            <dd>
+                                <b class="n">{{ forloop.counter }}</b> - {{ md.matricula_periodo.aluno.get_nome }}
+                                {% if perms.edu.view_aluno or professor_diario.ativo %}<a href="{{ md.matricula_periodo.aluno.get_absolute_url }}">{% endif %}{{ md.matricula_periodo.aluno.matricula|format }}{% if perms.edu.view_aluno or professor_diario.ativo %}</a>{% endif %}
+                            </dd>
+                            <dt class="visually-hidden">Situações</dt>
+                            {% if not md.habilitada or not md.is_cursando %}<dd class="false">Período letivo fechado</dd>{% endif %}
+                        </dl>
+                    </div>
+                </td>
+                <td>
+                    {% with vinculacoes=md.vinculacaoatividadeextensao_set.all %}
+                        {% if vinculacoes %}
+                            <ul>
+                                {% for vinculacao in vinculacoes %}
+                                    {% with codigo_situacao=vinculacao.get_codigo_situacao %}
+                                        <li>
+                                            {{ vinculacao }} -
+                                            <select {% if not pode_avaliar or not md.habilitada or not md.is_cursando %}disabled{% endif %} data-situacao-anterior="{{ codigo_situacao }}" onchange="avaliar_atividade_extensao(this, {{ md.pk }}, {{ vinculacao.pk }})">
+                                                <option {% if codigo_situacao == "0" %}selected{% endif %} value="0">Em análise</option>
+                                                <option {% if codigo_situacao == "1" %}selected{% endif %} value="1">Homologada</option>
+                                                <option {% if codigo_situacao == "2" %}selected{% endif %} value="2">Não Homologada</option>
+                                            </select>
+                                        </li>
+                                    {% endwith %}
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <span class="status status-default">Nenhuma</span>
+                        {% endif %}
+                    {% endwith %}
+                </td>
+                <td class="text-center status-atividades-extensao{{ md.pk }}">
+                    {% with ch=md.get_ch_atividade_extensao_cumprida ch_requerida=obj.componente_curricular.get_ch_extensao_exigida %}
+                        {% if ch %}
+                            {% if ch < ch_requerida %}
+                                <span class="status status-info">{{ ch }} de {{ ch_requerida }} hora(s)</span>
+                            {% else %}
+                                <span class="status status-success">{{ ch }} de {{ ch_requerida }} hora(s)</span>
+                            {% endif %}
+                        {% else %}
+                            <span class="status status-alert">Nenhuma</span>
+                        {% endif %}
+                    {% endwith %}
+                </td>
+            </tr>
+        {% empty %}
+            <tr>
+                <td colspan="3"><p class="alert alert-warning">Nenhum aluno matriculado neste diário.</p></td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+<script>
+    function avaliar_atividade_extensao(select, md, pk){
+        var situacao = $(select).val();
+        $.get('/edu/vinculacaoatividadeextensao/'+pk+'/avaliar/'+situacao+'/ajax/', function(html){
+            $(select).data('situacao-anterior', situacao);
+            $('.status-atividades-extensao'+md).html(html);
+        }).fail(function(xhr){
+            var data = xhr.responseJSON;
+            if (!data && xhr.responseText) {
+                try {
+                    data = JSON.parse(xhr.responseText);
+                } catch(e) {}
+            }
+            var situacaoAnterior = (data && data.situacao_anterior !== undefined) ? data.situacao_anterior : $(select).data('situacao-anterior');
+            if (situacaoAnterior !== undefined) {
+                $(select).val(situacaoAnterior);
+            }
+            var msg = (data && data.erro) || 'Não foi possível avaliar a atividade de extensão.';
+            alert(msg);
+        });
+    }
+</script>
+{% endwith %}

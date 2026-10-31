@@ -1,0 +1,264 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR" dir="ltr">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="x-ua-compatible" content="ie=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="description" content="SUAP: Documentação">
+        <title>SUAP: Documentação</title>
+        <link rel="shortcut icon" href="{% static 'comum/img/favicon.png' %}" />
+        <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.0.10/css/all.css" integrity="sha384-+d0P83n9kaQMCwj8F4RJB66tzIwOKmrdb46+porD/OvrJ+37WqIM7UoBtwHO6Nlg" crossorigin="anonymous">
+        <link rel="stylesheet" href="{% static 'comum/documentacao/lightbox.min.css' %}" />
+        <link rel="stylesheet" href="{% static 'comum/documentacao/main.css' %}" />
+        <script src="{% static 'comum/documentacao/jquery.min.js' %}"></script>
+        <script src="{% static 'comum/documentacao/lightbox.min.js' %}"></script>
+        <script>
+            $(function () {
+                $("#toggleMenu").click(function() {
+                    $("aside").toggleClass("collapsed");
+                });
+            });
+            lightbox.option({
+                'albumLabel': "Passo %1 de %2",
+            });
+        </script>
+    </head>
+
+    <body>
+        <button id="toggleMenu">Documentação</button>
+        <aside>
+            <h1><a href="/comum/documentacao/">Documentação</a></h1>
+			<p class="date">Atualizada em {{ data_ultima_atualizacao_documentacao }}</p>
+            <form role="search">
+                <input type="search" id="buscarDoc" onkeyup="buscar()" placeholder="Buscar" autofocus>
+            </form>
+            <ul id="menu">
+                {% for area, doc in documentacao.items %}
+                    <li>
+                        <h2><a class="closed" href="#">{{ area }}</a></h2>
+                        <ul class="hide ul_apps">
+                            {% for aplicacao in doc %}
+                                <li>
+                                    <h3><a class="closed sobre_modulo" href="#" data-aplicacao="{{ aplicacao.sigla }}">{{ aplicacao.nome }}</a></h3>
+                                    <ul class="hide ul_funcionalidades">
+                                        {% for funcionalidade in aplicacao.funcionalidades %}
+                                            <li>
+                                                <h4><a class="closed sobre_funcionalidade" href="#" data-aplicacao="{{ aplicacao.sigla }}" data-funcionalidade="{{ funcionalidade.chave }}" data-cenario="sobre"><span>{{ forloop.parentloop.counter }}.{{ forloop.counter }}.</span> {{ funcionalidade.nome }}</a></h4>
+                                                <ul class="hide ul_cenarios">
+                                                    {% for cenario in funcionalidade.cenarios %}
+                                                        <li>
+                                                            <h5>
+                                                                <a href="#" class="cenario" data-aplicacao="{{ aplicacao.sigla }}" data-funcionalidade="{{ funcionalidade.chave }}" data-cenario="{{ cenario.chave }}">
+                                                                    <span>{{ forloop.parentloop.parentloop.counter }}.{{ forloop.parentloop.counter }}.{{ forloop.counter }}</span>
+                                                                    {{ cenario.nome }}
+                                                                </a>
+                                                            </h5>
+                                                        </li>
+                                                    {% endfor %}
+                                                </ul>
+                                            </li>
+                                        {% endfor %}
+                                    </ul>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </li>
+                {% endfor %}
+            </ul>
+
+        </aside>
+
+        <main>
+            <h2>Selecione o módulo:</h2>
+            <div class="boxes">
+                {% for area, doc in documentacao.items %}
+                    <div class="item">
+                        <h3>{{ area }}</h3>
+                        <ol>
+                        {% for app in doc %}
+                            <li><a href="#" class="sobre" data-aplicacao="{{ app.sigla }}">{{ app.nome }}</a></li>
+                           {% endfor %}
+                        </ol>
+                    </div>
+                {% endfor %}
+            </div>
+        </main>
+
+        <script>
+            function buscar_recursivo(ul, expandir_descendentes) {
+                if (typeof i == "undefined") {
+                    i = 0;
+                }
+                if (typeof i_array == "undefined") {
+                    i_array = [];
+                }
+                if (typeof ul_array == "undefined") {
+                    ul_array = [];
+                }
+
+                i_array.push(i);
+                ul_array.push(ul);
+
+                expandir_ancestrais = false
+                i = 0;
+                while(i < ul.children.length){
+                    filho = ul.children[i];
+                    if (expandir_descendentes){
+                        if (filho.children.length == 1){
+                            filho.children[0].parentElement.style.display = "";
+                        }else{
+                            filho.children[0].children[0].classList.remove('closed')
+                            filho.children[0].children[0].classList.add('opened')
+                            filho.children[1].classList.remove('hide')
+                            buscar_recursivo(filho.children[1], true);
+                        }
+                    }else{
+                        texto_filho = filho.children[0].textContent
+                        if (texto_filho.toUpperCase().indexOf(filter) > -1) {
+                            if (filho.children.length == 1){
+                                filho.children[0].parentElement.style.display = "";
+                            }else{
+                                filho.children[0].children[0].classList.remove('closed')
+                                filho.children[0].children[0].classList.add('opened')
+                                filho.children[1].classList.remove('hide')
+                                buscar_recursivo(filho.children[1], true);
+                            }
+                        } else {
+                            if (filho.children.length > 1){
+                                buscar_recursivo(filho.children[1], false);
+                            }
+                        }
+                    }
+                    i = i+1;
+                }
+                i = i_array.pop();
+                ul = ul_array.pop();
+            }
+
+            function reset_links(esconder){
+                cenarios = document.getElementsByClassName("cenario")
+                for (i = 0; i < cenarios.length; i++) {
+                    if (esconder){
+                        cenarios[i].parentElement.parentElement.style.display = "none";
+                    }else{
+                        cenarios[i].parentElement.parentElement.style.display = "block";
+                    }
+                }
+            }
+
+            function esconder_ancestrais_link_oculto() {
+                ul = document.getElementsByClassName("ul_cenarios")
+                    for (i = 0; i < ul.length; i++) {
+                        lista = ul[i].children;
+                        ul[i].classList.add('hide');
+                        for (j = 0; j < lista.length; j++) {
+                            if (lista[j].style.display == ""){
+                                ul[i].parentElement.style.display = "";
+                                ul[i].classList.remove('hide')
+                                break;
+                            } else {
+                                ul[i].parentElement.style.display = "none";
+                            }
+                        }
+                    }
+                    ul = document.getElementsByClassName("ul_funcionalidades")
+                    for (i = 0; i < ul.length; i++) {
+                    lista = ul[i].children;
+                    ul[i].classList.add('hide')
+                        for (j = 0; j < lista.length; j++) {
+                        if (lista[j].style.display == ""){
+                            ul[i].parentElement.style.display = "";
+                                ul[i].classList.remove('hide')
+                                break;
+                            }else{
+                            ul[i].parentElement.style.display = "none";
+                            }
+                    }
+                }
+                ul = document.getElementsByClassName("ul_apps")
+                for (i = 0; i < ul.length; i++) {
+                    ul[i].classList.add('hide')
+                        lista = ul[i].children;
+                        for (j = 0; j < lista.length; j++) {
+                        if (lista[j].style.display == ""){
+                            ul[i].parentElement.style.display = "";
+                            ul[i].classList.remove('hide')
+                            break;
+                        }else{
+                            ul[i].parentElement.style.display = "none";
+                            }
+                        }
+                     }
+            }
+
+            function buscar() {
+                reset_links(true);
+                input = document.getElementById('buscarDoc');
+                filter = input.value.toUpperCase();
+                if (filter.length == 0){
+                    reset_links(false);
+                }
+                menu = document.getElementById('menu');
+                buscar_recursivo(menu, false);
+                esconder_ancestrais_link_oculto();
+            }
+
+            $(document).ready(function () {
+
+                // Menu Principal
+                $("aside a").click(function (){
+                    $("aside a").removeClass("active");
+                    $(this).addClass("active");
+                    $(this).toggleClass("opened");
+                    $(this).parent().next("ul").toggleClass("hide");
+                });
+
+                $(".cenario").each(function (index) {
+                    $(this).on("click", function () {
+                        m_aplicacao = $(this).data("aplicacao");
+                        m_funcionalidade = $(this).data("funcionalidade");
+                        m_cenario = $(this).data("cenario");
+
+                        $.ajax("/comum/documentacao/cenario/" + m_aplicacao + "/" + m_funcionalidade + "/" + m_cenario + "/")
+                            .done(function(data) {
+                                $("main").html(data);
+                        });
+                    });
+                });
+                $(".sobre").each(function (index) {
+                    $(this).on("click", function () {
+                        m_aplicacao = $(this).data("aplicacao");
+                        document.getElementById("buscarDoc").value = $(this)[0].textContent;
+                        buscar();
+                        $.ajax("/comum/documentacao/about/" + m_aplicacao +"/")
+                            .done(function(data) {
+                                $("main").html(data);
+                        });
+                    });
+                });
+                $(".sobre_modulo").each(function (index) {
+                    $(this).on("click", function () {
+                        m_aplicacao = $(this).data("aplicacao");
+                        $.ajax("/comum/documentacao/about/" + m_aplicacao +"/")
+                            .done(function(data) {
+                                $("main").html(data);
+                        });
+                    });
+                });
+                $(".sobre_funcionalidade").each(function (index) {
+                    $(this).on("click", function () {
+                        m_aplicacao = $(this).data("aplicacao");
+                        m_funcionalidade = $(this).data("funcionalidade");
+                        $.ajax("/comum/documentacao/about_feature/" + m_aplicacao +"/"+ m_funcionalidade +"/")
+                            .done(function(data) {
+                                $("main").html(data);
+                        });
+                    });
+                });
+            });
+
+        </script>
+
+    </body>
+</html>

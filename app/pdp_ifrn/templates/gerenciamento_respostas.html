@@ -1,0 +1,231 @@
+{% extends super_template %}
+
+{% block extrahead %}
+    <link rel="stylesheet" href="/static/cfs/css/estilo.css" />
+    <script src="/static/cfs/js/funcoes.js"></script>
+
+    <script type="text/javascript">
+        function deferirSelecionadas(){
+            if($("input[id=ids_respostas]:checked").length == 0){
+                alert('Nenhuma resposta foi selecionada!');
+            }else{
+                if(confirm("Tem certeza que deseja deferir as Respostas selecionadas?")){
+                    document.forms["form1"].action='/pdp_ifrn/registrar_historico_selecionadas/deferida/{{ status}}/';
+                    document.forms["form1"].submit();
+                }
+            }
+        }
+
+        function indeferirSelecionadas(){
+            if($("input[id=ids_respostas]:checked").length == 0){
+                alert('Nenhuma resposta foi selecionada!');
+            }else{
+                if(confirm("Tem certeza que deseja indeferir as Respostas selecionadas?")){
+                    document.forms["form1"].action='/pdp_ifrn/registrar_historico_selecionadas/indeferida/{{ status}}/';
+                    document.forms["form1"].submit();
+                }
+            }
+        }
+
+        function aprovarSelecionadas(){
+            if($("input[id=ids_respostas]:checked").length == 0){
+                alert('Nenhuma resposta foi selecionada!');
+            }else{
+                if(confirm("Tem certeza que deseja aprovar as Respostas selecionadas?")){
+                    document.forms["form1"].action='/pdp_ifrn/registrar_historico_selecionadas/aprovada/{{ status}}/';
+                    document.forms["form1"].submit();
+                }
+            }
+        }
+
+        function reprovarSelecionadas(){
+            if($("input[id=ids_respostas]:checked").length == 0){
+                alert('Nenhuma resposta foi selecionada!');
+            }else{
+                if(confirm("Tem certeza que deseja reprovar as Respostas selecionadas?")){
+                    document.forms["form1"].action='/pdp_ifrn/registrar_historico_selecionadas/reprovada/{{ status}}/';
+                    document.forms["form1"].submit();
+                }
+            }
+        }
+
+        function homologarSelecionadas(){
+            if($("input[id=ids_respostas]:checked").length == 0){
+                alert('Nenhuma resposta foi selecionada!');
+            }else{
+                if(confirm("Tem certeza que deseja homologar as Respostas selecionadas?")){
+                    document.forms["form1"].action='/pdp_ifrn/registrar_historico_selecionadas/homologada/{{ status}}/';
+                    document.forms["form1"].submit();
+                }
+            }
+        }
+
+        function rejeitarSelecionadas(){
+            if($("input[id=ids_respostas]:checked").length == 0){
+                alert('Nenhuma resposta foi selecionada!');
+            }else{
+                if(confirm("Tem certeza que deseja rejeitar as Respostas selecionadas?")){
+                    document.forms["form1"].action='/pdp_ifrn/registrar_historico_selecionadas/rejeitada/{{ status}}/';
+                    document.forms["form1"].submit();
+                }
+            }
+        }
+
+        function selecionar_todos(checkbox){
+            var inputs = document.getElementsByTagName("input");
+            var i = 0;
+            for(i =0; i<inputs.length; i++){
+                var input = inputs[i];
+                if(input.type.toUpperCase()=='CHECKBOX'){
+                    input.checked=checkbox.checked;
+                }
+            }
+        }
+    </script>
+
+    <style type="text/css">
+        /* Formatação dos ícones exibidos na tabela */
+        .icones{
+            cursor: pointer;
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            line-height: 14px;
+            vertical-align: text-top;
+            background-position: 14px 14px;
+            background-repeat: no-repeat;
+            text-indent: -9000px;
+            *margin-right: .3em;
+            *margin-left: 0;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="search-and-filters">
+        {% render_form form %}
+    </div>
+
+    {% if respostas %}
+        <form id="form1" name="form1" action="" method="POST">
+            {% csrf_token %}
+            <input type="hidden" name="ids_respostas_selecionadas" id="ids_respostas_selecionadas">
+            <table>
+                <thead>
+                    <tr>
+                        <th width="10px">#</th>
+                        <th width="2px"><input type="checkbox" onclick="selecionar_todos(this);"/></th>
+                        <th width="120px">Necessidade</th>
+                        <th width="40px">Data da Resposta</th>
+                        <th width="30px">Campus</th>
+                        <th width="40px">Situação</th>
+                        <th width="5px">Opções</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% autopaginate respostas 60 %}
+                    {% paginate %}
+                    {% for i in respostas %}
+                        <tr>
+                            <td> {{ forloop.counter }} </td>
+                            <td><input id="ids_respostas" name="ids_respostas" type="checkbox" value="{{ i.id }}"/></td>
+                            <td>
+                                <p>{{ i.necessidade }}</p>
+                                <a class="popup" href="/pdp_ifrn/resposta/{{ i.id }}/"><b>Ver Detalhes</b></a>
+                            </td>
+                            <td align="center">{{ i.data_cadastro|format  }}</td>
+                            <td align="center">{{ i.campus|format  }}</td>
+                            <td align="center">
+                                {{ i.status_formatado  }}
+                                ({{ i.get_usuario_ultimo_status  }} em {{ i.get_data_ultimo_status  }})
+                            </td>
+                            <td style="align: center" align="center">
+                                <ul class="action-bar">
+                                    <li class="has-child">
+                                        <a href="#">Ações</a>
+                                        <ul>
+                                            {% if pode_deferir_respostas_pdp %}
+                                                {% if i.get_ultimo_status == 'indeferida' or i.get_ultimo_status == 'pendente' %}
+                                                    <li>
+                                                        <a title="Clique aqui para deferir a resposta" href="/pdp_ifrn/registrar_historico/{{ i.id }}/deferida/{{ status}}/">Deferir</a>
+                                                    </li>
+                                                {% endif %}
+
+                                                {% if  i.get_ultimo_status == 'deferida' or i.get_ultimo_status == 'pendente' %}
+                                                <li>
+                                                    <a title="Clique aqui para indeferir a resposta" href="/pdp_ifrn/registrar_historico/{{ i.id }}/indeferida/{{ status}}/" class="popup">Indeferir</a>
+                                                </li>
+                                                {% endif %}
+                                            {% endif %}
+                                            {% if pode_aprovar_respostas_pdp %}
+                                                {% if  i.get_ultimo_status == 'deferida' or i.get_ultimo_status == 'reprovada' %}
+                                                    <li>
+                                                        <a title="Clique aqui para aprovar a resposta" href="/pdp_ifrn/registrar_historico/{{ i.id }}/aprovada/{{ status}}/">Aprovar</a>
+                                                    </li>
+                                                {% endif %}
+
+                                                {% if  i.get_ultimo_status == 'deferida' or i.get_ultimo_status == 'aprovada' %}
+                                                    <li>
+                                                        <a title="Clique aqui para reprovar a resposta" href="/pdp_ifrn/registrar_historico/{{ i.id }}/reprovada/{{ status}}/">Reprovar</a>
+                                                    </li>
+                                                {% endif %}
+                                            {% endif %}
+                                            {% if pode_homologar_respostas_pdp %}
+                                                {% if i.get_ultimo_status == 'aprovada' or i.get_ultimo_status == 'rejeitada' %}
+                                                    <li>
+                                                        <a title="Clique aqui para homologar a resposta" href="/pdp_ifrn/registrar_historico/{{ i.id }}/homologada/{{ status}}/">Homologar</a>
+                                                    </li>
+                                                {% endif %}
+
+                                                {% if i.get_ultimo_status == 'aprovada' or i.get_ultimo_status == 'homologada' %}
+                                                    <li>
+                                                        <a title="Clique aqui para não homologar a resposta" href="/pdp_ifrn/registrar_historico/{{ i.id }}/rejeitada/{{ status}}/">Rejeitar</a>
+                                                    </li>
+                                                {% endif %}
+                                            {% endif %}
+                                        </ul>
+                                    </li>
+                                </ul>
+                            </td>
+                        </tr>
+
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% paginate %}
+
+            <div class="submit-row">
+                {% if pode_deferir_respostas_pdp %}
+                    {% if status == 'indeferida' or status == 'pendente' %}
+                        <input value="Deferir Selecionadas" class="default" type="button" onclick="deferirSelecionadas();"/>
+                    {% endif %}
+                    {% if status == 'deferida' or status == 'pendente' %}
+                        <input value="Indeferir Selecionadas" class="default" type="button" onclick="indeferirSelecionadas();"/>
+                    {% endif %}
+                {% endif %}
+                {% if pode_aprovar_respostas_pdp %}
+                    {% if status == 'deferida' or status == 'reprovada' %}
+                        <input value="Aprovar Selecionadas" class="default" type="button" onclick="aprovarSelecionadas();"/>
+                    {% endif %}
+                    {% if status == 'deferida' or status == 'aprovada' %}
+                        <input value="Reprovar Selecionadas" class="default" type="button" onclick="reprovarSelecionadas();"/>
+                    {% endif %}
+                {% endif %}
+                {% if pode_homologar_respostas_pdp %}
+                    {% if status == 'aprovada' or status == 'rejeitada' %}
+                        <input value="Homologar Selecionadas" class="default" type="button" onclick="homologarSelecionadas();"/>
+                    {% endif %}
+                    {% if status == 'aprovada' or status == 'homologada' %}
+                        <input value="Não Homologar Selecionadas" class="default" type="button" onclick="rejeitarSelecionadas();"/>
+                    {% endif %}
+                {% endif %}
+            </div>
+        </form>
+
+    {% else %}
+        <p class="alert alert-warning">Nenhuma resposta encontrada. Selecione os campo de filtro e clique Buscar para pesquisar.</p>
+        
+    {% endif %}
+    <br />
+
+{% endblock %}

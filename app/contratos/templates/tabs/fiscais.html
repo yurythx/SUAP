@@ -1,0 +1,135 @@
+{% if pode_adicionar_fiscal and not contrato.cancelado %}
+    <ul class="action-bar">
+        <li>
+            <a class="btn success popup"
+                href="/contratos/adicionar_fiscal/{{ contrato.pk }}/">Adicionar Fiscal</a>
+        </li>
+        {% if is_operador %}
+            {% if cronograma %}
+                <li>
+                    <a class="btn default"
+                        href="/contratos/solicitacao_fiscal/{{ contrato.id }}/">Ofício de Solicitação de Fiscal</a>
+                </li>
+                <li>
+                    <a class="btn default"
+                        href="/contratos/solicitacao_publicacao_portaria_fiscal/{{ contrato.id }}/">Ofício de Solicitação de Publicação de Portaria</a>
+                </li>
+                <li>
+                    <a class="btn default"
+                        href="/contratos/gerar_despacho_fiscal/{{ contrato.id }}/">Despacho de Solicitação de Publicação de Portaria</a>
+                </li>
+            {% endif %}
+        {% endif %}
+    </ul>
+{% endif %}
+{% if is_operador %}
+    {% if not cronograma %}
+        <p class="alert alert-info">
+            Defina o cronograma do contrato para que memorandos de solicitação de fiscal possam ser gerados.
+        </p>
+    {% endif %}
+{% endif %}
+{% if fiscais %}
+    {% include "includes/filter_campus.html" with tab="fiscais" %}
+    <form method="post">
+        {% csrf_token %}
+        {% if pode_adicionar_fiscal or pode_excluir_fiscal %}
+            <div class="actions">
+                <label class="pt-2 pe-2">Ação:</label>
+                <button class="btn default"
+                        type="submit"
+                        formaction="/contratos/contrato/{{ contrato.id }}/alterar_situacao_fiscal/1/">
+                    Ativar fiscais
+                </button>
+                <button class="btn btn-primary"
+                        type="submit"
+                        formaction="/contratos/contrato/{{ contrato.id }}/alterar_situacao_fiscal/0/">
+                    Desativar fiscais
+                </button>
+            </div>
+        {% endif %}
+        <div class="table-responsive">
+            {% paginate %}
+            <table>
+                <caption>Fiscais Vinculados ao Contrato</caption>
+                <thead>
+                    <tr>
+                        {% if not contrato.cancelado %}
+                            {% if pode_adicionar_fiscal or pode_excluir_fiscal %}
+                                <th>-</th>
+                                <th class="no-print">Ações</th>
+                            {% endif %}
+                        {% endif %}
+                        <th>Servidor</th>
+                        <th>Tipo</th>
+                        <th>Termo</th>
+                        <th>Portaria</th>
+                        <th>{{ nomenclatura.campus }}</th>
+                        <th>Data da Nomeação</th>
+                        <th>Data Final da Vigência</th>
+                        <th>Situação</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% autopaginate fiscais 20 %}
+                    {% for fiscal in fiscais %}
+                        <tr>
+                            {% if not contrato.cancelado %}
+                                {% if pode_adicionar_fiscal or pode_excluir_fiscal %}
+                                    <td>
+                                        {% if not fiscal.data_exclusao %}
+                                            <input type="checkbox" name="fiscal_ids" value="{{ fiscal.id }}">
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td class="no-print">
+                                        {% if pode_adicionar_fiscal and not fiscal.data_exclusao %}
+                                            {% icon "edit" "/contratos/editar_fiscal/{{ fiscal.id }}/" %}
+                                        {% endif %}
+                                        {% if pode_excluir_fiscal and not fiscal.data_exclusao %}
+                                            {% icon "delete" "?excluir_fiscal={{ fiscal.pk }}" %}
+                                        {% endif %}
+                                    </td>
+                                {% endif %}
+                            {% endif %}
+                            <td>
+                                <a href="/rh/servidor/{{ fiscal.servidor.matricula }}/">{{ fiscal.servidor.matricula }}</a> - {{ fiscal.servidor.pessoa_fisica.nome }}
+                            </td>
+                            <td>{{ fiscal.tipo.descricao }}</td>
+                            {% if fiscal.termo_aditivo %}
+                                <td>
+                                    <a href="/contratos/aditivo/{{ fiscal.termo_aditivo.id }}/">{{ fiscal.termo_aditivo.ordem }}º Termo</a>
+                                </td>
+                            {% else %}
+                                <td>-</td>
+                            {% endif %}
+                            <td>{{ fiscal.numero_portaria }}</td>
+                            <td>{{ fiscal.campus }}</td>
+                            <td>{{ fiscal.data_nomeacao|format }}</td>
+                            <td>{{ fiscal.data_vigencia|format }}</td>
+                            {% if fiscal.data_exclusao %}
+                                <td>
+                                    <span class="status status-error">Excluído desde {{ fiscal.data_exclusao|date:"d/m/y" }}</span>
+                                </td>
+                            {% else %}
+                                {% if fiscal.inativo %}
+                                    <td>
+                                        <span class="status status-error">Inativo</span>
+                                    </td>
+                                {% else %}
+                                    <td>
+                                        <span class="status status-success">Ativo</span>
+                                    </td>
+                                {% endif %}
+                            {% endif %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% paginate %}
+        </div>
+    </form>
+{% else %}
+    <p class="alert alert-warning">Nenhum fiscal cadastrado.</p>
+{% endif %}

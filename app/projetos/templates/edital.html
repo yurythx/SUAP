@@ -1,0 +1,497 @@
+{% extends super_template %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        <li><a class="btn primary" href="/admin/projetos/edital/{{ edital.pk }}/">Editar</a></li>
+        <li><a class="btn success" href="/projetos/upload_edital/{{ edital.id }}/">Carregar Arquivo</a></li>
+        {% if perms.projetos.pode_gerenciar_edital and edital.is_periodo_selecao_e_pre_divulgacao %}
+            <li><a href="/projetos/executar_rotina_classificacao_edital/{{ edital.id }}/" class="btn primary confirm" data-confirm="Tem certeza que deseja executar a rotina de classificação dos projetos?">Classificar Projetos</a></li>
+        {% endif %}
+        {% if edital.pode_notificar_servidores %}
+            <li><a href="/projetos/notificar_servidores_edital/{{ edital.id }}/" class="btn success confirm">Notificar Servidores</a></li>
+        {% endif %}
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+{% box 'Dados do edital' %}
+    <dl class="definition-list flex">
+        <div class="list-item flex-basis-100">
+            <dt>Título</dt>
+            <dd>{{ edital.titulo }}</dd>
+        </div>
+        <div class="list-item flex-basis-100">
+            <dt>Descrição</dt>
+            <dd>{{ edital.descricao }}</dd>
+        </div>
+        {% if eh_interno %}
+            <div class="list-item">
+                <dt>Forma de Seleção</dt>
+                <dd>{{ edital.get_forma_selecao }}</dd>
+            </div>
+        {% endif %}
+        <div class="list-item">
+            <dt>Início das Inscrições</dt>
+            <dd>{{ edital.inicio_inscricoes|format }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Fim das Inscrições</dt>
+            <dd>{{ edital.fim_inscricoes|format }}</dd>
+        </div>
+        {% if edital.participa_aluno or edital.participa_servidor %}
+            <div class="list-item">
+                <dt>Tipos de Participantes</dt>
+                <dd>
+                    <ul>
+                        {% if edital.participa_aluno %}
+                            <li>Alunos</li>
+                        {% endif %}
+                        {% if edital.participa_servidor %}
+                            <li>Servidores</li>
+                        {% endif %}
+                    </ul>
+                </dd>
+            </div>
+        {% endif %}
+        <div class="list-item">
+            <dt>Permite Colaborador Externo</dt>
+            <dd>{{ edital.permite_colaborador_voluntario|format }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Exige Anuência da Chefia</dt>
+            <dd>{{ edital.exige_anuencia }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Versão Atual</dt>
+            <dd>
+                {% if edital.tem_arquivo %}
+                    {% if edital.arquivo_mais_recente.id_documento_edital %}
+                        <a href="/documento_eletronico/visualizar_documento/{{ edital.arquivo_mais_recente.id_documento_edital }}/">Edital</a>
+                    {% else %}
+                        <a href="{{ edital.arquivo_mais_recente.arquivo.url }}" class="btn default">Visualizar Arquivo</a>
+                    {% endif %}
+                {% elif edital.id_documento_edital %}
+                    <a href="/documento_eletronico/visualizar_documento/{{ edital.id_documento_edital }}/">Edital</a>
+                {% elif edital.arquivo %}
+                    <a href="/projetos/visualizar_arquivo/{{ edital.arquivo.id }}/">{{ edital.arquivo.nome }}</a>
+                {% else %}
+                    <span class="status status-alert">Aguardando submissão do arquivo</span>
+                {% endif %}
+            </dd>
+        </div>
+    </dl>
+    {% if edital.tem_arquivo %}
+        <div class="table-responsive">
+            <table>
+                <caption>Histórico de Retificações</caption>
+                <thead>
+                    <tr>
+                        <th class="no-print">Ações</th>
+                        <th>Data</th>
+                        <th>Arquivo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for arquivo in edital.editalarquivo_set.all %}
+                        <tr>
+                             <td class="no-print">
+                                    {% icon "delete" "/projetos/remover_arquivo_retificacao/{{ arquivo.id }}/" %}
+                                </td>
+                            <td>{{ arquivo.data_cadastro }}</td>
+                            {% if arquivo.id_documento_edital %}
+                                <td><a href="/documento_eletronico/visualizar_documento/{{ arquivo.id_documento_edital }}/" class="btn default">Visualizar Arquivo</a></td>
+                            {% else %}
+                                <td><a href="{{ arquivo.arquivo.url }}" class="btn default">Visualizar Arquivo</a></td>
+                            {% endif %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+{% endbox %}
+
+<div class="tab-pane" data-title="Anexos do Edital" data-tab="anexos_edital" data-counter="{{ edital.editalanexoauxiliar_set.count }}">
+    {% box 'Anexos do Edital' %}
+        <ul class="action-bar">
+            <li><a class="btn success popup" href="/projetos/adicionar_anexo_auxiliar/{{ edital.pk }}/">Adicionar Anexo</a></li>
+        </ul>
+        {% if edital.editalanexoauxiliar_set.exists %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Anexos do Edital</caption>
+                    <thead>
+                        <tr>
+                            <th class="no-print">Ações</th>
+                            <th>Nome</th>
+                            <th>Descrição</th>
+                            <th>Arquivo Digitalizado</th>
+                            <th>Opções</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for anexo in edital.editalanexoauxiliar_set.all %}
+                            <tr>
+                                <td class="no-print">
+                                    {% icon "edit" "/projetos/editar_anexo_auxiliar/{{ anexo.id }}/" "Editar" "popup" %}
+                                    {% icon "delete" "/projetos/remover_anexo_auxiliar/{{ anexo.id }}/" %}
+                                </td>
+                                <td>{{ anexo.nome }}</td>
+                                <td>{{ anexo.descricao }}</td>
+                                <td>
+                                {% if anexo.arquivo %}
+                                    <a href="/projetos/visualizar_arquivo/{{ anexo.arquivo.id }}/">{{ anexo.arquivo.nome }}</a>
+                                {% else %}
+                                    <span class="status status-alert">Aguardando submissão do arquivo</span>
+                                {% endif %}
+                                </td>
+                                <td><a href="/projetos/upload_anexo_auxiliar/{{ anexo.id }}/" class="btn success">Carregar Arquivo</a></td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Nenhum anexo cadastrado.</p>
+        {% endif %}
+    {% endbox %}
+</div>
+
+<div class="tab-pane" data-title="Anexos dos Projetos" data-tab="anexos_projeto" data-counter="{{ edital.editalanexo_set.count }}">
+    {% box 'Anexos dos Projetos' %}
+        <ul class="action-bar">
+            <li><a class="btn success" href="/projetos/adicionar_anexo/{{ edital.pk }}/">Adicionar Anexo</a></li>
+        </ul>
+        {% if edital.editalanexo_set.exists %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="no-print">Ações</th>
+                            <th>Nome</th>
+                            <th>Descrição</th>
+                            <th>Tipo de Membro</th>
+                            <th>Vínculo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for anexo in edital.editalanexo_set.all %}
+                            <tr>
+                                <td class="no-print">
+                                    {% icon "edit" "/projetos/editar_anexo/{{ anexo.id }}/" "Editar" "popup" %}
+                                    {% icon "delete" "/projetos/remover_anexo/{{ anexo.id }}/" %}
+                                </td>
+                                <td>{{ anexo.nome }}</td>
+                                <td>{{ anexo.descricao }}</td>
+                                <td>{{ anexo.get_tipo_membro_display|format }}</td>
+                                <td>{{ anexo.vinculo|format }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Nenhum anexo cadastrado.</p>
+        {% endif %}
+    {% endbox %}
+</div>
+
+{% if eh_interno %}
+    {% if edital.exige_tema %}
+        <div class="tab-pane" data-title="Temas" data-tab="temas" data-counter="{{ temas.count }}">
+            {% box 'Temas' %}
+                <ul class="action-bar">
+                    <li><a class="btn success" href="/projetos/adicionar_tema_edital/{{ edital.pk }}/">Adicionar Tema</a></li>
+                </ul>
+                <p class="alert alert-info">Caso o edital possua temas cadastrados, ao indicar um avaliador para um projeto, somente avaliadores com interesse na mesma área temática do projeto estarão disponíveis.</p>
+                {% if temas.exists %}
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th class="no-print">Ações</th>
+                                    <th>Área Temática</th>
+                                    <th>Descrição</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for tema in temas %}
+                                    <tr>
+                                        <td class="no-print">{% icon "delete" "/projetos/remover_tema_edital/{{ edital.id }}/{{ tema.id }}/?origem=1" %}</td>
+                                        <td>{{ tema.areatematica.descricao|format }}</td>
+                                        <td>{{ tema.descricao }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="alert alert-warning">Nenhum tema cadastrado.</p>
+                {% endif %}
+            {% endbox %}
+        </div>
+    {% endif %}
+    <div class="tab-pane" data-title="Fonte de Recursos" data-tab="fonte_recursos" data-counter="{{ edital.recurso_set.count }}">
+        {% box 'Fonte de Recursos' %}
+            <ul class="action-bar">
+                <li><a class="btn success popup" href="/projetos/adicionar_recurso/{{ edital.pk }}/">Adicionar Recurso</a></li>
+            </ul>
+            {% if edital.recurso_set.all.exists %}
+                <div class="table-responsive">
+                    <table>
+                        <caption>Fonte de recursos</caption>
+                        <thead>
+                            <tr>
+                                <th class="no-print">Ações</th>
+                                <th>Tipo de Despesa</th>
+                                <th>Origem</th>
+                                <th>Vinculada ao Cartão Pesquisador?</th>
+                                <th>Valor Disponível por Projeto (R$)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for recurso in edital.recurso_set.all %}
+                                <tr>
+                                    <td class="no-print">
+                                        {% icon "edit" "/projetos/editar_recurso/{{ recurso.id }}/" "Editar" "popup" %}
+                                        {% icon "delete" "/projetos/remover_recurso/{{ recurso.id }}/" %}
+                                    </td>
+                                    <td>{{ recurso.despesa }}</td>
+                                    <td>{{ recurso.origem }}</td>
+                                    <td>{{ recurso.eh_vinculada_cartao_pesquisador|format }}</td>
+                                    <td>{{ recurso.valor|format }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="alert alert-warning">Nenhum recurso cadastrado.</p>
+            {% endif %}
+        {% endbox %}
+    </div>
+{% endif %}
+
+<div class="tab-pane" data-title="Plano de Oferta por Campus" data-tab="oferta_por_campus" data-counter="{{ edital.get_ofertas_projeto.count }}">
+    {% box 'Plano de Oferta por Campus' %}
+        <ul class="action-bar">
+            {% if eh_interno %}
+                <li><a class="btn success popup" href="/projetos/adicionar_oferta_projeto/{{ edital.pk }}/">Adicionar Campus</a></li>
+                <li><a class="btn success" href="/projetos/adicionar_oferta_projeto_em_lote/{{ edital.pk }}/">Adicionar Campi em Lote</a></li>
+            {% else %}
+                <li><a class="btn success" href="/projetos/adicionar_oferta_projeto/{{ edital.pk }}/">Adicionar Oferta</a></li>
+            {% endif %}
+
+        </ul>
+        {% if edital.get_ofertas_projeto.exists %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Plano de Oferta por Campus</caption>
+                    <thead>
+                        <tr>
+                            <th class="no-print">Ações</th>
+                            <th>Campus</th>
+                            <th>Foco Tecnológico</th>
+                            {% if eh_interno %}
+                                {% if not edital.forma_selecao == edital.GRUPO %}
+                                    <th>Máx. de Projetos a Serem Pré-selecionados</th>
+                                {% endif %}
+                                {% if edital.forma_selecao == edital.CAMPUS %}
+                                    <th>Máx. de Projetos a Serem Selecionados</th>
+                                {% endif %}
+                            {% endif %}
+
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for oferta in edital.get_ofertas_projeto %}
+                            <tr>
+                                <td class="no-print">
+                                    {% icon "edit" "/projetos/editar_oferta_projeto/{{ oferta.id }}/{{ edital.id }}/" "Editar" "popup" %}
+                                    {% icon "delete" "/projetos/remover_oferta_projeto/{{ oferta.id }}/{{ edital.id }}/" %}
+                                </td>
+                                <td>{{ oferta.uo }}</td>
+                                <td>
+                                    <ul>
+                                        {% for foco_tecnologico in oferta.focos_tecnologicos.all %}
+                                            <li>{{ foco_tecnologico }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                </td>
+                                {% if eh_interno %}
+                                    {% if not edital.forma_selecao == edital.GRUPO %}
+                                        <td>{{ oferta.qtd_aprovados }}</td>
+                                    {% endif %}
+                                    {% if edital.forma_selecao == edital.CAMPUS %}
+                                        <td>{{ oferta.qtd_selecionados }}</td>
+                                    {% endif %}
+                                {% endif %}
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Nenhuma oferta cadastrada.</p>
+        {% endif %}
+    {% endbox %}
+</div>
+
+{% if eh_interno %}
+    {% if edital.forma_selecao == edital.GRUPO %}
+        <div class="tab-pane" data-title="Plano de Oferta por Grupo" data-tab="oferta_por_grupo" data-counter="{{ edital.get_ofertas_projeto_por_grupo.count }}">
+            {% box 'Plano de Oferta por Grupo' %}
+                <ul class="action-bar">
+                        <li><a class="btn success popup" href="/projetos/adicionar_oferta_por_grupo/{{ edital.pk }}/">Adicionar Grupo</a></li>
+
+                </ul>
+                {% if edital.get_ofertas_projeto_por_grupo.exists %}
+                    <div class="table-responsive">
+                        <table>
+                            <caption>Plano de Oferta por Grupo</caption>
+                            <thead>
+                                <tr>
+                                    <th class="no-print">Ações</th>
+                                    <th>Grupo</th>
+                                    <th>Máx. de Projetos a Serem Pré-selecionados</th>
+                                    <th>Máx. de Projetos a Serem Selecionados</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for oferta in edital.get_ofertas_projeto_por_grupo %}
+                                    <tr>
+                                        <td class="no-print">
+                                            {% icon "edit" "/projetos/editar_oferta_projeto_por_grupo/{{ oferta.id }}/{{ edital.id }}/" "Editar" "popup" %}
+                                            {% icon "delete" "/projetos/remover_oferta_projeto_por_grupo/{{ oferta.id }}/{{ edital.id }}/" %}
+                                        </td>
+                                        <td>{{ oferta.grupo }}</td>
+                                        <td>{{ oferta.pre_selecionados }}</td>
+                                        <td>{{ oferta.selecionados }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="alert alert-warning">Nenhuma oferta cadastrada.</p>
+                {% endif %}
+            {% endbox %}
+        </div>
+    {% endif %}
+    {% if edital.forma_selecao == edital.TEMA %}
+        <div class="tab-pane" data-title="Plano de Oferta por Tema" data-tab="oferta_por_tema" data-counter="{{ edital.get_ofertas_projeto_por_tema.count }}">
+            {% box 'Plano de Oferta por Tema' %}
+                <ul class="action-bar">
+                    <li><a class="btn success popup" href="/projetos/adicionar_oferta_projeto_por_tema/{{ edital.pk }}/">Adicionar Oferta</a></li>
+                </ul>
+                {% if edital.get_ofertas_projeto_por_tema.exists %}
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th class="no-print">Ações</th>
+                                    <th>Área Temática</th>
+                                    <th>Tema</th>
+                                    <th>Quantidade a Serem Selecionados</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for oferta in edital.get_ofertas_projeto_por_tema %}
+                                    <tr>
+                                        <td class="no-print">
+                                            {% icon "edit" "/projetos/editar_oferta_projeto_por_tema/{{ oferta.id }}/{{ edital.id }}/" "Editar" "popup" %}
+                                            {% icon "delete" "/projetos/remover_oferta_projeto_por_tema/{{ oferta.id }}/{{ edital.id }}/" %}
+                                        </td>
+                                        <td>{{ oferta.area_tematica }}</td>
+                                        <td>{{ oferta.tema }}</td>
+                                        <td>{{ oferta.selecionados }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="alert alert-warning">Nenhuma oferta cadastrada.</p>
+                {% endif %}
+            {% endbox %}
+        </div>
+    {% endif %}
+    <div class="tab-pane" data-title="Critérios para Pré-seleção" data-tab="criterios_pre_selecao" data-counter="{{ edital.criteriopreselecao_set.count }}">
+        <ul class="action-bar">
+            <li><a class="btn success popup" href="/projetos/adicionar_criterio_pre_selecao/{{ edital.pk }}/">Adicionar Critério</a></li>
+        </ul>
+        {% if edital.criteriopreselecao_set.exists %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Critérios para pré-seleção</caption>
+                    <thead>
+                        <tr>
+                            <th class="no-print">Ações</th>
+                            <th>Descrição</th>
+                            <th>Texto de Ajuda</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for criterio_avaliacao in edital.criteriopreselecao_set.all %}
+                            <tr>
+                                <td class="no-print">
+                                    {% icon "edit" "/projetos/editar_criterio_pre_selecao/{{ criterio_avaliacao.id }}/" "Editar" "popup" %}
+                                    {% icon "delete" "/projetos/remover_criterio_pre_selecao/{{ criterio_avaliacao.id }}/" %}
+                                </td>
+                                <td>{{ criterio_avaliacao.descricao|linebreaks }}</td>
+                                <td>{{ criterio_avaliacao.texto_ajuda|format }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Nenhum critério para pré-seleção cadastrado.</p>
+        {% endif %}
+    </div>
+
+    {% if not edital.tipo_edital == edital.EXTENSAO_FLUXO_CONTINUO or edital.exige_etapa_avaliacao %}
+        <div class="tab-pane" data-title="Critérios de Avaliação da Qualificação do Projeto" data-tab="criterios_avaliacao" data-counter="{{ edital.criterioavaliacao_set.count }}">
+            {% box 'Critérios de Avaliação da Qualificação do Projeto' %}
+                <ul class="action-bar">
+                    <li><a class="btn success popup" href="/projetos/adicionar_criterio_avaliacao/{{ edital.pk }}/">Adicionar Critério de Avaliação</a></li>
+                </ul>
+                {% if edital.criterioavaliacao_set.all.exists %}
+                    <div class="table-responsive">
+                        <table>
+                            <caption>Critérios de Avaliação da Qualificação do Projeto</caption>
+                            <thead>
+                                <tr>
+                                    <th class="no-print">Ações</th>
+                                    <th>Ordem de Desempate</th>
+                                    <th>Descrição</th>
+                                    <th>Pontuação Máxima</th>
+                                    <th>Pontuação Binária?</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for criterio_avaliacao in edital.get_criterios_de_avaliacao %}
+                                    <tr>
+                                        <td class="no-print">
+                                            {% icon "edit" "/projetos/editar_criterio_avaliacao/{{ criterio_avaliacao.id }}/" "Editar" "popup" %}
+                                            {% icon "delete" "/projetos/remover_criterio_avaliacao/{{ criterio_avaliacao.id }}/" %}
+                                        </td>
+                                        <td>{{ criterio_avaliacao.ordem_desempate|format }}</td>
+                                        <td>{{ criterio_avaliacao.descricao|linebreaks }}</td>
+                                        <td>{{ criterio_avaliacao.pontuacao_maxima|format }}</td>
+                                        <td>{{ criterio_avaliacao.pontuacao_binaria|format }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="alert alert-warning">Nenhum critério de avaliação cadastrado.</p>
+                {% endif %}
+            {% endbox %}
+        </div>
+    {% endif %}
+{% endif %}
+
+{% endblock %}

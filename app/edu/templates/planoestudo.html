@@ -1,0 +1,144 @@
+{% extends super_template %}
+
+{% block content %}
+
+        <h1>Plano de Estudo</h1>
+
+        <ul class="action-bar">
+            {% if obj.tipo == "Planejamento" and obj.homologado is None %}
+                <li><a class="btn success popup" href="/edu/definir_planoestudo/{{ obj.pk }}/">{% icone "edit" %} Planejar</a></li>
+            {% endif %}
+            <li><a class="btn default" href="/edu/planoestudo_pdf/{{ obj.pk }}/">{% icone "print" %} Imprimir</a></li>
+        </ul>
+
+        {% box "Dados gerais" %}
+        <table class="info">
+            <tr>
+                <td>Tipo</td>
+                <td colspan="3">{{ obj.get_tipo_display }}</td>
+            </tr>
+            <tr>
+                <td>Aluno</td>
+                <td>{{ obj.pedido_matricula.matricula_periodo.aluno.pessoa_fisica.nome|format }}</td>
+                <td>Matrícula</td>
+                <td>
+                    <a href="/edu/aluno/{{ obj.pedido_matricula.matricula_periodo.aluno.matricula }}/">
+                        {{ obj.pedido_matricula.matricula_periodo.aluno.matricula }}
+                    </a>
+                </td>
+            </tr>
+            <tr>
+                <td>Curso</td>
+                <td  colspan="3">{{ obj.pedido_matricula.matricula_periodo.aluno.curso_campus|format }}</td>
+            </tr>
+            <tr>
+                <td>Ano Letivo</td>
+                <td>{{ obj.pedido_matricula.matricula_periodo.ano_letivo|format }}</td>
+                <td>Período Letivo</td>
+                <td>{{ obj.pedido_matricula.matricula_periodo.periodo_letivo|format }}</td>
+            </tr>
+        </table>
+        {% endbox %}
+
+        {% box "Situação" %}
+            <table class="info">
+                <tr>
+                    {% if obj.tipo == "Planejamento" %}
+                    <td>Planejado</td>
+                    <td>{{ obj.planejamento_concluido|format }}</td>
+                    {% endif %}
+                    <td>Homologado</td>
+                    <td>{{ obj.homologado|format }}</td>
+                    {% if obj.tipo == "Planejamento" %}
+                    <td>Descumprido</td>
+                    <td>
+                        {% if obj.homologado %}
+                            {{ obj.descumprido|format }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    {% endif %}
+                </tr>
+            </table>
+            {% if obj.homologado is not None %}
+                <table class="info">
+                    <tr>
+                        <td>Data da Avaliação</td>
+                        <td>{{ obj.data_homologacao|format }}</td>
+                        <td>Número da Ata</td>
+                        <td>{{ obj.numero_ata_homologacao }}</td>
+                    </tr>
+                    {% if obj.observacao_homologacao %}
+                    <tr>
+                        <td>Observação</td>
+                        <td colspan="3">{{ obj.observacao_homologacao }}</td>
+                    </tr>
+                    {% endif %}
+                </table>
+            {% endif %}
+        {% endbox %}
+
+        {% if obj.tipo == "Planejamento" %}
+            {% box "Quadro resumo" %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Tipo de Componente</th>
+                            <th>C.H. Esperada</th>
+                            <th>C.H. Cumprida</th>
+                            <th>C.H. Planejada</th>
+                            <th>C.H. Final</th>
+                            <th>C.H. Completa</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for tipo_componente, ch_esperada, ch_cumprida, ch_planejada, ch_total, plano_concluido in resumo_ch %}
+                        <tr>
+                            <td>{{ tipo_componente }}</td>
+                            <td align="center">{{ ch_esperada }}</td>
+                            <td align="center">{{ ch_cumprida }}</td>
+                            <td align="center">{{ ch_planejada }}</td>
+                            <td align="center">{{ ch_total }}</td>
+                            <td align="center">{{ plano_concluido|format }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% endbox %}
+
+            {% box "Planejamento" %}
+                {% if obj.itemplanoestudo_set.exists %}
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Componente Curricular</th>
+                        <th>Ano/Período Letivo</th>
+                        <th>Tipo</th>
+                        <th>Optativa</th>
+                        <th>Situação</th>
+                        <th>Carga Horária</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for item in obj.itemplanoestudo_set.all %}
+                        <tr>
+                            <td>{{ item.componente_curricular.componente.descricao }}</td>
+                            <td>{{ item.ano_letivo }}/{{ item.periodo_letivo }}</td>
+                            <td>{{ item.componente_curricular.get_tipo_display }}</td>
+                            <td>{{ item.componente_curricular.optativo|format }}</td>
+                            <td>Pendente</td>
+                            <td align="center">{{ item.componente_curricular.componente.get_ch_hora_relogio }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                    <p class="alert alert-warning">
+                        Planejamento ainda não realizado.
+                    </p>
+                {% endif %}
+            {% endbox %}
+        {% endif %}
+
+{% endblock %}

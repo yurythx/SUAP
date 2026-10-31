@@ -1,0 +1,212 @@
+{% load ppc_tags %}
+
+{% for matrizppc in matrizes %}
+    <h1>{{ matrizppc.nome }}</h1>
+
+    {% for nd in nucleos_matriz %}
+        <h2>Núcleo {{ nd.nucleo.descricao }}</h2>
+        <table class="bordered">
+            <thead>
+                <tr>
+                    <th rowspan="2">Disciplina</th>
+                    <th colspan="{% if projeto.is_curso_anual %}{{ matrizppc.quantidade_periodos|multiply:2 }}{% else %}{{ matrizppc.quantidade_periodos }}{% endif %}">Aulas semanais por período</th>
+                    <th colspan="{% if matrizppc.possui_ch_ead %}3{% else %}2{% endif %}">Carga horária</th>
+                </tr>
+                <tr>
+                    {% for periodo in matrizppc.get_periodos %}
+                        <th colspan="{% if projeto.is_curso_anual %}2{% endif %}">{{ periodo }}</th>
+                    {% endfor %}
+                    <th>Hora/Relógio</th>
+                    <th>Hora/Aula</th>
+                    {% if matrizppc.possui_ch_ead %}
+                        <th>EAD</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for plano in matrizppc|method:"get_planos_disciplinappc_quadro"|call:nd.nucleo_id %}
+                    <tr>
+                        <td>{{ plano.plano_disciplina.nome_disciplina }}</td>
+                        {% for periodo in matrizppc.get_periodos %}
+                            {% if projeto.is_curso_anual and plano.periodo_oferta == periodo %}
+                                <td class="text-center">
+                                    {{ plano.get_qtd_aulas_1s|format }}
+                                </td>
+                                <td class="text-center">
+                                    {{ plano.get_qtd_aulas_2s|format }}
+                                </td>
+                            {% else %}
+                                <td colspan="{% if projeto.is_curso_anual %}2{% endif %}" class="text-center">
+                                    {% if plano.periodo_oferta == periodo %}
+                                        {{ plano.get_qtd_creditos|format }}
+                                    {% endif %}
+                                </td>
+                            {% endif %}
+                        {% endfor %}
+                        <td class="text-center">{{ plano.get_hora_relogio|format }}h</td>
+                        <td class="text-center">{{ plano.get_hora_aula|format }}h</td>
+                        {% if matrizppc.possui_ch_ead %}
+                            <td class="text-center">
+                                {% if plano.qtd_aulas_ead %}
+                                    {{ plano.get_info_hora_relogio_ead }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                        {% endif %}
+                    </tr>
+                {% endfor %}
+                {% if projeto.ch_cc_optativo %}
+                    {% for optativo in matrizppc|method:"get_configuracao_optativas"|call:nd.nucleo_id %}
+                        <tr>
+                            <td>Optativo {{ optativo.periodo|mask_roman }}</td>
+                            {% for periodo in matrizppc.get_periodos %}
+                                <td colspan="{% if projeto.is_curso_anual %}2{% endif %}">
+                                    {% if optativo.periodo == periodo %}
+                                        {{ optativo.get_qtd_creditos|format }}
+                                    {% endif %}
+                                </td>
+                            {% endfor %}
+                            <td class="text-center">{{ optativo.ch_exigida|format }}h</td>
+                            <td class="text-center">{{ optativo.get_hora_aula|format }}h</td>
+                            {% if matrizppc.possui_ch_ead %}
+                                <td>-</td>
+                            {% endif %}
+                        </tr>
+                    {% endfor %}
+                {% endif %}
+                <tr>
+                    <td><strong>Subtotal do núcleo {{ nd.nucleo.descricao }}</strong></td>
+                    {% if projeto.is_curso_anual %}
+                        {% for periodo in matrizppc.get_periodos %}
+                            {% for semestre in semestres %}
+                                <td class="text-center">{% get_total_creditos_por_planos_disciplinappc matrizppc nd.nucleo_id periodo semestre %}</td>
+                            {% endfor %}
+                        {% endfor %}
+                    {% else %}
+                        {% for periodo in matrizppc.get_periodos %}
+                            <td class="text-center">{% get_total_creditos_por_planos_disciplinappc matrizppc nd.nucleo_id periodo %}</td>
+                        {% endfor %}
+                    {% endif %}
+                    <td class="text-center">{{ matrizppc|method:"get_total_ch_hora_relogio_por_planos_disciplinappc"|call:nd.nucleo_id }}h</td>
+                    <td class="text-center">{{ matrizppc|method:"get_total_ch_hora_aula_por_planos_disciplinappc"|call:nd.nucleo_id }}h</td>
+                    {% if matrizppc.possui_ch_ead %}
+                        <td class="text-center">{{ matrizppc|method:"get_total_ch_ead_por_planos_disciplinappc"|call:nd.nucleo_id }}h</td>
+                    {% endif %}
+                </tr>
+            </tbody>
+        </table>
+    {% endfor %}
+    {% for nd in nucleos_pratica %}
+        <h2>Núcleo {{ nd.nucleo.descricao }} - Prática Profissional</h2>
+        {% with modalidades=matrizppc|method:"get_modalidades_praticaprofissionalppc"|call:nd.nucleo_id %}
+            {% if modalidades.exists %}
+                <table class="bordered">
+                    <thead>
+                        <th>Modalidade</th>
+                        <th class="text-center">Carga horária</th>
+                        <th class="text-center">Período</th>
+                        <th class="text-center">Optativa</th>
+                    </thead>
+                    <tbody>
+                        {% for modalidade in modalidades %}
+                            <tr>
+                                <td>{{ modalidade.modalidade_pratica_profissional.nome }}</td>
+                                <td class="text-center">{{ modalidade.ch_requerida|format }}</td>
+                                <td class="text-center">{{ modalidade.get_periodo }}</td>
+                                <td class="text-center">{{ modalidade.optativa|format }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="alert alert-warning">Nenhuma modalidade de prática profissional adicionada.</p>
+            {% endif %}
+        {% endwith %}
+    {% endfor %}
+
+    {% if nucleos_matriz.exists %}
+        <br>
+        <table class="bordered">
+            <thead>
+                <tr>
+                    <th rowspan="2">Disiciplinas</th>
+                    <th colspan="{% if projeto.is_curso_anual %}{{ matrizppc.quantidade_periodos|multiply:2 }}{% else %}{{ matrizppc.quantidade_periodos }}{% endif %}">Período</th>
+                    <th colspan="2" rowspan="2">Total</th>
+                </tr>
+                <tr>
+                    {% for periodo in matrizppc.get_periodos %}
+                        <th colspan="{% if projeto.is_curso_anual %}2{% endif %}">{{ periodo }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Carga horária semanal</td>
+                    {% if projeto.is_curso_anual %}
+                        {% for periodo in matrizppc.get_periodos %}
+                            {% for semestre in semestres %}
+                                <td class="text-center">{% get_total_creditos_por_planos_disciplinappc matrizppc 0 periodo semestre %}</td>
+                            {% endfor %}
+                        {% endfor %}
+                    {% else %}
+                        {% for periodo in matrizppc.get_periodos %}
+                            <td class="text-center">{% get_total_creditos_por_planos_disciplinappc matrizppc 0 periodo %}</td>
+                        {% endfor %}
+                    {% endif %}
+                    <td class="text-center">{{ matrizppc.get_total_ch_hora_relogio_por_planos_disciplinappc }} h/r</td>
+                    <td class="text-center">{{ matrizppc.get_total_ch_hora_aula_por_planos_disciplinappc }} h/a</td>
+                </tr>
+                <tr>
+                    <td>Quantidade</td>
+                    {% if projeto.is_curso_anual %}
+                        {% for periodo in matrizppc.get_periodos %}
+                            {% for semestre in semestres %}
+                                <td class="text-center">{% get_qtd_disciplinas_por_periodo matrizppc periodo semestre %}</td>
+                            {% endfor %}
+                        {% endfor %}
+                    {% else %}
+                        {% for periodo in matrizppc.get_periodos %}
+                            <td class="text-center">{% get_qtd_disciplinas_por_periodo matrizppc periodo %}</td>
+                        {% endfor %}
+                    {% endif %}
+                    <td class="text-center" colspan="2">-</td>
+                </tr>
+            </tbody>
+        </table>
+    {% endif %}
+    <br>
+    <table class="bordered">
+        <thead>
+            <tr>
+                <th rowspan="2">Componentes curriculares</th>
+                <th colspan="2">Carga horária</th>
+            </tr>
+            <tr>
+                <th>Hora/Relógio</th>
+                <th>Hora/Aula</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for nd in projeto.get_nucleos_matriz %}
+                <tr>
+                    <td>Subtotal da carga horária do Núcleo {{ nd.nucleo.descricao }}</td>
+                    <td class="text-center">{{ matrizppc|method:"get_total_ch_hora_relogio_por_planos_disciplinappc"|call:nd.nucleo_id }}</td>
+                    <td class="text-center">{{ matrizppc|method:"get_total_ch_hora_aula_por_planos_disciplinappc"|call:nd.nucleo_id }}</td>
+                </tr>
+            {% endfor %}
+            {% for nd in projeto.get_nucleos_pratica %}
+                <tr>
+                    <td>Subtotal da carga horária do Núcleo {{ nd.nucleo.descricao }} - Prática Profissional</td>
+                    <td class="text-center">{{ projeto.ch_pratica }}</td>
+                    <td class="text-center">-</td>
+                </tr>
+            {% endfor %}
+            <tr>
+                <td>Total da carga horária do curso</td>
+                <td class="text-center">{{ projeto.ch_curso }}</td>
+                <td class="text-center">{{ matrizppc.get_total_ch_hora_aula_por_planos_disciplinappc }}</td>
+            </tr>
+        </tbody>
+    </table>
+{% endfor %}

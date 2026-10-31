@@ -1,0 +1,150 @@
+{% extends super_template %}
+
+{% block extrahead %}
+<script src="/static/almoxarifado/js/jquery.form.js"></script>
+<script src="/static/djtools/jquery/jquery.autocomplete.js"></script>
+<script src="/static/djtools/jquery/jquery.bgiframe.min.js"></script>
+<script src="/static/admin/js/admin/RelatedObjectLookups.js"></script>
+<script src="/static/almoxarifado/js/mascaras.js"></script>
+<script src="/static/almoxarifado/js/mask.js"></script>
+<script src="/static/almoxarifado/js/auxiliar.js"></script>
+<script src="/static/almoxarifado/js/jquery.autocomplete.js"></script>
+<script src="/static/almoxarifado/js/validacao.js"></script>
+<script>
+    buscar_info_solicitante = function() {
+        $.ajax({
+            type: "POST",
+            url: "/almoxarifado/ajax/info_solicitante/",
+            data: "solicitante_id="+$("#solicitante_hidden").attr("value"),
+            dataType: "json",
+            success: function(response){
+                $("#info_matricula").html(response.matricula);        
+                $("#info_setor").val(response.setor);
+                $("#solicitante_info").removeClass("hidden");
+            }
+        });
+    };    
+    adicionar_item = function(){
+        var numeroItem = numeroUltimoItem() + 1;
+        var item = $("<div class='form-row several-items' id='item_" + numeroItem + "'><div class='field-box field-box-first'>"+
+            "<label for='material_" + numeroItem + "'>Material #" + numeroItem + ":</label>"+
+            "<input type='text' id='material_" + numeroItem + "' name='itens' value='' class='autocomplete' /></div>"+
+            "<div class='field-box field-box-first'><label class='inline' for='qtd_"+numeroItem+"'>Quantidade:</label>"+
+            "<input name='quantidades' id='qtd_"+numeroItem+"' type='number' maxlength='6' /></div>"+
+            "<a href='#item_"+numeroItem+"' class='deletelink btn danger' onclick='removeItemMaterial(\"item_"+numeroItem+"\")'>Remover</a>"+
+        "</div>");
+        $("div#Itens > fieldset > #ultima_linha").before(item);
+        $("#item_" + numeroItem).attr("ordem", numeroItem); //setando a ordem
+        $("#material_"+numeroItem).autocomplete("/almoxarifado/buscar_material_consumo_estoque_uo/{{ get_uo.id }}/" , {"minChars": 3}); //setando o autocomplete
+        $("#qtd_" + numeroItem).attr("onkeypress", "mascara(this,somenteNumeros)"); //setando o onkeyup
+    };
+
+    contador_chars = function(){
+        $('#obs').on('keyup', function() {
+            if(this.value.length > 255){
+                $(this).addClass('invalid');
+                $('#contador-chars').removeClass('hidden');
+                $('#contador-chars').show();
+                $('input[value="Efetuar"]').attr("disabled", "disabled");
+            } else {
+                $(this).removeClass('invalid');
+                $('#contador-chars').removeClass('hidden');
+                $('#contador-chars').hide();
+                $('input[value="Efetuar"]').removeAttr("disabled");
+            }
+        });
+    }
+    
+    $(document).ready(function(){
+        adicionar_item();
+        contador_chars();
+    });
+    
+</script>
+{% endblock %}
+
+{% block content %}
+
+<form action="/almoxarifado/requisicao_usuario_pedido/" method="post" id="requisicao_usuario_pedido">
+	{% csrf_token %}
+
+	{% if user|in_group:"Operador de Almoxarifado,Coordenador de Almoxarifado,Coordenador de Almoxarifado Sistêmico" %}
+	    <fieldset class="module aligned">
+		    <div class="form-row">
+				<div class="field-box">
+                    <label for="almoxarifado_fornecedor">Almoxarifado Fornecedor: </label>
+                    <input type="text" disabled="disabled" value="{{ get_uo.setor.sigla }}" id="almoxarifado_fornecedor" />
+                </div>
+	        </div>
+	        <div id="solicitante_info" class="form-row hidden">
+                <div class="field-box">
+                    <label for="info_setor">Setor:</label>
+                    <input type="text" disabled="disabled" id="info_setor" />
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="field-box">
+                    <label for="solicitante">Pessoa Solicitante:</label>
+                    <input type="text" id="solicitante" name="solicitante" class="input_text autocomplete" />
+                    <input type="hidden" name="uo_id" value="{{ get_uo.id }}" />
+                    <p class="help">Busque pelo nome.</p>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="field-box">
+                    <label for="obs">Observações:</label>
+                    <input type="text" id="obs" maxlength="255" name="obs" class="textarea" />
+                    <p class="help hidden" id="contador-chars">Diminua a quantidade de caractéres.</p>
+                </div>
+            </div>
+	    </fieldset>
+	{% else %}
+	    <fieldset class="module aligned">
+	        <div class="form-row">
+                <div class="field-box">
+	                <label>Solicitante:</label>
+	                <input type="text" disabled="disabled" value="{{ user.get_profile.nome }}" />
+                </div>
+	        </div>
+	        {% if user.get_profile.eh_sistemico %}
+	            <div class="form-row">
+                    <div class="field-box">
+	                    <label>Solicitar a:</label>
+	                    <select name="uo_id" onchange="montar_itens()">
+	                        {% for uo in uos %}
+	                            <option value="{{ uo.id }}">{{ uo.setor.sigla }}</option>
+	                        {% endfor %}
+	                    </select>
+                    </div>
+	            </div>
+	        {% else %}
+	            <input type="hidden" name="uo_id" value="{{ get_uo.id }}"/>
+	        {% endif %}
+	    </fieldset>
+	{% endif %}
+
+    {% box "Materiais" %}
+        <ul class="action-bar">
+            <li><a href="#" name='addItem' class="btn addlink success" onclick='adicionar_item()'>Adicionar Material</a></li>
+        </ul>
+
+        <p class="help">Só é possivel fazer requisição de materiais que possuam estoque no almoxarifado do campus <strong>{{ get_uo.setor.sigla }}</strong>.</p>
+
+        <div id="Itens">
+            <fieldset class="module aligned">
+                <div id="ultima_linha" class="inline-related"></div>
+            </fieldset>
+        </div>
+
+        <div class="submit-row">
+            <input class="default" type="button" value="Efetuar" onclick="validate_and_submit('/almoxarifado/validar/req_pedido/', '#requisicao_usuario_pedido')" />
+        </div>
+    {% endbox %}
+
+</form>
+
+<script>
+    createAutoComplete("solicitante", "/almoxarifado/buscar_servidor/", {"afterSelect": buscar_info_solicitante});
+</script>
+
+{% endblock %}

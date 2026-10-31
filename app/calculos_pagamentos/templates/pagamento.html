@@ -1,0 +1,98 @@
+{% extends super_template %}
+
+{% block content %}
+
+<ul class="action-bar">
+    {% if not pag.arquivo %}
+        <li><a class="btn" title="Gerar Arquivo Batch deste pagamento" href="/calculos_pagamentos/gerar_arquivo_nao_processados/?ids={{ pag.id }}">
+            Gerar Arquivo Batch deste pagamento
+        </a></li>
+    {% endif %}
+    {% if pag.situacao|make_list|first not in 35|make_list %}
+        <li><a class="btn" title="Alterar para Lançado Manualmente No SIAPE" href="/calculos_pagamentos/pagamento_lancado_manualmente/?pagamento_id={{ pag.id }}">
+            Pagamento lançado manualmente no SIAPE
+        </a></li>
+    {% endif %}
+</ul>
+
+{% box "Dados do {{ tab_title }}" %}
+    <dl class="definition-list">
+        <dt>Cálculo</dt>
+        <dd><a href="{{ pag.calculo.get_absolute_url }}">{{ pag.calculo|format }}</a></dd>
+
+        <dt>Mês Inicial do Cálculo</dt>
+        <dd>{{ pag.mes_inicio|date:"m/Y" }}</dd>
+
+        <dt>Mês Final Cálculo</dt>
+        <dd>{{ pag.mes_fim|date:"m/Y" }}</dd>
+
+        <dt>Situação</dt>
+        <dd>{{ pag.get_situacao_display|format }}</dd>
+    </dl>
+{% endbox %}
+
+{% box "Histórico" %}
+    {% if pag.historicos.exists %}
+        <table>
+            <tr>
+                <th>#</th>
+                <th>Data</th>
+                <th>Situação</th>
+                <th>Usuário</th>
+            </tr>
+            {% for historico in pag.historicos.all %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ historico.data|format }}</td>
+                    <td>{{ historico.get_situacao_display|format }}</td>
+                    <td>{{ historico.usuario|format }}</td>
+                </tr>
+            {% endfor %}
+        </table>
+    {% else %}
+        <b>Nenhum histórico encontrado.</b>
+    {% endif %}
+{% endbox %}
+
+{% box "Dados do Arquivo de Pagamento" %}
+	<table class="info">
+        {% if pag.arquivo %}
+            <tr>
+                <td>Mês/Ano</td>
+                <td>{{ pag.arquivo.mes|format }}/{{ pag.arquivo.ano|format }}</td>
+                <td>Quantidade de movimentações financeiras</td>
+                <td>{{ pag.arquivo.quant_registros_1|format }}</td>
+            </tr>
+            <tr>
+                <td>{{ pag.arquivo|verbose:'data_criacao'|format }}</td>
+                <td>{{ pag.arquivo.data_criacao|format }}</td>
+                <td>{{ pag.arquivo|verbose:'usuario'|format }}</td>
+                <td>{{ pag.arquivo.usuario|format }}</td>
+            </tr>
+            <tr>
+                <td>Linhas deste pagamento</td>
+                <td colspan="3">
+                    <table>
+                        <tr>
+                            <th style="width:98%">Linha</th>
+                            <th style="width:2%">Situação<br/>no<br/>SIAPE</th>
+                        </tr>
+                        {% for linha in pag.linhas.all %}
+                            <tr>
+                                <td><pre>{{ linha.get_linha|safe }}</pre></td>
+                                <td>{{ linha.get_situacao_display|format }}</td>
+                            </tr>
+                        {% endfor %}
+                    </table>
+                </td>
+            </tr>
+        {% else %}
+            <tr>
+                <td>Arquivo não gerado</td>
+                <td></td>
+            </tr>
+        {% endif %}
+    </table>
+{% endbox %}
+
+{% endblock %}

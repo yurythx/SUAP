@@ -1,0 +1,121 @@
+{% extends super_template %}
+
+{% block action-bar %}
+    <ol class="action-bar">
+        <li><a href="{% url 'ver_resumo_plano' plano_atividade.id %}" class="btn default">Plano de atividades original</a></li>
+        <li><a href="{% url 'movimentacoes_credito' plano_atividade.id %}" class="btn default">Movimentações</a></li>
+        <li><a href="{% url 'plano_concluido' plano_atividade.id %}" class=" btn default">Execução</a></li>
+    </ol>
+{% endblock %}
+
+{% block content %}
+    <div class="search-and-filters">
+		{% render_form planoconcluido_form %}
+    </div>
+    <ul class="action-bar">
+        {% if plano_vigente and plano_atividades_encerrado %}
+            {% if eh_gestor_ua or eh_gestor_coordenador_ua %}
+                <li><a class="btn success" href="{% url 'adicionar_atividade_orcamentaria' plano_atividade.id %}">Adicionar atividade complementar</a></li>
+                <li class="has-child">
+                    <a class="btn success" href="#">Adicionar realocação</a>
+                    <ul>
+                        <li><a href="{% url 'requisitar_realocacao_concedente' plano_atividade.id %}">
+                             Somente unidade concedente
+                        </a></li>
+                        <li><a href="{% url 'requisitar_realocacao_recebedora' plano_atividade.id %}">
+                             Somente unidade recebedora
+                        </a></li>
+                        <li><a href="{% url 'requisitar_realocacao_ambas' plano_atividade.id %}">
+                             Unidade concedente e recebedora
+                        </a></li>
+                    </ul>
+                </li>
+            {% endif %}
+        {% endif %}
+        {% if plano_concluido %}
+            <li>
+                <a href="/admin/plan_estrategico/requisicaorealocacao/?ano_cadastro={{ plano_atividade.ano_base }}" class="btn default">
+                    Requisições de realocação
+                </a>
+            </li>
+        {% endif %}
+    </ul>
+
+    {% box 'Legenda' %}
+        <div class="legenda">
+            <p>Legenda:</p>
+            <ul>
+                <li class="warning">{% icone "circle" %} Atividades complementares</li>
+            </ul>
+            <p class="alert alert-warning">
+            O limite disponível para realocar considera o menor valor entre:<br>
+            a) O saldo disponível da atividade menos o total empenhado da atividade;<br>
+            b) O saldo do plano interno da atividade (valor total do PI menos o total já movimentado e em movimentação).
+            </p>
+        </div>
+    {% endbox %}
+
+    {% for item in lista_projetos %}
+        {% box "{{ item.projeto_plano.projeto.codigo }} - {{ item.projeto_plano.projeto.nome }}" %}
+            {% if item.atividades %}
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th rowspan="2">Unidade gestora</th>
+                                <th rowspan="2">Componente funcional</th>
+                                <th rowspan="2">Atividade</th>
+                                <th rowspan="2">Origem de recurso/Plano Interno</th>
+                                <th>Valor inicial do plano (R$)</th>
+                                <th>Valor em realocação concedente (R$)</th>
+                                <th>Valor em realocação recebedora (R$)</th>
+                                <th>Valor total realocado (R$)</th>
+                                <th>Valor atualizado da atividade (R$)</th>
+                                <th>Limite para realocar</th>
+                                <th>Limite para realocar entre atividade do mesmo PI/UA</th>
+                                <th rowspan="2" class="no-print">Opções</th>
+                            </tr>
+                            <tr>
+                                <th class="text-center">(A)</th>
+                                <th class="text-center">(B)</th>
+                                <th class="text-center">(C)</th>
+                                <th class="text-center">(D)</th>
+                                <th class="text-center">(A + D - B)</th>
+                                <th class="text-center">(E)</th>
+                                <th class="text-center">(F)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for atividade in item.atividades %}
+                                {% if atividade.atividade_complementar %}
+                                    <tr class="highlight">
+                                {% else %}
+                                    <tr>
+                                {% endif %}
+                                    <td class="text-end">{{ atividade.unidade_gestora.setor_equivalente.sigla }}</td>
+                                    <td>{{ atividade.etapa_projeto_plano_atividade.etapa.codigo }} - {{ atividade.etapa_projeto_plano_atividade.etapa.descricao }}</td>
+                                    <td>{{ atividade.nome }}</td>
+                                    <td class="text-end">{{ atividade.origem_recurso_etapa|format }}{% if atividade.plano_interno %} / {{ atividade.plano_interno }}{% endif %}</td>
+                                    <td class="text-end {% if atividade.get_total >= 0 %}true{% else %}false{% endif %}">{{ atividade.get_total|format_money }}</td>
+                                    <td class="text-end {% if atividade.get_total_em_realocacao == 0 %}true{% else %}false{% endif %}">{{ atividade.get_total_em_realocacao|format_money }}</td>
+                                    <td class="text-end {% if atividade.get_total >= 0 %}true{% else %}false{% endif %}">{{ atividade.get_total_em_realocacao_recebedora|format_money }}</td>
+                                    <td class="text-end {% if atividade.get_valor_realocado >= 0 %}true{% else %}false{% endif %}"> {{ atividade.get_valor_realocado|format_money }}</td>
+                                    <td class="text-end {% if atividade.get_valor_disponivel_realocacao >= 0 %}true{% else %}false{% endif %}"> {{ atividade.get_valor_disponivel_realocacao|format_money }}</td>
+                                    <td class="text-end {% if atividade.get_limite_a_realocar >= 0 %}true{% else %}false{% endif %}"> {{ atividade.get_limite_a_realocar|format_money }}</td>
+                                    <td class="text-end {% if atividade.get_limite_a_realocar_mesmo_pi_ua >= 0 %}true{% else %}false{% endif %}"> {{ atividade.get_limite_a_realocar_mesmo_pi_ua|format_money }}</td>
+                                    {% if plano_atividades_encerrado %}
+                                        <td><a href="{% url 'detalhar_atividade_realocacao' plano_atividade.id atividade.id %}" class=" btn default">Detalhar</a></td>
+                                    {% else %}
+                                        <td><a href="{% url 'detalhar_atividade' atividade.id %}" class=" btn default popup">Detalhar</a></td>
+                                    {% endif %}
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="alert alert-warning">Nenhuma atividade neste macroprocesso conforme o filtro aplicado.</p>
+            {% endif %}
+        {% endbox %}
+    {% endfor %}
+{% endblock %}

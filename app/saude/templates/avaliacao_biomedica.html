@@ -1,0 +1,1354 @@
+{% extends super_template %}
+
+{% block extrahead %}
+    <script src="/static/saude/js/odontograma.js"></script>
+{% endblock %}
+
+{% block bodyclass %}hasAsideRight{% endblock %}
+
+{% block action-bar %}
+    {% include "includes/actionbar_atendimento.html" %}
+{% endblock %}
+
+{% block object-status %}
+    {% include "includes/status_atendimento.html" %}
+{% endblock %}
+
+{% block content %}
+
+    {% include "includes/dados_paciente.html" %}
+    {% if not eh_assistente_social %}
+        <div class="tab-pane" data-tab="aba_sinais_vitais" data-title="{{ sinaisvitais_titulo }}" data-checked="{% if sinaisvitais_count > 0 %}True{% else %}False{% endif %}">
+            {% box sinaisvitais_titulo %}
+                <ul class="tags" title="Categorias Responsáveis">
+                    <li>Médico</li>
+                    <li>Enfermeiro</li>
+                    <li>Técnico em Enfermagem</li>
+                    <li>Auxiliar de Enfermagem</li>
+                </ul>
+                <ul class="action-bar">
+                    {% if atendimento.is_aberto %}
+                        {% if especialidade.is_medico or especialidade.is_enfermeiro or especialidade.is_tecnico_enfermagem or especialidade.is_auxiliar_enfermagem %}
+                            <li><a class="btn success" href="/saude/adicionar_sinaisvitais/{{ atendimento.id }}/">{% icone "plus" %} Adicionar</a></li>
+                        {% endif %}
+                    {% endif %}
+                    {% if sinaisvitais_count > 1 %}
+                        <li><a class="btn default popup" href="/saude/historico_ficha/{{ atendimento.id }}/1/">Histórico</a></li>
+                    {% endif %}
+                </ul>
+
+                {% if sinaisvitais %}
+                     <dl class="definition-list flex">
+                        <div class="list-item flex-basis-25">
+                            <dt>Pressão Arterial</dt>
+                            <dd>{{ sinaisvitais.get_pressao_display|format }}</dd>
+                        </div>
+                        <div class="list-item flex-basis-25">
+                            <dt>Pulsação</dt>
+                            <dd>{{ sinaisvitais.get_pulsacao_display|format }}</dd>
+                        </div>
+                        {% if sinaisvitais.respiracao_categoria %}
+                            <div class="list-item flex-basis-25">
+                                <dt>Respiração</dt>
+                                <dd>{{ sinaisvitais.get_respiracao_categoria_display|format }}</dd>
+                            </div>
+                        {% endif %}
+                        {% if sinaisvitais.temperatura_categoria %}
+                            <div class="list-item flex-basis-25">
+                                <dt>Temperatura</dt>
+                                <dd>{{ sinaisvitais.get_temperatura_categoria_display|format }}</dd>
+                            </div>
+                        {% endif %}
+                     </dl>
+                    <p class="obs">{{ sinaisvitais_responsavel }}</p>
+                {% else %}
+                    <p class="alert alert-warning">Nenhuma avaliação cadastrada.</p>
+                {% endif %}
+            {% endbox %}
+        </div>
+
+        <div class="tab-pane" data-tab="aba_antropometria" data-title="{{ antropometria_titulo }}" data-checked="{% if antropometria_count > 0 %}True{% else %}False{% endif %}">
+            {% box antropometria_titulo %}
+                <ul class="tags" title="Categorias Responsáveis">
+                    <li>Médico</li>
+                    <li>Enfermeiro</li>
+                    <li>Técnico em Enfermagem</li>
+                    <li>Auxiliar de Enfermagem</li>
+                    <li>Odontólogo</li>
+                    <li>Técnico em Saúde Bucal</li>
+                    <li>Fisioterapeuta</li>
+                    <li>Nutricionista</li>
+                    <li>Psicólogo</li>
+                </ul>
+                <ul class="action-bar">
+                    {% if atendimento.is_aberto %}
+                        {% if especialidade.is_medico or especialidade.is_enfermeiro or especialidade.is_tecnico_enfermagem or especialidade.is_auxiliar_enfermagem or especialidade.is_nutricionista or especialidade.is_odontologo %}
+                            <li><a class="btn success" href="/saude/adicionar_antropometria/{{ atendimento.id }}/">{% icone "plus" %} Adicionar</a></li>
+                        {% endif %}
+                    {% endif %}
+                    <li><a href="/saude/antropometria_valores_referencia/" class="btn default popup">Valores de Referência</a></li>
+                    {% if antropometria_count > 1 %}
+                        <li><a class="btn default popup" href="/saude/historico_ficha/{{ atendimento.id }}/2/">Histórico</a></li>
+                    {% endif %}
+                </ul>
+                {% if antropometria %}
+                    <dl class="definition-list flex">
+                        <div class="list-item flex-basis-25">
+                            <dt>Estatura</dt>
+                            <dd>{{ antropometria.get_estatura_display|format }}</dd>
+                        </div>
+                        <div class="list-item flex-basis-25">
+                            <dt>Peso</dt>
+                            <dd>{{ antropometria.get_peso_display|format }}</dd>
+                        </div>
+                        <div class="list-item flex-basis-50">
+                            <dt>Circunferência da cintura</dt>
+                            <dd>{{ antropometria.get_cintura_display|format }}</dd>
+                            {% if not ocultar_dobras %}
+                                <dt>Circunferência da quadril</dt>
+                                <dd>{{ antropometria.get_quadril_display|format }}</dd>
+                                <dt>Circunferência do braço</dt>
+                                <dd>{{ antropometria.get_circunferencia_braco_display|format }}</dd>
+                            {% endif %}
+                        </div>
+                        <div class="list-item flex-basis-50">
+                            {% if not ocultar_dobras %}
+                                <dt>Razão cintura-quadril</dt>
+                                <dd>{{ antropometria.get_RCQ|format }}</dd>
+                            {% endif %}
+                            <dt>Índice de massa corporal</dt>
+                            <dd>{{ antropometria.get_IMC|format }} {% if antropometria.get_classificacao_IMC %}- {{ antropometria.get_classificacao_IMC }}{% endif %}</dd>
+                            {% if not ocultar_dobras %}
+                                <dt>Índice de adiposidade corporal</dt>
+                                <dd>{{ antropometria.get_IAC|format }}</dd>
+                            {% endif %}
+                        </div>
+                        <div class="list-item flex-basis-50">
+                            <dt>Percentual de gordura</dt>
+                            <dd>{{ antropometria.get_percentual_gordura_display|format }}</dd>
+                        </div>
+                    </dl>
+                    {% if not ocultar_dobras %}
+                        <dl class="definition-list flex">
+                            <div class="list-item flex-basis-100">
+                                <dt>Dobras cutânea triciptal</dt>
+                                <dd>{{ antropometria.get_pc_triciptal_display|format }}</dd>
+                                <dt>Dobras cutânea biciptal</dt>
+                                <dd>{{ antropometria.get_pc_biciptal_display|format }}</dd>
+                            </div>
+                            <div class="list-item flex-basis-100">
+                                <dt>Dobras cutânea subescapular</dt>
+                                <dd>{{ antropometria.get_pc_subescapular_display|format }}</dd>
+                                <dt>Dobras cutânea suprailíaca</dt>
+                                <dd>{{ antropometria.get_pc_suprailiaca_display|format }}</dd>
+                            </div>
+                        </dl>
+                        <dl class="definition-list flex">
+                            <div class="list-item flex-basis-100">
+                                <dt>Dobra cutânea abdominal</dt>
+                                <dd>{{ antropometria.get_dobra_cutanea_abdominal_display|format }}</dd>
+                                <dt>Dobra cutânea supraespinhal</dt>
+                                <dd>{{ antropometria.get_dobra_cutanea_supraespinhal_display|format }}</dd>
+                            </div>
+                            <div class="list-item flex-basis-100">
+                                <dt>Dobra cutânea coxa média</dt>
+                                <dd>{{ antropometria.get_dobra_cutanea_coxa_media_display|format }}</dd>
+                                <dt>Dobra cutânea panturrilha medial</dt>
+                                <dd>{{ antropometria.get_dobra_cutanea_panturrilha_medial_display|format }}</dd>
+                            </div>
+                        </dl>
+                    {% endif %}
+                    <dl class="definition-list flex">
+                        {% if antropometria.perda_peso %}
+                            <div class="list-item flex-basis-50">
+                                <dt>Perda de peso</dt>
+                                <dd> {% if not antropometria.perda_peso %}{{ antropometria.perda_peso|format }}{% endif %}</dd>
+                            </div>
+                            <div class="list-item flex-basis-50">
+                                <dt>Quanto de perda</dt>
+                                <dd>{{ antropometria.get_quanto_perdeu_display|format }}</dd>
+                                <dt>Há quanto tempo vem perdendo peso</dt>
+                                <dd>{{ antropometria.get_tempo_perda_display|format }}</dd>
+                            </div>
+                        {% endif %}
+                        {% if antropometria.ganho_peso %}
+                            <div class="list-item flex-basis-50">
+                                <dt>Ganho de peso</dt>
+                                <dd> {% if not antropometria.ganho_peso %}{{ antropometria.ganho_peso|format }}{% endif %}</dd>
+                            </div>
+                            <div class="list-item flex-basis-50">
+                                <dt>Quanto de ganho</dt>
+                                <dd>{{ antropometria.get_quanto_ganhou_display|format }}</dd>
+                                <dt>Há quanto tempo vem ganhando peso</dt>
+                                <dd>{{ antropometria.get_tempo_ganho_display|format }}</dd>
+                            </div>
+                        {% endif %}
+                    </dl>
+                    {% if antropometria.sentimento_relacao_corpo %}
+                        <h4>Marcadores de Práticas e de Consumo Alimentar</h4>
+                        <dl class="definition-list flex">
+                            <div class="list-item flex-basis-50">
+                                <dt>Como você se sente em relação ao seu corpo</dt>
+                                <dd>{{ antropometria.sentimento_relacao_corpo|format }}</dd>
+                                <dt>NOS ÚLTIMOS 30 DIAS, com que frequência você ficou com fome por não ter comida suficiente em sua casa</dt>
+                                <dd>{{ antropometria.periodo_sem_comida|format }}</dd>
+                            </div>
+                        </dl>
+                    {% endif %}
+                    <p class="obs">{{ antropometria_responsavel }}</p>
+                {% else %}
+                    <p class="alert alert-warning">Nenhuma avaliação cadastrada.</p>
+                {% endif %}
+            {% endbox %}
+
+        </div>
+
+        <div class="tab-pane" data-tab="aba_acuidade_visual" data-title="{{ acuidadevisual_titulo }}" data-checked="{% if acuidadevisual_count > 0 %}True{% endif %}">
+            {% box acuidadevisual_titulo %}
+
+                <ul class="tags" title="Categorias Responsáveis">
+                    <li>Médico</li>
+                    <li>Enfermeiro</li>
+                    <li>Técnico em Enfermagem</li>
+                    <li>Auxiliar de Enfermagem</li>
+                </ul>
+
+                <ul class="action-bar">
+                    {% if atendimento.is_aberto %}
+                        {% if especialidade.is_medico or especialidade.is_enfermeiro or especialidade.is_tecnico_enfermagem or especialidade.is_auxiliar_enfermagem %}
+                            <li><a class="btn success" href="/saude/adicionar_acuidadevisual/{{ atendimento.id }}/">{% icone "plus" %} Adicionar</a></li>
+                        {% endif %}
+                        {% if acuidadevisual_count > 1 %}
+                            <li><a class="btn default popup" href="/saude/historico_ficha/{{ atendimento.id }}/3/">Histórico</a></li>
+                        {% endif %}
+                    {% endif %}
+                </ul>
+
+                {% if acuidadevisual %}
+                    <dl class="definition-list flex">
+                        {% if acuidadevisual.teste_com_lente is None %}
+                            <div class="list-item flex-basis-25">
+                                <dt>Com correção</dt>
+                                <dd>{{ acuidadevisual.com_correcao|format }}</dd>
+                            </div>
+                        {% endif %}
+                        {% if acuidadevisual.teste_com_lente is not None %}
+                            <div class="list-item flex-basis-50">
+                                <dt>O teste será realizado com o estudante utilizando lentes corretivas</dt>
+                                <dd>{{ acuidadevisual.teste_com_lente|format }}</dd>
+                            </div>
+                        {% endif %}
+                        <div class="list-item flex-basis-25">
+                            <dt>Olho esquerdo</dt>
+                            <dd>{{ acuidadevisual.olho_esquerdo|format }}</dd>
+                        </div>
+                        <div class="list-item flex-basis-25">
+                            <dt>Olho direito</dt>
+                            <dd>{{ acuidadevisual.olho_direito|format }}</dd>
+                        </div>
+                        {% if acuidadevisual.usa_lente is not None %}
+                            <div class="list-item flex-basis-50">
+                                <dt>Já fez ou faz uso de lentes corretivas (óculos ou lentes de contato)</dt>
+                                <dd>{{ acuidadevisual.usa_lente|format }}</dd>
+                            </div>
+                        {% endif %}
+                        {% if acuidadevisual.usa_lente_detalhes is not None %}
+                            <div class="list-item flex-basis-50">
+                                <dt>Detalhes do uso de lentes corretivas</dt>
+                                <dd>{{ acuidadevisual.usa_lente_detalhes|format }}</dd>
+                            </div>
+                        {% endif %}
+
+                    </dl>
+                    <p class="obs">{{ acuidadevisual_responsavel }}</p>
+                {% else %}
+                    <p class="alert alert-warning">Nenhuma avaliação cadastrada.</p>
+                {% endif %}
+            {% endbox %}
+        </div>
+    {% endif %}
+    <div class="tab-pane" data-tab="aba_antecedentes" data-title="{{ antecedentesfamiliares_titulo }}" data-checked="{% if aba_antecedentes_preenchida %}True{% else %}False{% endif %}">
+        {% box 'Antecedentes' %}
+            <ul class="tags" title="Categorias Responsáveis">
+                <li>Médico</li>
+                <li>Enfermeiro</li>
+                <li>Técnico em Enfermagem</li>
+                <li>Odontólogo</li>
+                <li>Fisioterapeuta</li>
+                <li>Nutricionista</li>
+                <li>Assistente Social (somente visualização)</li>
+            </ul>
+            {% include "includes/ficha_antecedentes_familiares.html" %}
+        {% endbox %}
+
+        {% box 'Processo Saúde-Doença' %}
+            <ul class="tags" title="Categorias Responsáveis">
+                <li>Médico</li>
+                <li>Enfermeiro</li>
+                <li>Técnico em Enfermagem</li>
+                <li>Auxiliar de Enfermagem</li>
+                <li>Odontólogo</li>
+                <li>Fisioterapeuta</li>
+                <li>Nutricionista</li>
+                <li>Assistente Social (somente visualização)</li>
+
+            </ul>
+            {% include "includes/ficha_processo_saude_doenca.html" %}
+        {% endbox %}
+    </div>
+
+    <div class="tab-pane" data-tab="aba_habitosdevida" data-title="{{ habitosdevida_titulo }}" data-checked="{% if habitosdevida_count > 0 %}True{% else %}False{% endif %}">
+        {% box habitosdevida_titulo %}
+            <ul class="tags" title="Categorias Responsáveis">
+                <li>Médico</li>
+                <li>Enfermeiro</li>
+                <li>Técnico em Enfermagem</li>
+                <li>Auxiliar de Enfermagem</li>
+                <li>Odontólogo</li>
+                <li>Fisioterapeuta</li>
+                <li>Nutricionista</li>
+                <li>Assistente Social (somente visualização)</li>
+            </ul>
+            <ul class="action-bar">
+                {% if atendimento.is_aberto %}
+                    {% if especialidade.is_medico or especialidade.is_enfermeiro or especialidade.is_tecnico_enfermagem or especialidade.is_auxiliar_enfermagem or especialidade.is_odontologo or especialidade.is_fisioterapeuta or especialidade.is_nutricionista %}
+                        <li><a class="btn success" href="/saude/adicionar_habitosdevida/{{ atendimento.id }}/">{% icone "plus" %} Adicionar</a></li>
+                    {% endif %}
+                {% endif %}
+                {% if habitosdevida_count > 1 %}
+                    <li><a class="btn default popup" href="/saude/historico_ficha/{{ atendimento.id }}/4/">Histórico</a></li>
+                {% endif %}
+            </ul>
+            {% if habitosdevida %}
+                <dl class="definition-list flex">
+                    <div class="list-item flex-basis-25">
+                        <dt>Pratica atividade física</dt>
+                        <dd>{{ habitosdevida.atividade_fisica|format }}</dd>
+                    </div>
+                    {% if habitosdevida.atividade_fisica %}
+                        <div class="list-item flex-basis-25">
+                            <dt>Quais atividades</dt>
+                            <dd>{{ habitosdevida.qual_atividade|format }}</dd>
+                        </div>
+                    {% endif %}
+                    {% if habitosdevida.get_frequencia_atividade %}
+                        <div class="list-item flex-basis-25">
+                            <dt>Frequência da atividade física</dt>
+                            <dd>{{ habitosdevida.get_frequencia_atividade|format }}</dd>
+                        </div>
+                    {% endif %}
+                    {% if habitosdevida.get_duracao_atividade %}
+                        <div class="list-item flex-basis-25">
+                            <dt>Duração da atividade física</dt>
+                            <dd>{{ habitosdevida.get_duracao_atividade|format }}</dd>
+                        </div>
+                    {% endif %}
+                </dl>
+                <dl class="definition-list flex">
+                    <div class="list-item">
+                        <dt>Fumante</dt>
+                        <dd>{{ habitosdevida.fuma|format }}</dd>
+                    </div>
+                    {% if habitosdevida.fuma %}
+                        {% if habitosdevida.frequencia_fumo %}
+                            <div class="list-item">
+                                <dt>Frequência mínima de uso do fumo</dt>
+                                <dd>{{ habitosdevida.frequencia_fumo|format }}</dd>
+                            </div>
+                        {% endif %}
+                        {% if habitosdevida.idade_fumo %}
+                            <div class="list-item">
+                                <dt>Experimentou inicialmente com que idade (ano)</dt>
+                                <dd>{{ habitosdevida.idade_fumo|format }}</dd>
+                            </div>
+                        {% endif %}
+                        {% if habitosdevida.frequencia_uso_fumo %}
+                            <div class="list-item">
+                                <dt>Frequência de uso</dt>
+                                <dd>{{ habitosdevida.frequencia_uso_fumo|format }}</dd>
+                            </div>
+                        {% endif %}
+                    {% endif %}
+                </dl>
+                <dl class="definition-list flex">
+                    <div class="list-item">
+                        <dt>Ingere bebidas alcoólicas</dt>
+                        <dd>{{ habitosdevida.bebe|format }}</dd>
+                    </div>
+                    {% if habitosdevida.frequencia_bebida %}
+                        <div class="list-item">
+                            <dt>Frequência mínima de ingestão de bebidas alcoólicas</dt>
+                            <dd>{{ habitosdevida.get_frequencia_bebida|format }}</dd>
+                        </div>
+                    {% endif %}
+                    {% if habitosdevida.idade_bebida %}
+                        <div class="list-item">
+                            <dt>Experimentou inicialmente com que idade (ano)</dt>
+                            <dd>{{ habitosdevida.idade_bebida|format }}</dd>
+                        </div>
+                    {% endif %}
+                    {% if habitosdevida.frequencia_uso_bebida %}
+                        <div class="list-item">
+                            <dt>Frequência de uso</dt>
+                            <dd>{{ habitosdevida.frequencia_uso_bebida|format }}</dd>
+                        </div>
+                    {% endif %}
+                </dl>
+                <dl class="definition-list flex">
+                    <div class="list-item flex-basis-25">
+                        <dt>Faz uso ou já usou drogas ilícitas</dt>
+                        <dd>{{ habitosdevida.usa_drogas|format }}</dd>
+                    </div>
+                    {% if habitosdevida.usa_drogas %}
+                        <div class="list-item flex-basis-25">
+                            <dt>Quais drogas</dt>
+                            <dd>
+                                {% if habitosdevida.que_drogas or habitosdevida.outras_drogas %}
+                                    <ul>
+                                        {% for droga in habitosdevida.que_drogas.all %}
+                                            <li>{{ droga }}</li>
+                                        {% endfor %}
+                                        {% if habitosdevida.outras_drogas %}
+                                            <li>{{ habitosdevida.outras_drogas|format }}</li>
+                                        {% endif %}
+                                    </ul>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </dd>
+                        </div>
+                    {% endif %}
+                    {% if habitosdevida.idade_drogas %}
+                        <div class="list-item flex-basis-25">
+                            <dt>Experimentou inicialmente com que idade (ano)</dt>
+                            <dd>{{ habitosdevida.idade_drogas|format }}</dd>
+                        </div>
+                    {% endif %}
+                    {% if habitosdevida.frequencia_uso_droga %}
+                        <div class="list-item flex-basis-25">
+                            <dt>Frequência de uso</dt>
+                            <dd>{{ habitosdevida.frequencia_uso_droga|format }}</dd>
+                        </div>
+                    {% endif %}
+                </dl>
+                {% if habitosdevida.dificuldade_dormir is not None %}
+                    <dl class="definition-list flex">
+                        <div class="list-item">
+                            <dt>Tem dificuldade para dormir</dt>
+                            <dd>{{ habitosdevida.dificuldade_dormir|format }}</dd>
+                        </div>
+                        {% if habitosdevida.get_horas_sono %}
+                            <div class="list-item">
+                                <dt>Horas de sono diárias</dt>
+                                <dd>{{ habitosdevida.get_horas_sono|format }}</dd>
+                            </div>
+                        {% endif %}
+                    </dl>
+                {% endif %}
+                <dl class="definition-list flex">
+                    {% if habitosdevida.get_refeicoes %}
+                        <div class="list-item">
+                            <dt>Refeições por dia</dt>
+                            <dd>{{ habitosdevida.get_refeicoes|format }}</dd>
+                        </div>
+                    {% endif %}
+                </dl>
+                <dl class="definition-list flex">
+                    <div class="list-item">
+                        <dt>Tem vida sexual ativa</dt>
+                        <dd>{{ habitosdevida.vida_sexual_ativa|format }}</dd>
+                    </div>
+                    {% if habitosdevida.vida_sexual_ativa %}
+                        <div class="list-item">
+                            <dt>Faz uso de algum método contraceptivo</dt>
+                            <dd>{{ habitosdevida.metodo_contraceptivo|format }}</dd>
+                        </div>
+                        {% if habitosdevida.metodo_contraceptivo %}
+                            <div class="list-item">
+                                <dt>Qual método contraceptivo</dt>
+                                <dd>{{ habitosdevida.qual_metodo_contraceptivo.all|join:", "|default:"-" }}</dd>
+                            </div>
+                        {% endif %}
+                    {% endif %}
+                </dl>
+                {% if habitosdevida.uso_internet is not None %}
+                    <dl class="definition-list flex">
+                        <div class="list-item">
+                            <dt>Faz uso da internet</dt>
+                            <dd>{{ habitosdevida.uso_internet|format }}</dd>
+                        </div>
+                        {% if habitosdevida.get_tempo_uso_internet %}
+                            <div class="list-item">
+                                <dt>Qual o tempo de uso</dt>
+                                <dd>{{ habitosdevida.get_tempo_uso_internet|format }}</dd>
+                            </div>
+                        {% endif %}
+                        {% if habitosdevida.objetivo_uso_internet %}
+                            <div class="list-item">
+                                <dt>Objetivo do uso</dt>
+                                <dd>
+                                    {% if habitosdevida.objetivo_uso_internet %}
+                                        <ul>
+                                            {% for objetivo in habitosdevida.get_objetivo_uso_internet %}
+                                                <li>{{ objetivo }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                    {% endif %}
+                                </dd>
+                            </div>
+                        {% endif %}
+                    </dl>
+                {% endif %}
+                <p class="obs">{{ habitosdevida_responsavel }}</p>
+            {% else %}
+                <p class="alert alert-warning">Nenhuma avaliação cadastrada.</p>
+            {% endif %}
+        {% endbox %}
+    </div>
+    {% if not eh_assistente_social %}
+        {% if desenvolvimentopessoal %}
+            <div class="tab-pane" data-tab="aba_desenvolvimentopessoal" data-title="{{ desenvolvimentopessoal_titulo }}" data-checked="{% if desenvolvimentopessoal_count > 0 %}True{% else %}False{% endif %}">
+                {% box desenvolvimentopessoal_titulo %}
+                    <ul class="tags" title="Categorias Responsáveis">
+                        <li>Médico</li>
+                        <li>Enfermeiro</li>
+                        <li>Técnico em Enfermagem</li>
+                        <li>Auxiliar de Enfermagem</li>
+                        <li>Odontólogo</li>
+                        <li>Fisioterapeuta</li>
+                        <li>Nutricionista</li>
+                    </ul>
+                    <ul class="action-bar">
+                        {% if atendimento.is_aberto %}
+                            {% if especialidade.is_medico or especialidade.is_enfermeiro or especialidade.is_tecnico_enfermagem or especialidade.is_auxiliar_enfermagem or especialidade.is_odontologo or especialidade.is_fisioterapeuta or especialidade.is_nutricionista %}
+                                <li><a class="btn success" href="/saude/adicionar_desenvolvimentopessoal/{{ atendimento.id }}/">{% icone "plus" %} Adicionar</a></li>
+                            {% endif %}
+                        {% endif %}
+                        {% if desenvolvimentopessoal_count > 1 %}
+                            <li><a class="btn default popup" href="/saude/historico_ficha/{{ atendimento.id }}/5/">Histórico</a></li>
+                        {% endif %}
+                    </ul>
+                    <dl class="definition-list flex">
+                        <div class="list-item">
+                            <dt>Já teve ou tem algum problema de aprendizado</dt>
+                            <dd>{{ desenvolvimentopessoal.problema_aprendizado|format }}</dd>
+                        </div>
+                        {% if desenvolvimentopessoal.problema_aprendizado %}
+                            <div class="list-item">
+                                <dt>Qual problema de aprendizado</dt>
+                                <dd>{{ desenvolvimentopessoal.qual_problema_aprendizado|format }}</dd>
+                            </div>
+                            <div class="list-item">
+                                <dt>Origem do Problema</dt>
+                                <dd>{{ desenvolvimentopessoal.origem_problema|format }}</dd>
+                            </div>
+                        {% endif %}
+                    </dl>
+                    <p class="obs">{{ desenvolvimentopessoal_responsavel }}</p>
+                {% endbox %}
+            </div>
+        {% endif %}
+        <div class="tab-pane" data-tab="aba_examefisico" data-title="{{ examefisico_titulo }}" data-checked="{% if examefisico_count > 0 %}True{% else %}False{% endif %}">
+            {% box examefisico_titulo %}
+                <ul class="tags" title="Categorias Responsáveis">
+                    <li>Médico</li>
+                </ul>
+                <ul class="action-bar">
+                    {% if atendimento.is_aberto %}
+                        {% if especialidade.is_medico %}
+                            <li><a class="btn success" href="/saude/adicionar_examefisico/{{ atendimento.id }}/">{% icone "plus" %} Adicionar</a></li>
+                        {% endif %}
+                    {% endif %}
+                    {% if examefisico_count > 1 %}
+                        <li><a class="btn default popup" href="/saude/historico_ficha/{{ atendimento.id }}/6/">Histórico</a></li>
+                    {% endif %}
+                </ul>
+                {% if examefisico %}
+                   <dl class="definition-list flex">
+                        <div class="list-item flex-basis-50">
+                            <dt>Ectoscopia alterada</dt>
+                            <dd>{{ examefisico.ectoscopia_alterada|format }}</dd>
+                        </div>
+                        {% if examefisico.ectoscopia_alterada %}
+                            <div class="list-item flex-basis-50">
+                                <dt>Alteração (Ectoscopia)</dt><dd> {{ examefisico.alteracao_ectoscopia|format }}</dd>
+                            </div>
+                        {% endif %}
+                   </dl>
+                   <dl class="definition-list flex">
+                        <div class="list-item flex-basis-50">
+                            <dt>Aparelho cardiovascular alterado</dt>
+                            <dd>{{ examefisico.acv_alterado|format }}</dd>
+                        </div>
+                        {% if examefisico.acv_alterado %}
+                            <div class="list-item flex-basis-50">
+                                <dt>Alteração (ACV)</dt> <dd>{{ examefisico.alteracao_acv|format }}</dd>
+                            </div>
+                        {% endif %}
+                   </dl>
+                   <dl class="definition-list flex">
+
+                        <div class="list-item flex-basis-50">
+                            <dt>Aparelho respiratório alterado</dt>
+                            <dd>{{ examefisico.ar_alterado|format }}</dd>
+                        </div>
+                        {% if examefisico.ar_alterado %}
+                            <div class="list-item flex-basis-50">
+                                <dt>Alteração (AR)</dt> <dd>{{ examefisico.alteracao_ar|format }}</dd>
+                            </div>
+                        {% endif %}
+                   </dl>
+                   <dl class="definition-list flex">
+                        <div class="list-item flex-basis-50">
+                            <dt>Abdome alterado</dt>
+                            <dd>{{ examefisico.abdome_alterado|format }}</dd>
+                        </div>
+                        {% if examefisico.abdome_alterado %}
+                            <div class="list-item flex-basis-50">
+                                <dt>Alteração (Ab)</dt> <dd>{{ examefisico.alteracao_abdome|format }}</dd>
+                            </div>
+                        {% endif %}
+                   </dl>
+                   <dl class="definition-list flex">
+                        <div class="list-item flex-basis-50">
+                            <dt>Membros inferiores alterados</dt>
+                            <dd>{{ examefisico.mmi_alterados|format }}</dd>
+                        </div>
+                         {% if examefisico.mmi_alterados %}
+                            <div class="list-item flex-basis-50">
+                                <dt>Alteração (MMI)</dt><dd> {{ examefisico.alteracao_mmi|format }}</dd>
+                            </div>
+                        {% endif %}
+                  </dl>
+                   <dl class="definition-list flex">
+                        <div class="list-item flex-basis-50">
+                            <dt>Membros superiores alterados</dt>
+                            <dd>{{ examefisico.mms_alterados|format }}</dd>
+                        </div>
+                        {% if examefisico.mms_alterados %}
+                            <div class="list-item flex-basis-50">
+                                <dt>Alteração (MMS)</dt> <dd>{{ examefisico.alteracao_mms|format }}</dd>
+                            </div>
+                        {% endif %}
+                   </dl>
+                   <dl class="definition-list flex">
+                        <div class="list-item flex-basis-50">
+                            <dt>Sistema neurológico alterado</dt>
+                            <dd>{{ examefisico.snl_alterado|format }}</dd>
+                        </div>
+                        {% if examefisico.snl_alterado %}
+                            <div class="list-item flex-basis-50">
+                                <dt>Alteração no sistema neurológico</dt> <dd>{{ examefisico.alteracao_snl|format }}</dd>
+                            </div>
+                        {% endif %}
+                  </dl>
+                   <dl class="definition-list flex">
+                        <div class="list-item flex-basis-50">
+                            <dt>Estado mental alterado</dt>
+                            <dd>{{ examefisico.esm_alterado|format }}</dd>
+                        </div>
+                        {% if examefisico.esm_alterado %}
+                            <div class="list-item flex-basis-50">
+                                <dt>Alteração no estado mental</dt> <dd>{{ examefisico.alteracao_esm|format }}</dd>
+                            </div>
+                        {% endif %}
+                    </dl>
+                   <dl class="definition-list flex">
+                        <div class="list-item flex-basis-50">
+                            <dt>Outras Alterações</dt>
+                            <dd>{{ examefisico.outras_alteracoes|format }}</dd>
+                        </div>
+                        {% if examefisico.outras_alteracoes %}
+                            <div class="list-item flex-basis-50">
+                                <dt>Descrição</dt> <dd>{{ examefisico.outras_alteracoes_descricao|format }}</dd>
+                            </div>
+                        {% endif %}
+                    </dl>
+                    <p class="obs">{{ examefisico_responsavel }}</p>
+                {% else %}
+                    <p class="alert alert-warning">Nenhuma avaliação cadastrada.</p>
+                {% endif %}
+            {% endbox %}
+        </div>
+
+        <div class="tab-pane" data-tab="aba_percepcaosaudebucal" data-title="{{ percepcaosaudebucal_titulo }}" data-checked="{% if percepcaosaudebucal_count > 0 %}True{% else %}False{% endif %}">
+            {% box percepcaosaudebucal_titulo %}
+                <ul class="tags" title="Categorias Responsáveis">
+                    <li>Médico</li>
+                    <li>Enfermeiro</li>
+                    <li>Técnico em Enfermagem</li>
+                    <li>Auxiliar de Enfermagem</li>
+                    <li>Odontólogo</li>
+                    <li>Técnico em Saúde Bucal</li>
+                    <li>Fisioterapeuta</li>
+                    <li>Nutricionista</li>
+                    <li>Psicólogo</li>
+                </ul>
+                <ul class="action-bar">
+                    {% if atendimento.is_aberto %}
+                        {% if especialidade.eh_profissional_saude %}
+                            <li><a class="btn success" href="/saude/adicionar_percepcaosaudebucal/{{ atendimento.id }}/1/">{% icone "plus" %} Adicionar</a></li>
+                        {% endif %}
+                    {% endif %}
+                    {% if percepcaosaudebucal_count > 1 %}
+                        <li><a class="btn default popup" href="/saude/historico_ficha/{{ atendimento.id }}/7/">Histórico</a></li>
+                    {% endif %}
+                </ul>
+                {% if percepcaosaudebucal %}
+                    <dl class="definition-list flex">
+                        <div class="list-item flex-basis-100">
+                            {% if percepcaosaudebucal.frequencia_escovacao %}
+                                <dt>Quantas vezes você costuma escovar os dentes por dia</dt>
+                                <dd>{{ percepcaosaudebucal.frequencia_escovacao }}</dd>
+                            {% endif %}
+                        </div>
+                        <div class="list-item flex-basis-50">
+                            <dt>Já foi a um dentista anteriormente</dt>
+                            <dd>{{ percepcaosaudebucal.foi_dentista_anteriormente|format }}</dd>
+                        </div>
+                        {% if percepcaosaudebucal.tempo_ultima_vez_dentista %}
+                            <div class="list-item flex-basis-50">
+                                <dt>Quanto tempo faz que foi a última vez ao dentista</dt>
+                                <dd>{{ percepcaosaudebucal.get_tempo_ultima_vez_dentista_display|default:"Não informado" }}</dd>
+                            </div>
+                        {% endif %}
+
+                       {% if percepcaosaudebucal.usa_fio_dental is not None %}
+                            <div class="list-item flex-basis-50">
+                                <dt>Usa fio dental</dt>
+                                <dd>{{ percepcaosaudebucal.usa_fio_dental|format }}</dd>
+                            </div>
+                            {% if percepcaosaudebucal.usa_fio_dental %}
+                                <div class="list-item flex-basis-50">
+                                    <dt>Em quantos dias você usou o fio dental nos últimos 7 dias</dt>
+                                    <dd>{{ percepcaosaudebucal.qts_dias_fio_dental_ultima_semana|format }}</dd>
+                                </div>
+                            {% endif %}
+                       {% endif %}
+                       {% if percepcaosaudebucal.qtd_vezes_fio_dental_ultima_semana %}
+                            <div class="list-item flex-basis-100">
+                                <dt>Quantidade de vezes que usou fio dental na última semana</dt>
+                                <dd>{{ percepcaosaudebucal.qtd_vezes_fio_dental_ultima_semana|format }}</dd>
+                            </div>
+                       {% endif %}
+                       {% if percepcaosaudebucal.qtd_dias_consumiu_doce_ultima_semana %}
+                            <div class="list-item flex-basis-100">
+                                <dt>Quantidade de dias que consumiu doces, balas, bolos ou refrigerantes na última semana</dt>
+                                <dd>{{ percepcaosaudebucal.qtd_dias_consumiu_doce_ultima_semana|format }}</dd>
+                            </div>
+                       {% endif %}
+                       {% if percepcaosaudebucal.qtd_por_dia_consome_acucar %}
+                            <div class="list-item flex-basis-100">
+                                <dt>Quantas vezes por dia você consome alimentos ou bebidas com açúcar (Bolos, balas, refrigerantes, sucos artificiais, biscoitos e doces em geral)</dt>
+                                <dd>{{ percepcaosaudebucal.qtd_por_dia_consome_acucar|format }}</dd>
+                            </div>
+                       {% endif %}
+                    </dl>
+                    <dl class="definition-list flex">
+                        <div class="list-item flex-basis-100">
+                                <dt>Usa prótese (coroa, removível ou total)</dt>
+                                <dd>{{ percepcaosaudebucal.usa_protese|format }}</dd>
+                        </div>
+                        <div class="list-item flex-basis-50">
+                                <dt>Usa aparelho ortodôntico/contenção</dt>
+                                <dd>{{ percepcaosaudebucal.usa_aparelho_ortodontico|format }}</dd>
+                        </div>
+                        {% if percepcaosaudebucal.tempo_ortodontia %}
+                            <div class="list-item flex-basis-50">
+                                <dt>Tempo de ortodontia</dt>
+                                <dd>{{ percepcaosaudebucal.tempo_ortodontia|format }}</dd>
+                            </div>
+                       {% endif %}
+                    </dl>
+                    <dl class="definition-list flex">
+                        <div class="list-item flex-basis-100">
+                            <dt>Nos últimos 6 meses teve alguma dificuldade relacionada à boca, dente, prótese ou aparelho
+                                ortodôntico que lhe causou alguma dificuldade
+                            </dt>
+                            <dd>{{ percepcaosaudebucal.dificuldades|format }}</dd>
+                        </div>
+                        {% if percepcaosaudebucal.dificuldades %}
+                            <div class="list-item flex-basis-50">
+                                <dt>Dificuldade em sorrir</dt>
+                                <dd>{% if percepcaosaudebucal.motivo_dificuldade_sorrir %} {{ "Sim"|status }}{% else %}{{ "Não"|status }}{% endif %}</dd>
+                            </div>
+                            <div class="list-item flex-basis-50">
+                                {% if percepcaosaudebucal.motivo_dificuldade_sorrir %}
+                                    <dt>Qual motivo você atribui como responsável</dt>
+                                    <dd>{{ percepcaosaudebucal.motivo_dificuldade_sorrir|format }}</dd>
+                                {% endif %}
+                            </div>
+                            <div class="list-item flex-basis-50">
+                                <dt>Dificuldade em falar</dt>
+                                <dd>{% if percepcaosaudebucal.motivo_dificuldade_falar %} {{ "Sim"|status }}{% else %}{{ "Não"|status }}{% endif %}</dd>
+                            </div>
+                            <div class="list-item flex-basis-50">
+                                {% if percepcaosaudebucal.motivo_dificuldade_falar %}
+                                    <dt>Qual motivo você atribui como responsável</dt>
+                                    <dd>{{ percepcaosaudebucal.motivo_dificuldade_falar|format }}</dd>
+                                {% endif %}
+                            </div>
+                            <div class="list-item flex-basis-50">
+                                <dt>Dificuldade em comer</dt>
+                                <dd>{% if percepcaosaudebucal.motivo_dificuldade_comer %} {{ "Sim"|status }}{% else %}{{ "Não"|status }}{% endif %}</dd>
+                            </div>
+                            <div class="list-item flex-basis-50">
+                                {% if percepcaosaudebucal.motivo_dificuldade_comer %}
+                                    <dt>Qual motivo você atribui como responsável</dt>
+                                    <dd>{{ percepcaosaudebucal.motivo_dificuldade_comer|format }}</dd>
+                                {% endif %}
+                            </div>
+                            <div class="list-item flex-basis-50">
+                                <dt>Dificuldade em relacionar-se socialmente</dt>
+                                <dd>{% if percepcaosaudebucal.motivo_dificuldade_relacionar %} {{ "Sim"|status }}{% else %}{{ "Não"|status }}{% endif %}</dd>
+                            </div>
+                            <div class="list-item flex-basis-50">
+                                {% if percepcaosaudebucal.motivo_dificuldade_relacionar %}
+                                    <dt>Qual motivo você atribui como responsável</dt>
+                                    <dd>{{ percepcaosaudebucal.motivo_dificuldade_relacionar|format }}</dd>
+                                {% endif %}
+                            </div>
+                            <div class="list-item flex-basis-50">
+                                <dt>Dificuldade em manter humor habitual</dt>
+                                <dd>{% if percepcaosaudebucal.motivo_dificuldade_manter_humor %} {{ "Sim"|status }}{% else %}{{ "Não"|status }}{% endif %}</dd>
+                            </div>
+                            <div class="list-item flex-basis-50">
+                                {% if percepcaosaudebucal.motivo_dificuldade_manter_humor %}
+                                    <dt>Qual motivo você atribui como responsável</dt>
+                                    <dd>{{ percepcaosaudebucal.motivo_dificuldade_manter_humor|format }}</dd>
+                                {% endif %}
+                            </div>
+                            <div class="list-item flex-basis-50">
+                                <dt>Dificuldade em estudar/trabalhar</dt>
+                                <dd>{% if percepcaosaudebucal.motivo_dificuldade_estudar_trabalhar %} {{ "Sim"|status }}{% else %}{{ "Não"|status }}{% endif %}</dd>
+                                </div>
+                            <div class="list-item flex-basis-50">
+                                {% if percepcaosaudebucal.motivo_dificuldade_estudar_trabalhar %}
+                                    <dt>Qual motivo você atribui como responsável</dt>
+                                    <dd>{{ percepcaosaudebucal.motivo_dificuldade_estudar_trabalhar|format }}</dd>
+                                {% endif %}
+                            </div>
+                            <div class="list-item flex-basis-50">
+                                <dt>Dificuldade em higienizar a boca</dt>
+                                <dd>{% if percepcaosaudebucal.motivo_dificuldade_higienizar %} {{ "Sim"|status }}{% else %}{{ "Não"|status }}{% endif %}</dd>
+                                </div>
+                            <div class="list-item flex-basis-50">
+                                {% if percepcaosaudebucal.motivo_dificuldade_higienizar %}
+                                    <dt>Qual motivo você atribui como responsável</dt>
+                                    <dd>{{ percepcaosaudebucal.motivo_dificuldade_higienizar|format }}</dd>
+                                {% endif %}
+                            </div>
+                            <div class="list-item flex-basis-50">
+                                <dt>Dificuldade em dormir</dt>
+                                <dd>{% if percepcaosaudebucal.motivo_dificuldade_dormir %} {{ "Sim"|status }}{% else %}{{ "Não"|status }}{% endif %}</dd>
+                                </div>
+                            <div class="list-item flex-basis-50">
+                                {% if percepcaosaudebucal.motivo_dificuldade_dormir %}
+                                    <dt>Qual motivo você atribui como responsável</dt>
+                                    <dd>{{ percepcaosaudebucal.motivo_dificuldade_dormir|format }}</dd>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                    </dl>
+                    <p class="obs">{{ percepcaosaudebucal_responsavel }}</p>
+                {% else %}
+                    <p class="alert alert-warning">Nenhuma avaliação cadastrada.</p>
+                {% endif %}
+            {% endbox %}
+        </div>
+
+        <div class="tab-pane" data-tab="aba_odontograma" data-title="{{ odontograma_titulo }}" data-checked="{% if alteracoes or exames_periodontais or avaliacoes_tecidos %}True{% elif not odontograma %}False{% endif %}">
+            {% box odontograma_titulo %}
+                <ul class="tags" title="Categorias Responsáveis">
+                    <li>Odontólogo</li>
+                </ul>
+                {% if atendimento.is_aberto and especialidade.is_odontologo %}
+                    <ul class="action-bar">
+                        {% if atendimento.odontograma_set.exists %}
+                            <li><a class="btn primary" href="/saude/adicionar_odontograma/{{ atendimento.id }}/">{% icone "edit" %} Editar</a></li>
+                        {% else %}
+                            <li><a class="btn success" href="/saude/adicionar_odontograma/{{ atendimento.id }}/">{% icone "plus" %} Adicionar</a></li>
+                        {% endif %}
+                    </ul>
+                {% endif %}
+
+                {% if odontograma %}
+                    {% if situacoes %}
+                        <div class="legenda flat">
+                            <p>Legenda:</p>
+                            <ul>
+                                {% for situacao in situacoes %}
+                                    <li class="{{ situacao.categoria }}">
+                                        <input type="hidden" name="situacao_clinica_object" value="{{ situacao.id }}/{{ situacao.preenchimento }}-{{ situacao.categoria }}" />{{ situacao.descricao }}
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% endif %}
+
+                    <input type="hidden" id="faces_alteradas" value="{{ odontograma.dentes_alterados }}">
+                    <div id="odontogramaSVG" class="visualizacao">
+                        <script>
+                            desenhar_odontograma_visualizacao();
+                            carregar_categorias();
+                            restaurar_odontograma();
+                        </script>
+                    </div>
+
+                    {% if alteracoes %}
+                        <h4>Situações Clínicas</h4>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Dente</th>
+                                    <th>Face</th>
+                                    <th>Situação Clínica</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in alteracoes %}
+                                    <tr>
+                                        <td>{{ item.dente }}</td>
+                                        <td>{{ item.face }}</td>
+                                        <td>{{ item.situacao }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    {% endif %}
+                    <p class="obs">{{ odontograma_responsavel }}</p>
+                {% else %}
+                    <p class="alert alert-warning">Nenhum odontograma cadastrado.</p>
+                {% endif %}
+            {% endbox %}
+
+            {% box 'Exame Periodontal' %}
+
+                <ul class="tags" title="Categorias Responsáveis">
+                    <li>Odontólogo</li>
+                </ul>
+
+                {% if atendimento.is_aberto %}
+                    {% if atendimento.is_aberto and especialidade.is_odontologo %}
+                        <ul class="action-bar">
+                            <li><a class="btn success" href="/saude/adicionar_exame_periodontal/{{ atendimento.id }}/?origem=1">{% icone "plus" %} Adicionar</a></li>
+                        </ul>
+                    {% endif %}
+                {% endif %}
+
+                {% if exames_periodontais.exists %}
+                    <div>
+                        <div class="grid9">
+                            <div class="table-responsive">
+                                <table>
+                                    <caption>Exame periodontal</caption>
+                                    <thead>
+                                        <tr>
+                                            <th class="no-print">Ações</th>
+                                            <th>Ocorrência</th>
+                                            <th>Sextante</th>
+                                            <th>Atualizado por</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                    {% for exame in exames_periodontais %}
+                                        <tr>
+                                            <td class="no-print">
+                                                {% if atendimento.is_aberto and especialidade.is_odontologo %}
+                                                    {% icon "edit" "/saude/editar_exame_periodontal/{{ exame.pk }}/" "Editar" %}
+                                                    {% icon "delete" "/saude/excluir_exame_periodontal/{{ exame.pk }}/" "Excluir" %}
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ exame.get_ocorrencia|format }}</td>
+                                            <td>{{ exame.sextante|format }}</td>
+                                            <td>{{ exame.profissional|format }} em {{ exame.data_cadastro }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <p class="obs">{{ exames_periodontais_responsavel }}</p>
+                        </div>
+                        <div class="grid3">
+                            <img src="/static/saude/imagens/sextantes.gif" alt="Sextantes ou Regiões" />
+                        </div>
+                    </div>
+                {% else %}
+                    <p class="alert alert-warning">Nenhum registro cadastrado.</p>
+                {% endif %}
+            {% endbox %}
+
+            {% box 'Exame Estomatológico' %}
+                <ul class="tags" title="Categorias Responsáveis">
+                    <li>Odontólogo</li>
+                </ul>
+
+                <ul class="action-bar">
+                    {% if atendimento.is_aberto and especialidade.is_odontologo %}
+                        {% if avaliacoes_tecidos %}
+                            <li><a class="btn primary" href="/saude/adicionar_exame_estomatologico/{{ atendimento.id }}/">{% icone "edit" %} Editar</a></li>
+                        {% else %}
+                            <li><a class="btn success" href="/saude/adicionar_exame_estomatologico/{{ atendimento.id }}/">{% icone "plus" %} Adicionar</a></li>
+                        {% endif %}
+                    {% endif %}
+                </ul>
+
+                {% if avaliacoes_tecidos %}
+                    <dl class="definition-list">
+                        {% if avaliacoes_tecidos.labios %}
+                            <dt>Alteração no Lábio</dt>
+                            <dd>{{ avaliacoes_tecidos.labios|format }}</dd>
+                        {% endif %}
+                        {% if avaliacoes_tecidos.lingua %}
+                            <dt>Alteração na Língua</dt>
+                            <dd>{{ avaliacoes_tecidos.lingua|format }}</dd>
+                        {% endif %}
+                        {% if avaliacoes_tecidos.gengiva %}
+                            <dt>Alteração na Gengiva</dt>
+                            <dd>{{ avaliacoes_tecidos.gengiva|format }}</dd>
+                            {% endif %}
+                        {% if avaliacoes_tecidos.assoalho %}
+                            <dt>Alteração no Assoalho</dt>
+                            <dd>{{ avaliacoes_tecidos.assoalho|format }}</dd>
+                        {% endif %}
+                        {% if avaliacoes_tecidos.mucosa_jugal %}
+                            <dt>Alteração na Mucosa Jugal</dt>
+                            <dd>{{ avaliacoes_tecidos.mucosa_jugal|format }}</dd>
+                        {% endif %}
+                        {% if avaliacoes_tecidos.palato_duro %}
+                            <dt>Alteração no Palato Duro</dt>
+                            <dd>{{ avaliacoes_tecidos.palato_duro|format }}</dd>
+                        {% endif %}
+                        {% if avaliacoes_tecidos.palato_mole %}
+                            <dt>Alteração no Palato Mole</dt>
+                            <dd>{{ avaliacoes_tecidos.palato_mole|format }}</dd>
+                        {% endif %}
+                        {% if avaliacoes_tecidos.rebordo %}
+                            <dt>Alteração no Rebordo</dt>
+                            <dd>{{ avaliacoes_tecidos.rebordo|format }}</dd>
+                        {% endif %}
+                        {% if avaliacoes_tecidos.cadeia_ganglionar %}
+                            <dt>Alteração na Cadeia Ganglionar</dt>
+                            <dd>{{ avaliacoes_tecidos.cadeia_ganglionar|format }}</dd>
+                        {% endif %}
+                        {% if avaliacoes_tecidos.tonsilas_palatinas %}
+                            <dt>Alteração nas Tonsilas Palatinas</dt>
+                            <dd>{{ avaliacoes_tecidos.tonsilas_palatinas|format }}</dd>
+                        {% endif %}
+                        {% if avaliacoes_tecidos.atm %}
+                            <dt>Alteração na ATM</dt>
+                            <dd>{{ avaliacoes_tecidos.atm|format }}</dd>
+                        {% endif %}
+                        {% if avaliacoes_tecidos.oclusao %}
+                            <dt>Alteração na Oclusão</dt>
+                            <dd>{{ avaliacoes_tecidos.oclusao|format }}</dd>
+                        {% endif %}
+                     </dl>
+                    <p class="obs">{{ avaliacoes_tecidos_responsavel }}</p>
+                {% else %}
+                    <p class="alert alert-warning">Nenhum registro cadastrado.</p>
+                {% endif %}
+            {% endbox %}
+        </div>
+    {% endif %}
+    <div class="tab-pane" data-tab="aba_nutricao" data-title="{{ nutricao_titulo }}" data-checked="{% if nutricao_count > 0 %}True{% else %}False{% endif %}">
+        {% box nutricao_titulo %}
+            <ul class="tags" title="Categorias Responsáveis">
+                <li>Médico</li>
+                <li>Enfermeiro</li>
+                <li>Técnico em Enfermagem</li>
+                <li>Auxiliar de Enfermagem</li>
+                <li>Nutricionista</li>
+                <li>Assistente Social (somente visualização)</li>
+            </ul>
+            <ul class="action-bar">
+                {% if atendimento.is_aberto %}
+                    {% if especialidade.is_medico or especialidade.is_enfermeiro or especialidade.is_tecnico_enfermagem or especialidade.is_auxiliar_enfermagem or especialidade.is_nutricionista %}
+                        <li><a class="btn success" href="/saude/adicionar_nutricao_alimentacao/{{ atendimento.id }}/">{% icone "plus" %} Adicionar</a></li>
+                    {% endif %}
+                {% endif %}
+                {% if nutricao_count > 1 %}
+                    <li><a class="btn default popup" href="/saude/historico_ficha/{{ atendimento.id }}/11/">Histórico</a></li>
+                {% endif %}
+            </ul>
+            {% if nutricao %}
+                <dl class="definition-list flex">
+                    <div class="list-item flex-basis-50">
+                        <dt>Perda de peso</dt>
+                        <dd>{{ nutricao.perda_peso|format }}</dd>
+                    </div>
+                    {% if nutricao.perda_peso %}
+                        <div class="list-item flex-basis-25">
+                            <dt>Quanto de perda</dt>
+                            <dd>{{ nutricao.get_quanto_perdeu_display|format }}</dd>
+                        </div>
+                        <div class="list-item flex-basis-25">
+                            <dt>Há quanto tempo vem perdendo peso</dt>
+                            <dd>{{ nutricao.get_tempo_perda_display|format }}</dd>
+                        </div>
+                    {% endif %}
+                </dl>
+                <dl class="definition-list flex">
+                    <div class="list-item flex-basis-50">
+                        <dt>Ganho de peso</dt>
+                        <dd>{{ nutricao.ganho_peso|format }}</dd>
+                    </div>
+                    {% if nutricao.ganho_peso %}
+                        <div class="list-item flex-basis-25">
+                            <dt>Quanto de ganho</dt>
+                            <dd>{{ nutricao.get_quanto_ganhou_display|format }}</dd>
+                        </div>
+                        <div class="list-item flex-basis-25">
+                            <dt>Há quanto tempo vem ganhando peso</dt>
+                            <dd>{{ nutricao.get_tempo_ganho_display|format }}</dd>
+                        </div>
+                    {% endif %}
+                </dl>
+                <h4>Marcadores de Práticas e de Consumo Alimentar</h4>
+                <dl class="definition-list flex">
+                    <div class="list-item flex-basis-50">
+                        <dt>Como você se sente em relação ao seu corpo</dt>
+                        <dd>{{ nutricao.sentimento_relacao_corpo|format }}</dd>
+                        <dt>NOS ÚLTIMOS 30 DIAS, com que frequência você ficou com fome por não ter comida suficiente em sua casa</dt>
+                        <dd>{{ nutricao.periodo_sem_comida|format }}</dd>
+                    </div>
+                </dl>
+                <dl class="definition-list flex">
+                    <div class="definition-list flex">
+                        <div class="list-item flex-basis-25">
+                            <dt>Alergias a alimentos</dt>
+                            <dd>{{ nutricao.tem_alergia_alimentos|format }}</dd>
+                        </div>
+                        {% if nutricao.tem_alergia_alimentos %}
+                            <div class="list-item flex-basis-25">
+                                <dt>A alergia é</dt>
+                                <dd>{{ nutricao.diagnostico_alergia_alimentos }}</dd>
+                            </div>
+                            <div class="list-item flex-basis-50">
+                                <dt>Alergias</dt>
+                                <dd>{{ nutricao.alergia_alimentos|format }}{% if nutricao.alergia_alimentos_outros %} - {{ nutricao.alergia_alimentos_outros }} {% endif %}</dd>
+                            </div>
+                        {% endif %}
+                    </div>
+                </dl>
+                <dl class="definition-list flex">
+                    <div class="list-item flex-basis-50">
+                        <dt>Quantas refeições faz por dia</dt>
+                        <dd>{{ nutricao.refeicoes_por_dia|format }}</dd>
+                    </div>
+                </dl>
+                <dl class="definition-list flex">
+                    <div class="list-item flex-basis-25">
+                        <dt>Intolerância alimentar</dt>
+                        <dd>{{ nutricao.tem_intolerancia_alimentar|format }}</dd>
+                    </div>
+                    {% if nutricao.tem_intolerancia_alimentar %}
+                        <div class="list-item flex-basis-25">
+                            <dt>A intolerância é</dt>
+                            <dd>{{ nutricao.diagnostico_intolerancia_alimentar }}</dd>
+                        </div>
+                        <div class="list-item flex-basis-50">
+                            <dt>Intolerâncias alimentares</dt>
+                            <dd>{{ nutricao.intolerancia_alimentar|format }}{% if nutricao.intolerancia_alimentar_outros %} - {{ nutricao.intolerancia_alimentar_outros }} {% endif %}</dd>
+                        </div>
+                    {% endif %}
+
+                </dl>
+                <h4>Questionário sobre Refeições</h4>
+                 <dl class="definition-list flex">
+                    <div class="list-item flex-basis-50">
+                        <dt>Você tem costume de realizar refeições assistindo à TV, mexendo no computador e/ou celular</dt>
+                        <dd>{{ nutricao.faz_refeicao_distraido|format }}</dd>
+                    </div>
+                    <div class="list-item flex-basis-50">
+                        <dt>Quais refeições você faz ao longo do dia</dt>
+                        <dd>{{ nutricao.refeicoes_ao_dia|format }}</dd>
+                    </div>
+                </dl>
+                <h4>Ontem você consumiu</h4>
+                <dl class="definition-list flex">
+                    <div class="list-item flex-basis-100">
+                        <dt>Feijão</dt>
+                        <dd>{{ nutricao.consumiu_feijao_ontem|format }}</dd>
+                        <dt>Frutas frescas? (não considerar suco de frutas)</dt>
+                        <dd>{{ nutricao.consumiu_frutas_ontem|format }}</dd>
+                        <dt>Verduras e/ou legumes? (não considerar batata, mandioca, aipim, macaxeira, cará e inhame)</dt>
+                        <dd>{{ nutricao.consumiu_verduras_ontem|format }}</dd>
+                        <dt>Hambúrguer e/ou embutidos (presunto, mortadela, salame, linguiça, salsicha)</dt>
+                        <dd>{{ nutricao.consumiu_hamburguer_ontem|format }}</dd>
+                        <dt>Bebidas adoçadas (refrigerante, suco de caixinha, suco em pó, àgua de coco de caixinha, xaropes de guaraná/groselha, suco de fruta com adição de açúcar)</dt>
+                        <dd>{{ nutricao.consumiu_bebidas_adocadas_ontem|format }}</dd>
+                        <dt>Macarrão instantâneo, salgadinhos de pacote ou biscoitos salgados</dt>
+                        <dd>{{ nutricao.consumiu_macarrao_instantaneo_ontem|format }}</dd>
+                        <dt>Biscoito recheado, doces ou guloseimas (balas, pirulitos, chiclete, caramelo, gelatina)</dt>
+                        <dd>{{ nutricao.consumiu_biscoito_ontem|format }}</dd>
+                    </div>
+                </dl>
+                <p class="obs">{{ examefisico_responsavel }}</p>
+            {% else %}
+                <p class="alert alert-warning">Nenhuma avaliação cadastrada.</p>
+            {% endif %}
+        {% endbox %}
+    </div>
+    <div class="tab-pane" data-tab="aba_saudemental" data-title="{{ saudemental_titulo }}" data-checked="{% if saudemental_count > 0 %}True{% else %}False{% endif %}">
+        {% box saudemental_titulo %}
+            <ul class="tags" title="Categorias Responsáveis">
+                <li>Médico</li>
+                <li>Enfermeiro</li>
+                <li>Técnico em Enfermagem</li>
+                <li>Auxiliar de Enfermagem</li>
+                <li>Odontólogo</li>
+                <li>Técnico em Saúde Bucal</li>
+                <li>Fisioterapeuta</li>
+                <li>Nutricionista</li>
+                <li>Psicólogo</li>
+                <li>Assistente Social (somente visualização)</li>
+            </ul>
+            <ul class="action-bar">
+                {% if atendimento.is_aberto %}
+                    {% if especialidade.eh_profissional_saude %}
+                        <li><a class="btn success" href="/saude/adicionar_saudemental/{{ atendimento.id }}/">{% icone "plus" %} Adicionar</a></li>
+                    {% endif %}
+                {% endif %}
+                {% if saudemental_count > 1 %}
+                    <li><a class="btn default popup" href="/saude/historico_ficha/{{ atendimento.id }}/12/">Histórico</a></li>
+                {% endif %}
+            </ul>
+            {% if saudemental %}
+                <dl class="definition-list flex">
+                    <div class="list-item flex-basis-25">
+                        <dt>Tem ou já teve alguma questão de saúde mental</dt>
+                        <dd>{{ saudemental.tem_questao_saude_mental|format }}</dd>
+                    </div>
+                    {% if saudemental.tem_questao_saude_mental %}
+                        <div class="list-item flex-basis-25">
+                            <dt>Qual o transtorno</dt>
+                            <dd>{{ saudemental.qual_questao_saude_mental|format }}</dd>
+                        </div>
+                        <div class="list-item flex-basis-25">
+                            <dt>Faz acompanhamento</dt>
+                            <dd>{{ saudemental.faz_acompanhamento_saude_mental|format }}</dd>
+                        </div>
+                        {% if saudemental.faz_acompanhamento_saude_mental %}
+                             <div class="list-item flex-basis-25">
+                            <dt>Qual tipo de acompanhamento</dt>
+                            <dd>{{ saudemental.acompanhamento_saude_mental|format }} {% if saudemental.acompanhamento_saude_mental == 'Outro' %}- {{ saudemental.acompanhamento_saude_mental_outro }}{% endif %}</dd>
+                        </div>
+                        {% endif %}
+                    {% endif %}
+                </dl>
+                <dl class="definition-list flex">
+                    <div class="list-item flex-basis-25">
+                        <dt>Você já tentou se machucar alguma vez</dt>
+                        <dd>{{ saudemental.tentou_se_machucar|format }}</dd>
+                    </div>
+                    {% if saudemental.tentou_se_machucar %}
+                        <div class="list-item flex-basis-25">
+                            <dt>Descreva a situação</dt>
+                            <dd>{{ saudemental.tentou_se_machucar_descricao|format }}</dd>
+                        </div>
+                    {% endif %}
+                </dl>
+                <dl class="definition-list flex">
+                    <div class="list-item flex-basis-25">
+                        <dt>Que horário você costuma dormir</dt>
+                        <dd>{{ saudemental.hora_dormir|format }}</dd>
+                    </div>
+                    <div class="list-item flex-basis-25">
+                        <dt>Que horário você costuma acordar</dt>
+                        <dd>{{ saudemental.hora_acordar|format }}</dd>
+                    </div>
+                    <div class="list-item flex-basis-25">
+                        <dt>Como se sente ao acordar</dt>
+                        <dd>{{ saudemental.sentimento_acodar|format }}</dd>
+                    </div>
+                    <div class="list-item flex-basis-25">
+                        <dt>Como se sente ao longo do dia</dt>
+                        <dd>{{ saudemental.sentimento_durante_dia|format }}</dd>
+                    </div>
+                    <div class="list-item flex-basis-100">
+                        <dt>O que você costuma fazer 02 (duas) horas antes do sono</dt>
+                        <dd>{{ saudemental.atividades_antes_sono|format }}</dd>
+                    </div>
+                </dl>
+                <dl class="definition-list flex">
+                    <div class="list-item flex-basis-25">
+                        <dt>Você costuma usar telas antes de dormir</dt>
+                        <dd>{{ saudemental.usa_telas_antes_dormir|format }}</dd>
+                    </div>
+                    <div class="list-item flex-basis-25">
+                        <dt>Quanto tempo antes de dormir você para de usar telas</dt>
+                        <dd>{{ saudemental.para_telas_antes_dormir|format }}</dd>
+                    </div>
+                    <div class="list-item flex-basis-25">
+                        <dt>Você tem o hábito de usar telas para relaxar antes de dormir</dt>
+                        <dd>{{ saudemental.habito_telas_antes_dormir|format }}</dd>
+                    </div>
+                </dl>
+                <p class="obs">{{ saudemental_responsavel }}</p>
+            {% else %}
+                <p class="alert alert-warning">Nenhuma avaliação cadastrada.</p>
+            {% endif %}
+        {% endbox %}
+    </div>
+
+    <div class="tab-pane" data-tab="aba_informacaoadicional" data-title="Informações Adicionais" data-checked="{% if informacoesadicionais_count > 0 %}True{% endif %}">
+        {% box "Informações Adicionais" %}
+            <ul class="tags" title="Categorias Responsáveis">
+                <li>Médico</li>
+                <li>Enfermeiro</li>
+                <li>Técnico em Enfermagem</li>
+                <li>Auxiliar de Enfermagem</li>
+                <li>Odontólogo</li>
+                <li>Técnico em Saúde Bucal</li>
+                <li>Fisioterapeuta</li>
+                <li>Nutricionista</li>
+                <li>Psicólogo</li>
+                <li>Assistente Social (somente visualização)</li>
+            </ul>
+
+            {% if atendimento.is_aberto %}
+                {% if especialidade.eh_profissional_saude %}
+                    <ul class="action-bar">
+                        <li><a class="btn success" href="/saude/adicionar_informacao_adicional/{{ atendimento.id }}/">{% icone "plus" %} Adicionar</a></li>
+                    </ul>
+                {% endif %}
+            {% endif %}
+
+            {% if informacoes_adicionais.exists %}
+                <div class="table-responsive">
+                    <table>
+                        <caption>Informações adicionais</caption>
+                        <thead>
+                            <tr>
+                                <th>Informação</th>
+                                <th>Data</th>
+                                <th>Responsável</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for informacao in informacoes_adicionais %}
+                                <tr>
+                                    <td>{{ informacao.informacao }}</td>
+                                    <td>{{ informacao.data_cadastro }}</td>
+                                    <td>{{ informacao.profissional }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="alert alert-warning">Nenhuma informação adicional cadastrada.</p>
+            {% endif %}
+        {% endbox %}
+
+    </div>
+{% endblock %}
+
+{% block asideright %}
+    <aside class="right">
+        {% include "includes/dados_extras_paciente.html" %}
+        
+        {% include "includes/regras_para_fechamento.html" %}
+    </aside>
+{% endblock %}

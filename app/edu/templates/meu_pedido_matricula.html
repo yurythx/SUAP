@@ -1,0 +1,133 @@
+{% extends super_template %}
+
+{% block action-bar %}
+    {% if perms.efetuar_matricula %}
+        <ul class="action-bar">
+            <li><a class="btn" href="/edu/configuracao_pedido_matricula/{{ obj.configuracao_pedido_matricula_id }}/">{% icone "eye" %} Visualizar configuração</a></li>
+        </ul>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+
+        {% if obj.motivo_impedimento_matricula_vinculo %}
+            <p class="alert alert-info">O pedido de matrícula vínculo foi impedido pelo seguinte motivo: {{obj.motivo_impedimento_matricula_vinculo }}.</p>
+        {% endif %}
+
+    {% box "Pedidos de Matrícula em Disciplinas" %}
+        {% if pedidos_matricula_diario %}
+            <table>
+                <thead>
+                <tr>
+                    <th>Ano/Período</th>
+                    <th>Disciplina / Turma</th>
+                    <th>Diário</th>
+                    <th>Data do Processamento</th>
+                    <th>Deferimento</th>
+                    <th>Motivo</th>
+                    <th>Observação</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% if diarios_removidos %}
+                    <div class="alert alert-warning">O aluno foi removido dos seguintes diários e deve procurar a secretaria
+                        acadêmica:
+                        <ul>
+                            {% for diario in diarios_removidos %}
+                                <li>{{ diario }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                {% endif %}
+
+                {% for pedido_matricula_diario in pedidos_matricula_diario %}
+                    <tr>
+                        <td>{{ pedido_matricula_diario.pedido_matricula.matricula_periodo.ano_letivo }}/{{ pedido_matricula_diario.pedido_matricula.matricula_periodo.periodo_letivo }}</td>
+                        <td>{{ pedido_matricula_diario.diario.componente_curricular.componente|format }} /
+                            {{ pedido_matricula_diario.diario.turma|format }}</td>
+                        <td>{% if perms.view_diario %}
+                            <a href="/edu/diario/{{ pedido_matricula_diario.diario.pk }}/">{{ pedido_matricula_diario.diario.pk }}</a>{% else %}
+                            {{ pedido_matricula_diario.diario.pk }}{% endif %}</td>
+                        <td>{{ pedido_matricula_diario.data_processamento|format }}</td>
+                        <td>
+                            {% if pedido_matricula_diario.data_processamento %}
+                                {{ pedido_matricula_diario.deferido|format }}
+                            {% else %}
+                                <span class="status status-{{ matriculadiario.get_situacao_diario.status }}">{{ matriculadiario.get_situacao_diario.rotulo }}</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ pedido_matricula_diario.get_motivo_display|format }}</td>
+                        <td>
+                            {% if pedido_matricula_diario.deferido %}
+                                {% with matricula_diario=pedido_matricula_diario.get_matricula_diario %}
+                                    {% if not matricula_diario %}
+                                        <span class="status status-error">Removido</span>
+                                    {% else %}
+                                        <span class="status status-{{ matricula_diario.get_situacao_diario.status }}">{{ matricula_diario.get_situacao_diario.rotulo }}</span>
+                                    {% endif %}
+                                {% endwith %}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="alert alert-warning">Não há disciplinas no pedido de matrícula desse aluno.</p>
+        {% endif %}
+    {% endbox %}
+    {% box "Horários" %}
+        {% if not turnos.vazio %}
+            {% for turno in turnos %}
+                {% if not turno.vazio %}
+                    <table>
+                        <caption>{{ turno.descricao }}</caption>
+                        <thead>
+                        <tr>
+                            <th> -</th>
+                            {% for dia_semana in turno.dias_semana %}
+                                <th width="13%" class="text-center">{{ dia_semana.1 }}</th>
+                            {% endfor %}
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for horario_aula in turno.horariosaulas %}
+                            <tr>
+                                <td><strong>{{ horario_aula }}</strong></td>
+                                {% for dia_semana in turno.dias_semana %}
+                                    <td class="text-center parent">
+
+                                        {% for horarioauladiario in dia_semana.2 %}
+                                            {% if horario_aula == horarioauladiario.horario_aula %}
+
+                                                <a class='child' href="/edu/diario/{{ horarioauladiario.diario.pk }}"
+                                                   title="{{ horarioauladiario.diario.componente_curricular.componente.descricao }}">
+                                                    {{ horarioauladiario.diario.componente_curricular.componente.sigla }}
+                                                </a>
+                                                <br>
+                                                {% for professordiario in horarioauladiario.diario.professordiario_set.all %}
+                                                    {{ professordiario.professor.vinculo.pessoa.nome_usual|format|normalizar }}
+                                                    <br>
+                                                {% endfor %}
+
+                                            {% endif %}
+                                        {% endfor %}
+
+                                    </td>
+                                {% endfor %}
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                {% endif %}
+            {% endfor %}
+        {% else %}
+            <p class="alert alert-warning">Nenhum horário de aula definido.</p>
+        {% endif %}
+        <script>
+            $('.parent .child:nth-of-type(2)').parent().addClass('status status-error false');
+        </script>
+    {% endbox %}
+{% endblock %}

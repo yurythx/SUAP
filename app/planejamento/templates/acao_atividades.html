@@ -1,0 +1,127 @@
+{% extends super_template %}
+
+{% block extracss %}
+<link rel="stylesheet" href="/static/planejamento/css/planejamento.css" />
+{% endblock %}
+
+{% block content %}
+    <h1>{{ form.TITLE }}</h1>
+
+	{% box 'Dados gerais' %}
+    <table>
+        <tr>
+            <td>Meta<input type="hidden" id="id_meta_unidade" value="{{ meta_unidade.pk }}" name="meta_unidade" /></td>
+			<td>{{ meta_unidade.get_codigo_completo }} - {{ meta_unidade.meta }}</td>
+		</tr>
+		<tr>
+            <td>Ação</td>
+			<td>{{ acao.get_codigo_completo }} - {{ acao.titulo }}</td>
+		</tr>
+		<tr>
+			<td>Saldo disponível</td>
+			<td>
+				{% if saldo %}
+				{% if not saldo.0 %}
+				<span style="color:red;">
+					-{{ saldo.1|mascara_dinheiro }}
+					<span style="color:#bbb;margin-left:5px;font-weight:normal">(este saldo considera apenas os gastos planejados com recursos próprios)</span>
+				</span>
+				{% else %}
+				<span style="color:green;">
+					{{ saldo.1|mascara_dinheiro }}
+					<span style="color:#bbb;margin-left:5px;font-weight:normal">(este saldo considera apenas os gastos planejados com recursos próprios)</span>
+				</span>
+				{% endif %}
+				{% else %}
+				Valor Desconhecido
+				{% endif %}
+			</td>
+        </tr>
+    </table>
+	{% endbox %}
+	
+	{% if acao.atividade_set.all %}
+	
+	{% box 'Atividades Cadastradas' %}
+    <table cellspacing="0" id="table_lista_atividades">
+        <thead>
+            <tr>
+            	{% if meta_unidade.meta.objetivo_estrategico.configuracao.periodo_campus %}
+                <th></th>
+                <th></th>
+				{% else %}
+				{% if acao.status == 'Parcialmente Deferida' %}
+                <th></th>
+				<th></th>
+				{% endif %}
+				{% endif %}
+				<th></th>
+				<th>Descrição</th>
+                <th width="50px">Qtd.</th>
+                <th width="100px">Valor Unitário</th>
+                <th width="100px">Valor Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for atividade in acao.atividade_set.all %}
+            <tr>
+            	{% if meta_unidade.meta.objetivo_estrategico.configuracao.periodo_campus %}
+                <td class="icon_column">
+					<a id="lnk_editar_atividade" href="/planejamento/acao/{{ acao.id }}/atividade/{{ atividade.id }}/" class="icon icon-edit" title="Editar Atividade"><span class="visually-hidden">Editar</span></a>
+				</td>
+                <td class="icon_column">
+					{% icon "delete" "/planejamento/acao/{{ acao.id }}/atividade/{{ atividade.id }}/remover/" %}
+				</td>
+				{% else %}
+				{% if acao.status == 'Parcialmente Deferida' %}
+				<td class="icon_column">
+					<a id="lnk_editar_acao" href="/planejamento/acao/{{ acao.id }}/atividade/{{ atividade.id }}/" class="icon icon-edit" title="Editar Ação"><span class="visually-hidden">Editar</span></a>
+				</td>
+                <td class="icon_column">
+					{% icon "delete" "/planejamento/acao/{{ acao.id }}/atividade/{{ atividade.id }}/remover/" %}
+				</td>
+				{% endif %}
+				{% endif %}
+				<td class="icon_column">
+					{% icon "view" "/planejamento/atividade/{{ atividade.id }}/" %}
+				</td>
+				<td>{{ atividade.descricao }}</td>
+				<td class="text-center">{{ atividade.quantidade }}</td>
+                <td class="right_label">{{ atividade.valor_unitario|mascara_dinheiro }}</td>
+                <td class="col_valor right_label negrito_label">{{ atividade.get_valor_total|mascara_dinheiro }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+		<tfoot>				
+			<tr>
+				<td colspan="{% if meta_unidade.meta.objetivo_estrategico.configuracao.periodo_campus %}6{% else %}{% if acao.status == 'Parcialmente Deferida' %}6{% else %}4{% endif %}{% endif %}" class="right_label">Total</td>
+				<td class="right_label negrito_label">{{ acao.get_valor_total|mascara_dinheiro }}</td>
+			</tr>
+		</tfoot>
+    </table>
+    {% endbox %}
+	{% endif %}
+	
+	<a name="fcad" />
+	
+	<div id="botoes" class="botoes" >
+		{% if acao.status == 'Parcialmente Deferida' %}
+		<a id="btn_cadastrar" href="#fcad" class="lnk_botao{% if form.instance.pk %} invisivel{% endif %}">Adicionar Atividade</a>
+		{% else %}
+		<a id="btn_cadastrar" href="#fcad" class="lnk_botao{% if form.instance.pk or not meta_unidade.meta.objetivo_estrategico.configuracao.periodo_campus %} invisivel{% endif %}">Adicionar Atividade</a>
+		{% endif %}
+		<a id="btn_reset_forms" href="#fcad" class="lnk_botao{% if not form.instance.pk or not meta_unidade.meta.objetivo_estrategico.configuracao.periodo_campus %} invisivel{% endif %}">Cancelar</a>
+   	</div>
+	
+	{% if meta_unidade.meta.objetivo_estrategico.configuracao.periodo_campus %}
+	<div {% if not form.instance.pk and not form.errors %}class="invisivel"{% endif %}>
+		{% render_form form %}
+	</div>
+	{% else %}
+	{% if acao.status == 'Parcialmente Deferida' %}
+	<div {% if not form.instance.pk and not form.errors %}class="invisivel"{% endif %}>
+		{% render_form form %}
+	</div>
+	{% endif %}
+	{% endif %}
+{% endblock %}

@@ -1,0 +1,230 @@
+{% extends "admin/change_list.html" %}
+
+{% load admin_list i18n tags pipeline %}
+
+{% block extrahead %}
+
+    {# Loading Bar Pace #}
+    <script src="/static/comum/js/pace.min.js"></script>
+
+    {% javascript 'jsi18n' %}
+    {{ block.super }}
+    {{ media.js }}
+    {% if action_form %}
+        {% if actions_on_top or actions_on_bottom %}
+        <script>
+            (function ($) {
+                $(document).on('click', '#action-toggle', function() {
+                    if ($(this).is(":checked")) {
+                        $('input[type="checkbox"]').attr('checked','checked');
+                    } else {
+                        $('input[type="checkbox"]').removeAttr('checked');
+                    }
+                });
+            })(django.jQuery);
+        </script>
+        {% if actions_on_top and actions_on_bottom %}
+                <script>(function ($) {
+                    $(document).ready(function ($) {
+                        $('select[name=action]').change(function () {
+                            $('select[name=action]').val(this.value);
+                        })
+                    });
+                })(jQuery);</script>
+            {% endif %}
+        {% endif %}
+    {% endif %}
+    {% if cl.has_filters or cl.search_fields %}
+        <script>
+            $(document).ready(function() {
+                updateActiveFilter();
+            });
+            function updateActiveFilter() {
+                $(".filter option").each(function(){
+                    if (($(this).html().trim() !== "Todos") && ($(this).html().trim() !== "Qualquer data") && ($(this).is(":selected"))) {
+                        $(this).parent().parent().addClass("active");
+                    }
+                });
+            }
+            function updateActiveTabFilter(aba) {
+                $(".nav-tabs .tab-target").each(function(){
+                    $(this).parent().removeClass("active");
+                });
+                $(aba).parent().addClass("active");
+            }
+            $(document).on('click', '.tab-target', function( event ) {
+                event.preventDefault();
+                updateActiveTabFilter($(this));
+                ajaxUpdateFilters();
+            });
+            $(document).on('click', '.toplinks li a', function( event ) {
+                event.preventDefault();
+                ajaxUpdate(this.href)
+            });
+            function ajaxUpdate(url) {
+                //$('#search-and-filters-form').submit();
+                $.ajax({
+                    url: url,
+                    success: function (response) {
+                        $('#content-main').html(response);
+                        history.pushState(undefined, '', url);
+                        updateActiveFilter();
+                    },
+                });
+            }
+            function ajaxUpdateFilters() {
+                var url = '?';
+                // Adiciona à URL os filtros selecionados
+                $(".filter *[name$='_djt_filter'], .filter *[name$='_djt_filter_ac']").each(function(){
+                    var valores_selecionado_filtro = $(this).find("option:selected");
+                    for(var i=0; i<valores_selecionado_filtro.length; i++){
+                        var valor_selecionado_filtro = $(valores_selecionado_filtro[i]).val();
+                        if (valor_selecionado_filtro !== '' && valor_selecionado_filtro !== undefined) {
+                            if (url.length > 1) {
+                                url += '&';
+                            }
+                            url += valor_selecionado_filtro;
+                        }
+                    }
+                });
+
+                // Adiciona à URL o campo de Busca Texto
+                let termo_busca = $("#searchbar").val();
+                if (![undefined, ''].includes(termo_busca)) {
+                    if (url.length > 1) {
+                        url += '&';
+                    }
+                    url += 'q=' + termo_busca;
+                }
+
+                // Adiciona à URL a aba selecionada
+                let aba_selecionada = $(".nav-tabs .active .tab-target").attr("href");
+                if (!aba_selecionada) {
+                    aba_selecionada = $(".nav-tabs .active").attr("href");
+                }
+                if (![undefined, ''].includes(aba_selecionada)) {
+                    if (url.length > 1) {
+                        url += '&';
+                    }
+                    url += aba_selecionada;
+                }
+
+                $(".filter *[name$='__djt_filter_acm']").each(function(){
+                    let ac_filtro = $(this).attr("name").replace("__djt_filter_acm", "");
+                    let valores_ac_filtro = $(this).val();
+                    var valores = [];
+                    if(Array.isArray(valores_ac_filtro)){
+                        for(var i=0; i< valores_ac_filtro.length; i++){
+                            var valor_ac_filtro = valores_ac_filtro[i]
+                            if(ac_filtro.includes(ac_filtro)){
+                                valores[i] = valor_ac_filtro.replace(ac_filtro+"=", "");
+                            }
+                        }
+                        valores_ac_filtro = valores.join();
+                        valores_ac_filtro = [valores_ac_filtro];
+                    } else {
+                        valores_ac_filtro = [valores_ac_filtro.replace(ac_filtro+"=", "")];
+                    }
+                    for(var i=0; i< valores_ac_filtro.length; i++){
+                        var valor_ac_filtro = valores_ac_filtro[i];
+                        if (![undefined, ''].includes(valor_ac_filtro) && valor_ac_filtro !== null){
+                            if (!url.includes(valor_ac_filtro)) {
+                                if (url.length > 1) {
+                                    url += '&';
+                                }
+                                url += ac_filtro + "=" + valor_ac_filtro;
+                            } else {
+                                if (valores.includes(valor_ac_filtro)){
+                                    if (url.length > 1) {
+                                        url += '&';
+                                    }
+                                    url += ac_filtro + "=" + valor_ac_filtro;
+                                }
+                            }
+                        }
+                    }
+                });
+
+                $(".filter *[name*='drf__']:not(:hidden)").each(function(){
+                    let drf_filtro = $(this).attr("name");
+                    let valor_drf_filtro = $(this).val();
+                    if (![undefined, ''].includes(valor_drf_filtro)){
+                        if (!url.includes(drf_filtro)) {
+                            if (url.length > 1) {
+                                url += '&';
+                            }
+                            url += drf_filtro + "=" + valor_drf_filtro;
+                        }
+                    }
+                });
+
+                // Alterando o botão de exportar para excel
+                $('a[href*="export_to_xls=1"]').each(function(){
+                    $(this).attr('href', url + '&export_to_xls=1')
+                })
+
+                $("#shortcutLink").attr("href", '/comum/cadastrar_atalho/?url=' + window.btoa(unescape(encodeURIComponent(document.location.pathname + url))));
+
+                {% if cl.model_admin.filters_ajax %}
+                    $('#changelist').html("");
+                    $('.skeleton').removeClass("hidden");
+                    $('.skeleton').show();
+                    $('nav.toplinks').hide();
+                    $('#button_filter').attr('disabled', 'disabled');
+                    $.ajax({
+                        url: url,
+                        success: function (response) {
+                            $('#content-main').html(response);
+                            history.pushState(undefined, '', url);
+                            updateActiveFilter();
+                            if (typeof replaceAddAnotherLinks === 'function') replaceAddAnotherLinks();
+                            $('.skeleton').hide();
+                        },
+                    });
+                {% else %}
+                    $(location).prop('href', url);
+                {% endif %}
+            }
+        </script>
+    {% endif %}
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% block object-tools-items %}
+            {% if object_tools_items %}
+                {% for i in object_tools_items %}
+                    {% if i.subitems %}
+                        <li class="has-child">
+                            <a href="#" class="btn {{ i.css_class }}">{{ i.label }}</a>
+                            <ul>
+                                {% for subitem in i.subitems %}
+                                    <li>
+                                        <a href="{{ subitem.url }}{% if is_popup %}?_popup=1{% endif %}"
+                                        class="{{ subitem.css_class }}">
+                                            {{ subitem.label }}
+                                        </a>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        </li>
+                    {% else %}
+                        <li>
+                            <a href="{{ i.url }}{% if is_popup %}?_popup=1{% endif %}" class="btn {{ i.css_class }}">
+                                {{ i.label }}
+                            </a>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
+        {% endblock %}
+
+        {% help_button %}
+    </ul>
+{% endblock %}
+
+{% block content %}
+    <div id="content-main">
+        {% include cl.model_admin.content_main_admin_template %}
+    </div>
+{% endblock %}

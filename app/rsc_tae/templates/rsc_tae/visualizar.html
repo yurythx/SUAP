@@ -1,0 +1,526 @@
+{% extends super_template %}
+{% load static %}
+{% load rsc_tae_extras %}
+
+{% block extracss %}
+<link rel="stylesheet" href="{% static 'rsc_tae/css/rsc-tae.css' %}">
+{% endblock %}
+
+{% block object-status %}
+    {{ processo.get_situacao_badge }}
+    <span class="status status-info">Pontuação total: <strong class="js-total-pontos">{{ resumo_preenchimento_total_pontos|format }}</strong></span>
+    <span class="status status-info">Total de itens: <strong class="js-itens-preenchidos">{{ resumo_preenchimento_total_itens }}</strong></span>
+    {% if processo.assinatura_preenchimento_hash %}
+        <span class="status status-success" title="Preenchimento assinado pelo avaliado na conclusão">{% icone "lock" %} Assinado pelo avaliado</span>
+    {% endif %}
+{% endblock %}
+
+{% block action-bar %}
+<ul class="action-bar">
+    {% if pode_concluir_preenchimento %}
+        <li>
+            <a href="{% url 'rsc_tae:concluir_preenchimento' processo.id %}" class="btn success">{% icone "check" %} Concluir preenchimento</a>
+        </li>
+    {% endif %}
+    {% if pode_alterar_nivel %}
+        <li>
+            <a href="{% url 'rsc_tae:alterar_nivel' processo.id %}" class="btn default">{% icone "exchange-alt" %} Alterar nível pretendido</a>
+        </li>
+    {% endif %}
+    {% if pode_validar_documento_preliminar %}
+        <li>
+            <a href="{% url 'rsc_tae:validar_processo' processo.id %}" class="btn success">Validar processo</a>
+        </li>
+    {% endif %}
+    {% if pode_definir_avaliador %}
+        <li>
+            <a href="{% url 'rsc_tae:definir_avaliador_atual' processo.id %}?_popup=1" class="btn popup">Definir avaliador</a>
+        </li>
+    {% endif %}
+    {% if pode_avaliar %}
+        <li>
+            <a href="{% url 'rsc_tae:avaliar' processo.id %}" class="btn primary">Avaliar</a>
+        </li>
+    {% endif %}
+    {% if pode_recusar_ou_impedir %}
+        <li>
+            <a href="{% url 'rsc_tae:recusar_avaliacao' processo.id %}" class="btn danger">Recusar avaliação</a>
+        </li>
+        <li>
+            <a href="{% url 'rsc_tae:declarar_impedimento' processo.id %}" class="btn warning">Declarar impedimento</a>
+        </li>
+    {% endif %}
+    {% if pode_deliberar_crsc %}
+        <li>
+            <a href="{% url 'rsc_tae:deliberar_crsc' processo.id %}" class="btn default">Deliberação da CRSC</a>
+        </li>
+    {% endif %}
+</ul>
+{% endblock %}
+
+{% block content %}
+
+<dl class="definition-list flex mb-5">
+    <div class="list-item">
+        <dt>Servidor</dt>
+        <dd>{{ processo.vinculo }}</dd>
+    </div>
+    <div class="list-item">
+        <dt>Titulação atual</dt>
+        <dd>{{ servidor.titulacao }}</dd>
+    </div>
+    <div class="list-item">
+        <dt>RSC pretendido</dt>
+        <dd>{{ processo.nivel_requisitado.nome }}</dd>
+    </div>
+    <div class="list-item">
+        <dt>RSC Equivalente</dt>
+        <dd>{{ processo.rsc_equivalente }}</dd>
+    </div>
+    {% if processo.processo_eletronico %}
+        <div class="list-item">
+            <dt>Processo Eletrônico</dt>
+            <dd><a href="{{ processo.processo_eletronico.get_absolute_url }}" target="_blank" rel="noopener">{{ processo.processo_eletronico }}</a></dd>
+        </div>
+    {% endif %}
+    {% if processo.assinatura_preenchimento_hash %}
+        <div class="list-item rsc-flex-basis-100">
+            <dt>{% icone "lock" %} Assinatura do avaliado (preenchimento)</dt>
+            <dd>
+                <span class="rsc-hash">{{ processo.assinatura_preenchimento_hash }}</span>
+                {% if processo.data_entrada_requerimento %}
+                    <span class="text-muted"> — assinado em {{ processo.data_entrada_requerimento|date:"d/m/Y H:i" }}</span>
+                {% endif %}
+                {% if request.user.is_superuser %}
+                    <details class="rsc-assinatura-conteudo">
+                        <summary>Ver conteúdo assinado</summary>
+                        <pre class="rsc-hash rsc-pre-wrap">{{ processo.assinatura_preenchimento_conteudo_formatado }}</pre>
+                    </details>
+                {% endif %}
+            </dd>
+        </div>
+    {% endif %}
+    {% if processo.situacao == 5 and processo.avaliacao_motivo_indeferimento %}
+        <div class="list-item rsc-flex-basis-100">
+            <dt>Motivo do indeferimento</dt>
+            <dd class="rsc-pre-wrap">{{ processo.avaliacao_motivo_indeferimento }}</dd>
+        </div>
+    {% endif %}
+</dl>
+
+{% if apontamentos_correcao %}
+    <div class="alert alert-warning" role="alert">
+        <h4>
+            Correções solicitadas pela comissão
+        </h4>
+        <p>Corrija os itens abaixo e conclua o preenchimento novamente.</p>
+        <ul>
+            {% for apontamento in apontamentos_correcao %}
+                <li>
+                    <strong>{{ apontamento.get_area_display }}:</strong>
+                    <span class="rsc-pre-wrap">{{ apontamento.descricao }}</span>
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+{% endif %}
+
+<div
+    id="js-rsc-meta"
+    class="d-none"
+    data-eh-dono="{% if eh_dono %}1{% else %}0{% endif %}"
+    data-pode-editar-preenchimento="{% if pode_editar_preenchimento %}1{% else %}0{% endif %}"
+></div>
+
+<div class="tab-pane" data-title="Instruções" data-tab="instrucoes">
+    {% include 'rsc_tae/partials/instrucoes.html' %}
+</div>
+
+<div class="tab-pane" data-title="Documentos preliminares" data-tab="documentos_preliminares" data-checked="{% if abas_status.documentos %}True{% endif %}">
+    {% include 'rsc_tae/partials/documentos_preliminares.html' %}
+</div>
+
+<div class="tab-pane" data-title="Formulário" data-tab="formulario" data-checked="{% if abas_status.formulario %}True{% endif %}">
+
+    {% if apontamento_formulario %}
+        <div class="alert alert-warning" role="alert">
+            <strong>{% icone "exclamation-triangle" %} Correção solicitada neste formulário:</strong>
+            <span class="rsc-pre-wrap">{{ apontamento_formulario.descricao }}</span>
+        </div>
+    {% endif %}
+
+    {% if pode_editar_preenchimento %}
+        <div class="alert alert-info" role="alert">
+            {% icone "info-circle" %} Ao anexar comprovantes, são aceitos apenas arquivos em formato PDF.
+        </div>
+    {% endif %}
+
+    <div class="rsc-resumo-sticky boxes texts flex-container sm" aria-label="Resumo do progresso">
+        <div class="box-item">
+            <h3 class="title">Pontuação</h3>
+            <p class="stat py-0">
+                <strong class="js-total-pontos">{{ total_pontos|format }}</strong><small> / <span id="js-pontos-minimos">{{ pontos_minimos|format }}</span> pontos</small>
+            </p>
+            <div id="js-progress-pontos">{% progressbar pontos_percent %}</div>
+            <p class="progress-description mb-0" id="js-pontos-faltam">
+                {% if pontos_faltam > 0 %}Faltam {{ pontos_faltam|format }} pontos{% else %}Mínimo atingido{% endif %}
+            </p>
+        </div>
+        <div class="box-item">
+            <h3 class="title">Itens</h3>
+            <p class="stat py-0">
+                <strong class="js-itens-preenchidos">{{ itens_preenchidos }}</strong><small> / <span id="js-itens-minimos">{{ itens_minimos }}</span></small>
+            </p>
+            <div id="js-progress-itens">{% progressbar itens_percent %}</div>
+            <p class="progress-description mb-0">Itens preenchidos</p>
+        </div>
+        {% if requisito_obrigatorio_status.aplicavel %}
+            <div class="box-item">
+                <h3 class="title" title="Para este nível, ao menos um critério pontuado deve pertencer a um destes requisitos (RN04).">Requisito obrigatório</h3>
+                <div id="js-requisito-obrigatorio-status">
+                    {% if requisito_obrigatorio_status.alcancado %}
+                        <span class="status status-success">Alcançado</span>
+                    {% else %}
+                        <span class="status status-alert">Pendente</span>
+                    {% endif %}
+                </div>
+                <small class="d-inline-block text-muted pt-4">{{ requisito_obrigatorio_status.labels|join:', ' }}</small>
+            </div>
+        {% endif %}
+        <div class="box-item">
+            <h3 class="title">Pontos por requisitos</h3>
+            <div id="js-pontos-por-requisito" class="d-flex flex-wrap gap-2">
+                {% for r in pontos_por_requisito_list %}
+                    <span class="rsc-requisito-chip badge ms-0"><strong>{{ r.numeral }}</strong> {{ r.pontos }}</span>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="rsc-resumo-placeholder" aria-hidden="true"></div>
+
+    <div class="d-flex justify-content-end mb-2">
+        <span class="rsc-autosave-status" id="js-autosave-status"></span>
+    </div>
+
+    <ul class="nav nav-tabs rsc-requisito-tabs" role="tablist">
+        {% for grupo in grupos_requisito_formulario %}
+        <li class="nav-item">
+            <button type="button" class="nav-link{% if forloop.first %} active{% endif %}"
+                    id="req-tab-{{ forloop.counter }}"
+                    data-rsc-tab="#req-pane-{{ forloop.counter }}"
+                    role="tab"
+                    aria-controls="req-pane-{{ forloop.counter }}"
+                    aria-selected="{% if forloop.first %}true{% else %}false{% endif %}">
+                {{ grupo.label }}
+                {% if grupo.subtotal_itens > 0 %}<span class="badge">{{ grupo.subtotal_itens }}</span>{% endif %}
+            </button>
+        </li>
+        {% endfor %}
+    </ul>
+
+    <div class="rsc-requisito-tab-content">
+        {% for grupo in grupos_requisito_formulario %}
+        <div class="rsc-requisito-pane{% if forloop.first %} active{% endif %}"
+             id="req-pane-{{ forloop.counter }}"
+             role="tabpanel"
+             aria-labelledby="req-tab-{{ forloop.counter }}">
+
+            <div class="table-responsive rsc-tabela-saberes">
+                <table>
+                    <caption class="visually-hidden">{{ grupo.label }}</caption>
+                    <thead>
+                        <tr>
+                            <th>Nº</th>
+                            <th>Saber &amp; Descrição</th>
+                            <th>Unidade</th>
+                            <th class="text-end">Pontos</th>
+                            <th class="text-end">Total do item</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for linha in grupo.linhas %}
+                        <tr class="rsc-linha-principal" data-item-id="{{ linha.item.id }}">
+                            <td rowspan="2">{{ linha.item.numero }}</td>
+                            <td>
+                                <h3 class="rsc-saber-titulo py-0">{{ linha.item.titulo }}</h3>
+                                <p class="text-muted pb-3">{{ linha.item.descricao }}</p>
+
+                                {% if linha.item.documentos_comprobatorios %}
+                                    <p class="alert alert-light mb-0">
+                                        <strong>Documentos comprobatórios:</strong> {{ linha.item.documentos_comprobatorios }}
+                                    </p>
+                                {% endif %}
+                            </td>
+                            <td rowspan="2">{{ linha.item.unidade_medida }}</td>
+                            <td rowspan="2" class="text-end">
+                                <span class="js-pontuacao-unidade" data-pontuacao-unidade="{{ linha.item.pontuacao_unidade }}">
+                                    {{ linha.item.pontuacao_unidade|format }}
+                                </span>
+                            </td>
+                            <td rowspan="2" class="text-end">
+                                <strong class="js-pontuacao-item-total" data-item-id="{{ linha.item.id }}">{{ linha.pontuacao_total|format }}</strong>
+                            </td>
+                        </tr>
+
+                        <tr class="rsc-linha-anexos" data-item-id="{{ linha.item.id }}">
+                            <td>
+                                <div class="rsc-anexos-box" data-item-id="{{ linha.item.id }}">
+                                    <div class="d-flex align-items-center flex-wrap gap-2 mb-4">
+                                        <h4 class="mt-0 pt-0">Documentos anexados</h4>
+                                        <span>— Total do item: <strong class="js-pontuacao-item-total" data-item-id="{{ linha.item.id }}">{{ linha.pontuacao_total|format }}</strong></span>
+                                        {% if pode_editar_preenchimento %}
+                                            <button type="button" class="btn ms-auto js-anexar-documentos" data-item-id="{{ linha.item.id }}">
+                                                {% icone "paperclip" %} Anexar documento
+                                            </button>
+                                        {% endif %}
+                                    </div>
+                                    <ul class="rsc-anexos-list js-anexos-list" data-item-id="{{ linha.item.id }}" data-item-temporal="{% if linha.item.item_temporal %}1{% else %}0{% endif %}" data-item-aceita-papel="{% if linha.item.aceita_papel %}1{% else %}0{% endif %}">
+                                        {% for anexo in linha.anexos %}
+                                            <li class="rsc-anexo-card">
+                                                {% with anexo_nome=anexo.nome_original|default:anexo.arquivo.name %}
+                                                <div class="rsc-anexo-card__topo">
+                                                    <div class="rsc-anexo-nome">
+                                                        {{ anexo_nome }} <span class="text-muted">({{ anexo.arquivo|tamanho_arquivo }})</span>
+                                                    </div>
+                                                    <span class="rsc-anexos-acoes" aria-label="Ações do anexo">
+                                                        <a class="btn default no-confirm" href="{{ anexo.arquivo.url }}" target="_blank" rel="noopener" aria-label="Visualizar anexo">{% icone "eye" %}</a>
+                                                        {% if pode_editar_preenchimento %}
+                                                            <button type="button" class="btn danger no-confirm js-excluir-anexo" data-anexo-id="{{ anexo.id }}" aria-label="Excluir anexo">{% icone "trash" %}</button>
+                                                        {% endif %}
+                                                    </span>
+                                                </div>
+                                                <div class="rsc-anexo-card__campos">
+                                                    {% if pode_editar_preenchimento %}
+                                                        <label class="rsc-anexo-campo rsc-anexo-campo--descricao">
+                                                            <span>Descrição <abbr title="Obrigatório" class="rsc-obrigatorio">*</abbr></span>
+                                                            <textarea rows="2" class="js-anexo-descricao rsc-anexo-descricao-input{% if not anexo.descricao %} rsc-campo-invalido{% endif %}" data-anexo-id="{{ anexo.id }}" data-item-id="{{ linha.item.id }}" placeholder="Descrição do documento (obrigatória)" aria-label="Descrição do documento">{{ anexo.descricao }}</textarea>
+                                                        </label>
+                                                        {% if linha.item.aceita_papel %}
+                                                            <div class="rsc-anexo-campo">
+                                                                <span>Papel <abbr title="Obrigatório" class="rsc-obrigatorio">*</abbr></span>
+                                                                <div class="rsc-anexo-papel{% if not anexo.papel %} rsc-campo-invalido{% endif %}" role="radiogroup" aria-label="Papel do documento" data-anexo-id="{{ anexo.id }}">
+                                                                    <label><input type="radio" name="papel-{{ anexo.id }}" value="titular" class="js-anexo-papel" data-anexo-id="{{ anexo.id }}" data-item-id="{{ linha.item.id }}"{% if anexo.papel == 'titular' %} checked{% endif %}> Titular</label>
+                                                                    <label><input type="radio" name="papel-{{ anexo.id }}" value="substituto" class="js-anexo-papel" data-anexo-id="{{ anexo.id }}" data-item-id="{{ linha.item.id }}"{% if anexo.papel == 'substituto' %} checked{% endif %}> Substituto</label>
+                                                                </div>
+                                                            </div>
+                                                        {% endif %}
+                                                        {% if linha.item.item_temporal %}
+                                                            <div class="rsc-anexo-campo">
+                                                                <span>Período</span>
+                                                                <div class="rsc-anexo-datas" role="group" aria-label="Período do documento">
+                                                                    <label class="rsc-data-label">Início<input type="date" class="js-anexo-data-inicio rsc-data-input" data-anexo-id="{{ anexo.id }}" data-item-id="{{ linha.item.id }}" value="{{ anexo.data_inicio|date:'Y-m-d' }}" /></label>
+                                                                    <label class="rsc-data-label">Fim<input type="date" class="js-anexo-data-fim rsc-data-input" data-anexo-id="{{ anexo.id }}" data-item-id="{{ linha.item.id }}" value="{{ anexo.data_fim|date:'Y-m-d' }}" /></label>
+                                                                    <span class="status status-info rsc-periodo-display js-periodo-display" data-anexo-id="{{ anexo.id }}">{{ anexo.periodo_display }}</span>
+                                                                </div>
+                                                            </div>
+                                                        {% else %}
+                                                            <div class="rsc-anexo-campo">
+                                                                <span>Unidades</span>
+                                                                <div class="rsc-anexo-pontos" role="group" aria-label="Unidades do arquivo">
+                                                                    <button type="button" class="btn default rsc-anexo-pontos-btn js-anexo-pontos-minus no-confirm" data-anexo-id="{{ anexo.id }}" aria-label="Diminuir unidades"><span class="icone fas fa-minus" aria-hidden="true"></span></button>
+                                                                    <input type="text" value="{{ anexo.pontuacao|format }}" class="js-anexo-pontuacao rsc-anexo-pontos-input" inputmode="decimal" autocomplete="off" data-anexo-id="{{ anexo.id }}" data-item-id="{{ linha.item.id }}" data-step="1" aria-label="Unidades" />
+                                                                    <button type="button" class="btn default rsc-anexo-pontos-btn js-anexo-pontos-plus" data-anexo-id="{{ anexo.id }}" aria-label="Aumentar unidades"><span class="icone fas fa-plus" aria-hidden="true"></span></button>
+                                                                </div>
+                                                            </div>
+                                                        {% endif %}
+                                                    {% else %}
+                                                        {% if anexo.descricao %}<div class="rsc-anexo-descricao-readonly text-muted"><strong>Descrição:</strong> {{ anexo.descricao }}</div>{% endif %}
+                                                        {% if linha.item.aceita_papel %}<div class="rsc-anexo-papel-readonly text-muted"><strong>Papel:</strong> {{ anexo.get_papel_display|default:'—' }}</div>{% endif %}
+                                                        {% if linha.item.item_temporal %}
+                                                            <div class="rsc-anexo-datas-readonly text-muted">
+                                                                {% if anexo.data_inicio and anexo.data_fim %}{{ anexo.data_inicio|date:'d/m/Y' }} a {{ anexo.data_fim|date:'d/m/Y' }} — <strong>{{ anexo.periodo_display }}</strong>{% else %}Período não informado{% endif %}
+                                                            </div>
+                                                        {% else %}
+                                                            <div class="rsc-anexo-pontos-readonly text-muted">{{ anexo.pontuacao|format }} pts</div>
+                                                        {% endif %}
+                                                    {% endif %}
+                                                </div>
+                                                {% endwith %}
+                                            </li>
+                                        {% empty %}
+                                            <li>
+                                                <p class="alert alert-warning mb-0">Nenhum documento anexado. São aceitos apenas arquivos em formato PDF.</p>
+                                            </li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+</div>
+
+<div class="tab-pane" data-title="Memorial Descritivo" data-tab="memorial-descritivo">
+    {% if apontamento_memorial %}
+        <div class="alert alert-warning" role="alert">
+            <strong>{% icone "exclamation-triangle" %} Correção solicitada no memorial:</strong>
+            <span class="rsc-pre-wrap">{{ apontamento_memorial.descricao }}</span>
+        </div>
+    {% endif %}
+
+    <div id="js-memorial-descritivo">
+        {% include 'rsc_tae/partials/memorial_descritivo.html' %}
+    </div>
+</div>
+
+<div class="tab-pane" data-title="Resumo do preenchimento" data-tab="resumo-preenchimento">
+    <div id="js-resumo-preenchimento">
+        {% include 'rsc_tae/partials/resumo_preenchimento.html' %}
+    </div>
+</div>
+
+<div class="tab-pane" data-title="Documentos" data-tab="documentos">
+    {% if processo.situacao == 1 or processo.situacao == 7 %}
+        <p class="alert alert-warning">
+            Os documentos do processo eletrônico ficarão disponíveis após a conclusão do preenchimento.
+        </p>
+    {% else %}
+        <ul class="rsc-doc-lista">
+            {% if processo_eletronico_instalado %}
+                {% if processo.situacao == 4 or processo.situacao == 5 %}
+                    <li class="rsc-doc-item rsc-doc-item--destaque">
+                        <span class="rsc-doc-item__icon" aria-hidden="true">{% icone "folder-open" %}</span>
+                        <span class="rsc-doc-item__body">
+                            <span class="rsc-doc-item__title">Processo Eletrônico</span>
+                            <span class="rsc-doc-desc">
+                                {% if processo.processo_eletronico %}
+                                    Gerado a partir deste RSC-TAE (requerimento, memorial, parecer e processo completo).
+                                {% else %}
+                                    Gere o processo eletrônico com o requerimento, memorial, parecer e processo completo.
+                                {% endif %}
+                            </span>
+                        </span>
+                        {% if processo.processo_eletronico %}
+                            <a class="btn primary ms-auto" href="{{ processo.processo_eletronico.get_absolute_url }}" target="_blank" rel="noopener">{% icone "external-link-alt" %} Acessar processo</a>
+                        {% elif pode_criar_processo_eletronico %}
+                            <a class="btn success ms-auto confirm" href="{% url 'rsc_tae:criar_processo_eletronico' processo.id %}">{% icone "plus" %} Criar processo eletrônico</a>
+                        {% else %}
+                            <span class="ms-auto text-muted">Ainda não gerado</span>
+                        {% endif %}
+                    </li>
+                {% endif %}
+            {% endif %}
+            <li class="rsc-doc-item">
+                <span class="rsc-doc-item__icon" aria-hidden="true">{% icone "file-signature" %}</span>
+                <span class="rsc-doc-item__body">
+                    <span class="rsc-doc-item__title">Requerimento</span>
+                    <span class="rsc-doc-desc">
+                        Modelo padrão da Portaria MEC nº 608/2026 — identifica o servidor e o nível pretendido.{% if processo.data_entrada_requerimento %} Protocolado em {{ processo.data_entrada_requerimento|date:"d/m/Y H:i" }}.{% endif %}
+                    </span>
+                </span>
+                {% if processo.requerimento_arquivo %}
+                    <a class="btn default ms-auto" href="{{ processo.requerimento_arquivo.url }}" target="_blank" rel="noopener">{% icone "external-link-alt" %} Abrir</a>
+                {% else %}
+                    <a class="btn default ms-auto" href="{% url 'rsc_tae:requerimento_pdf' processo.id %}" target="_blank" rel="noopener">{% icone "external-link-alt" %} Abrir</a>
+                {% endif %}
+            </li>
+            <li class="rsc-doc-item">
+                <span class="rsc-doc-item__icon" aria-hidden="true">{% icone "table" %}</span>
+                <span class="rsc-doc-item__body">
+                    <span class="rsc-doc-item__title">Formulário de Pontuação</span>
+                    <span class="rsc-doc-desc">Itens declarados com quantidades e pontos por requisito.</span>
+                </span>
+                <a class="btn default ms-auto" href="{% url 'rsc_tae:formulario_pontuacao_pdf' processo.id %}" target="_blank" rel="noopener">{% icone "external-link-alt" %} Abrir</a>
+            </li>
+            {% if memorial_descritivo and memorial_descritivo.conclusao %}
+                <li class="rsc-doc-item">
+                    <span class="rsc-doc-item__icon" aria-hidden="true">{% icone "book" %}</span>
+                    <span class="rsc-doc-item__body">
+                        <span class="rsc-doc-item__title">Memorial Descritivo</span>
+                        <span class="rsc-doc-desc">Narrativa do servidor sobre sua trajetória e saberes.</span>
+                    </span>
+                    <a class="btn default ms-auto" href="{% url 'rsc_tae:memorial_pdf' processo.id %}" target="_blank" rel="noopener">{% icone "external-link-alt" %} Abrir</a>
+                </li>
+            {% endif %}
+            <li class="rsc-doc-item rsc-doc-item--destaque">
+                <span class="rsc-doc-item__icon" aria-hidden="true">{% icone "file-pdf" %}</span>
+                <span class="rsc-doc-item__body">
+                    <span class="rsc-doc-item__title">Processo Completo (bundle)</span>
+                    <span class="rsc-doc-desc">PDF único com todas as peças do processo — usado no SEI/SUAP-EDU.</span>
+                </span>
+                <a class="btn primary ms-auto" href="{% url 'rsc_tae:processo_completo_pdf' processo.id %}" target="_blank" rel="noopener">{% icone "external-link-alt" %} Abrir</a>
+            </li>
+
+            {% if processo.situacao == 4 or processo.situacao == 5 %}
+                <li class="rsc-doc-item">
+                    <span class="rsc-doc-item__icon" aria-hidden="true">{% icone "clipboard-list" %}</span>
+                    <span class="rsc-doc-item__body">
+                        <span class="rsc-doc-item__title">Relatório da Avaliação</span>
+                        <span class="rsc-doc-desc">Detalhamento completo das avaliações por item e arquivo.</span>
+                    </span>
+                    <a class="btn default ms-auto" href="{% url 'rsc_tae:relatorio_avaliacao' processo.id %}" target="_blank" rel="noopener">{% icone "external-link-alt" %} Abrir</a>
+                </li>
+                <li class="rsc-doc-item">
+                    <span class="rsc-doc-item__icon" aria-hidden="true">{% icone "gavel" %}</span>
+                    <span class="rsc-doc-item__body">
+                        <span class="rsc-doc-item__title">Parecer Conclusivo</span>
+                        <span class="rsc-doc-desc">Decisão formal da Comissão de Avaliação.</span>
+                    </span>
+                    <a class="btn default ms-auto" href="{% url 'rsc_tae:parecer_pdf' processo.id %}" target="_blank" rel="noopener">{% icone "external-link-alt" %} Abrir</a>
+                </li>
+            {% endif %}
+
+            {% if processo.situacao == 4 %}
+                <li class="rsc-doc-item">
+                    <span class="rsc-doc-item__icon" aria-hidden="true">{% icone "file-contract" %}</span>
+                    <span class="rsc-doc-item__body">
+                        <span class="rsc-doc-item__title">Minuta de Portaria de Concessão</span>
+                        <span class="rsc-doc-desc">Minuta para publicação da portaria pela autoridade competente.</span>
+                    </span>
+                    <a class="btn success ms-auto" href="{% url 'rsc_tae:minuta_portaria_pdf' processo.id %}" target="_blank" rel="noopener">{% icone "external-link-alt" %} Abrir</a>
+                </li>
+            {% endif %}
+        </ul>
+    {% endif %}
+</div>
+
+{% if pode_ver_deliberacao %}
+    <div class="tab-pane" data-title="Deliberação" data-tab="deliberacao">
+        {% include 'rsc_tae/partials/deliberacao_avaliado.html' %}
+    </div>
+{% endif %}
+
+<div class="tab-pane" data-title="Histórico" data-tab="historico">
+    {% if processo.data_entrada_requerimento %}
+        <p class="alert alert-info">
+            <strong>Entrada do requerimento:</strong> {{ processo.data_entrada_requerimento|date:"d/m/Y H:i" }} — data-chave para prazos e concessão do benefício.
+        </p>
+    {% endif %}
+    {% if historico_situacoes %}
+        <ul class="timeline">
+            {% for h in historico_situacoes %}
+                <li class="{{ h.classe_timeline }}">
+                    <div class="timeline-date">{{ h.data_transicao|date:"d/m/Y H:i" }}</div>
+                    <div class="timeline-icon"></div>
+                    <div class="timeline-content">
+                        <h4>
+                            {% if h.situacao_anterior %}{{ h.get_situacao_anterior_display }} → {% endif %}{{ h.get_situacao_nova_display }}
+                            {% if h.realizado_por_vinculo %}<small>por {{ h.realizado_por_vinculo }}</small>{% endif %}
+                        </h4>
+                        {% if h.motivo %}<p>{{ h.motivo }}</p>{% endif %}
+                        <dl>
+                            <dt>Origem:</dt>
+                            <dd>{{ h.get_origem_display }}</dd>
+                        </dl>
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="alert alert-warning">Nenhuma mudança de situação registrada.</p>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extrascripts %}
+<form id="js-csrf" class="d-none">{% csrf_token %}</form>
+
+<script src="{% static 'rsc_tae/js/rsc-tae.js' %}" defer></script>
+{% endblock %}

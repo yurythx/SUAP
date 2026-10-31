@@ -1,0 +1,149 @@
+{% extends super_template %}
+
+{% block action-bar %}
+<ul class="action-bar">
+	{% if pode_remover and not requisicao.avaliada %}
+		<li><a class="btn danger" href="/almoxarifado/requisicao/{{ requisicao.tipo }}/{{ requisicao.id }}/remover/" title="Remover Requisição">Remover Requisição</a></li>
+	{% endif %}
+    {% if pode_remover and requisicao.avaliada and requisicao.pode_ser_cancelada and not requisicao.motivo_cancelamento %}
+		<li><a class="btn danger" href="/almoxarifado/cancelar_requisicaosaida/{{ requisicao.tipo }}/{{ requisicao.uo_fornecedora.id }}/{{ requisicao.id }}/" title="Cancelar Requisição">Cancelar Requisição</a></li>
+	{% endif %}
+    {% if requisicao.avaliada %}
+        {% if requisicao.tipo == "user" and pode_devolver %}
+            <li><a href="/almoxarifado/devolver_item/{{ requisicao.tipo }}/{{ requisicao.uo_fornecedora.id }}/{{ requisicao.id }}/" class="btn popup">Selecionar Itens para Devolução</a></li>
+        {% endif %}
+        <li><a href="/almoxarifado/relatorio/nota_fornecimento_pdf/{{ requisicao.tipo }}/{{ requisicao.id }}/" class="btn">Gerar PDF</a></li>
+    {% endif %}
+</ul>
+{% endblock %}
+
+{% block content %}
+
+{% box 'Dados gerais' %}
+    <dl class="definition-list flex">
+        <div class="list-item">
+            <dt>Data</dt>
+            <dd>{{ requisicao.data|format }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Servidor Destino</dt>
+            <dd>{{ requisicao.vinculo_solicitante.relacionamento|format }}</dd>
+        </div>
+        {% if requisicao.tipo == "user" %}
+            <div class="list-item">
+                <dt>Setor Requisitante</dt>
+                <dd>{{ requisicao.setor_solicitante.sigla }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Servidor Origem</dt>
+                <dd>{{ requisicao.vinculo_fornecedor|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Transferência Realizada Em</dt>
+                <dd>{{ requisicao.data_avaliacao_fornecedor|format }}</dd>
+            </div>
+        {% else %}
+            <div class="list-item">
+                <dt>Unidade Requisitante</dt>
+                <dd>{{ requisicao.uo_solicitante.setor.sigla }}</dd>
+            </div>
+        {% endif %}
+        <div class="list-item">
+            <dt>Unidade fornecedora</dt>
+            <dd>{{ requisicao.uo_fornecedora.setor.sigla }}</dd>
+        </div>
+        <div class="list-item flex-basis-100">
+            <dt>Observações</dt>
+            <dd>{{ requisicao.observacoes|format }}</dd>
+        </div>
+        {% if requisicao.motivo_cancelamento %}
+            <div class="list-item flex-basis-100">
+                <dt>Motivo do cancelamento</dt>
+                <dd>{{ requisicao.motivo_cancelamento|format }}</dd>
+            </div>
+        {% endif %}
+    </dl>
+{% endbox %}
+
+{% box 'Itens Requisitados' %}
+    {% if itens_requisicao %}
+        <div class="table-responsive">
+            <table>
+                <caption>Itens Requisitados</caption>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>ED</th>
+                        <th>Cód. Mat</th>
+                        <th>Material</th>
+                        <th>Qtd. Solicitada</th>
+                        {% if requisicao.avaliada %}
+                            <th>Qtd. Aceita</th>
+                            <th>Valor</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in itens_requisicao %}
+                        <tr >
+                            <td>{{ forloop.counter }}</td>
+                            <td class="text-center">{{ item.material.categoria.codigo }}</td>
+                            <td>{{ item.material.codigo }}</td>
+                            <td>{{ item.material }}</td>
+                            <td class="text-end">{{ item.qtd }}</td>
+                            {% if requisicao.avaliada %}
+                                <td class="text-end">{{ item.saida.qtd }}</td>
+                                <td class="text-end">R$ {{ item.valor_unitario }}</td>
+                            {% endif %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+                {% if requisicao.avaliada %}
+                    <tfoot>
+                        <tr>
+                            <td colspan="6">Total:</td>
+                            <td>R$ {{ requisicao.get_total }}</td>
+                        </tr>
+                    </tfoot>
+                {% endif %}
+            </table>
+        </div>
+    {% else %}    
+        {% if requisicao.motivo_cancelamento %}
+            <p class="alert alert-warning">Os itens foram removidos.</p>    
+        {% else %}    
+            <p class="alert alert-warning">Nenhum item requisitado.</p>
+        {% endif %}    
+    {% endif %}    
+{% endbox %}
+
+{% if itens_devolvidos %}
+    {% box 'Itens Devolvidos' %}
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>ED</th>
+                        <th>Cód. mat</th>
+                        <th>Material</th>
+                        <th>Qtd. devolvida</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in itens_devolvidos %}
+                        <t>
+                            <th>{{ forloop.counter }}</th>
+                            <th class="text-center">{{ item.material.categoria.codigo }}</th>
+                            <th>{{ item.material.codigo }}</th>
+                            <th>{{ item.material }}</th>
+                            <th class="text-end">{{ item.quantidade }}</th>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endbox %}
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,75 @@
+{% extends super_template %}
+
+
+
+{% block content %}
+    <p class="alert alert-info">Este relatório mensal de bolsistas é gerado a partir dos anexos cadastrados na aba 'Anexos' dos projetos e que sejam vinculados aos desembolsos da rubrica 'Auxílio financeiro a estudante'.</p>
+    <div class="search-and-filters">
+        {% render_form form %}
+    </div>
+    {% if registros.exists %}
+        <ul class="action-bar">
+            <li><a class="btn" href="{{ request.get_full_path }}&xls=1">Exportar para XLS</a></li>
+        </ul>
+        <table>
+            <thead>
+                <tr>
+                    <th class="no-print">Ações</th>
+                    <th>Aluno</th>
+                    <th>Edital</th>
+                    <th>Projeto</th>
+                    <th>Bolsista</th>
+                    <th>Dados Bancários</th>
+                    <th>Ativo</th>
+                    <th class="no-print">Arquivo</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% autopaginate registros 50 %}
+                {% paginate %}
+                {% for registro in registros %}
+                    {% with participacao=registro.get_participacao %}
+                        <tr>
+                           <td class="no-print">{% icon "view" "/pesquisa/projeto/{{ registro.projeto.id }}/?tab=anexos" %}</td>
+                           <td>{{ registro.vinculo_membro_equipe.pessoa.nome }} ({{ participacao.get_participante.matricula }})</td>
+                           <td>{{ registro.projeto.edital.titulo }}</td>
+                           <td>{{ registro.projeto.titulo }}</td>
+                           <td>
+                               {% if participacao.vinculo == "Bolsista" and participacao.bolsa_concedida == True %}
+                                   <span class="status status-success">Sim</span>
+                               {% else %}
+                                    <span class="status status-error">Não</span>
+                               {% endif %}
+                           </td>
+                           <td>
+                               {% if participacao.instituicao %}
+                                    <p><b>Banco</b>: {{ participacao.instituicao }}</p>
+                                    <p><b>Agência</b>: {{ participacao.numero_agencia }}</p>
+                                    <p><b>Tipo da Conta</b>: {{ participacao.tipo_conta }}</p>
+                                    <p><b>Número da Conta</b>: {{ participacao.numero_conta }}</p>
+                                    <p><b>Operação</b>: {{ participacao.operacao|format }}</p>
+                                {% endif %}
+                           </td>
+
+                           <td>{{ participacao.ativo|format }}</td>
+                           <td class="no-print">
+                               {% if registro.arquivo %}
+                                   <ul class="action-bar">
+                                       <li><a href="/pesquisa/visualizar_arquivo/{{ registro.arquivo.id }}/" class="btn default">Ver Arquivo</a></li>
+                                   </ul>
+                               {% endif %}
+                           </td>
+                       </tr>
+                    {% endwith %}
+                {% endfor %}
+            </tbody>
+        </table>
+        {% paginate %}
+
+
+    {% elif form.is_bound %}
+        <p class="alert alert-warning">Nenhum bolsista encontrado para o mês e ano informados.</p>
+    {% else %}
+        <p class="alert alert-warning">Selecione o mês e o ano para exibir a lista de bolsistas.</p>
+    {% endif %}
+{% endblock %}

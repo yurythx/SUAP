@@ -1,0 +1,126 @@
+<div class="primary-info">
+    <div class="status-info-container">
+        {% if solicitacao.estah_expirada %}
+            <span class="status status-error">Expirada</span>
+        {% else %}
+            {{ solicitacao.get_status_display|status }}
+        {% endif %}
+    </div>
+    <h4>
+        <strong>Solicitação de Anexação de Documento a {{ solicitacao.solicitado|format }} </strong>
+    </h4>
+    <ul class="action-bar">
+        {% if solicitacao.pode_anexar_documento %}
+            <li><a href="{% url 'concluir_juntada_documento' solicitacao.id %}" class="btn success">
+                {% icone "share" %} Concluir solicitação
+            </a></li>
+            {% if solicitacao.pode_adicionar_documento_interno %}
+                <li><a href="{% url 'listar_documentos_juntar' solicitacao.id %}" class="btn success">
+                    {% icone "plus" %} Adicionar documento
+                </a></li>
+            {% endif %}
+            <li><a href="{% url 'solicitar_juntada_documento_externo' solicitacao.id %}" class="btn success">
+                {% icone "plus" %} Realizar upload de documento
+            </a></li>
+        {% endif %}
+        {% if solicitacao.pode_cancelar_solicitacao %}
+            <li><a href="{% url 'cancelar_solicitacao_documento' solicitacao.id %}" class="btn danger">
+                {% icone "times" %} Cancelar solicitação
+            </a></li>
+        {% endif %}
+    </ul>
+    <div class="extra-info">
+        {% if solicitacao.estah_esperando %}
+            <div class="alert alert-info">
+                <strong>Atenção: </strong>{{ solicitacao.solicitante.get_profile.nome_usual }} só poderá avaliar os
+                documentos desta solicitação se
+                {{ solicitacao.solicitado.pessoa.nome_usual }} <strong>concluir a solicitação de juntada</strong>
+                até {{ solicitacao.data_limite|date }}
+                ou quando esta solicitação expirar.
+            </div>
+        {% endif %}
+        <h5>Justificativa da solicitação</h5>
+        {{ solicitacao.motivo|linebreaks }}
+        {% if solicitacao.possui_solicitacoes_de_juntada %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Documentos</caption>
+                    <thead>
+                    <tr>
+                        <th>Documento</th>
+                        <th>Situação</th>
+                        <th>Justificativa do (In)deferimento</th>
+                        <th>Avaliado por</th>
+                        <th>Avaliado em</th>
+                        <th class="no-print">Opções</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for item in solicitacao.solicitacoes_de_juntada %}
+                        <tr>
+                            <td>{{ item.documento }}</td>
+                            <td>{{ item.get_status_display|status }}</td>
+                            <td>{{ item.parecer|format }}</td>
+                            <td>{{ item.avaliado_por|format }}</td>
+                            <td>{{ item.avaliado_em|format }}</td>
+                            <td class="no-print">
+                                {% if item.pode_deferir_documento %}
+                                    <a href="{% url 'avaliar_solicitacao_juntada_documento' item.id %}"
+                                    class="btn">Avaliar</a>
+                                {% else %}
+                                    {% if item.estah_indeferido %}
+                                        {% if item.avaliado_por == request.user.get_vinculo and item.anexo_content_object.pode_ler %}
+                                            {% icon "view" "{{ item.get_documento_url }}" %}
+                                        {% endif %}
+                                    {% elif item.anexo_content_object.pode_ler %}
+                                        {% icon "view" "{{ item.get_documento_url }}" %}
+                                    {% endif %}
+                                    {% if item|method:"pode_remover_documento"|call:request.user %}
+                                        {% icon "delete" "/processo_eletronico/remover_documento_juntada/{{ item.id }}/" %}
+                                    {% endif %}
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            {% if solicitacao.estah_finalizada %}
+                <div class="alert alert-warning">
+                    <strong>Atenção: </strong> {{ solicitacao.solicitado.nome_usual }} concluiu a solicitação sem anexar
+                    nenhum documento.
+                </div>
+            {% endif %}
+        {% endif %}
+    </div>
+</div>
+<dl class="secondary-info">
+    <div class="list-item">
+        <dt>{% icone "calendar" %} Data Limite:</dt>
+        <dd>{{ solicitacao.data_limite|date }}</dd>
+    </div>
+    <div class="list-item">
+        <dt>{% icone "user" %} Solicitação por:</dt>
+        <dd>{{ solicitacao.solicitante|format }} em {{ solicitacao.data_solicitacao|format }}</dd>
+    </div>
+    {% if solicitacao.estah_cancelada %}
+        <div class="list-item">
+            <dt>{% icone "user" %} Cancelada por:</dt>
+            <dd>{{ solicitacao.cancelada_por|format }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>{% icone "calendar-times" %} Data do Cancelamento:</dt>
+            <dd>{{ solicitacao.data_cancelamento|format }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>{% icone "paragraph" %} Justificativa do Cancelamento:</dt>
+            <dd>{{ solicitacao.justificativa_cancelamento|linebreaks }}</dd>
+        </div>
+    {% elif solicitacao.data_conclusao %}
+        <div class="list-item">
+            <dt>{% icone "calendar" %} Data da Resposta:</dt>
+            <dd>{{ solicitacao.data_conclusao|format }}</dd>
+        </div>
+    {% endif %}
+</dl>

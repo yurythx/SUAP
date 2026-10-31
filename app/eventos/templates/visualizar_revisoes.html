@@ -1,0 +1,78 @@
+{% extends "admin/base_anonima.html" %}
+{% load eventos_tags %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if submissao.estah_aguardando_nova_versao and submissao.get_autor_correspondente.id == participante_logado.id %}
+            <li><a class="btn success" href="{% url 'submeter_nova_versao' evento.id submissao.id %}">Submeter nova versão</a></li>
+        {% endif %}
+        {% if not participante_logado.tipo.eh_avaliador_de_trabalho %}
+            <li><a href="{% url 'atualizar_participante' evento.pk %}" class="btn primary">{% icone "edit" %} Atualizar dados</a></li>
+        {% else %}
+            <li><a href="{% url 'listar_trabalhos_submetidos_ao_avaliador' evento.pk %}" class="btn default">{% icone "list" %} Listar trabalhos</a></li>
+        {% endif %}
+        <li><a href="{% url 'perfil_do_participante' evento.id %}" class="btn">Voltar</a></li>
+        <li><a href="{% url 'logout_participante'%}" class="btn danger">{% icone "sign-out-alt" %} Sair</a></li>
+    </ul>
+{% endblock %}
+
+{% block content %}
+    <dl class="definition-list">
+        <dt>Nome</dt>
+        <dd>{{ participante_logado.nome }} {{ participante_logado.id }} - {{ submissao.get_autor_correspondente.id }}</dd>
+        <h4>Submissão: #{{ submissao.id }} - {{ submissao.titulo }}</h4>
+        <dt>Modalidade</dt>
+        <dd>{{ submissao.modalidade }}</dd>
+        <dt>Área temática</dt>
+        <dd>{{ submissao.area_tematica }}</dd>
+        <dt>Autores</dt>
+        {% for autor_submissao in submissao.autores_relacionados.all %}
+        <dd>{{ autor_submissao }}</dd>
+        {% endfor %}
+        <dt>Situação</dt>
+        <dd>{{ submissao.get_situacao_display|status }}</dd>
+    </dl>
+    {% for versao in submissao.versoes.all %}
+        {% box "Versão {{ versao.numero }}" %}
+            {% if versao.arquivo %}
+                <ul class="action-bar">
+                    <li><a href="{{ versao.arquivo.url }}" class="btn default">{% icone "download" %} Baixar trabalho</a></li>
+                </ul>
+
+                {% for avaliacao_submissao in versao.pareceres.avaliados %}
+                    
+                    <div class="general-box">
+                        <div class="primary-info">
+                            <h4 class="title">Avaliador # {{ forloop.counter }}</h4>
+                        </div>
+                        <dl class="secondary-info">
+                            <div class="list-item">
+                                <dt>Recomendação:</dt>
+                                {% if versao.pode_visualizar_pareceres %}
+                                    <dd>{{ avaliacao_submissao.get_recomendacao_display|default_if_none:"Não informado" }}</dd>
+                                {% else %}
+                                    <dd class="false">Não disponível</dd>
+                                {% endif %}
+                            </div>
+                            <div class="list-item">
+                                <dt>Observação:</dt>
+                                {% if versao.pode_visualizar_pareceres %}
+                                    <dd>{{ avaliacao_submissao.observacao|default:"-" }}</dd>
+                                {% else %}
+                                    <dd class="false">Não disponível</dd>
+                                {% endif %}
+                            </div>
+                        </dl>
+                    </div>
+                {% empty %}
+                    <p class="alert alert-warning">Aguardando pareceres dos avaliadores.</p>
+                {% endfor %}
+            {% else %}
+                <p class="alert alert-warning">Aguardando submissão de nova versão por parte do autor correspondente.</p>
+            {% endif %}
+
+        {% endbox %}
+    {% empty %}
+        <p class="alert alert-warning">Não há versões registradas para esta submissão.</p>
+    {% endfor %}
+{% endblock %}

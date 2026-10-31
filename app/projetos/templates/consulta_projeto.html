@@ -1,0 +1,385 @@
+{% extends super_template %}
+
+{% block extrahead %}
+    <script>
+        function mudar_url(url, aba){
+            if(aba != ""){
+                window.location.href=url+"?tab="+aba;
+            } else {
+                window.location.href=url
+            };
+        };
+    </script>
+{% endblock %}
+
+{% block object-status %}
+    <!-- O status "Selecionado" não pode ser revelado antes da data de divulgação. -->
+    {% if status == projeto.STATUS_SELECIONADO %}
+        <span class="status status-alert">Pré-selecionado</span>
+    {% else %}
+        {{ status|status }}
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+
+    <dl class="definition-list flex">
+        <div class="list-item flex-basis-100">
+            <dt>Título do Projeto</dt>
+            <dd>{{ projeto.titulo }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Período do Edital</dt>
+            <dd>{{ periodo|format }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Campus do Projeto</dt>
+            <dd>{{ projeto.uo }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Monitor do Projeto</dt>
+            <dd>{{ projeto.vinculo_monitor.user|format }}</dd>
+        </div>
+    </dl>
+
+    <div class="tab-pane" data-title="Dados do Projeto" data-tab="dados_projeto" data-checked="True">
+        {% box "Dados do Projeto" %}
+
+            <dl class="definition-list flex">
+                {% if not eh_interno %}
+                    <div class="list-item">
+                        <dt>Edital, Convênio ou Termo de Cooperação</dt>
+                        <dd>{{ projeto.nome_edital_externo|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Valor do Fomento do Projeto</dt>
+                        <dd>{{ projeto.valor_fomento_projeto_externo|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Avaliado Por</dt>
+                        <dd>{{ projeto.vinculo_autor_pre_avaliacao.user|format }}</dd>
+                    </div>
+                {% endif %}
+                <div class="list-item">
+                    <dt>Início da Execução</dt>
+                    <dd>{{ projeto.inicio_execucao|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Término da Execução</dt>
+                    <dd>{{ projeto.fim_execucao|format }}</dd>
+                </div>
+                {% if projeto.nucleo_extensao %}
+                    <div class="list-item">
+                        <dt>Núcleo de Extensão e Prática Profissional</dt>
+                        <dd>{{ projeto.nucleo_extensao|format }}</dd>
+                    </div>
+                {% endif %}
+            </dl>
+            <dl class="definition-list flex small-items">
+                <div class="list-item">
+                    <dt>Possui Cunho Social</dt>
+                    <dd>{{ projeto.possui_cunho_social|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Contempla Ações de Empreendedorismo/Cooperativismo/Economia Solidária Criativa</dt>
+                    <dd>{{ projeto.possui_acoes_empreendedorismo|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Possui acordo de cooperação internacional vigente</dt>
+                    <dd>{{ projeto.possui_cooperacao_internacional|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Tem interesse no fomento para custeio</dt>
+                    <dd>{{ projeto.tem_interesse_cartao_pesquisador|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Possui termo de parceria/adesão</dt>
+                    <dd>{% if projeto.termoparceriaadesao_set.exists %}<span class="status status-success"> Sim</span> {% else %} <span class="status status-error">Não</span> {% endif %}</dd>
+                </div>
+            </dl>
+            <dl class="definition-list flex">
+                <div class="list-item">
+                    <dt>Foco Tecnológico</dt>
+                    <dd>{{ projeto.focotecnologico|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Área do Conhecimento</dt>
+                    <dd>{{ projeto.area_conhecimento|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Área Temática</dt>
+                    <dd>{{ projeto.area_tematica|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Tema</dt>
+                    <dd>{{ projeto.tema|format }}</dd>
+                </div>
+                <div class="list-item">
+                    <dt>Enviado em</dt>
+                    <dd>{{ projeto.data_conclusao_planejamento|format }}</dd>
+                </div>
+                {% if eh_interno %}
+                    <div class="list-item">
+                        <dt>Pré-seleção</dt>
+                        <dd>{{ status_pre_selecao|safe }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Data da Pré-seleção</dt>
+                        <dd>{{ projeto.data_pre_avaliacao|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Seleção</dt>
+                        <dd>{{ status_selecao|safe }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Data da Seleção</dt>
+                        <dd>
+                            {% if not projeto.edital.tipo_edital == projeto.edital.EXTENSAO_FLUXO_CONTINUO %}
+                                {% if projeto.edital.is_periodo_pos_selecao %}
+                                    {{ projeto.data_avaliacao|format }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            {% else %}
+                                {{ projeto.data_avaliacao|format }}
+                            {% endif %}
+                        </dd>
+                    </div>
+                    {% if projeto.foi_selecionado_fora_do_prazo %}
+                        <div class="list-item">
+                            <dt>Observação</dt>
+                            <d><p class="alert alert-info">Este projeto foi selecionado em {{ projeto.get_data_selecao_fora_do_prazo }} em função do cancelamento do projeto '{{ projeto.get_projeto_desistencia }}'</p></d>
+                        </div>
+                    {% endif %}
+                    <div class="list-item">
+                        <dt>Pontuação</dt>
+                        {% if projeto.edital.tipo_edital == projeto.edital.EXTENSAO_FLUXO_CONTINUO %}
+                            <dd><span class="status status-info">Não se aplica</span></dd>
+                        {% else %}
+                            <dd>
+                                {% if projeto.edital.is_periodo_pos_selecao or is_gerente_sistemico %}
+                                    {{ projeto.pontuacao|format }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </dd>
+                        {% endif %}
+                    </div>
+                    <div class="list-item">
+                        <dt>Data da Divulgação</dt>
+                        <dd>
+                            {% if projeto.edital.tipo_edital == projeto.edital.EXTENSAO_FLUXO_CONTINUO %}
+                                {{ projeto.data_pre_avaliacao|format }}
+                            {% else %}
+                                {{ projeto.edital.divulgacao_selecao|format }}
+                            {% endif %}
+                        </dd>
+                    </div>
+                    {% if projeto.inativado %}
+                        <div class="list-item">
+                            <dt>Motivo da Inativação</dt>
+                            <dd>{{ projeto.motivo_inativacao }}<small>Inativado em {{ projeto.inativado_em }} por {{ projeto.inativado_por }}</small></dd>
+                        </div>
+                    {% endif %}
+                {% else %}
+                    <div class="list-item flex-basis-100">
+                        <dt>Resumo</dt>
+                        <dd class="richtext">{{ projeto.resumo|safe|striptags }}</dd>
+                    </div>
+                {% endif %}
+            </dl>
+        {% endbox %}
+        {% if projeto.termoparceriaadesao_set.exists %}
+            {% box "Termos de Parceria/Adesão" %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Descrição</th>
+                            <th>Arquivo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for termo in projeto.termoparceriaadesao_set.all %}
+                            <tr>
+                                <td>{{ termo.descricao }}</td>
+                                <td><a href="{{ termo.arquivo.url }}" class="btn">Ver termo</a></td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% endbox %}
+        {% endif %}
+        {% if eh_interno %}
+            {% box "Discriminação do Projeto" %}
+                <table class="info">
+                    <tr>
+                        <td>Resumo</td>
+                        <td class="richtext">{{ projeto.resumo|safe|striptags }}</td>
+                    </tr>
+                </table>
+            {% endbox %}
+        {% endif %}
+    </div>
+
+    <div class="tab-pane" data-title="Dados do Edital" data-tab="dados_edital">
+        {% box projeto.edital.titulo %}
+             <dl class="definition-list flex">
+                <div class="list-item">
+                    <dt>Período de Inscrição</dt>
+                    <dd>
+                        {% if status == projeto.STATUS_EM_INSCRICAO %}
+                            <span class="alert alert-warning">{{ projeto.edital.inicio_inscricoes }} a {{ projeto.edital.fim_inscricoes }}</span>
+                        {% else %}
+                            {{ projeto.edital.inicio_inscricoes }} a {{ projeto.edital.fim_inscricoes }}
+                        {% endif %}
+                    </dd>
+                </div>
+                {% if eh_interno %}
+                    <div class="list-item">
+                        <dt>Período de Pré-seleção</dt>
+                        <dd>{{ projeto.edital.inicio_pre_selecao }} - {{ projeto.edital.inicio_selecao }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Período de Seleção</dt>
+                        <dd>{{ projeto.edital.inicio_selecao }} - {{ projeto.edital.fim_selecao }}</dd>
+                    </div>
+                    {% if projeto.edital.data_recurso %}
+                        <div class="list-item">
+                            <dt>Período de Recurso</dt>
+                            <dd>{{ projeto.edital.fim_selecao }} - {{ projeto.edital.data_recurso }}</dd>
+                        </div>
+                    {% endif %}
+                    <div class="list-item">
+                        <dt>Divulgação do Resultado</dt>
+                        <dd>{{ projeto.edital.divulgacao_selecao }}</dd>
+                    </div>
+                {% endif %}
+            </dl>
+            {% if projeto.edital.arquivo %}
+                <h4>Arquivo Digitalizado</h4>
+                <ul>
+                    <li><a href="/projetos/visualizar_arquivo/{{ projeto.edital.arquivo.id }}/">{{ projeto.edital.arquivo.nome }}</a></li>
+                </ul>
+            {% endif %}
+            <h4>Anexos</h4>
+            {% if projeto.edital.editalanexoauxiliar_set.all %}
+                <ul>
+                    {% for anexo in projeto.edital.editalanexoauxiliar_set.all %}
+                        {% if anexo.arquivo %}
+                           <li><a href="/projetos/visualizar_arquivo/{{ anexo.arquivo.id }}/">{{ anexo.arquivo.nome }}</a> - {{ anexo.descricao }}</li>
+                        {% endif %}
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="alert alert-warning">Aguardando submissão de arquivos.</p>
+            {% endif %}
+        {% endbox %}
+    </div>
+
+    {% if eh_interno %}
+        <div class="tab-pane" data-title="Caracterização dos Beneficiários" data-tab="caracterizacao_beneficiario" data-counter="{{ projeto.caracterizacaobeneficiario_set.count }}">
+            {% box "Caracterização dos Beneficiários" %}
+                {% if not projeto.publico_alvo %}
+                    {% if projeto.caracterizacaobeneficiario_set.all %}
+                        <div class="table-responsive">
+                            <table>
+                                <caption>Caracterização dos beneficiários</caption>
+                                <thead>
+                                    <tr>
+                                        {% if pode_editar_inscricao_execucao and not eh_somente_leitura %}
+                                            <th class="no-print">Ações</th>
+                                        {% endif %}
+                                        <th>Público-alvo</th>
+                                        <th>Quantidade prevista de pessoas a atender</th>
+                                        {% if projeto.pre_aprovado and projeto.aprovado %}
+                                            <th>Quantidade de pessoas atendidas</th>
+                                            <th>Descrição do público-alvo</th>
+                                        {% endif %}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for caracterizacao_beneficiario in projeto.caracterizacaobeneficiario_set.all %}
+                                        <tr>
+                                            {% if pode_editar_inscricao_execucao and not eh_somente_leitura %}
+                                                <td class="no-print">
+                                                    {% icon "edit" "/projetos/editar_caracterizacao_beneficiario/{{ caracterizacao_beneficiario.pk }}/" "Editar" "popup" %}
+                                                    {% icon "delete" "/projetos/remover_caracterizacao_beneficiario/{{ caracterizacao_beneficiario.pk }}/" %}
+                                                </td>
+                                            {% endif %}
+                                            <td>{{ caracterizacao_beneficiario.tipo_beneficiario }}</td>
+                                            <td>{{ caracterizacao_beneficiario.quantidade }}</td>
+                                            {% if projeto.pre_aprovado and projeto.aprovado %}
+                                                <td>
+                                                    {% if caracterizacao_beneficiario.quantidade_atendida %}
+                                                        {{ caracterizacao_beneficiario.quantidade_atendida|format }}
+                                                    {% endif %}
+                                                   {% if not caracterizacao_beneficiario.quantidade_atendida and projeto.pode_registrar_execucao %}
+                                                        <a href="/projetos/registro_beneficiario_atendido/{{ caracterizacao_beneficiario.id }}/" class="btn success popup" title="Registrar">Registrar</a>
+                                                   {% endif %}
+                                                </td>
+                                                <td>{{ caracterizacao_beneficiario.descricao_beneficiario|format }}</td>
+                                            {% endif %}
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="alert alert-warning">Nenhuma caracterização cadastrada.</p>
+                    {% endif %}
+                {% else %}
+                    <table class="info">
+                        <tr>
+                          <td>Público alvo:</td>
+                          <td>{{ projeto.publico_alvo }}</td>
+                        </tr>
+                    </table>
+                {% endif %}
+            {% endbox %}
+        </div>
+    {% endif %}
+
+    {% if avaliador_pode_visualizar %}
+        <div class="tab-pane" data-title="Equipe" data-tab="equipe" data-counter="{{ projeto.participacao_set.count }}">
+            {% if projeto.participacao_set.exists %}
+                {% if coordenadores.exists %}
+                    <h4 class="mt-0 mb-0 pt-0">Coordenadores <span class="badge">{{ coordenadores.count }}</span></h4>
+                    {% for participacao in coordenadores %}
+                        {% include "includes/box_participante_consulta.html" %}
+                    {% endfor %}
+                {% endif %}
+
+                {% if docentes.exists %}
+                    <h4 class="mb-0">Docentes <span class="badge">{{ docentes.count }}</span></h4>
+                    {% for participacao in docentes %}
+                        {% include "includes/box_participante_consulta.html" %}
+                    {% endfor %}
+                {% endif %}
+
+                {% if discentes.exists %}
+                    <h4 class="mb-0">Discentes <span class="badge">{{ discentes.count }}</span></h4>
+                    {% for participacao in discentes %}
+                        {% include "includes/box_participante_consulta.html" %}
+                    {% endfor %}
+                {% endif %}
+
+                {% if tec_adm.exists %}
+                    <h4 class="mb-0">Técnicos administrativos <span class="badge">{{ tec_adm.count }}</span></h4>
+                    {% for participacao in tec_adm %}
+                        {% include "includes/box_participante_consulta.html" %}
+                    {% endfor %}
+                {% endif %}
+
+                {% if col_ext.exists %}
+                    <h4 class="mb-0">Colaboradores externos <span class="badge">{{ col_ext.count }}</span></h4>
+                    {% for participacao in col_ext %}
+                        {% include "includes/box_participante_consulta.html" %}
+                    {% endfor %}
+                {% endif %}
+            {% else %}
+                <p class="alert alert-warning">Nenhum participante cadastrado.</p>
+            {% endif %}
+        </div>
+    {% endif %}
+
+{% endblock %}

@@ -1,0 +1,161 @@
+{% extends super_template %}
+
+{% block extracss %}
+<link rel="stylesheet" href="/static/planejamento/css/planejamento.css" />
+<link rel="stylesheet" href="/static/planejamento/css/acoes_validar.css" />
+{% endblock %}
+    
+{% block extrahead %}
+<script src="/static/planejamento/js/AcaoValidar.js"></script>
+{% endblock %}
+
+{% block content %}
+	{% if msg %}
+	<div class="alert alert-warning">
+		{{msg}}
+	</div>
+	{% endif %}
+<h2>Validação de Ações</h2>
+
+{% box 'Dados da Meta' %}
+	<table>
+		<tbody>
+			<tr>
+				<td>Ano Base</td>
+				<td>{{ meta_unidade.meta.objetivo_estrategico.configuracao }}</td>
+			</tr>
+			<tr>
+				<td>Unidade</td>
+				<td>{{ meta_unidade.unidade.setor_equivalente.nome }}</td>
+			</tr>
+			<tr>
+				<td>Objetivo Estratégico</td>
+				<td>{{ meta_unidade.meta.objetivo_estrategico.get_codigo_completo }} - {{ meta_unidade.meta.objetivo_estrategico.descricao }}</td>
+			</tr>
+			<tr>
+				<td>Meta</td>
+				<td>{{ meta_unidade.meta.get_codigo_completo }} - {{ meta_unidade.meta.titulo }}</td>
+			</tr>
+		</tbody>
+	</table>
+{% endbox %}
+
+{% if acoes_nao_importadas %}
+	{% box 'Ações Propostas Não Importadas' %}
+		<table>
+			<thead>
+				<tr>
+					<th style="text-align:left;">Título</th>
+					<th width="80px">Quantidade</th>
+					<th width="100px">Valor Total</th>
+					{% if periodo_cadastro_campus %}
+			    		<th>Ações</th>
+					{% endif %}
+			    </tr>
+		    </thead>
+			<tbody>
+		        {% for acao in acoes_nao_importadas %}
+		        <tr>
+					<td>{{ acao.titulo }}</td>
+					<td class="text-center">{{ acao.quantidade }}</td>
+					<td class="text-end">{{ acao.valor_total|mascara_dinheiro }}</td>
+					{% if periodo_cadastro_campus %}
+			        	<td>
+							<ul class="action-bar">
+			        			<li><a class="btn" href="/planejamento/metaunidade/{{ meta_unidade.id }}/acoespropostas/{{ acao.id_acaoproposta_metaunidade }}/">Importar ação proposta</a></li>
+							</ul>
+			        	</td>
+					{% endif %}
+		        </tr>
+		        {% endfor %}
+		    </tbody>
+		</table>
+	{% endbox %}
+{% endif %}
+
+<form method="post">
+	{% csrf_token %}
+	{% if acoes %}
+	{% box 'Ações' %}
+		<table id="validacao_acoes">
+			<thead>
+				<th></th>
+				<th></th>
+				<th colspan="3" >Ações</th>
+				{% if not periodo_cadastro_campus %}
+					<th></th>
+				{% endif %}
+				<th>Título</th>
+				<th>Status</th>
+				<th style="text-align:center;width:100px;">Qtd. Proposta</th>
+				<th style="text-align:center;width:100px;">Valor Proposto</th>
+				<th style="text-align:center;width:100px;">Qtd. Informada</th>
+				<th style="text-align:center;width:100px;">Valor Informado</th>
+			</thead>
+			<tbody>
+				{% for acao in acoes %}
+				<tr>
+					<td>
+			    		{% if acao.status == 'Pendente' %}
+						    -	
+						{% else %}
+						    <a class="popup btn" href="/planejamento/acao/comentario/{{ acao.id }}/">Comentário</a>
+						{% endif %}
+					</td>
+					<td></td>
+					<td>{% icon "view" "/planejamento/acao/{{ acao.id }}/" %}</td>
+					<td></td>
+					<td>
+						<a class="btn popup" href="/planejamento/acao/{{ meta_unidade.id }}/validar/{{ acao.id }}/">Validar</a>
+					</td>
+					{% if not periodo_cadastro_campus %}
+					<td>
+						{% if periodo_validacao_sistemico %}
+							{% if acao.status == 'Parcialmente Deferida' %}
+								{% icon "view" "/planejamento/metaunidade/{{ meta_unidade.id }}/acoes/" %}
+							{% else %}
+							     -
+							{% endif %}
+						{% else %}
+                            -
+						{% endif %}
+					</td>
+					{% endif %}
+					<td>
+						{{ acao.titulo }}
+					</td>
+					<td>
+						{% if acao.status == 'Deferida' %}
+							<span class="status status-success">Ação validada</span>
+						{% else %}
+							<span class="status status-error">Ação não validada</span>
+						{% endif %}
+					</td>
+					<td class="text-center">
+						{{ acao.quantidade_proposta }}
+					</td>
+					<td class="text-end">
+						{{ acao.valor_referencia|mascara_dinheiro }}
+					</td>
+					<td class="text-center">
+						{{ acao.quantidade }}
+					</td>
+					<td class="text-end">
+						{{ acao.valor_informado|mascara_dinheiro }}
+					</td>
+				</tr>
+				{% endfor %}
+			</tbody>
+			<tfoot>
+				<tr> 
+					<td colspan="{% if not periodo_cadastro_campus %}11{% else %}10{% endif %}" style="font-weight:bolder;text-align:right;">Valor Total Utilizado:</td>
+					<td class="text-end">{{ valor_total_acoes|mascara_dinheiro }}</td>
+				</tr>
+			</tfoot>
+		</table>
+	{% endbox %}
+	
+	{% endif %}
+</form>
+	
+{% endblock %}

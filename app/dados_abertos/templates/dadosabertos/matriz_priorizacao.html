@@ -1,0 +1,104 @@
+{% extends "admin/base_site.html" %}
+{% load dados_abertos_filters i18n static %}
+
+{% block extracss %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static 'dados_abertos/css/matriz_priorizacao.css' %}">
+{% endblock %}
+
+{% block action-bar %}
+
+    <ul class="action-bar">
+        {% if tem_base_nao_avaliada and pode_editar %}
+        <li>
+            <input type="submit" form="matriz-priorizacao-form" value="{% trans 'Salvar' %}" class="btn success">
+        </li>
+
+        <li>
+            <button type="submit" form="matriz-priorizacao-form" name="acao" value="finalizar" class="btn warning">Finalizar</button>
+        </li>
+        {% endif %}
+    </ul>
+
+{% endblock %}
+
+{% block content %}
+
+{% if pdas|length > 1 %}
+    <form method="get" class="form-inline">
+        <div class="form-row">
+            <div class="field-box">
+                <label for="id_pda">Plano de Dados Abertos</label>
+                <select name="pda" id="id_pda" onchange="this.form.submit()">
+                    {% for p in pdas %}
+                        <option value="{{ p.pk }}" {% if p.pk == pda.pk %}selected{% endif %}>{{ p }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <noscript><input type="submit" value="{% trans 'Trocar' %}" class="btn default"></noscript>
+    </form>
+{% endif %}
+
+{% if not tem_base_nao_avaliada %}
+    <p class="alert alert-info"><strong>Informação:</strong> Todas as bases relacionadas do Plano de Dados Abertos <strong>{{ pda.titulo }}</strong> foram avaliadas.</p>
+{% endif %}
+
+<form id="matriz-priorizacao-form" method="post">
+    {% csrf_token %}
+    {# mantém a matriz no PDA selecionado ao salvar/finalizar #}
+    <input type="hidden" name="pda" value="{{ pda.pk }}">
+
+    <div class="table-responsive">
+
+        <table>
+            <caption class="pt-0">Priorização das Bases de Dados</caption>
+            <thead>
+                <tr>
+                    <th class="da-col-base">Base de Dados</th>
+                    <th class="da-col-alias" title="Resultado da consulta pública">CP</th>
+                    {% for c in criterios %}
+                        <th class="da-col-alias" title="{{ c.nome }}">C{{ forloop.counter }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% if pda %}
+                {% for base in bases %}
+                <tr class="da-row-item">
+                    <td>{{ base.nome }}</td>
+                    <td class="da-cell-center">{{ base.votos }}</td>
+                    {% for c in criterios %}
+                        <td class="da-cell-center">
+                            {% if pode_editar %}{% render_select_field base c %}{% else %}{% render_select_field base c True %}{% endif %}
+                        </td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+                {% else %}
+                <tr>
+                    <td colspan="11">{% trans "Nenhum PDA cadastrado." %}</td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+
+    </div>
+
+    <div class="da-legenda">
+        <p class="da-legenda__titulo">Legenda dos critérios</p>
+        <ul class="da-legenda__lista">
+            <li><strong>CP</strong> — Resultado da consulta pública</li>
+            {% for c in criterios %}
+                <li><strong>C{{ forloop.counter }}</strong> — {{ c.nome }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% if tem_base_nao_avaliada and pode_editar %}
+    <div class="submit-row">
+        <input type="submit" value="{% trans 'Salvar' %}" class="default">
+    </div>
+    {% endif %}
+</form>
+
+{% endblock %}

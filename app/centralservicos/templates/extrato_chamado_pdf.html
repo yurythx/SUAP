@@ -1,0 +1,166 @@
+{% extends "relatorio_pdf.html" %}
+{% load centralservicos_templatetags %}
+{% block style %}
+    ul {
+        list-style-position: outside;
+    }
+    .termo {
+        width: 20%;
+        font-weight: bold;
+    }
+    .item-lt {
+        page-break-inside: avoid;
+        margin-left: 0.33cm;
+    }
+    .cabecalho-item-lt {
+        text-align: left;
+        display: block;
+        margin: 0;
+        padding-left: 0.4cm;
+    }
+    .cabecalho-item-lt:before {
+        content: '\25CF';
+        font-size: 1.5rem;
+        position: absolute;
+        left: 0.4cm;
+    }
+    .wrapper-corpo-item-lt {
+        border-left: 1pt solid #ddd;
+        margin: 0.15cm 0;
+        padding: 0.3cm 0;
+        padding-left: 0.4cm;
+    }
+    .item-lt:last-of-type .wrapper-corpo-item-lt {
+        border-left: none;
+    }
+    .corpo-item-lt {
+        text-align: left;
+        line-height: 1.3em;
+    }
+    .descricao-evento {
+        font-weight: bold;
+        margin: 0;
+        padding: 0.1em 0;
+        border-bottom: 1pt solid #000;
+    }
+    hr {
+        border: none;
+        border-top: 1pt solid #aaa;
+    }
+    footer {
+        bottom: -0.5em;
+    }
+{% endblock %}
+
+{% block content %}
+    <div>
+        <h1>Extrato do Chamado {{ chamado.id }}</h1>
+    </div>
+
+    {% with formato_data="d/m/Y, à\s H:i:s" %}
+
+        <section id="dadosGerais">
+            <h1>Dados gerais</h1>
+            <table>
+                <tr>
+                    <td class="termo">Interessado:</td>
+                    <td>{{ dados_gerais.interessado }}</td>
+                </tr>
+                <tr>
+                    <td class="termo">Dados da Abertura:</td>
+                    <td>Aberto por {{ dados_gerais.aberto_por }} em {{ dados_gerais.data_abertura|date:formato_data }}.</td>
+                </tr>
+                <tr>
+                    <td class="termo">URL do Chamado:</td>
+                    <td><a href="{{ dados_gerais.url_chamado }}">{{ dados_gerais.url_chamado }}</a></td>
+                </tr>
+            </table>
+        </section>
+
+        <section id="descricao">
+            <h1>Descrição</h1>
+            {{ descricao|linebreaksbr }}
+        </section>
+
+        <section id="linhaDoTempo">
+            <h1>Linha do Tempo</h1>
+            {% for item in linha_do_tempo %}
+                <div class="item-lt">
+                <h3 class="cabecalho-item-lt">{{ item.data_hora|date:formato_data }}:</h3>
+                <div class="wrapper-corpo-item-lt">
+                    {% if item.tipo == 'comentario' %}
+                    {% with comentario=item.objeto %}
+                        {% if not comentario.mensagem_automatica %}
+                            <div class="corpo-item-lt">
+                                <span class="descricao-evento">{{ comentario.remetente }} comentou:</span>
+                                {% if comentario.desconsiderada_em == None %}
+                                    {{ comentario.texto|linebreaks }}
+                                    {% if comentario.bases_conhecimento.exists %}
+                                        {% with qtd_artigos=comentario.bases_conhecimento.count %}
+                                        <strong>
+                                            Artigo{{ qtd_artigos|pluralize }} da Base de Conhecimentos sugerido{{ qtd_artigos|pluralize }}:
+                                        </strong>
+                                        <ul>
+                                        {% for base in comentario.bases_conhecimento.all %}
+                                            <li>
+                                                {{ base.titulo }}
+                                                (<a href="{{ base.get_visualizar_base_conhecimento_url }}">{{ base.get_visualizar_base_conhecimento_url }}</a>)
+                                            </li>
+                                        {% endfor %}
+                                        {% endwith %}
+                                        </ul>
+                                    {% endif %}
+                                {% else %}
+                                    <p><s>{{ comentario.texto|linebreaksbr }}</s></p>
+                                    <p>(Comentário desconsiderado em {{ comentario.desconsiderada_em|date:formato_data }}.)</p>
+                                {% endif %}
+                            </div>
+                        {% else %}
+                            <div class="corpo-item-lt">
+                                <span class="descricao-evento">Mensagem automática do sistema:</span>
+                                <p>{{ comentario.texto|safe|linebreaks }}</p>
+                            </div>
+                        {% endif %}
+                    {% endwith %}
+                    {% elif item.tipo == 'historicostatus' %}
+                        {% with historicostatus=item.objeto %}
+                            {% if not historicostatus.comunicacao.mensagem_automatica %}
+                                <div class="corpo-item-lt">
+                                    <span class="descricao-evento">Mensagem automática do sistema:</span>
+                                    <p>
+                                        {% if historicostatus.status == historicostatus.aberto %}
+                                            Chamado {{ historicostatus.get_status_display | status }} por {{ historicostatus.usuario }}.
+                                        {% else %}
+                                            {{ historicostatus.usuario }} alterou a situação do chamado para <strong>{{ historicostatus.get_status_display }}</strong>.
+                                        {% endif %}
+                                    </p>
+                                </div>
+                            {% else %}
+                                <div class="corpo-item-lt">
+                                    <span class="descricao-evento">Mensagem automática do sistema:</span>
+                                    <p>Situação alterada automaticamente para <strong>{{ historicostatus.get_status_display }}</strong>.</p>
+                                </div>
+                            {% endif %}
+                        {% endwith %}
+                    {% elif item.tipo == 'anexo' %}
+                        {% with anexo=item.objeto %}
+                            <div class="corpo-item-lt">
+                                <span class="descricao-evento">Arquivo anexado:</span>
+                                <p>
+                                    {{ anexo.anexado_por }} adicionou o seguinte anexo: <strong>{{ anexo.descricao }}</strong>
+                                    (<a href="{{ anexo.anexo.get_url_publica }}">{{ anexo.anexo.get_url_publica }}</a>).
+                                </p>
+                            </div>
+                        {% endwith %}
+                    {% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+            </ul>
+        </section>
+
+        <footer>Emitido via SUAP em {{ data_emissao|date:formato_data }}.</footer>
+
+    {% endwith %}
+
+{% endblock %}

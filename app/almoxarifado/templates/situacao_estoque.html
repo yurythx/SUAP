@@ -1,0 +1,154 @@
+{% extends super_template %}
+
+{% block extrahead %}
+<script>
+function format(valor){
+    valor = valor+'';
+    var index = valor.indexOf('.');
+    if(index==-1) valor+='.00';
+    else if(index==valor.length-2) valor+='0';
+    index = valor.indexOf('.');
+    if(valor.length>index+7) valor = valor.substring(0, index+7);
+    return valor;
+}
+
+$(document).ready(function(){
+    $("form").bind("submit", function() {
+        var canSubmit = true;
+        $(":input[type=checkbox], :input[type=text], :input[type=number]", this).each(function() {
+            var type = this.type;
+            if (type == "checkbox" && $("input[type=checkbox]:checked").length == 0) {
+                window.alert('Você precisa selecionar, no mínimo, um dos materiais.');
+                canSubmit = false;
+            } else if (type != "checkbox" && !$(this).is('[disabled]') && this.value=="") {
+                window.alert("Há campos obrigatórios que precisam ser preenchidos.");
+                this.focus();
+                canSubmit = false;
+            }
+            return canSubmit;
+        });
+        return canSubmit;
+    });
+
+	$('input[type=checkbox], input[type=text], input[type=number]').on('change', function(){
+		var id = $(this).data("material");
+
+        if ($("input[type=checkbox][data-material=" + id + "]").is(":checked")) {
+            var totalizador = $('#totalizador');
+            var qtd = $('#qtd' + id).val();
+            if(qtd=='') qtd = 0;
+            var valor = $('#valor' + id).val();
+            if (valor=='') {
+                valor = 0;
+            } else {
+                valor = valor.replace('.','').replace(',','.');
+            }
+            var parcial = qtd * valor;
+
+            $("input[type=text][data-material=" + id + "]").removeAttr("disabled");
+            $("input[type=number][data-material=" + id + "]").removeAttr("disabled");
+            $(this).parent().parent().addClass("selected");
+			$('#total' + id).html(format(parcial));
+		} else {
+            $("input[type=text][data-material=" + id + "]").attr("disabled", "disabled");
+            $("input[type=number][data-material=" + id + "]").attr("disabled", "disabled");
+            $(this).parent().parent().removeClass("selected");
+            $('#total' + id).html('0.00');
+		}
+
+		// atualiza o totalizador
+		var rotulos = $('strong[data-total]');
+		var total = 0;
+		for (var i=0; i < rotulos.length; i++) {
+            total += rotulos[i].innerHTML * 1;
+		}
+		$('#totalizador').html(format(total));
+	});
+});
+</script>
+{% endblock %}
+
+{% block action-bar %}
+<ul class="action-bar">
+    <li><a class="btn popup success" href="/almoxarifado/configuracao_estoque/">Adicionar Material Controlado</a></li>
+</ul>
+{% endblock %}
+
+{% block content %}
+
+<div class="alert alert-info">
+	<p>Esta página destina-se à realização de novas aquisições de materiais de consumo.</p>
+	<p>A informação <strong>quantidade à ressuprimir</strong> foi calculada automaticamente partir da configuração especificada na página de <a href="/almoxarifado/configuracao_estoque/">Configuração de Estoque</a>.</p>
+	<p>Selecione os materiais que deseja adquirir, informando suas respectivas quantidades. Após selecionar todos os itens desejados, clique no botão "Gerar Lista de Compras" no canto inferior da página.</p>
+	<p>As quantidades dos itens adquiridos podem ser alterados de acordo com as necessidades atuais. O valor de cada item corresponde ao maior valor até então adquirido.</p>
+</div>
+
+<form action="/almoxarifado/relatorio_compra/" method="get" target="_blank" id="form">
+    <input type="hidden" id="pdf" name="pdf" value="0"/>
+    <table class="results" id="tabela">
+    	<thead>
+            <tr>
+            	<th>-</th>
+                <th>Código</th>
+                <th>Material de Consumo</th>
+                <th>Situação</th>
+                <th>Qtd Em Estoque</th>
+                <th>Qtd À Ressumprimir</th>
+                <th>Preço Unitário (R$)</th>
+                <th>Qtd À Adquirir</th>
+                <th>Valor Parcial (R$)</th>
+            </tr>
+        </thead>
+        <tbody>
+	        {% autopaginate configuracoes 50 %}
+	        {% paginate %}
+	        {% for configuracao in configuracoes %}
+	        	<!--{{ configuracao.calcular_previsao_estoque }}-->
+	            <tr>
+	            	<td><input type="checkbox" name="id" id="{{ configuracao.id }}" data-material="{{ configuracao.id }}" value="{{ configuracao.material.id }}" /></td>
+	                <td>{{ configuracao.material.codigo }}</td>
+                    <td><a href="/almoxarifado/material_historico/{{ configuracao.material.id }}/?tab={{ uo }}">{{ configuracao.material }}</a></td>
+	                <td>
+	            		{% if configuracao.esta_em_estado_de_compra %}
+	            			<span class="status status-alert">Estado de Compra</span>
+	            		{% else %}
+	            			{% if configuracao.esta_em_ponto_critico %}
+	            				<span class="status status-error">Ponto Crítico</span>
+	            			{% else %}
+	            				{% if configuracao.esta_em_estoque_normal %}
+	            					<span class="status status-success">Estoque Normal</span>
+	            				{% else %}
+	            					{% if configuracao.esta_em_estoque_maximo %}
+	            						<span class="status status-alert">Estoque Máximo</span>
+									{% endif %}
+								{% endif %}
+							{% endif %}
+						{% endif %}
+	            	</td>
+	                <td>{{ configuracao.material.get_estoque_atual }}</td>
+	                <td>{{ configuracao.qtd_ressuprimir|floatformat }}</td>
+	                <td>R$ <input type="text" name="valor{{ configuracao.material.id }}" id="valor{{ configuracao.id }}" size="5" data-material="{{ configuracao.id }}" value="{{ configuracao.maior_valor_adquirido|floatformat:2 }}" disabled="disabled" class="int" /></td>
+	                {% if configuracao.esta_em_ponto_critico or configuracao.esta_em_estado_de_compra %}
+	                	<td><input type="number" name="qtd{{ configuracao.material.id }}" id="qtd{{ configuracao.id }}" size="3" data-material="{{ configuracao.id }}" value="{{ configuracao.qtd_ressuprimir_atual|floatformat }}" disabled="disabled" class="pq" /> </td>
+	                {% else %}
+	                	<td><input type="number" name="qtd{{ configuracao.material.id }}" id="qtd{{ configuracao.id }}" size="3" data-material="{{ configuracao.id }}" value="0" disabled="disabled" class="pq" /> </td>
+	                {% endif %}
+	                <td class="text-end">R$ <strong id="total{{ configuracao.id }}" data-total="True">0.00</strong></td>
+	            </tr>
+	        {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr>
+                <td colspan="8">Total:</td>
+                <td id="totalizador">0,00</td>
+            </tr>
+        </tfoot>
+    </table>
+
+	<div class="submit-row">
+        <button type="submit" class="btn success sm" value="Gerar Lista de Compra em HTML" onclick="document.getElementById('pdf').value=0;">Gerar Lista de Compra em HTML</button>
+		<button type="submit" class="btn success sm" value="Gerar Lista de Compra em PDF" onclick="document.getElementById('pdf').value=1;" >Gerar Lista de Compra em PDF</button>
+	</div>
+
+</form>
+{% endblock %}

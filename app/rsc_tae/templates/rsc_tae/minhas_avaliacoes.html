@@ -1,0 +1,134 @@
+{% extends super_template %}
+{% load static %}
+
+{% block extracss %}
+<link rel="stylesheet" href="{% static 'rsc_tae/css/rsc-tae.css' %}">
+{% endblock %}
+
+{% block content %}
+
+<dl class="definition-list flex">
+    <div class="list-item">
+        <dt>Avaliador</dt>
+        <dd>{{ vinculo_usuario }}</dd>
+    </div>
+    <div class="list-item">
+        <dt>A avaliar</dt>
+        <dd>{{ linhas_a_avaliar|length }}</dd>
+    </div>
+    <div class="list-item">
+        <dt>Concluídas</dt>
+        <dd>{{ linhas_concluidas|length }}</dd>
+    </div>
+</dl>
+
+{% box 'A avaliar' %}
+    {% if not linhas_a_avaliar %}
+        <p class="alert alert-warning">Nenhum processo aguardando sua avaliação.</p>
+    {% else %}
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Processo</th>
+                        <th>Nível</th>
+                        <th>Situação</th>
+                        <th>Prazo</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ln in linhas_a_avaliar %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'rsc_tae:visualizar' ln.processo.id %}"><strong>#{{ ln.processo.id }}</strong></a>
+                                <div class="text-muted">{{ ln.processo.vinculo }}</div>
+                            </td>
+                            <td>{{ ln.processo.nivel_requisitado }}</td>
+                            <td>{{ ln.processo.get_situacao_badge }}</td>
+                            <td>
+                                {% if ln.sla %}
+                                    {% if ln.sla.atrasado %}
+                                        <span class="status status-error" title="Prazo: {{ ln.sla.dias_sla }} dias | Entrou em: {{ ln.sla.data_entrada|date:'d/m/Y' }}">{{ ln.sla.dias_restantes }}d</span>
+                                    {% elif ln.sla.alerta %}
+                                        <span class="status status-alert" title="Prazo: {{ ln.sla.dias_sla }} dias | Entrou em: {{ ln.sla.data_entrada|date:'d/m/Y' }}">{{ ln.sla.dias_restantes }}d</span>
+                                    {% else %}
+                                        <span class="status status-success" title="Prazo: {{ ln.sla.dias_sla }} dias | Entrou em: {{ ln.sla.data_entrada|date:'d/m/Y' }}">{{ ln.sla.dias_restantes }}d</span>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="rsc-avaliacoes-acoes">
+                                    {% if ln.pode_avaliar %}
+                                        <a class="btn success" href="{% url 'rsc_tae:avaliar' ln.processo.id %}">Avaliar</a>
+                                    {% elif ln.pode_ver_resumo %}
+                                        <a class="btn default" href="{% url 'rsc_tae:resumo_avaliacao' ln.processo.id %}">Resumo</a>
+                                    {% endif %}
+                                    {% if ln.pode_recusar_ou_impedir %}
+                                        <a class="btn danger" href="{% url 'rsc_tae:recusar_avaliacao' ln.processo.id %}">Recusar</a>
+                                        <a class="btn warning" href="{% url 'rsc_tae:declarar_impedimento' ln.processo.id %}">Impedimento</a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+{% endbox %}
+
+{% box 'Concluídas' %}
+    {% if not linhas_concluidas %}
+        <p class="alert alert-warning">Nenhuma avaliação concluída.</p>
+    {% else %}
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Processo</th>
+                        <th>Nível</th>
+                        <th>Minha avaliação</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ln in linhas_concluidas %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'rsc_tae:visualizar' ln.processo.id %}"><strong>#{{ ln.processo.id }}</strong></a>
+                                <div class="text-muted">{{ ln.processo.vinculo }}</div>
+                            </td>
+                            <td>{{ ln.processo.nivel_requisitado }}</td>
+                            <td>
+                                {% if ln.minha_avaliacao.resposta == 3 %}
+                                    <span class="status status-error">Recusada</span>
+                                {% elif ln.minha_avaliacao.resposta == 4 %}
+                                    <span class="status status-error">Impedimento</span>
+                                {% elif ln.minha_avaliacao.substituido %}
+                                    <span class="status status-default">Substituído</span>
+                                {% elif ln.finalizada %}
+                                    <span class="status status-success">Finalizada</span>
+                                {% else %}
+                                    <span class="status status-info">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="rsc-avaliacoes-acoes">
+                                    {% if ln.pode_ver_resumo %}
+                                        <a class="btn default" href="{% url 'rsc_tae:resumo_avaliacao' ln.processo.id %}">Resumo</a>
+                                    {% endif %}
+                                    <a class="btn default" href="{% url 'rsc_tae:visualizar' ln.processo.id %}">Ver processo</a>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+{% endbox %}
+
+{% endblock %}

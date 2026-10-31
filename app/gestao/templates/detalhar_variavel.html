@@ -1,0 +1,818 @@
+{% extends super_template %}
+
+{% block action-bar %}
+<ul class="action-bar">
+    {% if url_csv %}
+    	<li><a class="btn" href="{{ url_csv }}">Gerar XLS</a></li>
+    {% endif %}
+    <li><a class="btn" href="/gestao/comparar_variavel/{{ sigla }}/">Gerar DIFF</a></li>
+    <li><a class="btn" href="/gestao/comparar_variavel/{{ sigla }}/?only_diff=true">Gerar Somente DIFF</a></li>
+</ul>
+{% endblock %}
+
+{% block content %}
+
+{% box "Dados gerais" %}
+	<dl class="definition-list flex">
+		<div class="list-item flex-grow-3">
+			<dt>Descrição</dt>
+            <dd>{{ variavel.descricao }}</dd>
+		</div>
+		<div class="list-item">
+			<dt>Valor</dt>
+			<dd>{% if variavel.is_decimal %}{{ valor|mascara_dinheiro }} {% else %} {{ valor|format }} {% endif %}</dd>
+		</div>
+		<div class="list-item">
+			<dt>Ano de Referência</dt>
+			<dd>{{ ano_referencia }}</dd>
+		</div>
+		<div class="list-item">
+			<dt>Período de Referência</dt>
+			<dd>{{ data_base|format }} a {{ data_limite|format }}</dd>
+		</div>
+	</dl>
+{% endbox %}
+
+<ul class="tabs">
+	{% for uo in uos %}
+		{% if uo %}
+			<li {% if uo.pk == uo_ativa|add:0 %}class="active"{% endif %}>
+				<a href="/gestao/detalhar_variavel/{{ sigla }}/{{ uo.pk }}/">{{ uo }} {% if uo.pk == uo_ativa|add:0 %}<span class="badge">{{ valor|format }}</span>{% endif %}</a>
+			</li>
+		{% else %}
+			<li {% if 'Todas' == uo_ativa %}class="active"{% endif %}>
+				<a href="/gestao/detalhar_variavel/{{ sigla }}/Todas/">Todas {% if 'Todas' == uo_ativa %}<span class="badge">{{ valor|format }}</span>{% endif %}</a>
+			</li>
+		{% endif %}
+    {% endfor %}
+</ul>
+
+{% if tabela %}
+	{% box "Detalhamento Campus/Nível de Ensino" %}
+		<table>
+			<thead>
+				<tr>
+                    {% for coluna in tabela.colunas %}
+                        <th class="text-end">{{ coluna }}</th>
+                    {% endfor %}
+				</tr>
+			</thead>
+			<tbody>
+				{% for registro in tabela.registros %}
+					<tr>
+						{% for key, value in registro.items %}
+						    <td {% if not forloop.first %}class="text-end"{% endif %}>{{ value }}</td>
+						{% endfor %}
+					</tr>
+				{% endfor %}
+			</tbody>
+		</table>
+	{% endbox %}
+{% endif %}
+
+<div class="search-and-filters">
+	<div class="filter">
+		<label>Buscar:</label>
+		<form method="get" action="" id="changelist-search">
+			<input type="text" name="q" value="{{ q }}" />
+			<input type="submit" value="Ir" />
+		</form>
+	</div>
+</div>
+
+{% for tabela in tabelas %}
+	{% box tabela.titulo %}
+		<table>
+			<thead>
+				<tr>
+					{% for c in tabela.colunas %}
+					<th>{{ c }}</th>
+					{% endfor %}
+				</tr>
+			</thead>
+			<tbody>
+				{% for linha in tabela.dados %}
+				<tr>
+					{% for coluna in linha %}
+						{% if coluna.display != 'none' %}
+						<td {% if coluna.width %}width="{{ coluna.width }}"{% endif %} {% if coluna.align %}style="text-align:{{ coluna.align }};"{% endif %}>
+							{% if coluna.type == 'money' %}
+								{{ coluna.info|mascara_dinheiro }}
+							{% else %}
+								{{ coluna.info }}
+							{% endif %}
+						</td>
+						{% endif %}
+					{% endfor %}
+				</tr>
+				{% endfor %}
+			</tbody>
+		</table>
+	{% endbox %}
+{% endfor %}
+
+{% if qs_servidores.count %}
+	{% autopaginate qs_servidores 50 %}
+	{% paginate %}
+	<table>
+		<thead>
+			<tr>
+				<th>Matrícula</th>
+				<th>Nome</th>
+				<th>Cargo</th>
+			</tr>
+		</thead>
+		<tbody>
+			{% for servidor in qs_servidores %}
+				<tr>
+					<td>{{ servidor.matricula }}</td>
+					<td>{{ servidor|format }}</td>
+					<td>{{ servidor.cargo_emprego }}</td>
+				</tr>
+			{% endfor %}
+		</tbody>
+	</table>
+	{% paginate %}
+{% endif %}
+
+{% if qs_ofertas_vagas.count %}
+	{% autopaginate qs_ofertas_vagas 50 %}
+	{% paginate %}
+	<table>
+		<thead>
+			<tr>
+				<th>Processo Seletivo</th>
+				<th>Curso</th>
+				<th>Campus</th>
+				<th class="text-end">Quantidade</th>
+			</tr>
+		</thead>
+		<tbody>
+			{% for oferta in qs_ofertas_vagas %}
+				<tr>
+					<td>{{ oferta.edital }}</td>
+					<td>{{ oferta.curso_campus }}</td>
+					<td>{{ oferta.curso_campus.diretoria.setor.uo.sigla }}</td>
+					<td class="text-end">{{ oferta.qtd }}</td>
+				</tr>
+			{% endfor %}
+		</tbody>
+	</table>
+	{% paginate %}
+{% endif %}
+
+{% if qs_inscricoes.count %}
+	{% autopaginate qs_inscricoes 50 %}
+	{% paginate %}
+	<table>
+		<thead>
+			<tr>
+				<th>Nome do Canditado</th>
+				<th>CPF do Candidato</th>
+				<th>Número da Inscrição</th>
+				<th>Oferta de Vaga</th>
+				<th>Campus</th>
+			</tr>
+		</thead>
+		<tbody>
+			{% for candidato_vaga in qs_inscricoes %}
+				<tr>
+					<td>{{ candidato_vaga.candidato.nome }}</td>
+					<td>{{ candidato_vaga.candidato.cpf }}</td>
+					<td>{{ candidato_vaga.candidato.inscricao }}</td>
+					<td>{{ candidato_vaga.oferta_vaga }}</td>
+					<td>{{ candidato_vaga.oferta_vaga.curso_campus.diretoria.setor.uo.sigla }}</td>
+				</tr>
+			{% endfor %}
+		</tbody>
+	</table>
+	{% paginate %}
+{% endif %}
+
+{% if qs_alunos.count %}
+	{% box "Alunos" %}
+		{% autopaginate qs_alunos 25 %}
+		<table>
+			<thead>
+				<tr>
+					<th>Matrícula</th>
+					<th>Nome</th>
+					<th>CPF</th>
+					<th>Curso</th>
+					<th>Sit. Cadastro</th>
+					<th>Sit. Última Matrícula</th>
+				</tr>
+			</thead>
+			<tbody>
+				{% for aluno in qs_alunos %}
+					<tr>
+						<td>{{ aluno.matricula }}</td>
+						<td>{{ aluno|format }}</td>
+						<td>{{ aluno.pessoa_fisica.cpf }}</td>
+						<td>{{ aluno.curso_campus }}</td>
+
+						{# Rotina antiga que se baseia no HistoricoSituacaoMatricula. #}
+						{# <td class="text-center"> #}
+						{# {{ aluno.get_historico_matricula_periodo_referencia.0|format }}#}
+						{# <br> ({{ aluno.get_historico_matricula_periodo_referencia.1|format }})#}
+						{# </td>#}
+
+						{# Rotina nova que se baseia na SituacaoMatricula do aluno. #}
+						<td class="text-center">{{ aluno.situacao|format }} </td>
+
+						<td class="text-center">
+							<p>{{ aluno.get_ultima_matricula_periodo.get_historico_no_periodo_referencia.0|format }}</p>
+							<p>({{ aluno.get_ultima_matricula_periodo.get_historico_no_periodo_referencia.1|format }})</p>
+						</td>
+					</tr>
+				{% endfor %}
+			</tbody>
+		</table>
+		{% paginate %}
+	{% endbox %}
+{% endif %}
+
+{% if qs_curso.count %}
+	{% autopaginate qs_curso 50 %}
+	{% paginate %}
+	<table>
+		<thead>
+			<tr>
+				<th>Descrição</th>
+			</tr>
+		</thead>
+		<tbody>
+			{% for curso in qs_curso %}
+				<tr>
+					<td><a href="{{ curso.get_absolute_url }}">{{ curso.descricao }}</td></a>
+				</tr>
+			{% endfor %}
+		</tbody>
+	</table>
+	{% paginate %}
+{% endif %}
+
+{% if qs_matriculas.count %}
+	{% box "Alunos" %}
+		{% autopaginate qs_matriculas 25 %}
+		<table>
+			<thead>
+				<tr>
+					<th>Matrícula</th>
+					<th>Nome</th>
+					<th>CPF</th>
+					<th>Curso</th>
+					<th>Sit. Cadastro</th>
+					<th>Sit. Última Matrícula</th>
+				</tr>
+			</thead>
+			<tbody>
+				{% for registro in qs_matriculas %}
+					<tr>
+						<td>{{ registro.aluno.matricula }}</td>
+						<td>{{ registro.aluno|format }}</td>
+						<td>{{ registro.aluno.pessoa_fisica.cpf }}</td>
+						<td>{{ registro.aluno.curso_campus }}</td>
+						<td class="text-center">
+							<p>{{ registro.aluno.get_historico_matricula_periodo_referencia.0|format }}</p>
+							<p>({{ registro.aluno.get_historico_matricula_periodo_referencia.1|format }})</p>
+						</td>
+						<td class="text-center">
+							<p>{{ registro.aluno.get_ultima_matricula_periodo.get_historico_no_periodo_referencia.0|format }}</p>
+							<p>({{ registro.aluno.get_ultima_matricula_periodo.get_historico_no_periodo_referencia.1|format }})</p>
+						</td>
+					</tr>
+				{% endfor %}
+			</tbody>
+		</table>
+		{% paginate %}
+	{% endbox %}
+{% endif %}
+
+{% if qs_matriculas_turmas.count %}
+	{% autopaginate qs_matriculas_turmas 50 %}
+	{% paginate %}
+	<table>
+		<thead>
+			<tr>
+				<th>Matrícula</th>
+				<th>Nome</th>
+				<th>CPF</th>
+				<th>Turma</th>
+				<th>Curso</th>
+			</tr>
+		</thead>
+		<tbody>
+			{% for registro in qs_matriculas_turmas %}
+				<tr>
+					<td>{{ registro.aluno.matricula }}</td>
+					<td>{{ registro.aluno|format }}</td>
+					<td>{{ registro.aluno.pessoa_fisica.cpf }}</td>
+					<td>{{ registro.turma }}</td>
+					<td>{{ registro.aluno.curso_campus.descricao }}</td>
+				</tr>
+			{% endfor %}
+		</tbody>
+	</table>
+	{% paginate %}
+{% endif %}
+
+{# Variável RFP  #}
+
+{% if qs_faixa_1.count %}
+	{% box "Até 0.5 (exclusivo)" %}
+		{% autopaginate qs_faixa_1 25 %}
+		{% paginate %}
+		<table>
+			<thead>
+				<tr>
+					<th>Matrícula</th>
+					<th>Nome</th>
+					<th>CPF</th>
+					<th>Nº de Residentes</th>
+					<th class="text-end">Rendar Bruta (R$)</th>
+					<th class="text-end">Rendar per Capita</th>
+				</tr>
+			</thead>
+			<tbody>
+				{% for matriculaperiodo in qs_faixa_1 %}
+					<tr>
+						<td>{{ matriculaperiodo.aluno.matricula }}</td>
+						<td>{{ matriculaperiodo.aluno|format }}</td>
+						<td>{{ matriculaperiodo.aluno.pessoa_fisica.cpf }}</td>
+						<td>{{ matriculaperiodo.aluno.caracterizacao.qtd_pessoas_domicilio }} Residentes</td>
+						<td class="text-end">{{ matriculaperiodo.aluno.caracterizacao.renda_bruta_familiar|format }}</td>
+						<td class="text-end">{{ matriculaperiodo.aluno.caracterizacao.renda_per_capita|format }} Salário(s)</td>
+					</tr>
+				{% endfor %}
+			</tbody>
+		</table>
+		{% paginate %}
+	{% endbox %}
+{% endif %}
+
+{% if qs_faixa_2.count %}
+	{% box "Entre 0.5 e 1 (exclusivo)" %}
+		{% autopaginate qs_faixa_2 25 %}
+		{% paginate %}
+		<table>
+			<thead>
+				<tr>
+					<th>Matrícula</th>
+					<th>Nome</th>
+					<th>CPF</th>
+					<th>Nº de Residentes</th>
+					<th class="text-end">Rendar Bruta (R$)</th>
+					<th class="text-end">Rendar per Capita</th>
+				</tr>
+			</thead>
+			<tbody>
+				{% for matriculaperiodo in qs_faixa_2 %}
+					<tr>
+						<td>{{ matriculaperiodo.aluno.matricula }}</td>
+						<td>{{ matriculaperiodo.aluno|format }}</td>
+						<td>{{ matriculaperiodo.aluno.pessoa_fisica.cpf }}</td>
+						<td>{{ matriculaperiodo.aluno.caracterizacao.qtd_pessoas_domicilio }} Residentes</td>
+						<td class="text-end">{{ matriculaperiodo.aluno.caracterizacao.renda_bruta_familiar|format }}</td>
+						<td class="text-end">{{ matriculaperiodo.aluno.caracterizacao.renda_per_capita|format }} Salário(s)</td>
+					</tr>
+				{% endfor %}
+			</tbody>
+		</table>
+		{% paginate %}
+	{% endbox %}
+{% endif %}
+
+{% if qs_faixa_3.count %}
+	{% box "Entre 1.0 e 1.5 (exclusivo)" %}
+		{% autopaginate qs_faixa_3 25 %}
+		{% paginate %}
+		<table>
+			<thead>
+				<tr>
+					<th>Matrícula</th>
+					<th>Nome</th>
+					<th>CPF</th>
+					<th>Nº de Residentes</th>
+					<th class="text-end">Rendar Bruta (R$)</th>
+					<th class="text-end">Rendar per Capita</th>
+				</tr>
+			</thead>
+			<tbody>
+				{% for matriculaperiodo in qs_faixa_3 %}
+					<tr>
+						<td>{{ matriculaperiodo.aluno.matricula }}</td>
+						<td>{{ matriculaperiodo.aluno|format }}</td>
+						<td>{{ matriculaperiodo.aluno.pessoa_fisica.cpf }}</td>
+						<td>{{ matriculaperiodo.aluno.caracterizacao.qtd_pessoas_domicilio }} Residentes</td>
+						<td class="text-end">{{ matriculaperiodo.aluno.caracterizacao.renda_bruta_familiar|format }}</td>
+						<td class="text-end">{{ matriculaperiodo.aluno.caracterizacao.renda_per_capita|format }} Salário(s)</td>
+					</tr>
+				{% endfor %}
+			</tbody>
+		</table>
+		{% paginate %}
+	{% endbox %}
+{% endif %}
+
+{% if qs_faixa_4.count %}
+	{% box "Entre 1.5 e 2.0 (exclusivo)" %}
+		{% autopaginate qs_faixa_4 25 %}
+		{% paginate %}
+		<table>
+			<thead>
+				<tr>
+					<th>Matrícula</th>
+					<th>Nome</th>
+					<th>CPF</th>
+					<th>Nº de Residentes</th>
+					<th class="text-end">Rendar Bruta (R$)</th>
+					<th class="text-end">Rendar per Capita</th>
+				</tr>
+			</thead>
+			<tbody>
+				{% for matriculaperiodo in qs_faixa_4 %}
+					<tr>
+						<td>{{ matriculaperiodo.aluno.matricula }}</td>
+						<td>{{ matriculaperiodo.aluno|format }}</td>
+						<td>{{ matriculaperiodo.aluno.pessoa_fisica.cpf }}</td>
+						<td>{{ matriculaperiodo.aluno.caracterizacao.qtd_pessoas_domicilio }} Residentes</td>
+						<td class="text-end">{{ matriculaperiodo.aluno.caracterizacao.renda_bruta_familiar|format }}</td>
+						<td class="text-end">{{ matriculaperiodo.aluno.caracterizacao.renda_per_capita|format }} Salário(s)</td>
+					</tr>
+				{% endfor %}
+			</tbody>
+		</table>
+		{% paginate %}
+	{% endbox %}
+{% endif %}
+
+{% if qs_faixa_5.count %}
+	{% box "Entre 2.0 e 2.5 (exclusivo)" %}
+		{% autopaginate qs_faixa_5 25 %}
+		{% paginate %}
+		<table>
+			<thead>
+				<tr>
+					<th>Matrícula</th>
+					<th>Nome</th>
+					<th>CPF</th>
+					<th>Nº de Residentes</th>
+					<th class="text-end">Rendar Bruta (R$)</th>
+					<th class="text-end">Rendar per Capita</th>
+				</tr>
+			</thead>
+			<tbody>
+				{% for matriculaperiodo in qs_faixa_5 %}
+					<tr>
+						<td>{{ matriculaperiodo.aluno.matricula }}</td>
+						<td>{{ matriculaperiodo.aluno|format }}</td>
+						<td>{{ matriculaperiodo.aluno.pessoa_fisica.cpf }}</td>
+						<td>{{ matriculaperiodo.aluno.caracterizacao.qtd_pessoas_domicilio }} Residentes</td>
+						<td class="text-end">{{ matriculaperiodo.aluno.caracterizacao.renda_bruta_familiar|format }}</td>
+						<td class="text-end">{{ matriculaperiodo.aluno.caracterizacao.renda_per_capita|format }} Salário(s)</td>
+					</tr>
+				{% endfor %}
+			</tbody>
+		</table>
+		{% paginate %}
+	{% endbox %}
+{% endif %}
+
+{% if qs_faixa_6.count %}
+	{% box "Entre 2.5 e 3.0 (exclusivo)" %}
+		{% autopaginate qs_faixa_6 25 %}
+		{% paginate %}
+		<table>
+			<thead>
+				<tr>
+					<th>Matrícula</th>
+					<th>Nome</th>
+					<th>CPF</th>
+					<th>Nº de Residentes</th>
+					<th class="text-end">Rendar Bruta (R$)</th>
+					<th class="text-end">Rendar per Capita</th>
+				</tr>
+			</thead>
+			<tbody>
+				{% for matriculaperiodo in qs_faixa_6 %}
+					<tr>
+						<td>{{ matriculaperiodo.aluno.matricula }}</td>
+						<td>{{ matriculaperiodo.aluno|format }}</td>
+						<td>{{ matriculaperiodo.aluno.pessoa_fisica.cpf }}</td>
+						<td>{{ matriculaperiodo.aluno.caracterizacao.qtd_pessoas_domicilio }} Residentes</td>
+						<td class="text-end">{{ matriculaperiodo.aluno.caracterizacao.renda_bruta_familiar|format }}</td>
+						<td class="text-end">{{ matriculaperiodo.aluno.caracterizacao.renda_per_capita|format }} Salário(s)</td>
+					</tr>
+				{% endfor %}
+			</tbody>
+		</table>
+		{% paginate %}
+	{% endbox %}
+{% endif %}
+
+{% if qs_faixa_7.count %}
+	{% box "Maior ou igual que 3" %}
+		{% autopaginate qs_faixa_7 25 %}
+		{% paginate %}
+		<table>
+			<thead>
+				<tr>
+					<th>Matrícula</th>
+					<th>Nome</th>
+					<th>CPF</th>
+					<th>Nº de Residentes</th>
+					<th class="text-end">Rendar Bruta (R$)</th>
+					<th class="text-end">Rendar per Capita</th>
+				</tr>
+			</thead>
+			<tbody>
+				{% for matriculaperiodo in qs_faixa_7 %}
+					<tr>
+						<td>{{ matriculaperiodo.aluno.matricula }}</td>
+						<td>{{ matriculaperiodo.aluno|format }}</td>
+						<td>{{ matriculaperiodo.aluno.pessoa_fisica.cpf }}</td>
+						<td>{{ matriculaperiodo.aluno.caracterizacao.qtd_pessoas_domicilio }} Residentes</td>
+						<td class="text-end">{{ matriculaperiodo.aluno.caracterizacao.renda_bruta_familiar|format }}</td>
+						<td class="text-end">{{ matriculaperiodo.aluno.caracterizacao.renda_per_capita|format }} Salário(s)</td>
+					</tr>
+				{% endfor %}
+			</tbody>
+		</table>
+		{% paginate %}
+	{% endbox %}
+{% endif %}
+{# Variável RFP (fim)- #}
+
+
+{# Variáveis DEE, TAEE e DISCEE (início)- #}
+{% if qs_pessoas.count %}
+	{% box qs_pessoas_descricao %}
+		{% autopaginate qs_pessoas 50 %}
+		{% paginate %}
+		<table>
+			<thead>
+				<tr>
+{#					<th>Matrícula</th>#}
+					<th>Nome</th>
+					<th>Projeto(s)</th>
+				</tr>
+			</thead>
+			<tbody>
+				{% for pessoa in qs_pessoas %}
+					<tr>
+						<td>{{ pessoa|format }}</td>
+						<td>
+							<ul>
+							{% for participacao in pessoa.projetos_extensao.distinct %}
+								{% if participacao.projeto.aprovado %}
+									{% if participacao.projeto.inicio_execucao >= data_base and participacao.projeto.inicio_execucao <= data_limite %}
+										<li>
+											<a href="/projetos/projeto/{{ participacao.projeto.pk }}/">{{ participacao.projeto.titulo }}</a>
+											{% if not participacao.ativo %}
+												<span class="status status-error">Inativo(a) no projeto</span>
+											{% endif %}
+									  	</li>
+								 	{% endif %}
+							 	{% endif %}
+							{% endfor %}
+							</ul>
+						</td>
+					</tr>
+				{% endfor %}
+			</tbody>
+		</table>
+		{% paginate %}
+	{% endbox %}
+{% endif %}
+{# Variáveis DEE, TAEE e DISCEE (fim)- #}
+
+
+{% if qs_trabalho_evento.count %}
+	{% box "Trabalhos" %}
+		{% autopaginate qs_trabalho_evento 50 %}
+		{% paginate %}
+		<table>
+			<thead>
+				<tr>
+					<th>Matrícula</th>
+					<th>Nome</th>
+					<th>Evento</th>
+					<th>Título</th>
+					<th>Ano</th>
+				</tr>
+			</thead>
+			<tbody>
+				{% for trabalho in qs_trabalho_evento %}
+					<tr>
+						<td>{{ trabalho.curriculo.vinculo.relacionamento.matricula }}</td>
+						<td>{{ trabalho.curriculo.vinculo.user|format }}</td>
+						<td>{{ trabalho.nome_evento }}</td>
+						<td>{{ trabalho.titulo }}</td>
+						<td>{{ trabalho.ano }}</td>
+					</tr>
+				{% endfor %}
+			</tbody>
+		</table>
+		{% paginate %}
+	{% endbox %}
+{% endif %}
+
+{% if qs_artigos.count %}
+
+	{% autopaginate qs_artigos 50 %}
+
+	{% if artigos_resumo_quantitativo_estrato_dict %}
+		{% box "Resumo Quantitativo por Estrato" %}
+			<table>
+				<thead>
+					<tr>
+						<th>Estrato</th>
+						<th>Total</th>
+					</tr>
+				</thead>
+				<tbody>
+					{% for estrato, total in artigos_resumo_quantitativo_estrato_dict.items %}
+						<tr>
+							<td>{{ estrato }}</td>
+							<td>{{ total }}</td>
+						</tr>
+					{% endfor %}
+				</tbody>
+			</table>
+		{% endbox %}
+	{% endif %}
+
+	{% box "Trabalhos" %}
+		<table>
+			<thead>
+				<tr>
+					<th>Matrícula</th>
+					<th>Nome</th>
+					<th>Periódico/Revista</th>
+					<th>ISSN</th>
+					<th>Estrato</th>
+					<th>Título</th>
+					<th>Ano</th>
+				</tr>
+			</thead>
+			<tbody>
+				{% for artigo in qs_artigos %}
+					<tr>
+						<td>{{ artigo.curriculo.vinculo.relacionamento.matricula }}</td>
+						<td>{{ artigo.curriculo.vinculo.user|format }}</td>
+						<td>{{ artigo.titulo_periodico_revista }}</td>
+						<td>{{ artigo.issn }}</td>
+						<td>
+							{% if artigo.estrato %}
+								{{ artigo.estrato }}
+							{% else %}
+								-
+							{% endif %}
+						</td>
+						<td>{{ artigo.titulo }}</td>
+						<td>{{ artigo.ano }}</td>
+					</tr>
+				{% endfor %}
+			</tbody>
+		</table>
+	{% endbox %}
+
+	{% paginate %}
+{% endif %}
+
+{% if qs_livros.count %}
+	{% box "Livros" %}
+		{% autopaginate qs_livros 50 %}
+		{% paginate %}
+		<table>
+			<thead>
+				<tr>
+					<th>Matrícula</th>
+					<th>Nome</th>
+					<th>Editora</th>
+					<th>ISBN</th>
+					<th>Título</th>
+					<th>Ano</th>
+				</tr>
+			</thead>
+			<tbody>
+				{% for livro in qs_livros %}
+					<tr>
+						<td>{{ livro.curriculo.vinculo.relacionamento.matricula }}</td>
+						<td>{{ livro.curriculo.vinculo.pessoa|format }}</td>
+						<td>{{ livro.nome_editora }}</td>
+						<td>{{ livro.isbn }}</td>
+						<td>{{ livro.titulo }}</td>
+						<td>{{ livro.ano }}</td>
+					</tr>
+				{% endfor %}
+			</tbody>
+		</table>
+		{% paginate %}
+	{% endbox %}
+{% endif %}
+
+{% if qs_capitulos.count %}
+	{% box "Capítulos" %}
+		{% autopaginate qs_capitulos 50 %}
+		{% paginate %}
+		<table>
+			<thead>
+				<tr>
+					<th>Matrícula</th>
+					<th>Nome</th>
+					<th>Editora</th>
+					<th>ISBN</th>
+					<th>Título</th>
+					<th>Ano</th>
+				</tr>
+			</thead>
+			<tbody>
+				{% for capitulo in qs_capitulos %}
+					<tr>
+						<td>{{ capitulo.curriculo.vinculo.relacionamento.matricula }}</td>
+						<td>{{ capitulo.curriculo.vinculo.pessoa|format }}</td>
+						<td>{{ capitulo.nome_editora }}</td>
+						<td>{{ capitulo.isbn }}</td>
+						<td>{{ capitulo.titulo }}</td>
+						<td>{{ capitulo.ano }}</td>
+					</tr>
+				{% endfor %}
+			</tbody>
+		</table>
+		{% paginate %}
+	{% endbox %}
+{% endif %}
+
+{% if detalhamento_variavel_AEQ %}
+	{% box "Alunos Equivalentes - Detalhamento por Aluno" %}
+		<table>
+			<thead>
+				<tr>
+					<th>Aluno</th>
+					<th>Curso</th>
+					<th>Matriz</th>
+					<th>CH Total</th>
+					<th>Duração do Curso Em Anos</th>
+					<th>FECH</th>
+					<th>FEC</th>
+					<th>Valor AEQ</th>
+				</tr>
+			</thead>
+			<tbody>
+				{% for reg in detalhamento_variavel_AEQ %}
+					<tr>
+						<td>{{ reg.aluno|format }}</td>
+						<td>{{ reg.curso }}</td>
+						<td>{{ reg.matriz }}</td>
+						<td>{{ reg.ch_total }}</td>
+						<td>{{ reg.duracao_curso_anos }}</td>
+						<td>{{ reg.fator_equiparacao_carga_horaria }}</td>
+						<td>{{ reg.fator_esforco_curso }}</td>
+						<td>{{ reg.valor_aluno_equivalente }}</td>
+					</tr>
+				{% endfor %}
+			</tbody>
+		</table>
+	{% endbox %}
+{% endif %}
+
+{% if detalhamento_variavel_AEQ_FENC %}
+	{% box "Alunos Equivalentes - Detalhamento por Aluno" %}
+		<table>
+			<thead>
+				<tr>
+					<th>Aluno</th>
+					<th>Curso</th>
+					<th>Matriz</th>
+					<th>CH Total</th>
+					<th>Duração do Curso Em Anos</th>
+					<th>FECH</th>
+					<th>FEC</th>
+					<th>Valor AEQ</th>
+					<th>FENC</th>
+					<th>Valor AEQ x FENC</th>
+				</tr>
+			</thead>
+			<tbody>
+				{% for reg in detalhamento_variavel_AEQ_FENC %}
+					<tr>
+						<td>{{ reg.aluno|format }}</td>
+						<td>{{ reg.curso }}</td>
+						<td>{{ reg.matriz }}</td>
+						<td>{{ reg.ch_total }}</td>
+						<td>{{ reg.duracao_curso_anos }}</td>
+						<td>{{ reg.fator_equiparacao_carga_horaria }}</td>
+						<td>{{ reg.fator_esforco_curso }}</td>
+						<td>{{ reg.valor_aluno_equivalente }}</td>
+						<td>{{ reg.fenc }}</td>
+						<td>{{ reg.valor_aluno_equivalente_com_fenc }}</td>
+					</tr>
+				{% endfor %}
+			</tbody>
+		</table>
+	{% endbox %}
+{% endif %}
+
+{% endblock %}

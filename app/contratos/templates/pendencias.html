@@ -1,0 +1,114 @@
+{% extends super_template %}
+
+{% block content %}
+
+	<script>
+		function selecionarTudo(){
+			var inputs = document.getElementsByTagName('input');
+			for(var i=0; i<inputs.length; i++){
+				if(inputs[i].checked==false) inputs[i].checked = true;
+			}
+		}
+	</script>
+	<div class="search-and-filters">
+        {% render_form form %}
+	</div>
+	{% if form.is_bound %}
+		<ul class="action-bar">
+			<li><a class="btn" href="#" onclick="selecionarTudo(); return false;">Selecionar Tudo</a></li>
+		</ul>
+
+		<div class="tab-pane" data-title="Contratos aguardando Renovação" data-counter="{{ total_contratos }}">
+			{% if contratos %}
+				<form method="post">
+					{% csrf_token %}
+					<input type="hidden" name="emails_fiscais_contratos" id="emails_fiscais_contratos">
+					<table>
+						<thead>
+							<tr>
+								<th>-</th>
+								<th>Número</th>
+								<th>Fiscais</th>
+								<th>Contratada</th>
+								<th>Prazo de Vencimento</th>
+							</tr>
+						</thead>
+						<tbody>
+							{% autopaginate contratos 1000 %}
+							{% paginate %}
+							{% for contrato in contratos %}
+								 <tr>
+									<td><input type="checkbox" name="contrato_ids" value="{{ contrato.id }}"/></td>
+									<td><a href="/contratos/contrato/{{ contrato.id }}/">{{ contrato.numero }}</a></td>
+									<td>
+										<ul>
+											{% for fiscal in contrato.get_fiscais_atuais.all %}
+												<li>{{ fiscal }} ({{ fiscal.servidor.email_institucional }})</li>
+											{% endfor %}
+										</ul>
+									</td>
+									<td>{{ contrato.vinculo_contratado|format }}</td>
+									<td><b>{{ contrato.get_data_vencimento|date:"d/m/Y" }}</b></td>
+								</tr>
+							 {% endfor %}
+						</tbody>
+					</table>
+					<div class="submit-row">
+						<input class="default" value="Enviar Notificação via E-mail" type="submit">
+					</div>
+				</form>
+			{% else %}
+				<p class="alert alert-warning">Nenhum contrato encontrado.</p>
+			{% endif %}
+		</div>
+
+		<div class="tab-pane" data-title="Parcelas aguardando Medição" data-counter="{{ parcelas.count }}">
+			<form method="post">
+				{% csrf_token %}
+				{% if parcelas.exists %}
+					<table>
+						<thead>
+							<tr>
+								<th>-</th>
+								<th>Contrato</th>
+								<th>Fiscais</th>
+								<th>Data Prevista de Início</th>
+								<th>Parcela</th>
+							</tr>
+						</thead>
+						<tbody>
+						{% autopaginate parcelas 1000 %}
+						{% paginate %}
+						{% for parcela in parcelas %}
+							 {% if parcela.cronograma == parcela.cronograma.contrato.get_cronograma %}
+								 <tr>
+									<td><input type="checkbox" name="parcela_ids" value="{{ parcela.id }}"/></td>
+									<td><a href="/contratos/contrato/{{ parcela.cronograma.contrato.id }}/#cronograma">{{ parcela.cronograma.contrato }}</a></td>
+									<td>
+										<ul>
+											{% for fiscal in parcela.cronograma.contrato.get_fiscais_atuais.all %}
+												<li>{{ fiscal }} ({{ fiscal.servidor.email_notificacao|default:'<span class="status-error">Servidor sem e-mail</span>' }})</li>
+											{% endfor %}
+										</ul>
+									</td>
+									<td>{{ parcela.data_prevista_inicio|date:"d/m/Y" }} </td>
+									<td>R$ {{ parcela.valor_previsto|mascara_dinheiro }}</td>
+								</tr>
+							  {% endif %}
+						{% endfor %}
+						</tbody>
+					</table>
+				{% else %}
+					<p class="alert alert-warning">Nenhuma parcela aguardando medição.</p>
+				{% endif %}
+
+				<div class="submit-row">
+					<input class="default" value="Enviar Notificação via E-mail" type="submit" />
+				</div>
+			</form>
+		</div>
+	{% else %}
+		<p class="alert alert-warning">Selecione um campus.</p>
+	{% endif %}
+
+{% endblock %}

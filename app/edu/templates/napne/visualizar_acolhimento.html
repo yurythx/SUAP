@@ -1,0 +1,276 @@
+{% extends super_template %}
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if perms.edu.change_acolhimento %}
+            <li>
+                <a class="btn primary popup"
+                   href="{% url 'napne_editar_acolhimento' acolhimento.id %}">{% icone "edit" %} Editar</a>
+            </li>
+            {% if request.user|in_group:"Coordenador sistêmico do Napne" or request.user|in_group:"Coordenador do Napne" %}
+                <li>
+                    <a class="btn success popup"
+                       href="{% url 'napne_adicionar_acompanhamento' acolhimento.id %}">
+                        {% icone "plus" %} Adicionar acompanhamento
+                    </a>
+                </li>
+                <li>
+                    <a class="btn warning popup"
+                       href="{% url 'napne_atualizar_nees_aluno' acolhimento.id %}">
+                        {% icone "edit" %} Atualizar NEEs
+                    </a>
+                </li>
+            {% endif %}
+        {% endif %}
+        <li>
+            <a class="btn" href="{% url 'napne_listar_acolhimentos' %}">Voltar para acolhimentos</a>
+        </li>
+    </ul>
+{% endblock %}
+{% block content %}
+    <div class="person">
+        <div class="photo-circle">
+            <img src="{{ acolhimento.aluno.get_foto_75x100_url }}"
+                 alt="Foto de {{ acolhimento.aluno.get_profile.nome_usual }}">
+        </div>
+        <dl class="definition-list flex small-items">
+            <div class="list-item">
+                <dt>Aluno</dt>
+                <dd>
+                    <h4>{{ acolhimento.aluno }}</h4>
+                </dd>
+            </div>
+            <div class="list-item">
+                <dt>Curso/Campus</dt>
+                <dd>
+                    {{ acolhimento.aluno.curso_campus.descricao }} ({{ acolhimento.aluno.curso_campus.diretoria.setor.uo.nome }})
+                </dd>
+            </div>
+            {% if acolhimento.aluno.possui_nee %}
+                <div class="list-item">
+                    <dt>Deficiências e outras NEEs</dt>
+                    <dd class="false">
+                        {{ acolhimento.aluno.get_nee|format }}
+                    </dd>
+                </div>
+            {% endif %}
+        </dl>
+    </div>
+    <dl class="definition-list flex">
+        <div class="list-item">
+            <dt>Data do acolhimento</dt>
+            <dd>
+                {{ acolhimento.data_acolhimento|format }}
+            </dd>
+        </div>
+        <div class="list-item">
+            <dt>Cadastrado em</dt>
+            <dd>
+                {{ acolhimento.cadastrado_em|format }} por {{ acolhimento.cadastrado_por|format }}
+            </dd>
+        </div>
+        {% if acolhimento.ultima_atualizacao_em %}
+            <div class="list-item">
+                <dt>Última atualização em</dt>
+                <dd>
+                    {{ acolhimento.ultima_atualizacao_em|format }} por {{ acolhimento.ultima_atualizacao_por|format }}
+                </dd>
+            </div>
+        {% endif %}
+        <div class="list-item flex-basis-100">
+            <dt>Relatório de acolhimento</dt>
+            <dd>
+                {{ acolhimento.relatorio }}
+            </dd>
+        </div>
+    </dl>
+    {% if perms.edu.view_entrevista %}
+        <div class="tab-pane"
+             data-title="Entrevistas"
+             data-tab="entrevistas"
+             data-counter="{{ acolhimento.entrevista_set.count }}">
+            <ul class="action-bar">
+                {% if perms.edu.add_entrevista %}
+                    <li>
+                        <a class="btn success popup"
+                           href="{% url 'napne_adicionar_entrevista' acolhimento.id %}">
+                            {% icone "plus" %} Adicionar entrevista
+                        </a>
+                    </li>
+                {% endif %}
+            </ul>
+            {% if acolhimento.entrevista_set.exists %}
+                <div class="table-responsive">
+                    <table>
+                        <caption>Entrevistas deste acolhimento</caption>
+                        <thead>
+                            <tr>
+                                <th>Data da Entrevista</th>
+                                <th>Anamnese</th>
+                                {% if perms.edu.view_parecer_entrevista %}<th>Parecer</th>{% endif %}
+                                <th>Sugestões de Recursos</th>
+                                <th>Cadastrado em</th>
+                                <th>Cadastrado por</th>
+                                <th>Última atualização por</th>
+                                <th>Última atualização em</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for entrevista in acolhimento.entrevista_set.all %}
+                                <tr>
+                                    <td>{{ entrevista.data_entrevista|format }}</td>
+                                    <td>{{ entrevista.anamnese }}</td>
+                                    {% if perms.edu.view_parecer_entrevista %}<td>{{ entrevista.get_parecer_display }}</td>{% endif %}
+                                    <td>
+                                        <ul>
+                                            {% for recurso in entrevista.sugestoes_recursos.all %}
+                                                <li>{{ recurso.nome }}</li>
+                                            {% empty %}
+                                                <li>Nenhum recurso sugerido.</li>
+                                            {% endfor %}
+                                        </ul>
+                                    </td>
+                                    <td>{{ entrevista.cadastrado_em|format }}</td>
+                                    <td>{{ entrevista.cadastrado_por|format }}</td>
+                                    <td>{{ entrevista.ultima_atualizacao_por|format }}</td>
+                                    <td>{{ entrevista.ultima_atualizacao_em|format }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="alert alert-warning">
+                    Nenhuma entrevista adicionada.
+                </td>
+            {% endif %}
+        </div>
+    {% endif %}
+    {% if perms.edu.view_acompanhamento %}
+        <div class="tab-pane"
+             data-title="Acompanhamentos"
+             data-tab="acompanhamentos"
+             data-counter="{{ total_acompanhamentos }}">
+            <ul class="action-bar">
+                {% if perms.edu.add_profissionalapoioespecializado %}
+                    <li>
+                        <a class="btn success popup"
+                           href="{% url 'napne_adicionar_profissional_apoio_especializado' acolhimento.id %}">
+                            {% icone "plus" %} Definir profissional
+                        </a>
+                    </li>
+                {% endif %}
+                {% if perms.edu.add_acompanhamento %}
+                    {% for apoio in apoios_acolhimento %}
+                        <li>
+                            <a class="btn success popup"
+                               href="{% url 'napne_adicionar_acompanhamento' acolhimento.id apoio.id %}">
+                                {% icone "plus" %} Adicionar acompanhamento ({{ apoio.apoio_especializado.nome }})
+                            </a>
+                        </li>
+                    {% endfor %}
+                {% endif %}
+            </ul>
+            {# Acompanhamentos do coordenador (sem profissional) #}
+            {% if acompanhamentos_sem_profissional %}
+                <div class="general-box">
+                    <div class="primary-info">
+                        <h4 class="title">Acompanhamentos do Coordenador</h4>
+                        {% include "napne/includes/tabela_acompanhamento.html" with acompanhamentos=acompanhamentos_sem_profissional %}
+                    </div>
+                </div>
+            {% endif %}
+            {# Acompanhamentos por profissional #}
+            {% for profissional_apoio_especializado in profissionais_apoio_especializado %}
+                {% with acompanhamentos=profissional_apoio_especializado.acompanhamentos.all %}
+                    <div class="general-box">
+                        <div class="primary-info">
+                            <h4 class="title">{{ profissional_apoio_especializado.profissional }}</h4>
+                            {% include "napne/includes/tabela_acompanhamento.html" with acompanhamentos=acompanhamentos %}
+                        </div>
+                        <dl class="secondary-info">
+                            <div class="list-item">
+                                <dt>Apoio especializado</dt>
+                                <dd>
+                                    {{ profissional_apoio_especializado.apoio_especializado }}
+                                </dd>
+                            </div>
+                            <div class="list-item">
+                                <dt>Situação</dt>
+                                <dd>
+                                    {{ profissional_apoio_especializado.get_situacao_display|status }}
+                                </dd>
+                            </div>
+                        </dl>
+                    </div>
+                {% endwith %}
+            {% endfor %}
+        </div>
+    {% endif %}
+    {% if perms.edu.view_acolhimentoanexo %}
+        <div class="tab-pane"
+             data-title="Anexos"
+             data-tab="anexos"
+             data-counter="{{ acolhimento.acolhimentoanexo_set.count }}">
+            {% if perms.edu.add_acolhimentoanexo %}
+                <ul class="action-bar">
+                    <li>
+                        <a class="btn success popup"
+                           href="{% url 'napne_adicionar_anexo' acolhimento.id %}">
+                            {% icone "plus" %} Adicionar Anexo
+                        </a>
+                    </li>
+                </ul>
+            {% endif %}
+            {% if acolhimento.acolhimentoanexo_set.exists %}
+                <div class="table-responsive">
+                    <table>
+                        <caption>Anexos adicionados a este acolhimento</caption>
+                        <thead>
+                            <tr>
+                                <th class="no-print">Ações</th>
+                                <th>Descrição</th>
+                                <th>Arquivo</th>
+                                <th>Documento Digital</th>
+                                <th>Cadastrado em</th>
+                                <th>Cadastrado por</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for anexo in acolhimento.acolhimentoanexo_set.all %}
+                                <tr>
+                                    <td class="list-display-icons no-print">
+                                        {% if user == anexo.cadastrado_por %}
+                                            <form method="post"
+                                                  action="{% url 'napne_remover_anexo' acolhimento.id anexo.id %}">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn danger">{% icone "trash-alt" %}</button>
+                                            </form>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ anexo.descricao|format }}</td>
+                                    <td>
+                                        {% if anexo.arquivo.url %}
+                                            <a href="{{ anexo.arquivo.url }}" download class="btn small">{% icone "download" %} Download</a>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if anexo.documento_digital %}
+                                            <a class="default"
+                                               href="{% url 'visualizar_documento' anexo.documento_digital.id %}">
+                                                {{ anexo.documento_digital }}
+                                            </a>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ anexo.cadastrado_em|format }}</td>
+                                    <td>{{ anexo.cadastrado_por|format }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="alert alert-warning">Nenhum anexo adicionado.</p>
+            {% endif %}
+        </div>
+    {% endif %}
+{% endblock %}

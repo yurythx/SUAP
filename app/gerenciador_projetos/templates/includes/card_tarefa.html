@@ -1,0 +1,159 @@
+{% load gerenciador_projetos_templatetags %}
+
+<div class="general-box">
+    <div class="primary-info">
+        <div class="status-info-container">
+            {% if show_status %}
+                {% if projeto %}
+                    {{ tarefa.get_situacao_display|status }}
+                {% else %}
+                    <span class="status status-info">Projeto: {{ tarefa.projeto.titulo }}</span>
+                {% endif %}
+            {% endif %}
+        </div>
+        <h4 class="title">
+            {% if tarefa.tarefa_pai %}<em>{{ tarefa.tarefa_pai }}</em>{% endif %}
+            <a href="{% url 'tarefa' tarefa.id %}">{% if tarefa.tarefa_pai %}{% icone "level-up-alt" "fa-rotate-90 me-3" %}{% endif %}{% if tarefa.uo %}{{ tarefa.uo }} - {% endif %}{{ tarefa.titulo }}</a>
+        </h4>
+        {% if projeto %}
+            {% if user|in_group:"Gerente de Projeto,Membro de Projeto" %}
+                {% if action_bar_completa %}
+                    <ul class="action-bar">
+                        {% if pode_registrar_evolucao and pode_editar_tarefas and not tarefa.bloqueada_para_novas_acoes %}
+                            <li><a class="btn success popup" href="{% url 'gerenciar_historicoevolucao' tarefa.id %}">{% icone "pen" %} Registrar evolução</a></li>
+                            <li><a class="btn primary" href="{% url 'atribuir_tarefa_a_campus' tarefa.id %}">{% icone "share" %} Atribuir a campus</a></li>
+                        {% endif %}
+                        {% if pode_editar_tarefas and not tarefa.bloqueada_para_novas_acoes %}
+                            <li>
+                                <a href="{% url 'alterar_tarefa' tarefa.projeto.id tarefa.id %}" class="btn primary" title="Editar">
+                                    {% icone "edit" %}
+                                    <span class="visually-hidden">Editar</span>
+                                </a>
+                            </li>
+                        {% endif %}
+                        {% if eh_membro_projeto and qtd_atribuido_a == 0 and not tarefa.bloqueada_para_novas_acoes %}
+                            <li>
+                                <form method="post" action="{% url 'atribuir_a_mim' tarefa.id %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn primary">{% icone "edit" %} Atribuir a mim</button>
+                                </form>
+                            </li>
+                        {% endif %}
+                        {% if pode_editar_tarefas and not tarefa.projeto.encerrado %}
+                            <li>
+                                <a class="btn danger no-confirm" href="{% url 'excluir_tarefa' tarefa.id %}" title="Remover">
+                                    {% icone "trash" %}
+                                    <span class="visually-hidden">Remover</span>
+                                </a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                {% else %}
+                    <ul class="action-bar">
+                        {% if projeto.pode_editar_tarefas %}
+                            {% if tarefa.pode_alterar_situacao %}
+                                <li class="has-child">
+                                    <a class="btn primary" href="#" title="Alterar">{% icone "edit" %} <span class="visually-hidden">Alterar</span></a>
+                                    <ul>
+                                        {% for codigo, rotulo in tarefa.get_situacoes_disponiveis %}
+                                            <li><a class="popup" href="{% url 'alterar_situacao_tarefa' tarefa.id codigo %}">Situação > {{ rotulo }}</a></li>
+                                        {% endfor %}
+                                        {% if not tarefa.bloqueada_para_novas_acoes %}
+                                            {% for percentual in tarefa.PROGRESSOS_RAPIDOS %}
+                                                <li>
+                                                    <form method="post" action="{% url 'alterar_progresso_tarefa' tarefa.id percentual %}">
+                                                        {% csrf_token %}
+                                                        <button type="submit" class="btn">Progresso > {{ percentual }}%</button>
+                                                    </form>
+                                                </li>
+                                            {% endfor %}
+                                        {% endif %}
+                                    </ul>
+                                </li>
+                            {% endif %}
+                            {% if not tarefa.bloqueada_para_novas_acoes %}
+                                <li class="has-child">
+                                    <a class="btn" href="#" title="Ações">{% icone "bars" %}<span class="visually-hidden">Ações</span></a>
+                                    <ul>
+                                        <li><a class="popup" href="{% url 'gerenciar_historicoevolucao' tarefa.id %}">Registrar evolução</a></li>
+                                        <li><a class="popup" href="{% url 'adicionar_tarefa' tarefa.projeto.id %}?tarefa_pai={{ tarefa.id }}">Adicionar subtarefa</a></li>
+                                        <li><a class="popup" href="{% url 'alterar_tarefa' tarefa.projeto.id tarefa.id %}">Editar</a></li>
+                                    </ul>
+                                </li>
+                            {% endif %}
+                        {% endif %}
+                    </ul>
+                {% endif %}
+            {% endif %}
+        {% endif %}
+        <div class="extra-info">
+            {% with qtd_atribuido_a=tarefa.qtd_atribuido_a|default:tarefa.atribuido_a.count qtd_tags=tarefa.qtd_tags|default:tarefa.tags.count qtd_subtarefas=tarefa.qtd_subtarefas|default:tarefa.get_subtarefas.count qtd_subtarefas_concluidas=tarefa.qtd_subtarefas_concluidas|default:tarefa.get_subtarefas_concluidas.count qtd_historicoevolucao=tarefa.qtd_historicoevolucao|default:tarefa.get_historicoevolucao.count qtd_anexos=tarefa.qtd_anexos|default:tarefa.get_anexos.count qtd_observadores=tarefa.qtd_observadores|default:tarefa.observadores.count %}
+                <ul class="badge-info">
+                    {% if qtd_subtarefas > 0 %}
+                        <li class="badge {% if qtd_subtarefas_concluidas == qtd_subtarefas %}true{% else %}false{% endif %}" title="Progresso das subtarefas">
+                            {% icone "tasks" %}
+                            <span class="visually-hidden">Progresso das subtarefas:</span>
+                            {{ qtd_subtarefas_concluidas }}/{{ qtd_subtarefas }}
+                        </li>
+                    {% endif %}
+                    {% if qtd_atribuido_a > 0 %}
+                        {% for atribuido in tarefa.atribuido_a.all %}
+                            <li>
+                                <span class="visually-hidden">Atribuída a:</span>
+                                <div class="photo-circle smallest me-0" title="Atribuída a {{ atribuido.get_profile.nome_usual }}">
+                                    <img alt="{{ atribuido.get_profile.nome_usual }}" src="{{ atribuido.get_vinculo.get_foto_75x100_url }}">
+                                </div>
+                            </li>
+                        {% endfor %}
+                    {% endif %}
+                    <li title="Prioridade" class="badge {% if tarefa.get_prioridade_display == 'Alta' %}text-danger{% endif %}">
+                        {% icone "fire" %}
+                        <span class="visually-hidden">Prioridade</span>
+                        {{ tarefa.get_prioridade_display }}
+                    </li>
+                    {% if qtd_historicoevolucao > 0 %}
+                        <li title="Quantidade de comentários" class="badge">
+                            {% icone "comment-alt" %}
+                            <span class="visually-hidden">Comentários</span>
+                            {{ qtd_historicoevolucao }}
+                        </li>
+                    {% endif %}
+                    {% if qtd_anexos > 0 %}
+                        <li title="Quantidade de anexos" class="badge">
+                            {% icone "paperclip" %}
+                            <span class="visually-hidden">Anexos</span>
+                            {{ qtd_anexos }}
+                        </li>
+                    {% endif %}
+                    {% if qtd_observadores > 0 and user in tarefa.observadores.all %}
+                        <li title="Você é observador dessa tarefa" class="badge">
+                            {% icone "eye" %}
+                            <span class="visually-hidden">Você é observador dessa tarefa</span>
+                        </li>
+                    {% endif %}
+                    {% if tarefa.data_conclusao_estimada %}
+                        <li title="Data de conclusão estimada"
+                            class="badge {% if tarefa.data_estimada_ultrapassada %}false{% endif %}">
+                            {% icone "clock" %}
+                            <span class="visually-hidden">Data de conclusão estimada:</span>
+                            {{ tarefa.data_conclusao_estimada|format }}
+                        </li>
+                    {% endif %}
+                    {% with qtd_tags=tarefa.qtd_tags|default:tarefa.tags.count %}
+                        {% if qtd_tags > 0 %}
+                            {% for tag in tarefa.tags.all %}
+                                <li class="badge {{ tag.cor }}" title="Tag">
+                                    {% icone "tag" %}
+                                    {{ tag.nome }}
+                                </li>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+                    <li title="Progresso da tarefa">
+                        {% progressbar tarefa.percentual_executado %}
+                    </li>
+                </ul>
+            {% endwith %}
+        </div>
+    </div>
+</div>

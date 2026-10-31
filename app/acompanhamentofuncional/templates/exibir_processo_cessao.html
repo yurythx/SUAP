@@ -1,0 +1,117 @@
+{% extends super_template %}
+
+{% block content %}
+    {% if usuario_logado_pode_editar %}
+        <ul class="action-bar">
+            <li><a class="btn primary" href='/admin/acompanhamentofuncional/servidorcessao/{{ processo.id }}/'>Editar Dados</a></li>
+        </ul>
+    {% endif %}
+
+	{% box 'Dados gerais' %}
+	    <table class="info">
+	        <tbody>
+	            <tr>
+	                <td>Servidor Cedido</td>
+	                <td>{{ processo.servidor_cedido }}</td>
+	            </tr>
+	            <tr>
+	                <td>Campus</td>
+	                <td>{{ processo.servidor_cedido.setor.uo.sigla }}</td>
+	            </tr>
+	            <tr>
+	                <td>Número da Portaria</td>
+	                <td>{{ processo.numero_portaria|format }}</td>
+	            </tr>
+	            <tr>
+	                <td>Instituição Destino</td>
+	                <td>{{ processo.instituicao_destino }}</td>
+	            </tr>
+                <tr>
+                    <td>Com Ressarcimento Mensal</td>
+                    <td>{{ processo.ressarcimento_mensal|format }}</td>
+                </tr>
+	            <tr>
+	                <td>Data Limite de Retorno</td>
+	                <td>{{ processo.data_limite_retorno|format }}</td>
+	            </tr>
+	            <tr>
+	                <td>Observações</td>
+	                <td>{{ processo.observacao }}</td>
+	            </tr>
+	            <tr>
+	                <td>Situação do Processo</td>
+	                <td>{{ processo.status_processo_as_html }}</td>
+	            </tr>
+	            <tr>
+	                <td>Tipo de Afastamento (Ponto SUAP)</td>
+	                <td>{{ processo.tipo_afastamento|format }}</td>
+	            </tr>
+	            <tr>
+	                <td>Situação do Prazo</td>
+	                <td>{{ processo.status_prazo_as_html }}</td>
+	            </tr>
+	            <tr>
+	                <td>Dias Restantes</td>
+	                <td>{{ processo.dias_restantes_as_html }}</td>
+	            </tr>
+            </tbody>
+        </table>
+    {% endbox %}
+
+    {% if usuario_logado_pode_visualizar_frequencias %}
+        {% box 'Frequências' %}
+            {% if pode_adicionar_frequencia %}
+                <ul class="action-bar">
+                    <li><a class='btn success popup' href='/acompanhamentofuncional/adicionar_frequencia/{{ processo.id }}/'>Adicionar Frequência</a></li>
+                </ul>
+            {% endif %}
+            {% if processo.servidorcessaofrequencia_set.exists %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="no-print">Ações</th>
+                            <th>Período de Referência</th>
+                            <th>Arquivo</th>
+                            <th>Enviado por</th>
+                            <th>Data do Envio</th>
+                            <th>Afastamento (Ponto SUAP)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for frequencia in processo.servidorcessaofrequencia_set.all %}
+                            <tr>
+                                <td class="no-print">
+                                    {% if frequencia.enviado_por.get_profile.id == request.user.get_profile.id or request.user.is_superuser %}
+                                        {% icon "delete" "/acompanhamentofuncional/excluir_frequencia/{{ frequencia.id }}/" %}
+                                    {% endif %}
+                                </td>
+                                <td>{{ frequencia.data_inicial|format }} a {{ frequencia.data_final|format }}</td>
+                                <td><a href="{{ frequencia.arquivo.url }}" target="_blank">{{ frequencia.arquivo }}</a></td>
+                                <td>{{ frequencia.quem_enviou }}</td>
+                                <td>{{ frequencia.data_envio }}</td>
+                                <td class="no-print">
+                                    <ul class="action-bar">
+                                        {% if frequencia.afastamento %}
+                                            <li><a href="/acompanhamentofuncional/frequencia_exibir_afastamento/{{ frequencia.id }}/" class="btn success popup">Visualizar</a></li>
+                                            {% if usuario_logado_pode_editar %}
+                                                <li><a href="/acompanhamentofuncional/frequencia_excluir_afastamento/{{ frequencia.id }}/" class="btn danger confirm">Remover</a></li>
+                                            {% endif %}
+                                        {% else %}
+                                            {% if usuario_logado_pode_editar and processo.tipo_afastamento %}
+                                                <li><a href="/acompanhamentofuncional/frequencia_criar_afastamento/{{ frequencia.id }}/" class="btn primary confirm">Criar</a></li>
+                                            {% else %}
+                                                <li>&nbsp;</li>
+                                            {% endif %}
+                                        {% endif %}
+                                    </ul>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="alert alert-warning">Não há registros informados.</p>
+            {% endif %}
+        {% endbox %}
+    {% endif %}
+{% endblock %}

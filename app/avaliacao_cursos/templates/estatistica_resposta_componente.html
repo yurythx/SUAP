@@ -1,0 +1,107 @@
+{% extends super_template %}
+
+{% block extrahead %}
+<script src="/static/djtools/graficos/highcharts.js"></script>
+<script src="/static/djtools/graficos/exporting.js"></script>
+<script>
+var setorSelecionada = '';
+var segmentoSelecionado = '';
+function recarregar(a, setor, segmento){
+    function succes(data){
+        $('#dados').html($(data).find('#dados').html());
+        $('#setores').find('span').css('font-size', '1.3rem');
+        $(a).css('font-size', '20px');
+        removerZeros();
+    }
+    {% if not matriz_id %}
+    $.get("/avaliacao_cursos/estatistica_resposta_componente/{{ pk }}/0/{{ componente_pk }}/{{ segmento_pk }}/?_popup=1&setor="+setor+"&segmento="+segmento, succes);
+    {% else %}
+    $.get("/avaliacao_cursos/estatistica_resposta_componente_curricular/{{ pk }}/{{ componente_curricular.pk }}/{{ segmento_pk }}/?_popup=1&setor="+setor+"&segmento="+segmento, succes);
+    {% endif %}
+    setorSelecionada = setor;
+    segmentoSelecionado = segmento;
+}
+function removerZeros(){
+    $( "text" ).each(function( index ) {
+      if($(this).text()=='0%'){
+         $(this).css('display', 'none');
+      }
+    });
+}
+</script>
+{% endblock %}
+
+{% block bodyclass %}hasAsideRight{% endblock %}
+
+{% block content %}
+
+    <ul id="setores">
+        <li>
+            <span>Setor</span>
+            <ul>
+                {% if setores.count > 1 %}
+                <li><span style="cursor:pointer" onclick="javascript:recarregar(this, '', segmentoSelecionado)">TODOS</span></li>
+                {% endif %}
+                {% for setor in setores %}
+                    <li><span style="cursor:pointer" onclick="javascript:recarregar(this, '{{ setor.pk }}', segmentoSelecionado)">{{ setor.sigla }}</span></li>
+                {% endfor %}
+            </ul>
+        </li>
+    </ul>
+    <div id="dados">
+    <div id="grafico" class="grafico-item"></div>
+    <script>{{ grafico|safe }}</script>
+
+    <h3>Resultado Absoluto</h3>
+    <div style="margin-top:20px">
+        <table>
+                <tr><th></th>{% for group in groups %}<th>{{ group }}</th>{% endfor %}</tr>
+                {% for serie in series %}<tr>{% for valor in serie %}{% if forloop.first %}<th>{{ valor }}</th>{% else %}<td>{{ valor }}</td>{% endif %}{% endfor %}</tr>{% endfor %}
+        </table>
+    </div>
+
+    <h3>Resultado Percentual</h3>
+    <div style="margin-top:20px">
+        <table>
+                <tr><th></th>{% for group in groups %}<th>{{ group }}</th>{% endfor %}</tr>
+                {% for serie in series2 %}<tr>{% for valor in serie %}{% if forloop.first %}<th>{{ valor }}</th>{% else %}<td>{{ valor }}%</td>{% endif %}{% endfor %}</tr>{% endfor %}
+        </table>
+    </div>
+
+    {% if respostas.exists %}
+        {% if perms.avaliacao_cursos.add_avaliacao %}
+        <div style="margin-top:20px">
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Justificativa</th>
+                    <th>Campus</th>
+                    <th>Setor</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for resposta in respostas %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ resposta.justificativa }}</td>
+                    <td>{{ resposta.respondente.setor.uo }}</td>
+                    <td>{{ resposta.respondente.setor }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+            <p class="alert alert-warning">Essa informação ainda não está aberta ao público.</p>
+        {% endif %}
+        </div>
+    {% endif %}
+    </div>
+
+    <script>
+        $( document ).ready(function() {
+            removerZeros();
+        });
+    </script>
+
+{% endblock %}

@@ -1,0 +1,111 @@
+{% extends super_template %}
+
+{% block action-bar %}
+    {% if possui_professor %}
+        <ul class="action-bar">
+            {% if perms.edu.add_aula and pode_manipular_etapa and possui_professor %}
+                <li><a class="btn success popup" href="/edu/adicionar_aula_diario/{{ diario.pk }}/{{ etapa }}/">Adicionar aula</a></li>
+            {% endif %}
+            <li><a class="btn" href="/edu/diario/{{ diario.pk }}/{{ etapa }}/">Visualizar diário</a></li>
+        </ul>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    {% if possui_professor %}
+        {% if aulas %}
+            {% box "Aulas" badge=aulas.count %}
+                {% include "includes/diario_ch_por_tipo.html" with obj=diario %}
+
+                <p class="alert alert-info">Os registros sem destaque correspodem às aulas que ainda serão ministradas.</p>
+                <div class="checkbox">
+                    <input id="input_ocultar" type="checkbox" onchange="inverterOrdenacao()">
+                    <label for="input_ocultar"><span class="negrito">Inverter ordenação</span></label>
+                </div>
+                {% with qtd_professores=diario.professordiario_set.count %}
+                    <div class="table-responsive">
+                        <table id="table_registro_aula">
+                            <caption>Aulas</caption>
+                            <thead>
+                            <tr>
+                                {% if acesso_total and pode_manipular_etapa and perms.edu.add_falta %}
+                                    <th>-</th>
+                                {% endif %}
+                                <th>Etapa</th>
+                                {% if diario.componente_curricular.matriz.estrutura.limitar_ch_por_tipo_aula %}
+                                    <th>Tipo</th>
+                                {% endif %}
+                                <th>Quantidade</th>
+                                <th>Data</th>
+                                {% if qtd_professores > 1 %}
+                                    <th>Professor</th>
+                                {% endif %}
+                                <th>Conteúdo</th>
+                                {% if inicio_confirmacao_frequencia %}
+                                    <th>Registro de frequências</th>
+                                {% endif %}
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for aula in aulas %}
+                                <tr {% if not aula.is_ministrada %}class="disabled"{% endif %}>
+                                    {% if acesso_total and pode_manipular_etapa and perms.edu.add_falta %}
+                                        <td>
+                                            {% icon "edit" "/edu/adicionar_aula_diario/{{ diario.pk }}/{{ etapa }}/{{ aula.pk }}/" "Editar" "popup" %}
+                                            {% icon "delete" "/comum/excluir/edu/aula/{{ aula.pk }}/" "Remover" "no-confirm popup" %}
+                                        </td>
+                                    {% endif %}
+                                    <td class="text-center">{% if aula.etapa == 5 %}Final{% else %}{{ aula.etapa }}{% endif %}</td>
+                                    {% if diario.componente_curricular.matriz.estrutura.limitar_ch_por_tipo_aula %}
+                                        <td>{{ aula.get_tipo_display }}</td>
+                                    {% endif %}
+                                    <td>{{ aula.quantidade }} Hora(s)/Aula</td>
+                                    <td>{{ aula.data|format }}</td>
+                                    {% if qtd_professores > 1 %}
+                                        <td>{{ aula.get_professores|format }}</td>
+                                    {% endif %}
+                                    <td>{{ aula.conteudo|linebreaks }}</td>
+                                    {% if inicio_confirmacao_frequencia %}
+                                    <td>
+                                        {% if aula.is_ministrada %}
+                                            {% if aula.registro_frequencia_confirmado %}
+                                                <span class="status status-success">Realização Confirmada</span>
+                                            {% else %}
+                                                <a href="?registro_frequencia_confirmado={{ aula.id }}" class="btn success confirm" data-confirm="Tem certeza que deseja confirmar a realização da chamada (reqistro de frequência) dessa aula? Isso normalmente é atribuição do professor do diário.">{% icone "check" %} Confirmar realização</a>
+                                            {% endif %}
+                                        {% endif %}
+                                    </td>
+                                    {% endif %}
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endwith %}
+            {% endbox %}
+            <div id="chamada-form" class="mt-4">{% include "includes/chamada_form.html" %}</div>
+        {% else %}
+            <p class="alert alert-warning">Nenhuma aula cadastrada até o momento.</p>
+        {% endif %}
+    {% else %}
+        <p class="alert alert-warning">
+            Não é possível registrar as aulas pois o professor do diário ainda não foi definido.
+        </p>
+    {% endif %}
+    <script>
+        jQuery.moveRow = function (table, from, to) {
+            var rows = jQuery('tr', table);
+            rows.eq(from).detach().insertAfter(rows.eq(to));
+        }
+
+        function inverterOrdenacao() {
+            var tbl = document.getElementById('table_registro_aula');
+            cont = tbl.rows.length;
+
+            while (cont > 2) {
+                cont--;
+                jQuery.moveRow(tbl, 1, cont);
+            }
+        }
+    </script>
+{% endblock %}

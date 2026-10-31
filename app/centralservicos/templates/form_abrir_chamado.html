@@ -1,0 +1,115 @@
+{% extends super_template %}
+
+{% block content %}
+
+{% if servico.get_quantidade_chamados_abertos > 0 or servico.sla_em_horas or servico.mediana_tempo_resposta or servico.mediana_tempo_atendimento %}
+    <ul class="flex-container boxes infos sm">
+        {% if servico.get_quantidade_chamados_abertos > 0 %}
+            <li class="box-item with-description">
+                {% icone "info-circle" %}
+                <p class="stat">{{ servico.get_quantidade_chamados_abertos }}</p>
+                <h4 class="title">Chamados abertos</h4>
+                <p class="description">Para este serviço</p>
+            </li>
+        {% endif %}
+        {% if servico.mediana_tempo_resposta %}
+            <li class="box-item with-description">
+                {% icone "hourglass-half" %}
+                <p class="stat">{{ servico.mediana_tempo_resposta|seconds_to_hours|format_hours:'-' }}</p>
+                <h4 class="title">Tempo médio</h4>
+                <p class="description">Para iniciar o atendimento dos chamados deste serviço</p>
+            </li>
+        {% endif %}
+        {% if servico.sla_em_horas %}
+            <li class="box-item with-description">
+                {% icone "clock" %}
+                <p class="stat">{{ servico.sla_em_horas|format_hours:'-' }}</p>
+                <h4 class="title">Tempo estimado</h4>
+                <p class="description">Para resolução deste chamado</p>
+            </li>
+        {% endif %}
+        {% if servico.mediana_tempo_atendimento %}
+            <li class="box-item with-description">
+                {% icone "hourglass-end" %}
+                <p class="stat">{{ servico.mediana_tempo_atendimento|seconds_to_hours|format_hours:'-' }}</p>
+                <h4 class="title">Tempo médio</h4>
+                <p class="description">Para resolver os chamados deste serviço após iniciar o atendimento</p>
+            </li>
+        {% endif %}
+    </ul>
+{% endif %}
+
+{% if servico.texto_ajuda %}
+    {% box 'Informações adicionais' class="text mb-3" %}
+        {{ servico.texto_ajuda|linebreaks }}
+    {% endbox %}
+{% endif %}
+
+{% if form.errors or formset.errors %}
+    <p class="errornote">Por favor, corrija os erros abaixo.</p>
+    {% if form.non_field_errors %}
+        <p class="errornote">{{ form.non_field_errors }}</p>
+    {% endif %}
+{% endif %}
+
+<form method="post" enctype="multipart/form-data">
+    {% box 'Descreva o seu chamado' %}
+        {% csrf_token %}
+        {% if servico.texto_modelo %}
+            <div class="alert alert-warning"><h4>Informações para preenchimento do chamado:</h4> {{ servico.texto_modelo|linebreaksbr }}</div>
+        {% endif %}
+        <fieldset>
+            {% for field in form %}
+                <div class="form-row{% if field.field.required %} required{% endif %}{% if field.errors %} errors{% endif %} {{ field.label|slugify }}">
+                    <div class="field-box-first">
+                        {{ field.errors }}
+                        {{ field.label_tag }}
+                        {{ field }}
+                        <p class="help">{{ field.help_text }}</p>
+                    </div>
+                </div>
+            {% endfor %}
+        </fieldset>
+
+        {{ formset.management_form }}
+        {% if servico.permite_anexos %}
+            {{ formset.non_form_errors.as_ul }}
+            <div class="table-responsive">
+                <table>
+                    <caption>Anexar Arquivos</caption>
+                    {% for form in formset.forms %}
+                        {% if forloop.first %}
+                            <thead>
+                                <tr>
+                                    {% for field in form.visible_fields %}
+                                        <th>{{ field.label|capfirst }}</th>
+                                    {% endfor %}
+                                </tr>
+                            </thead>
+                        {% endif %}
+                        <tr>
+                            {% for field in form.visible_fields %}
+                                <td>
+                                    {# Include the hidden fields in the form #}
+                                    {% if forloop.first %}
+                                        {% for hidden in form.hidden_fields %}
+                                            {{ hidden }}
+                                        {% endfor %}
+                                    {% endif %}
+                                    {{ field.errors.as_ul }}
+                                    {{ field }}
+                                </td>
+                             {% endfor %}
+                        </tr>
+                    {% endfor %}
+                </table>
+            </div>
+        {% endif %}
+        
+        <div class="submit-row">
+            <input class="success" type="submit" value="Abrir chamado">
+        </div>
+    {% endbox %}    
+</form>
+
+{% endblock %}

@@ -1,0 +1,157 @@
+{# Aba "Visão geral" do dashboard RSC-TAE: panorama dos processos e conformidade de prazos. #}
+
+{# ------------------------------------------------------------------ #}
+{#  Gráficos — linha 1: distribuição por situação + por nível          #}
+{# ------------------------------------------------------------------ #}
+<div class="rsc-chart-grid-2">
+    <div>
+        {% box 'Distribuição por Situação' %}
+        <div id="chart-situacao" class="rsc-chart-container"></div>
+        {% endbox %}
+    </div>
+    <div>
+        {% box 'Processos por Nível RSC' %}
+        <div id="chart-nivel" class="rsc-chart-container"></div>
+        {% endbox %}
+    </div>
+</div>
+
+{# ------------------------------------------------------------------ #}
+{#  Gráfico — evolução mensal                                          #}
+{# ------------------------------------------------------------------ #}
+{% box 'Evolução Mensal (últimos 12 meses)' %}
+<div id="chart-evolucao" class="rsc-chart-container"></div>
+{% endbox %}
+
+{# ------------------------------------------------------------------ #}
+{#  Gráfico — conformidade SLA por etapa                               #}
+{# ------------------------------------------------------------------ #}
+{% box 'Conformidade de SLA por Etapa' %}
+<div id="chart-sla-etapa" class="rsc-chart-container"></div>
+{% endbox %}
+
+{# ------------------------------------------------------------------ #}
+{#  Tabela de alertas SLA                                              #}
+{# ------------------------------------------------------------------ #}
+{% box 'Alertas de Prazo (SLA)' %}
+{% if not alertas_sla %}
+    <p class="text-muted">Nenhum processo com prazo em alerta ou atrasado.</p>
+{% else %}
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead>
+                <tr>
+                    <th>Processo</th>
+                    <th>Servidor</th>
+                    <th>Nível</th>
+                    <th>Situação</th>
+                    <th>Responsável</th>
+                    <th>Entrou em</th>
+                    <th>Prazo (dias)</th>
+                    <th>Decorridos</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in alertas_sla %}
+                <tr>
+                    <td>
+                        <a href="{{ item.processo.get_absolute_url }}">#{{ item.processo.pk }}</a>
+                    </td>
+                    <td>{{ item.processo.vinculo.pessoa.nome }}</td>
+                    <td>{{ item.processo.nivel_requisitado }}</td>
+                    <td>{{ item.processo.get_situacao_badge }}</td>
+                    <td>{{ item.responsavel }}</td>
+                    <td>{{ item.sla.data_entrada|date:"d/m/Y" }}</td>
+                    <td class="text-center">{{ item.sla.dias_sla }}</td>
+                    <td class="text-center">{{ item.sla.dias_decorridos }}</td>
+                    <td>
+                        {% if item.sla.atrasado %}
+                            <span class="status status-error">
+                                {{ item.sla.dias_restantes|stringformat:"+d" }}d
+                            </span>
+                        {% else %}
+                            <span class="status status-alert">
+                                {{ item.sla.dias_restantes }}d restante(s)
+                            </span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endif %}
+{% endbox %}
+
+<script>
+(function () {
+    var defaultOpts = {
+        credits: { enabled: false },
+        title: { text: null },
+        exporting: { enabled: false }
+    };
+
+    // -- Donut: distribuição por situação --
+    Highcharts.chart('chart-situacao', Object.assign({}, defaultOpts, {
+        chart: { type: 'pie' },
+        tooltip: { pointFormat: '<b>{point.y}</b> processo(s) ({point.percentage:.1f}%)' },
+        plotOptions: {
+            pie: {
+                innerSize: '50%',
+                dataLabels: { enabled: true, format: '{point.name}: {point.y}' }
+            }
+        },
+        series: [{
+            name: 'Processos',
+            colorByPoint: true,
+            data: {{ situacao_chart_data|safe }}
+        }]
+    }));
+
+    // -- Barras: processos por nível --
+    Highcharts.chart('chart-nivel', Object.assign({}, defaultOpts, {
+        chart: { type: 'column' },
+        xAxis: { categories: {{ nivel_labels|safe }}, title: { text: null } },
+        yAxis: { title: { text: 'Processos' }, allowDecimals: false },
+        tooltip: { valueSuffix: ' processo(s)' },
+        legend: { enabled: false },
+        series: [{
+            name: 'Processos',
+            data: {{ nivel_totais|safe }},
+            color: '#4e73df'
+        }]
+    }));
+
+    // -- Linhas: evolução mensal --
+    Highcharts.chart('chart-evolucao', Object.assign({}, defaultOpts, {
+        chart: { type: 'line' },
+        xAxis: { categories: {{ evolucao_categorias|safe }} },
+        yAxis: { title: { text: 'Processos' }, allowDecimals: false, min: 0 },
+        tooltip: { shared: true },
+        series: [
+            { name: 'Abertos', data: {{ evolucao_abertos|safe }}, color: '#4e73df' },
+            { name: 'Finalizados', data: {{ evolucao_finalizados|safe }}, color: '#1cc88a' }
+        ]
+    }));
+
+    // -- Barras empilhadas: conformidade SLA por etapa --
+    Highcharts.chart('chart-sla-etapa', Object.assign({}, defaultOpts, {
+        chart: { type: 'bar' },
+        xAxis: { categories: {{ sla_etapa_labels|safe }}, title: { text: null } },
+        yAxis: { title: { text: 'Processos' }, allowDecimals: false, stackLabels: { enabled: true } },
+        tooltip: {
+            formatter: function () {
+                return '<b>' + this.series.name + '</b>: ' + this.y + ' processo(s)';
+            }
+        },
+        plotOptions: { bar: { stacking: 'normal', dataLabels: { enabled: true } } },
+        legend: { enabled: true },
+        series: [
+            { name: 'Dentro do prazo', data: {{ sla_serie_ok|safe }},       color: '#1cc88a' },
+            { name: 'Alerta (≤3 dias)', data: {{ sla_serie_alerta|safe }},  color: '#f6c23e' },
+            { name: 'Estourado',         data: {{ sla_serie_estourado|safe }}, color: '#e74a3b' }
+        ]
+    }));
+}());
+</script>

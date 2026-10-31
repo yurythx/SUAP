@@ -1,0 +1,154 @@
+{% extends super_template %}
+
+{% block content %}
+
+	{% box 'Edital {{ edital.titulo }}' %}
+		{% if edital.forma_selecao == edital.GRUPO %}
+			<div class="table-responsive">
+				<table>
+					<caption>Estatísticas dos projetos</caption>
+					<thead>
+						<tr>
+							<th>Grupo</th>
+							<th>Quantidade Ofertada</th>
+							<th>Quantidade Selecionada</th>
+							<th>Quantidade Disponível</th>
+						</tr>
+					</thead>
+					<tbody>
+						{% for grupo in edital.ofertaprojetoporgrupo_set.all %}
+							<tr>
+							   <td>{{ grupo.grupo }}</td>
+							   <td>{{ grupo.selecionados }}</td>
+							   <td>{{ grupo.qtd_selecionados }}</td>
+							   <td>{{ grupo.qtd_disponivel_selecao }}</td>
+							</tr>
+						{% endfor %}
+					</tbody>
+				</table>
+			</div>
+
+		{% else %}
+			<div class="table-responsive">
+				<table>
+					<caption>Estatísticas dos projetos</caption>
+					<thead>
+						<tr>
+							<th>Campus</th>
+							<th>Quantidade Ofertada</th>
+							<th>Quantidade Selecionada</th>
+							<th>Quantidade Disponível</th>
+						</tr>
+					</thead>
+					<tbody>
+						{% for uo in uos %}
+							<tr>
+							   <td>{{ uo }}</td>
+							   <td>{{ uo.qtd_ofertada }}</td>
+							   <td>{{ uo.qtd_aprovados }}</td>
+							   <td>{{ uo.qtd_disponivel }}</td>
+							</tr>
+						{% endfor %}
+					</tbody>
+				</table>
+			</div>
+		{% endif %}
+	{% endbox %}
+
+	{% box 'Projetos' %}
+		{% if projetos.exists %}
+			<div class="legenda">
+				<p>Legenda:</p>
+				<ul>
+			 		<li class="danger">Projetos pendentes da sua avaliação</li>
+				</ul>
+			</div>
+			<div class="table-responsive">
+				<table>
+					<caption>Projetos em seleção</caption>
+					<thead>
+						<tr>
+							<th>Título</th>
+							<th>Resumo</th>
+							<th>Campus</th>
+							<th>Pré-seleção</th>
+							<th>Avaliações</th>
+							<th>Pontuação Final*</th>
+							<th>Selecionado</th>
+							<th class="no-print">Opções</th>
+						</tr>
+					</thead>
+					<tbody>
+						{% for projeto in projetos %}
+							<tr {% if projeto.pendente_avaliacao %}class="error"{% endif %}>
+									<td>
+										{{ projeto.titulo }}
+									</td>
+								</td>
+								<td>{{ projeto.resumo|safe }}</td>
+								<td>{{ projeto.uo }}</td>
+								<td>
+									{% if projeto.data_pre_avaliacao %}
+										{% if projeto.pre_aprovado %}
+											<span class="status status-success">Pré-selecionado em {{ projeto.data_pre_avaliacao|date:"d/m/Y" }}</span>
+										{% else %}
+											<span class="status status-rejeitado">Rejeitado em {{ projeto.data_pre_avaliacao|date:"d/m/Y" }}</span>
+										{% endif %}
+
+									{% else %}
+										<span class="status status-alert">Aguardando pré-seleção</span>
+									{% endif %}
+								</td>
+								<td>
+									<ul>
+									{% for avaliacao in projeto.avaliacao_set.all %}
+										<li>
+
+											{% if not avaliacao.vinculo == request.user.get_vinculo %}
+												<p>{{ avaliacao.pontuacao|format }}: {{ avaliacao.parecer }}</p>
+												<p>({{ avaliacao.data }})</p>
+											{% else %}
+												<p><strong>{{ avaliacao.pontuacao|format }}: {{ avaliacao.parecer }}</strong></p>
+												<p><strong>({{ avaliacao.data }})</strong></p>
+											{% endif %}
+										</li>
+									{% endfor %}
+									</ul>
+								</td>
+								<td>
+									{{ projeto.pontuacao|format }}
+								</td>
+								<td>
+									{{ projeto.aprovado|format }}
+								</td>
+								<td class="no-print">
+									<ul class="action-bar">
+										{% if projeto.pendente_avaliacao %}
+											<li><a class="btn success" href="/projetos/avaliar/{{ projeto.id }}/">Avaliar</a></li>
+											{% if projeto.pode_aceitar_indicacao %}
+												<li><a class="btn success" href="/projetos/aceitar_indicacao/{{ projeto.id }}/">Aceitar Indicação para Avaliar</a></li>
+											{% endif %}
+											{% if not projeto.rejeitou_indicacao %}
+												<li><a class="btn danger confirm" href="/projetos/rejeitar_indicacao/{{ projeto.id }}/">Rejeitar Indicação para Avaliar</a></li>
+											{% endif %}
+										{% elif projeto.rejeitou_indicacao %}
+											<li><span class="status status-rejeitado">Indicação rejeitada</span></li>
+										{% else %}
+											<li><a class="btn primary" href="/projetos/avaliar/{{ projeto.id }}/">Editar Avaliação</a></li>
+										{% endif %}
+										<li><a href="/projetos/projeto/{{ projeto.id }}/" class="btn default">Visualizar</a></li>
+										<li><a href="/projetos/imprimir_projeto/{{ projeto.id }}/" class="btn default">Imprimir</a></li>
+									</ul>
+								</td>
+							</tr>
+						{% endfor %}
+					</tbody>
+				</table>
+			</div>
+			<p class="obs">*A pontuação final só será calculada quando a segunda avaliação for realizada.</p>
+		{% else %}
+			<p class="alert alert-warning">Nenhum projeto encontrado.</p>
+		{% endif %}
+	{% endbox %}
+	
+{% endblock %}

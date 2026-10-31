@@ -1,0 +1,92 @@
+{% extends super_template %}
+
+{% block extrahead %}
+    <script>$('.status-error').parent().find('td').addClass('status-error');</script>
+
+    {% if not is_administrador and not form.exibir_forcar_fechamento %}
+        <script>
+            $(document).ready(function () {
+                $('#id_forcar_fechamento').parent().parent().hide();
+            });
+        </script>
+    {% endif %}
+
+{% endblock %}
+
+{% block content %}
+
+    <ul class="action-bar">
+        {% if request.GET.modulo %}
+            <li><a href="/edu/turma/{{ request.GET.turma }}/?tab=dados_modulos" class="btn">Voltar para a turma</a></li>
+        {% elif request.GET.tipo %}
+            <li><a href="/edu/{{ acao }}/" class="btn success">Realizar novo processamento</a></li>
+        {% endif %}
+    </ul>
+
+    {% if request.GET.tipo %}
+        {% if not matriculas_periodo.exists %}
+            {% if request.GET.tipo == "MATRICULA" and form.cleaned_data.aluno %}
+                <p class="alert alert-info">O período do aluno {{ form.cleaned_data.aluno }} encontra-se {{ situacao_contraria }} ou não pode ser (re)processado.</p>
+            {% elif request.GET.tipo == "TURMA" and form.cleaned_data.modulo %}
+                <p class="alert alert-info">O módulo {{ form.cleaned_data.modulo }} de todos os alunos da turma {{ form.cleaned_data.turma }}
+                    encontra-se {{ situacao_contraria }} ou não pode ser (re)processado.</p>
+            {% elif request.GET.tipo == "TURMA" and form.cleaned_data.turma %}
+                <p class="alert alert-info">O período de todos os alunos da turma {{ form.cleaned_data.turma }}
+                    encontra-se {{ situacao_contraria }} ou não pode ser (re)processado.</p>
+            {% elif request.GET.tipo == "CURSO" and form.cleaned_data.curso %}
+                <p class="alert alert-info">O período de todos os alunos do curso {{ form.cleaned_data.curso }}
+                    encontra-se {{ situacao_contraria }} ou não pode ser (re)processado.</p>
+            {% elif request.GET.tipo == "DIARIO" and form.cleaned_data.diario %}
+                <p class="alert alert-info">O período de todos os alunos do diário {{ form.cleaned_data.diario }}
+                    encontra-se {{ situacao_contraria }} ou não pode ser (re)processado.</p>
+            {% else %}
+                <p class="alert alert-info">Nenhum aluno encontrado.</p>
+            {% endif %}
+        {% else %}
+            {% autopaginate matriculas_periodo 50 %}
+            {% box "Relação de Alunos" %}
+
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Aluno</th>
+                        <th>Frequência no Período</th>
+                        <th>Situação no Período</th>
+                        {% if acao == 'fechar_periodo_letivo' %}
+                            <th>Período será fechado?</th>
+                        {% endif %}
+                        <th>Diários</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% paginate %}
+                    {% for matricula_periodo in matriculas_periodo %}
+                        <tr>
+                            <td>{{ matricula_periodo.aluno.get_nome }} (<a target="_blank"
+                                                                           href="{{ matricula_periodo.aluno.get_absolute_url }}">{{ matricula_periodo.aluno.matricula }}</a>)
+                            </td>
+                            <td>{{ matricula_periodo.get_percentual_carga_horaria_frequentada }} %</td>
+                            <td>{{ matricula_periodo.situacao }}</td>
+                            {% if acao == 'fechar_periodo_letivo' %}
+                                <td>
+                                    {{ matricula_periodo|method:"pode_fechar_periodo_letivo"|call:form.cleaned_data.modulo|format }} 
+                                </td>
+                            {% endif %}
+                            <td class="text-center"><a class="btn default popup" data-reload-on-close="false"
+                                                        href="/edu/exibir_diarios_fechamento/{{ matricula_periodo.pk }}/{% if form.cleaned_data.modulo %}{{ form.cleaned_data.modulo }}/{% endif %}">Listar</a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endbox %}
+        {% endif %}
+    {% endif %}
+
+    {% if not request.GET.tipo or not form.processado and matriculas_periodo.exists %}
+        {% render_form form %}
+    {% endif %}
+
+{% endblock %}

@@ -1,0 +1,498 @@
+{% extends "relatorio_pdf.html" %}
+
+{% block cabecalho %}
+    {% if html %}
+        <ul class="action-bar">
+            <li><a class="btn" href="/projetos/relatorio_projeto/{{ projeto.pk }}/">Imprimir em PDF</a></li>
+        </ul>
+    {% endif %}
+    <h2>{{ nome_instituicao|upper }}</h2>
+    <p>{{ nome_pro_reitoria|upper }}</p>
+    {% if projeto.edital.tipo_edital == projeto.edital.EXTENSAO_FLUXO_CONTINUO %}
+        <p>PROJETO DE EXTENSÃO - FLUXO CONTÍNUO</p>
+    {% else %}
+        <p>PROGRAMA DE APOIO INSTITUCIONAL À EXTENSÃO</p>
+    {% endif %}
+    <p>{{ projeto.edital.titulo }}</p>
+    {% if projeto.get_registro_conclusao.dt_avaliacao %}
+        <p>RELATÓRIO FINAL DO PROJETO</p>
+    {% else %}
+        <p>RELATÓRIO PARCIAL DO PROJETO</p>
+    {% endif %}
+
+{% endblock %}
+
+{% block content %}
+
+    {% with publico_alvo=projeto.publico_alvo %}
+
+        <h3>UNIDADE PROPONENTE</h3>
+        <table>
+            <tbody>
+                <tr>
+                    <td>
+                        <dl>
+                            <dt>Campus</dt>
+                            <dd>{{ projeto.uo }}</dd>
+                        </dl>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <dl>
+                            <dt>Foco Tecnológico</dt>
+                            <dd>{{ projeto.focotecnologico|upper }}</dd>
+                        </dl>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>IDENTIFICAÇÃO DO PROJETO</h3>
+        <table>
+            <tbody>
+                <tr>
+                    <td colspan="4">
+                        <dl>
+                            <dt>Título do Projeto</dt>
+                            <dd>{{ projeto.titulo }}</dd>
+                        </dl>
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="2">
+                        <dl>
+                            <dt>Grande Área de Conhecimento</dt>
+                            <dd>{{ projeto.area_conhecimento.superior.descricao }}</dd>
+                        </dl>
+                    </td>
+                    <td colspan="2">
+                         <dl>
+                            <dt>Área de Conhecimento</dt>
+                            <dd>{{ projeto.area_conhecimento.descricao }}</dd>
+                         </dl>
+                    </td>
+                </tr>
+                {% if eh_interno %}
+                    <tr>
+                        <td colspan="2">
+                            <dl>
+                                <dt>Período de Execução: </dt>
+                                <dd>Início: <span class="negrito">{{ projeto.inicio_execucao|format }}</span> | Término: <span class="negrito">{{ projeto.fim_execucao|format }}</span></dd>
+                            </dl>
+                        </td>
+                        <td colspan="2">
+                            <dl>
+                                <dt>Possui Cunho Social: </dt>
+                                {% if projeto.possui_cunho_social %}
+                                <dd>Sim</dd>
+                                {% else %}
+                                <dd>Não</dd>
+                                {% endif %}
+                            </dl>
+                        </td>
+                        <td colspan="2">
+                            <dl>
+                                <dt>Possui acordo de cooperação internacional vigente:</dt>
+                                {% if projeto.possui_cooperacao_internacional %}
+                                <dd>Sim</dd>
+                                {% else %}
+                                <dd>Não</dd>
+                                {% endif %}
+                            </dl>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="2">
+                            <dl>
+                                <dt>Nome do Responsável (Coordenador)</dt>
+                                <dd>{{ projeto.get_responsavel }}</dd>
+                            </dl>
+                        </td>
+                        <td>
+                            <dl>
+                                <dt>Matrícula</dt>
+                                <dd>{{ projeto.get_responsavel.funcionario.matricula }}</dd>
+                            </dl>
+                        </td>
+                        <td>
+                            <dl>
+                                <dt>Vínculo</dt>
+                                <dd>{{ projeto.get_vinculo_responsavel }}</dd>
+                            </dl>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <dl>
+                                <dt>Titulação</dt>
+                              <dd>{{ projeto.get_responsavel.funcionario.titulacao }}</dd>
+                            </dl>
+                        </td>
+                        <td>
+                            <dl>
+                                <dt>Departamento de Lotação</dt>
+                              <dd>{{ projeto.get_responsavel.funcionario.setor }}</dd>
+                            </dl>
+                        </td>
+                        <td>
+                            <dl>
+                                <dt>Telefone</dt>
+                              <dd>{{ projeto.get_responsavel.funcionario.pessoa_fisica.telefones }}</dd>
+                            </dl>
+                        </td>
+                        <td>
+                            <dl>
+                                <dt>E-mail</dt>
+                              <dd>{{ projeto.get_responsavel.email_notificacao|format }}</dd>
+                            </dl>
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+
+        <h3>EQUIPE PARTICIPANTE</h3>
+        {% if projeto.get_participacoes_servidores_ativos %}
+            <table>
+                <caption>Professores e/ou Técnicos Administrativos do {% get_valor_por_chave "comum" "instituicao_sigla" %}</caption>
+                <thead>
+                    <tr>
+                        <th>Membro</th>
+                        <th>Contatos</th>
+                        <th>Bolsista</th>
+                        <th>Titulação</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in projeto.get_participacoes_servidores_ativos %}
+                        <tr>
+                            {% if not pode_visualizar_equipe %}
+                                <td>
+                                    <dl>
+                                        <dt>Nome:</dt>
+                                        <dd>************************</dd>
+                                        <dt>Matrícula:</dt>
+                                        <dd>************************</dd>
+                                    </dl>
+                                </td>
+                                <td>
+                                    <dl>
+                                        <dt>Tel.:</dt>
+                                        <dd>************************</dd>
+                                        <dt>E-mail:</dt>
+                                        <dd>************************</dd>
+                                    </dl>
+                                </td>
+                            {% else %}
+                                <td>
+                                    <dl>
+                                        <dt>Nome:</dt>
+                                        <dd>{{ p.vinculo_pessoa.pessoa.nome }}</dd>
+                                        <dt>Matrícula:</dt>
+                                        <dd>{{ p.vinculo_pessoa.relacionamento.matricula }}</dd>
+                                    </dl>
+                                </td>
+                                <td>
+                                    <dl>
+                                        <dt>Tel.:</dt>
+                                        <dd>{{ p.vinculo_pessoa.pessoa.telefones }}</dd>
+                                        <dt>E-mail:</dt>
+                                        <dd>{{ p.vinculo_pessoa.email_notificacao|format }}</dd>
+                                    </dl>
+                                </td>
+                            {% endif %}
+                            <td>
+                                {% if p.vinculo == tipo_vinculo.BOLSISTA %}
+                                    Sim
+                                {% else %}
+                                    Não
+                                {% endif %}
+                            </td>
+                            <td>{{ p.vinculo_pessoa.relacionamento.titulacao }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+        {% if projeto.get_participacoes_alunos %}
+            <table>
+                <caption>Estudantes do {% get_valor_por_chave "comum" "instituicao_sigla" %}</caption>
+                <thead>
+                    <tr>
+                        <th>Membro</th>
+                        <th>Contatos</th>
+                        <th>Bolsista</th>
+                        <th>Curso</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in projeto.get_participacoes_alunos %}
+                        <tr>
+                            {% if not pode_visualizar_equipe %}
+                                <td>
+                                    <dl>
+                                        <dt>Nome:</dt>
+                                        <dd>************************</dd>
+                                        <dt>Matrícula:</dt>
+                                        <dd>************************</dd>
+                                    </dl>
+                                </td>
+                                <td>
+                                    <dl>
+                                        <dt>Tel.:</dt>
+                                        <dd>************************</dd>
+                                        <dt>E-mail:</dt>
+                                        <dd>************************</dd>
+                                    </dl>
+                                </td>
+                            {% else %}
+                            <td>
+                                <dl>
+                                    <dt>Nome:</dt>
+                                    <dd>{{ p.vinculo_pessoa.pessoa.nome }}</dd>
+                                    <dt>Matrícula:</dt>
+                                    <dd>{{ p.get_participante.matricula }}</dd>
+                                </dl>
+                            </td>
+                            <td>
+                                <dl>
+                                    <dt>Tel.:</dt>
+                                    <dd>{{ p.vinculo_pessoa.pessoa.telefones }}</dd>
+                                    <dt>E-mail:</dt>
+                                    <dd>{{ p.vinculo_pessoa.email_notificacao|format }}</dd>
+                                </dl>
+                            </td>
+                            {% endif %}
+                            <td>
+                                {% if p.vinculo == tipo_vinculo.BOLSISTA %}
+                                    Sim
+                                {% else %}
+                                    Não
+                                {% endif %}
+                            </td>
+                            <td>{{ p.vinculo_pessoa.relacionamento.curso_campus.descricao_historico|format }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+        {% if projeto.edital.permite_colaborador_voluntario and projeto.get_participacoes_colaboradores %}
+            <table>
+                <caption>Colaboradores Externos</caption>
+                <thead>
+                    <tr>
+                        <th>Membro</th>
+                        <th>Contatos</th>
+                        <th>Bolsista</th>
+                        <th>Titulação</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in projeto.get_participacoes_colaboradores %}
+                        <tr>
+                            {% if not pode_visualizar_equipe %}
+                                <td>
+                                    <dl>
+                                        <dt>Nome:</dt>
+                                        <dd>************************</dd>
+                                        <dt>Matrícula:</dt>
+                                        <dd>************************</dd>
+                                    </dl>
+                                </td>
+                                <td>
+                                    <dl>
+                                        <dt>Tel.:</dt>
+                                        <dd>************************</dd>
+                                        <dt>E-mail:</dt>
+                                        <dd>************************</dd>
+                                    </dl>
+                                </td>
+                            {% else %}
+                                <td>
+                                    <dl>
+                                        <dt>Nome:</dt>
+                                        <dd>{{ p.vinculo_pessoa.pessoa.nome }}</dd>
+                                        <dt>CPF:</dt>
+                                        <dd>{{ p.get_identificador }}</dd>
+                                    </dl>
+                                </td>
+                                <td>
+                                    <dl>
+                                        <dt>Tel.:</dt>
+                                        <dd>{{ p.vinculo_pessoa.pessoa.telefones }}</dd>
+                                        <dt>E-mail:</dt>
+                                        <dd>{{ p.vinculo_pessoa.email_notificacao|format }}</dd>
+                                    </dl>
+                                </td>
+                            {% endif %}
+                            <td>
+                                {% if p.vinculo == tipo_vinculo.BOLSISTA %}
+                                    Sim
+                                {% else %}
+                                    Não
+                                {% endif %}
+                            </td>
+                            <td>{{ p.get_participante.titulacao|format }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+        {% if publico_alvo %}
+            <h3>PÚBLICO ALVO (INTERNO, EXTERNO OU AMBOS</h3>
+            <table>
+                <tr>
+                    <td>{{ projeto.publico_alvo }}</td>
+                </tr>
+            </table>
+        {% endif %}
+        {% if eh_interno %}
+            <h3>CARACTERIZAÇÃO DOS BENEFICIÁRIOS</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Público Alvo</th>
+                        <th>Quantidade Prevista de Pessoas a Atender</th>
+                        <th>Quantidade de Pessoas Atendidas</th>
+                        <th>Descrição do Público-Alvo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for caracterizacao_beneficiario in projeto.caracterizacaobeneficiario_set.all %}
+                        <tr>
+                            <td>{{ caracterizacao_beneficiario.tipo_beneficiario }}</td>
+                            <td align="right">{{ caracterizacao_beneficiario.quantidade }}</td>
+                            <td align="right">{{ caracterizacao_beneficiario.quantidade_atendida|format }}</td>
+                            <td align="right">{{ caracterizacao_beneficiario.descricao_beneficiario|format }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+        {% if eh_interno %}
+            <h3>CUSTO TOTAL DO PROJETO</h3>
+            <table>
+                <tr>
+                    <td>
+                        R$ {{ valor_financiamento_projeto|format }}
+                    </td>
+                </tr>
+            </table>
+
+            <h3>METAS</h3>
+            <table>
+                <tr>
+                    <td>
+                        <dl>
+                            {% for meta in projeto.get_metas %}
+                                <dd>{{ meta.ordem }} - {{ meta.descricao|sanitize }}</dd>
+                            {% endfor %}
+                        </dl>
+                    </td>
+                </tr>
+            </table>
+
+            <h3>CRONOGRAMA DE EXECUÇÃO</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th rowspan="2">Meta</th>
+                        <th rowspan="2">Atividade</th>
+                        <th rowspan="2">Especificação</th>
+                        <th rowspan="2">Indicador(es) Qualitativo(s)</th>
+                        <th colspan="2">Indicador Físico</th>
+                        <th colspan="2">Período de Execução</th>
+                    </tr>
+                    <tr>
+                        <th>Indicador Quantitativo</th>
+                        <th>Qtd.</th>
+                        <th>Início</th>
+                        <th>Término</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for meta in projeto.get_metas %}
+                        {% for etapa in meta.get_etapas %}
+                            {% if not etapa.get_registro_execucao %}
+                                <tr>
+                                    <td>{{ etapa.meta.ordem }}</td>
+                                    <td>{{ etapa.ordem }}</td>
+                                    <td>{{ etapa.descricao }}</td>
+                                    <td>{{ etapa.indicadores_qualitativos }}</td>
+                                    <td>{{ etapa.unidade_medida }}</td>
+                                    <td>{{ etapa.qtd }}</td>
+                                    <td>{{ etapa.inicio_execucao|format }}</td>
+                                    <td>{{ etapa.fim_execucao|format }}</td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td>{{ etapa.meta.ordem }}</td>
+                                    <td>{{ etapa.ordem }}</td>
+                                    <td>{{ etapa.descricao }} <strong>{{ etapa.get_registro_execucao.obs }} </strong></td>
+                                    <td>{{ etapa.indicadores_qualitativos }} : <strong>{{ etapa.get_registro_execucao.tipo_indicador_qualitativo }}</strong></td>
+                                    <td>{{ etapa.unidade_medida }}</td>
+                                    <td>{{ etapa.get_registro_execucao.qtd }}</td>
+                                    <td>Previsto para {{ etapa.inicio_execucao|format }} | <strong>Iniciado em {{ etapa.get_registro_execucao.inicio_execucao|format }}</strong></td>
+                                    <td>Previsto para  {{ etapa.fim_execucao|format }} | <strong>Concluído em {{ etapa.get_registro_execucao.fim_execucao|format }}</strong></td>
+                                </tr>
+                            {% endif %}
+                        {% endfor %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+
+        {% if projeto.get_registro_conclusao.resultados_alcancados %}
+            <h3>RESULTADOS ALCANÇADOS</h3>
+            <table>
+                <tbody>
+                    <tr>
+                        <td>{{ projeto.get_registro_conclusao.resultados_alcancados }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        {% endif %}
+
+        {% if projeto.fotoprojeto_set.exists and eh_interno %}
+            <h3>FOTOS </h3>
+            <table>
+                <tbody>
+                    <tr>
+                        <td>
+                            {% for foto in projeto.fotoprojeto_set.all %}
+                                <p><img src="{{ foto.imagem.url }}" class="foto" alt="" /> {{ foto.legenda }}</p>
+                            {% endfor %}
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        {% endif %}
+
+        {% if projeto.get_registro_conclusao.obs and eh_interno %}
+            <h3>OBSERVAÇÕES DO COORDENADOR</h3>
+            <table>
+                <tbody>
+                    <tr>
+                        <td>{{ projeto.get_registro_conclusao.obs }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        {% endif %}
+        {% if projeto.get_registro_conclusao.avaliador and eh_interno %}
+            <h3>VALIDAÇÃO DO PROJETO</h3>
+            <table>
+                <tbody>
+                    <tr>
+                        <td>
+                            <p>Validado pelo coordenador de extensão {{ projeto.get_registro_conclusao.avaliador }} em {{ projeto.get_registro_conclusao.dt_avaliacao|format }}.</p>
+                            <p><strong>{{ projeto.get_registro_conclusao.obs_avaliador }}</strong></p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        {% endif %}
+
+    {% endwith %}
+
+{% endblock %}

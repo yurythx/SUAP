@@ -1,0 +1,92 @@
+{% extends super_template %}
+
+{% block action-bar %}
+	<ul class="action-bar">
+	 <li><a class="btn primary" href="/projetos/editais_abertos/">Editais com inscrições abertas</a></li>
+	</ul>
+{% endblock %}
+
+{% block content %}
+
+	{% if tem_aviso %}
+		<div class="alert alert-warning">{{ tem_aviso|safe }}</div>
+	{% endif %}
+
+    <div class="search-and-filters">
+		{% render_form form %}
+	</div>
+
+    {% if editais.exists %}
+
+        {% autopaginate editais 20 %}
+        {% paginate %}
+		{% for edital in editais %}
+			<div class="general-box">
+				<div class="primary-info">
+					<h4><strong>{{ edital.titulo }}</strong></h4>
+					<div class="extra-info">
+						<p>{{ edital.descricao }}</p>
+						{% if edital.editalanexoauxiliar_set.all %}
+							<h5>Anexos</h5>
+							<ul>
+								{% for anexo in edital.editalanexoauxiliar_set.all %}
+									{% if anexo.arquivo %}
+										<li><a href="/projetos/visualizar_arquivo/{{ anexo.arquivo.id }}/">{{ anexo.nome }}</a> - {{ anexo.descricao }}</li>
+									{% endif %}
+								{% endfor %}
+							</ul>
+						{% endif %}
+					</div>
+				</div>
+				<dl class="secondary-info">
+					<div class="list-item">
+						<dt>Arquivo do Edital:</dt>
+						{% if edital.tem_arquivo %}
+							{% if edital.arquivo_mais_recente.id_documento_edital %}
+								<a href="/documento_eletronico/visualizar_documento/{{ edital.arquivo_mais_recente.id_documento_edital }}/">Edital</a>
+							{% else %}
+								<dd><a href="{{ edital.arquivo_mais_recente.arquivo.url }}">Edital</a></dd>
+							{% endif %}
+						{% elif edital.id_documento_edital %}
+							<a href="/documento_eletronico/visualizar_documento/{{ edital.id_documento_edital }}/">Edital</a>
+						{% elif edital.arquivo %}
+							<dd><a href="/projetos/visualizar_arquivo/{{ edital.arquivo.id }}/">Edital</a></dd>
+						{% endif %}
+					</div>
+					<div class="list-item">
+						<dt>Inscrições:</dt>
+						<dd><span class="true">{{ edital.inicio_inscricoes|format }}</span> a <span class="false">{{ edital.fim_inscricoes|format }}</span></dd>
+					</div>
+                    {% if edital.eh_fomento_interno %}
+                        <div class="list-item">
+                            <dt>Período de Pré-seleção:</dt>
+                            <dd>{{ edital.inicio_pre_selecao }} - {{ edital.inicio_selecao }}</dd>
+                        </div>
+                        <div class="list-item">
+                            <dt>Período de Seleção:</dt>
+                            <dd>{{ edital.inicio_selecao }} - {{ edital.fim_selecao }}</dd>
+                        </div>
+                        {% if edital.data_recurso %}
+                            <div class="list-item">
+                                <dt>Período de Recurso:</dt>
+                                <dd>{{ edital.fim_selecao }} - {{ edital.data_recurso }}</dd>
+                            </div>
+                        {% endif %}
+                        <div class="list-item">
+                            <dt>Divulgação do Resultado:</dt>
+                            <dd>{{ edital.divulgacao_selecao }}</dd>
+                        </div>
+                    {% endif %}
+					<div class="list-item">
+						<dt>Para os Campi:</dt>
+						<dd>{{ edital.get_uos|join:", "|format }}</dd>
+					</div>
+				</dl>
+			</div>
+		{% endfor %}
+        {% paginate %}
+	{% else %}
+		<p class="alert alert-warning">Nenhum edital disponível.</p>
+	{% endif %}
+
+{% endblock %}

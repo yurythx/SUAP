@@ -1,0 +1,243 @@
+{% extends "relatorio_pdf.html" %}
+
+{% block css_variables %}
+    --page-mt: 6cm;
+{% endblock %}
+
+{% block style %}
+    header {
+        top: -5cm;
+    }
+    small {
+        font-size: 11px;
+        color: gray;
+    }
+{% endblock %}
+
+{% block cabecalho %}
+    <header>
+        <table>
+            <tr>
+                <td rowspan="4" class="logo-brasao-container"><img src="/static/comum/img/brazao_colorido.jpg" class="logo-brasao" /></td>
+                <td class="titulo">SERVIÇO PÚBLICO FEDERAL</td>
+                <td rowspan="4" class="logo-instituicao-container text-end"><img src="/static/comum/img/logo_instituicao.jpg" class="logo-instituicao" /></td>
+            </tr>
+            <tr>
+                <td class="titulo">INSTITUTO FEDERAL DE EDUCAÇÃO, CIÊNCIA E TECNOLOGIA DO RIO GRANDE DO NORTE</td>
+            </tr>
+            <tr>
+                <td class="titulo">DIRETORIA DE GESTÃO DE PESSOAS</td>
+            </tr>
+            <tr>
+                <td class="titulo">COORDENAÇÃO DE DESENVOLVIMENTO DE PESSOAL</td>
+            </tr>
+            <tr>
+                <td colspan="3">
+                    <div class="box mt-1">
+                        {% if processo.is_tipo_progressao_merito %}
+                            FICHA DE AVALIAÇÃO PARA EFEITO DE CONCESSÃO DE PROGRESSÃO POR AVALIAÇÃO DE DESEMPENHO
+                            AOS SERVIDORES TÉCNICOS ADMINISTRATIVOS EM EDUCAÇÃO DE QUE TRATA A LEI Nº 11.091/2005,
+                            REGULAMENTADA PELO DECRETO 5.825/2006. (Resolução nº 15/2004-CD/CEFET-RN, de 27/06/2007)
+                        {% else %}
+                            FICHA DE AVALIAÇÃO DO SERVIDOR EM ESTÁGIO PROBATÓRIO (Resolução nº 08/92 - CONSUP)
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+        </table>
+    </header>
+{% endblock %}
+
+{% block content %}
+    <h2>RESUMO DO PROCESSO DE PROGRESSÃO</h2>
+    <table class="definicoes">
+        <tr>
+            <td colspan="2"><strong>Servidor avaliado</strong> {{ processo.avaliado }}</td>
+            <td colspan="2"><strong>Cargo</strong> {{ processo.avaliado.cargo_emprego }}</td>
+        </tr>
+        {% if processo.is_tipo_progressao_merito %}
+            <tr>
+                <td colspan="2">
+                    <strong>Padrão de Vencimento Atual</strong>
+                    {{ processo.padrao_anterior }}
+                </td>
+                <td colspan="2">
+                    <strong>Padrão de vencimento novo</strong>
+                    {{ processo.padrao_novo }}
+                </td>
+            </tr>
+        {% endif %}
+
+        <tr>
+            <td><strong>Data de início da contagem</strong> {{ processo.data_inicio_contagem_progressao }}</td>
+            <td><strong>Data de fim da contagem</strong> {{ processo.data_fim_contagem_progressao }}</td>
+            <td><strong>Média do processo</strong> {{ processo.media_processo }}</td>
+            <td>
+                <strong>Resultado final</strong>
+                {% if processo.is_aprovado %}
+                    <span class="status status-success">{{ processo.obter_situacao_final_processo_as_text }}</span>
+                {% elif processo.is_reprovado %}
+                    <span class="status status-error">{{ processo.obter_situacao_final_processo_as_text }}</span>
+                {% else %}
+                    <span class="status status-alert">{{ processo.obter_situacao_final_processo_as_text }}</span>
+                {% endif %}
+            </td>
+        </tr>
+    </table>
+
+    {% if tem_observacao %}
+        <h2>Dias que contribuiram para o cálculo da data fim da progressão (Despacho 124/2022 - ASSEL/DIGPE/RE/IFRN)</h2>
+        <table class="definicoes">
+            <tbody>
+                <tr>
+                    <td>
+                        <strong>Dias Afetados</strong>
+                        {% for data in datas_afetadas %}{{ data }} {% endfor %}
+                    </td>
+                    <td>
+                        <strong>Quantidade de Dias</strong>
+                        {{ qtd_dias_descontados }}
+                    </td>
+                    <td>
+                        <strong>Afastamentos</strong>
+                        {% for afastamento in afastamentos_servidor %}
+                            {{ afastamento.data_inicio }} a {{ afastamento.data_termino }} - {{ afastamento.afastamento.sigla }}({{ afastamento.afastamento.codigo }})
+                        {% endfor %}
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    {% endif %}
+    {% if afastamentos_no_periodo %}
+        <h2>Afastamentos que interrompem o Tempo de Serviço e/ou suspendem Estágio Probatório</h2>
+        <table class="definicoes">
+            <thead>
+                <th>Afastamento</th>
+                <th>Interrompe Tempo de Serviço</th>
+                <th>Suspende Estágio Probatório</th>
+                <th class="text-end">Dias</th>
+            </thead>
+            <tbody>
+                {% for afastamento in afastamentos_no_periodo %}
+                    <tr>
+                        <td>{{ afastamento.nome }} ({{ afastamento.tipo }})</td>
+                        <td>{{ afastamento.interrompe_tempo_servico|format }}</td>
+                        <td>{{ afastamento.suspende_estagio_probatorio|format }}</td>
+                        <td class="text-end">{{ afastamento.dias }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td>Total de dias:</td>
+                    <td colspan="3" class="text-end">{{ total_dias_interrompem_estagio_probatorio }}</td>
+                </tr>
+            </tfoot>
+        </table>
+    {% endif %}
+
+    {% if afastamento_regra_24_meses %}
+        <h2>Licença saúde superior a 24 meses</h2>
+        <div class="alert alert-info">
+            <p><strong>Informação:</strong></p>
+            <ul>
+                <li>Conforme <strong>alínea "b", inciso VIII do <a href="https://www.planalto.gov.br/ccivil_03/leis/l8112cons.htm#art102" target="blank">Art. 102 da Lei 8.112/90</a></strong>, as licenças para tratamento da própria saúde superiores ao limite de vinte e quatro meses, cumulativo ao longo do tempo de serviço público prestado à União, em cargo de provimento efetivo <strong>não são considerados como efetivo exercício</strong>.</li>
+            </ul>
+        </div>
+        <table class="definicoes">
+            <thead>
+                <tr>
+                    <th>Afastamento</th>
+                    <th>Dias</th>
+                    <th>Total de Dias</th>
+                </tr>
+            </thead>
+            {% for k, v in afastamento_regra_24_meses.items %}
+            <tr>
+                <td>{{ k }}</td>
+                <td>{{ v }}</td>
+                <td>{{ v|length }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    {% endif %}
+
+    {% for avaliacao in avaliacoes %}
+        <h2>AVALIAÇÃO DE DESEMPENHO: {{ avaliacao.periodo.avaliacao_modelo }}</h2>
+        <table class="definicoes">
+            <tr>
+                <td style="width:40%">
+                    <strong>Avaliador
+                        {% if avaliacao.processo.is_tipo_progressao_merito %}
+                            {% if avaliacao.tipo_avaliador == avaliacao.TIPO_AVALIADOR_CHEFE %}
+                                - Chefe imediato
+                            {% elif avaliacao.tipo_avaliador == avaliacao.TIPO_AVALIADOR_AUTO %}
+                                - Auto-avaliação
+                            {% elif avaliacao.tipo_avaliador == avaliacao.TIPO_AVALIADOR_EQUIPE %}
+                                - Membro da equipe
+                            {% endif %}
+                        {% elif avaliacao.processo.is_tipo_estagio_probatorio %}
+                            - Chefe Imediato
+                        {% endif %}
+                    </strong> {{ avaliacao.avaliador.nome }} ({{ avaliacao.avaliador.relacionamento.matricula }})
+                </td>
+                <td><strong>Cargo</strong> {{ avaliacao.avaliador.relacionamento.cargo_emprego|format }}</td>
+                <td style="width:150px"><strong>Período avaliado</strong> {{ avaliacao.periodo }}</td>
+            </tr>
+        </table>
+        <table class="bordered mt-1">
+            {% for questao in avaliacao.obter_itens_avaliados %}
+                <tr>
+                    <td>{{ questao.criterio_avaliado }}</td>
+                    <td class="text-center">{{ questao.nota|format }}</td>
+                </tr>
+            {% endfor %}
+            <tr>
+                <td class="text-end negrito">Total de pontos:</td>
+                <td class="text-center"><strong>{{ avaliacao.total_pontos|format }}</strong></td>
+            </tr>
+        </table>
+        <table class="definicoes mt-1">
+            <tr>
+                <td>
+                    <strong>
+                        {% if avaliacao.processo.is_tipo_estagio_probatorio %}PARECER GERAL/{% endif %}
+                        Considerações/Comentários do Chefe Imediato
+                        {% if avaliacao.processo.is_tipo_progressao_merito %} ou do Membro da Equipe{% endif %}
+                    </strong>
+                    {{ avaliacao.comentario_avaliador|format }}
+                </td>
+            </tr>
+            <tr>
+                <td><strong>Considerações/Comentários do Servidor Avaliado</strong> {{ avaliacao.comentario_avaliado|format }}</td>
+            </tr>
+            <tr>
+                <td><strong>Considerações/Comentários do Setor de Recursos Humanos</strong> {{ avaliacao.comentario_rh|format }}</td>
+            </tr>
+
+                <tr>
+                    <td>
+                        <strong>Assinatura do Avaliado: {{ avaliacao.processo.avaliado }} {% if avaliacao.data_assinatura_avaliado %}(em {{ avaliacao.data_assinatura_avaliado }}){% endif %}</strong>
+                        <span class="word-break-all">{{ avaliacao.get_assinatura_avaliado_as_html|safe }}</span>
+                    </td>
+                </tr>
+                {% if avaliacao.processo.is_tipo_progressao_merito %}
+                <tr>
+                    <td>
+                        <strong>Assinatura do Avaliador: {{ avaliacao.avaliador }} {% if avaliacao.data_assinatura_avaliador %}(em {{ avaliacao.data_assinatura_avaliador }}){% endif %}</strong>
+                        <span class="word-break-all">{{ avaliacao.get_assinatura_avaliador_as_html|safe }}</span>
+                    </td>
+                </tr>
+                {% endif %}
+                <tr>
+                    <td>
+                        <strong>Assinatura do Chefe Imediato{% if avaliacao.chefe_imediato_assinante %}{% if not avaliacao.chefe_imediato_assinante == avaliacao.avaliador %}: {{ avaliacao.chefe_imediato_assinante }}{% endif %}{% endif %} {% if avaliacao.data_assinatura_chefe_imediato %}(em {{ avaliacao.data_assinatura_chefe_imediato }}){% endif %}</strong>
+                        <span class="word-break-all">{{ avaliacao.get_assinatura_chefe_imediato_as_html|safe }}</span>
+                    </td>
+                </tr>
+        </table>
+        {% if not forloop.last %}
+            <p class="page-break"></p>
+        {% endif %}
+    {% endfor %}
+{% endblock %}

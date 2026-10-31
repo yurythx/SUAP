@@ -1,0 +1,87 @@
+{% extends super_template %}
+
+{% block action-bar %}
+    {% if pdi.mapa_estrategico %}
+        <ul class="action-bar">
+            <li><a href="{{ pdi.mapa_estrategico.url }}" class="btn default">{% icone "file-download" %} Mapa Estratégico</a></li>
+            <li><a href="/plan_estrategico/relatorio_indicadores_pdi/{{ pdi.pk }}/" class="btn default">{% icone "eye" %} Relatório de Indicadores</a></li>
+        </ul>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+
+    <div class="search-and-filters">
+        {% render_form filter_form %}
+    </div>
+
+    {% box 'O que é o Farol de Desempenho?' class='collapsed' %}
+        <ul class="flex-container boxes texts">
+            <li class="box-item">
+                <h4>Qual o objetivo?</h4>
+                <p class="description"><strong>“O que não pode ser medido não pode ser gerenciado!”</strong>, esta é a motivação para o uso do Farol de desempenho. É uma ferramenta do PDI que possibilita o acompanhamento, por toda a comunidade, dos principais processos críticos da instituição. Esses processos críticos, conhecidos na metodologia do BSC por <strong>Objetivos estratégicos</strong>, são agrupados em 4 grandes grupos, chamados de <strong>Perspectivas</strong>, que no nosso caso são: Estudantes e Sociedade, Processos acadêmicos, Gestão e infraestrutura, e Orçamento.</p>
+                <p class="description">Os objetivos estratégicos, por sua vez, são formados por <strong>Indicadores de desempenho</strong>, que visam garantir a realização dos objetivos estratégicos. São esses indicadores, que possibilitam também, o acompanhamento do PDI por parte de todos, e o gerenciamento por parte dos responsáveis pelos indicadores.</p>
+                <p class="description">Vale a pena ressaltar, que os indicadores de desempenho foram definidos a partir do diálogo com toda a comunidade, tendo como referência o histórico da instituição, alinhada com a nossa <strong>Visão</strong> de futuro.</p>
+            </li>
+            <li class="box-item">
+                <h4>Como é medido?</h4>
+                <p class="description">Por ser uma funcionalidade para medir o desempenho institucional, o Farol emprega uma série de cálculos envolvendo os Objetivos Estratégicos (OE) e seus respectivos indicadores de desempenho.</p>
+                <p class="description">Cada indicador possui um peso dentro do OE, sendo esse fator de grande influência nas informações apresentadas. Ou seja, um indicador que alcançou a meta e possui peso elevado num determinado OE, irá influenciar positivamente o resultado do OE. Ao passo que, se um indicador de peso elevado apresentou situação ‘não alcançado’, a influência será negativa, e poderá até mesmo suplantar o desempenho dos demais indicadores com meta já atingida para o OE.</p>
+                <p class="description">Em suma, o Farol apresenta o <strong>nível de alcance dos Objetivos Estratégicos ao longo do ano</strong>, com base no desempenho de seus indicadores. </p>
+            </li>
+            <li class="box-item">
+                <h4>Como entender?</h4>
+                <p class="description">O Farol apresenta as 4 perspectivas do PDI, com seus respectivos Objetivos Estratégicos (OE). Para cada OE, são apresentadas 2 informações: </p>
+                <dl>
+                    <dt>Situação:</dt><dd>Descreve o alcance da meta, e pode ser: alcançado, parcialmente alcançado ou não alcançado;</dd>
+                    <dt>Barra de progresso:</dt><dd>Representação gráfica do valor real do indicador em relação à sua meta.</dd>
+                </dl>
+                <p class="description">Ao clicar em cada OE, serão apresentados seus respectivos indicadores de desempenho.</p>
+            </li>
+        </ul>
+    {% endbox %}
+
+    {% box 'Legenda dos Objetivos Estratégicos' %}
+        <div class="legenda">
+            <p><strong>Legenda:</strong></p>
+            <ul>
+                <li class="danger">{% icone "circle" %} Não alcançado</li>
+                <li class="warning">{% icone "circle" %} Parcialmente alcançado</li>
+                <li class="success">{% icone "circle" %} Alcançado</li>
+                <li class="default">{% icone "circle" %} Não informado/Não se aplica</li>
+            </ul>
+        </div>
+    {% endbox %}
+
+    {% for perspectiva in pdi.perspectivas.all %}
+        {% box "Perspectiva: {{ perspectiva.perspectiva.sigla }} - {{ perspectiva.perspectiva.nome }}" badge="{{ perspectiva.pdiobjetivoestrategico_set.count }} objetivos estratégicos" %}
+            {% if perspectiva.perspectiva.descricao %}
+                <p class="mb-4">{{ perspectiva.perspectiva.descricao }}</p>
+            {% endif %}
+
+            {% for objetivo in perspectiva.pdiobjetivoestrategico_set.all %}
+                <a href="/plan_estrategico/pdi/{{ perspectiva.pdi.id }}/farol2/{{ objetivo.pk }}/{{ ano_base }}/{% if uo %}{{ uo.pk }}/{% endif %}"
+                    class="farol {% if objetivo.status == 'Alcançado' %} success {% elif objetivo.status == 'Parcialmente' %} warning {% elif objetivo.status == 'Não Alcançado' %} danger {% endif %}">
+                    <span class="fas fa-circle farol-status" aria-hidden="true"></span>
+                    <h4 class="title sm">{{ objetivo.sigla }}</h4>
+                    <p class="description">{{ objetivo.descricao }}</p>
+                    {% if objetivo.status == "Alcançado" %}
+                        <span class="status status-success">Alcançado</span>
+                    {% elif objetivo.status == "Não Alcançado" %}
+                        <span class="status status-error">{{ objetivo.status }}</span>
+                    {% elif objetivo.status == "Parcialmente" %}
+                        <span class="status status-alert">Parcialmente alcançado</span>
+                    {% else %}
+                        <span class="status status-default">{{ objetivo.status }}</span>
+                    {% endif %}
+                    {% if objetivo.status == "Não Informado" %}
+                        <span class="status status-alert ms-auto">{{ objetivo.valor_real|format }}</span>
+                    {% else %}
+                        {% progressbar objetivo.valor_real|floatformat:0|default:'-' %}
+                    {% endif %}
+                </a>
+            {% endfor %}
+        {% endbox %}
+    {% endfor %}
+
+{% endblock %}

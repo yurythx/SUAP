@@ -1,0 +1,137 @@
+{% extends super_template %}
+
+{% block object-status %}
+    {{ posicionamento.get_status_display|status }}
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if posicionamento|method:"pode_publicar"|call:request.user %} 
+            <li>
+                <a href="{% url 'auditoria:publicar_posicionamento' posicionamento.id %}" class="btn success">
+                    {% icone "hourglass" %} Publicar
+                </a>
+            </li>
+        {% endif %}
+        {% if posicionamento|method:"pode_solicitar_revisao"|call:request.user %}
+            <li>
+                <a href="{% url 'auditoria:solicitar_revisao_posicionamento' posicionamento.id %}" class="btn primary">
+                    {% icone "hourglass" %} Solicitar Revisão
+                </a>
+            </li>
+        {% endif %}
+        {% if posicionamento|method:"pode_editar"|call:request.user %} 
+            <li>
+                <a href="{% url 'auditoria:editar_posicionamento' posicionamento.id %}" class="btn primary">
+                    Editar
+                </a>
+            </li> 
+            <li>
+                <a href="{% url 'auditoria:remover_posicionamento' posicionamento.id %}" class="btn danger">
+                    Apagar
+                </a>
+            </li> 
+        {% endif %} 
+        {% if posicionamento|method:"pode_revisar"|call:request.user %}
+            <li>
+                <a href="{% url 'auditoria:adicionar_revisao_posicionamento' posicionamento.id %}" class="btn primary">
+                    Adicionar Revisão
+                </a>
+            </li> 
+        {% endif %} 
+    </ul>
+
+{% endblock %}
+
+{% block content %}
+    {% box "Dados gerais" %}
+        <dl class="definition-list flex">
+            <div class="list-item flex-basis-25">
+                <dt>Posicionamento Número</dt>
+                <dd>{{ posicionamento.id }}</dd>
+            </div> 
+            {% if eh_auditor %}
+                <div class="list-item flex-basis-25">
+                    <dt>Tipo da Posicionamento</dt>
+                    <dd>{{ posicionamento.get_tipo_display }}</dd>
+                </div>
+                <div class="list-item flex-basis-100">
+                    <dt>Motivação</dt>
+                    <dd>{{ posicionamento.get_motivo }}</dd>
+                </div>
+            {% endif %}
+            <div class="list-item flex-basis-50">
+                <dt>Manifestação</dt>
+                <dd><a href="{{ posicionamento.manifestacao.get_absolute_url }}">{{ posicionamento.manifestacao }}</a></dd>
+            </div>
+            {% if eh_auditor %}
+                <div class="list-item flex-basis-50">
+                    <dt>Tipo da Manifestação</dt>
+                    <dd>{{ posicionamento.manifestacao.get_tipo_display }}</dd>
+                </div>
+                <div class="list-item flex-basis-25">
+                    <dt>Criada por</dt>
+                    <dd>{{ posicionamento.incluido_por|format }}</dd>
+                </div>
+            {% endif %}
+            <div class="list-item flex-basis-25">
+                <dt>Criada em</dt>
+                <dd>{{ posicionamento.criado_em }}</dd>
+            </div>
+            {% if eh_auditor %}
+                <div class="list-item flex-basis-25">
+                    <dt>Pubilicado por</dt>
+                    <dd>{{ posicionamento.publicado_por|format }}</dd>
+                </div>
+                <div class="list-item flex-basis-25">
+                    <dt>Pubilicado em</dt>
+                    <dd>{{ posicionamento.publicado_em|format }}</dd>
+                </div>
+                <div class="list-item flex-basis-25">
+                    <dt>Revisor</dt>
+                    <dd>{{ posicionamento.revisor|format }}</dd>
+                </div>
+                <div class="list-item flex-basis-25">
+                    <dt>Ciência em </dt>
+                    <dd>{{ posicionamento.ciencia_em|format }}</dd>
+                </div>
+            {% endif %}
+        </dl>
+    {% endbox %}
+    {% if posicionamento.prorrogacao %}
+        {% box "Prorrogação de Prazo" %}
+            <dl class="definition-list flex">
+                <div class="list-item flex-basis-50">
+                    <dt>Prazo Solicitado</dt>
+                    <dd>{{ posicionamento.prorrogacao.prazo_solicitado|date:"d/m/Y" }}</dd>
+                </div>
+                <div class="list-item flex-basis-50">
+                    <dt>Prazo Aceito</dt>
+                    <dd>{{ posicionamento.prorrogacao.prazo|date:"d/m/Y"|default:"-" }}</dd>
+                </div>
+                <div class="list-item flex-basis-50">
+                    <dt>Solicitação Criada em</dt>
+                    <dd>{{ posicionamento.prorrogacao.criado_em|date:"d/m/Y H:i" }}</dd>
+                </div>
+                <div class="list-item flex-basis-50">
+                    <dt>Status da Prorrogação</dt>
+                    <dd>{{ posicionamento.prorrogacao.get_status_display|status }}</dd>
+                </div>
+            </dl>
+        {% endbox %}
+    {% endif %}
+    <div class="tab-pane" data-tab="posicionamento-parecer" data-title="Posicionamento da Auditoria">
+        <div class="richtext">
+            {{ posicionamento.parecer|default:"Sem parecer cadastrado"|safe }}
+        </div>
+    </div>
+    {% if eh_auditor %}
+        <div class="tab-pane" data-tab="posicionamento-revisoes" data-title="Revisões">
+            {% box "Revisão" %}
+                {% for revisao in posicionamento.revisoes.all %}
+                    {% include 'posicionamento/revisao.html' with revisao=revisao %} 
+                {% endfor %}
+            {% endbox %}
+        </div>
+    {% endif %}
+{% endblock %}

@@ -1,0 +1,39 @@
+FROM ghcr.io/astral-sh/uv:python3.14-trixie
+ENV DEBIAN_FRONTEND=noninteractive
+ENV LANG=pt_BR.UTF-8
+ENV LANGUAGE=pt_BR:pt
+ENV LC_ALL=pt_BR.UTF-8
+ENV TZ="America/Fortaleza"
+ENV UV_LINK_MODE=copy \
+     UV_COMPILE_BYTECODE=1 \
+     UV_PYTHON_DOWNLOADS=never \
+     UV_PYTHON=python3.14 \
+     UV_PROJECT_ENVIRONMENT=/venv
+ARG UID=33
+ARG GID=33
+RUN mkdir -p /var/www
+RUN usermod -u 33 -d /var/www www-data && groupmod -g 33 www-data && chown -R www-data:www-data /var/www
+RUN export LANG=C.UTF-8
+RUN set -eux; \
+     apt-get update -qy; \
+     BASE="locales vim git build-essential cron ntpsec-ntpdate openssl curl qpdf tmpreaper"; \
+     LDAP="libldap2-dev libsasl2-dev"; \
+     PILLOW="libjpeg-dev libfreetype6-dev zlib1g-dev"; \
+     PYMSSQL="freetds-dev"; \
+     LXML="libxmlsec1-dev libxml2-dev libxslt1-dev"; \
+     WEASYPRINT="libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0"; \
+     MAGIC="libmagic1"; \
+     apt-get install -qyy $BASE $LDAP $PILLOW $PYMSSQL $LXML $WEASYPRINT $MAGIC; \
+     rm -rf /var/lib/apt/lists/*; rm -rf /var/cache/*;
+RUN echo "pt_BR.UTF-8 UTF-8" >> /etc/locale.gen
+RUN locale-gen pt_BR.UTF-8
+WORKDIR /opt/suap
+RUN --mount=type=cache,target=/root/.cache \
+     --mount=type=bind,source=uv.lock,target=uv.lock \
+     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+     uv sync --locked --group prod --no-dev --no-install-project
+ENV PATH="/venv/bin:$PATH"
+RUN python -m nltk.downloader -d /usr/local/share/nltk_data punkt_tab punkt stopwords
+ADD docker/crontab/tasks /etc/crontab
+RUN chown www-data:www-data /opt/suap
+USER www-data

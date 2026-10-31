@@ -1,0 +1,111 @@
+{% extends super_template %}
+{% load static %}
+{% load rsc_tae_extras %}
+
+{% block extracss %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static 'rsc_tae/css/rsc-tae.css' %}">
+{% endblock %}
+
+{% block content %}
+
+    <div class="rsc-avaliar-arquivo">
+        <div class="rsc-avaliar-arquivo-grid">
+            <div id="iframe" class="iframe-arquivo">
+                <iframe src="{{ anexo.arquivo.url }}" width="100%" height="600" allow="fullscreen"></iframe>
+            </div>
+
+            <div class="dados">
+
+                <form method="post" action="">
+                    {% csrf_token %}
+                    <div class="table-responsive">
+                    <table>
+                        <caption>INFORMAÇÕES</caption>
+                        <tr>
+                            <td>Item</td>
+                            <td>{{ criterio }}</td>
+                        </tr>
+                        <tr>
+                            <td>Pontuação por unidade</td>
+                            <td>{{ pontuacao_unidade|format }} pts</td>
+                        </tr>
+                        <tr>
+                            <td>Unidades informadas</td>
+                            <td>
+                                {% if criterio.item_temporal %}
+                                    {{ unidades_informadas|meses_para_anos }} ano(s)
+                                    <span class="text-muted">(período: {{ anexo.periodo_display }})</span>
+                                {% else %}
+                                    {{ unidades_informadas|format }}
+                                {% endif %}
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <td>Pontuação requerida</td>
+                            <td>
+                                {% if criterio.item_temporal %}
+                                    {% pontos_por_ano pontuacao_unidade unidades_informadas as pontos_requeridos %}{{ pontos_requeridos|format }} pts
+                                {% else %}
+                                    {{ pontos_informados|format }} pts
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Unidades validadas{% if criterio.item_temporal %} (em meses){% endif %}</td>
+                            <td>
+                                <input
+                                    type="number"
+                                    name="pontuacao_validada"
+                                    id="pontuacao_validada"
+                                    step="0.01"
+                                    min="0"
+                                    value="{{ avaliacao_anexo.pontuacao_validada }}"
+                                >
+                                {% if criterio.item_temporal %}
+                                    <p class="help">Item temporal: informe a duração validada <strong>em meses</strong>. A conversão em anos ("ano ou fração acima de 6 meses") e a pontuação são recalculadas automaticamente.</p>
+                                {% else %}
+                                    <p class="help">Preencher apenas se houver ajustes. Informe apenas as unidades validadas. A pontuação será recalculada automaticamente.</p>
+                                {% endif %}
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <td colspan="2">
+                                <label for="observacao_avaliacao">Observações / Justificativa</label>
+                                <textarea id="observacao_avaliacao" name="observacao" class="rsc-textarea-full">{% if avaliacao_anexo.observacao %}{{ avaliacao_anexo.observacao }}{% endif %}</textarea>
+                                <br />
+                                <button type="submit" name="acao" value="validar" class="btn success">Validar</button>
+                                <button type="submit" name="acao" value="indeferir" class="btn danger no-confirm float-right">Indeferir Arquivo</button>
+                            </td>
+                        </tr>
+                    </table>
+                    </div>
+                    <script>
+                        (function() {
+                            var form = document.querySelector('.rsc-avaliar-arquivo form');
+                            form.addEventListener('submit', function(e) {
+                                var acao = e.submitter ? e.submitter.value : '';
+                                var observacao = document.getElementById('observacao_avaliacao').value.trim();
+                                var pontuacaoInput = document.getElementById('pontuacao_validada').value.trim();
+                                if (acao === 'indeferir' && !observacao) {
+                                    e.preventDefault();
+                                    alert('Informe uma observação/justificativa para indeferir o arquivo.');
+                                    return;
+                                }
+                                if (acao === 'validar' && pontuacaoInput !== '' && !observacao) {
+                                    e.preventDefault();
+                                    alert('Informe uma observação/justificativa ao alterar a pontuação.');
+                                    return;
+                                }
+                            });
+                        })();
+                    </script>
+                </form>
+
+            </div>
+        </div>
+    </div>
+
+{% endblock %}

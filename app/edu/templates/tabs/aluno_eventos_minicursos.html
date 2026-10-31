@@ -1,0 +1,76 @@
+{% box 'Eventos e Palestras' %}
+    {% if obj.get_participacoes_em_eventos.exists %}
+        <div class="table-responsive">
+        <table>
+            <caption>Minhas participações</caption>
+            <thead>
+            <tr>
+                <th>Título</th>
+                <th>Descrição</th>
+                <th>Certificado</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for participacao in obj.get_participacoes_em_eventos %}
+                <tr>
+                    <td>{{ participacao.evento.titulo }}</td>
+                    <td>{{ participacao.evento.descricao }}</td>
+                    <td><a href="/edu/imprimir_certificado_participacao_evento/{{ participacao.token }}/" class="btn">Imprimir
+                        Certificado</a></td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    {% else %}
+        <p class="alert alert-warning">Aluno(a) não possui participações em eventos/palestras cadastradas.</p>
+    {% endif %}
+{% endbox %}
+
+{% box 'Minicursos' %}
+    {% if obj.get_participacoes_em_minicursos.exists %}
+        <div class="table-responsive">
+        <table>
+            <caption>Minhas turmas</caption>
+            <thead>
+            <tr>
+                {% if not is_proprio_aluno %}
+                    <th class="no-print field-get_acoes">Ações</th>
+                {% endif %}
+                <th>Descrição</th>
+                <th>Ano/Período Letivo</th>
+                <th>Situação</th>
+                <th class="no-print field-get_acoes">Opções</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for aluno in obj.get_participacoes_em_minicursos %}
+                {% with participanteturmaminicurso=aluno.participanteturmaminicurso_set.first %}
+                <tr>
+                    {% if not is_proprio_aluno %}
+                        <td class="no-print field-get_acoes">{% icon "view" "{{ participanteturmaminicurso.turma.get_absolute_url }}" "Visualizar" %}</td>
+                    {% endif %}
+                    <td>{{ participanteturmaminicurso.turma.minicurso.descricao }}</td>
+                    <td>{{ participanteturmaminicurso.turma.ano_letivo.ano }}.{{ participanteturmaminicurso.turma.periodo_letivo }}</td>
+                    <td>{{ aluno.situacao|status }}</td>
+                    <td class="no-print field-get_acoes">
+                        <ul class="action-bar">
+                            {% if aluno.is_concluido %}
+                                <li><a href="/edu/autenticar_certificado_minicurso/?cpf={{ aluno.pessoa_fisica.cpf }}&data_conclusao={{ participanteturmaminicurso.turma.data_fim|format }}&codigo_turma={{ participanteturmaminicurso.turma.pk }}" class="btn">Imprimir certificado</a></li>
+                                <li><a href="/edu/enviar_certificado_participacao_minicurso/{{ participanteturmaminicurso.turma.pk }}/{{ obj.pk }}/" class="btn primary">Enviar certificado por e-mail</a></li>
+                            {% endif %}
+                            {% if participanteturmaminicurso.possui_pendencia_vinculo_pratica_profissional and perms.edu.change_turmaminicurso %}
+                                <li><a href="{% url 'associar_atividadepraticaprofissional_participanteturmaminicurso' participanteturmaminicurso.id obj.id %}" class="btn warning">Associar à atividade de prática profissional</a></li>
+                            {% endif %}                            
+                        </ul>
+                    </td>
+                </tr>
+                {% endwith %}
+            {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    {% else %}
+        <p class="alert alert-warning">Aluno(a) não possui participações em minicursos cadastradas.</p>
+    {% endif %}
+{% endbox %}

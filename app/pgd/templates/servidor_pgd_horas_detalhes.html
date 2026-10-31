@@ -1,0 +1,364 @@
+{% extends "base_super_pgd.html" %}
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if pode_distribuir_horas %}
+            <li><a class="btn success" href="/pgd/distribuir_horas_automaticamente_rit/{{ rit.id }}">Distribuir/Redistribuir horas automaticamente</a></li>
+            <li><a class="btn danger" href="/pgd/desfazer_distribuicao_horas/{{ rit.id }}">Desfazer distribuição de horas</a></li>
+            <li><a class="btn success" href="/pgd/atualizar_horas_previstas_rit/{{ rit.id }}">Atualizar horas previstas</a></li>
+        {% endif %}
+        <li><a class="btn" href="/pgd/servidor_pgd_horas/{{ adesao.id }}">Visualizar Horas</a></li>
+    </ul>
+{% endblock %}
+
+{% block content %} {{ block.super }}
+
+    {% if pit.estah_cancelado %}
+        <p class="alert alert-danger"><strong>Atenção:</strong> O PIT relacionado está <strong>CANCELADO</strong>.</p>
+    {% endif %}
+
+    {% include "includes/msg_adesao_pgd.html" %}
+
+    {% if not pode_distribuir_horas %}
+        <div class="alert alert-warning">
+            <p><strong>Importante</strong>:</p>
+            <ul>
+                <li>Só poderá haver distribuição de horas para RITs homologados</li>
+            </ul>
+        </div>
+    {% endif %}
+
+    {% if rit.bloqueado_para_distribuicao_manual %}
+        <div class="alert alert-warning">
+            <p><strong>Importante</strong>:</p>
+            <ul>
+                <li>Este RIT está bloqueado para ajustes de distribuição manual. Não foi possível distribuir a "CH A DISTRIBUIR" por não ter datas compensáveis por este RIT.</li>
+            </ul>
+        </div>
+    {% endif %}
+
+    <div class="alert alert-info">
+        <p><strong>Orientações</strong>:</p>
+        <ol>
+            <li>
+                As etapas da distribuição automática de horas segue a seguinte prioridade: 
+                <ul>
+                    <li>
+                        Período do RIT (todas as outras etapas só ococrrem quano existe algum saldo excedente nesta etapa)
+                    </li>
+                    <li>
+                        Meses anteriores ao RIT (dentro do semestre referente ao RIT)
+                    </li>
+                    <li>
+                        Compensações específicas
+                    </li>
+                    <li>
+                        Meses posteriores ao RIT (dentro do semestre referente ao RIT)
+                    </li>
+                </ul>
+            </li>
+            <li>
+                A distribuição de horas para período do RIT sempre será automática
+            </li>
+            <li>
+                A distribuição de horas para o semestre do RIT e para Compensações Espeíficas pode ser feita manualmente
+            </li>
+        </ol>
+    </div>
+
+    {% box "Dados gerais" %}
+        <div class="table-responsive">
+            <table class="info large">
+                <tbody>
+                    <tr>
+                        <td>RIT</td>
+                        <td>{{ rit.get_verbose_rit_servidor }}</td>
+                    </tr>
+                    <tr>
+                        <td>Entregue</td>
+                        <td>
+                            {{ rit.entregue|format }}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Aprovado</td>
+                        <td>
+                            {{ rit.aprovado_definitivo|format  }}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Homologado</td>
+                        <td>
+                            {{ rit.homologado_definitivo|format  }}
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    {% endbox %}
+
+    {% box 'Cálculos' %}
+        <ul class="flex-container boxes infos">
+            <li class="box-item">
+                <p class="stat">{{ rit.tempo_previsto|format_time2 }}</p>
+                <p class="title">{{ rit|verbose:'tempo_previsto' }}</p>
+            </li>
+            <li class="box-item">
+                <p class="stat">{{ rit.tempo_planejado|format_time2 }}</p>
+                <p class="title">{{ rit|verbose:'tempo_planejado' }}</p>
+            </li>
+        </ul>
+        <ul class="flex-container boxes infos">
+            <li class="box-item">
+                <p class="stat">{{ rit.get_tempo_homologado|format_time2 }}</p>
+                <p class="title">{{ rit|verbose:'tempo_executado_homologado' }}</p>
+            </li>
+        </ul>
+        <ul class="flex-container boxes infos">
+            <li class="box-item">
+                <p class="stat">{{ rit.ch_distribuida|format_time }}</p>
+                <p class="title">{{ rit|verbose:'ch_distribuida' }}</p>
+            </li>
+            <li class="box-item">
+                <p class="stat">{{ rit.ch_a_distribuir|format_time }}</p>
+                <p class="title">{{ rit|verbose:'ch_a_distribuir' }}</p>
+            </li>
+        </ul>
+    {% endbox %}
+
+    {% if distribuicoes %}
+        {% box 'Distribuição' %}
+            <div class="table-responsive">
+                <table class="info large">
+                    <tbody>
+                        <tr>
+                            <td>{{ rit|verbose:'ch_distribuido_periodo_rit' }}</td>
+                            <td>
+                                {{ rit.ch_distribuido_periodo_rit|format_time }}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>{{ rit|verbose:'ch_distribuido_semestre_rit' }}</td>
+                            <td>
+                                {{ rit.ch_distribuido_semestre_rit|format_time }}
+                                {% if pode_ajustar_distribuicao_horas_semestre_rit %}
+                                    <a class="btn success" href="/pgd/ajustar_distribuicao_semestre/{{ rit.id }}">Ajustar distribuição</a>
+                                {% endif %}
+                                {% if pode_desfazer_distribuicao_horas_semestre %}
+                                    <a class="btn danger" href="/pgd/desfazer_distribuicao_horas_semestre/{{ rit.id }}">Desfazer distribuição</a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>{{ rit|verbose:'ch_distribuido_compesacao_especifica' }}</td>
+                            <td>
+                                {{ rit.ch_distribuido_compesacao_especifica|format_time }}
+                                {% if pode_ajustar_distribuicoes_compensacao_especifica %}
+                                    <a class="btn success" href="/pgd/visualizar_distribuicao_compensacao_especifica/{{ rit.id }}">Ajustar distribuição</a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="alert alert-info">
+                <p><strong>Orientações</strong>:</p>
+                <ol>
+                    <li>
+                        Nesta seção você pode consultar o detalhamento da distribuição das horas deste RIT
+                    </li>
+                    <li>
+                        Eventualmente alguma CH ainda não foi distribuída e utilizada para compensação para um determinado dia. 
+                        Isso pode acontecer nos casos em que ainda não existe um débito naquele dia.
+                        Nesses casos o servidor poderá efetuar a sua compensação 
+                        no Controle de Horas do Servidor (Relatório de Frequência)
+                    </li>
+                </ol>
+            </div>
+    
+            <div class="tab-pane" data-title="Semestre do RIT">
+                {% if ch_segundos_rit_ch_distribuido_periodo_rit and ch_segundos_saldos_externos_periodo_rit and ch_segundos_rit_ch_distribuido_periodo_rit > ch_segundos_saldos_externos_periodo_rit %}
+                    <div class="alert alert-info">
+                        <p><strong>Atenção</strong>:</p>
+                        <ol>
+                            <li>
+                                Foram <strong>{{ ch_segundos_rit_ch_distribuido_periodo_rit|format_time }}</strong> distribuídas no período do RIT e
+                                <strong>{{ ch_segundos_saldos_externos_periodo_rit|format_time }}</strong> disponibilizadas para 
+                                compensação dos débitos de carga horária <strong>existentes</strong> no mesmo período.
+                            </li>
+                            <li>
+                                A diferença de <strong>{{ ch_segundos_diferenca_periodo_rit|format_time }}</strong>
+                                não implica que exista uma "sobra" de carga horária que poderá ser utilizada para outros 
+                                débitos no semestre do RIT. 
+                            </li>
+                            <li>
+                                Provavelmente essa diferença deve-se a uma eventual <strong>carga horária trabalhada</strong> e contabilizada 
+                                no registro de frequências (registro de frequência em período de PGD).
+                            </li>
+                            <li>
+                                Para fins de PGD, <strong>toda carga horária distribuída no período do RIT pertence única e exclusivamente a esse período, podendo ser utilizada para compensar apenas os débitos de carga horária existentes no mesmo período</strong>.
+                            </li>
+                        </ol>
+                    </div>
+                {% endif %}
+
+                {% if not dados_semestre_rit %}    
+                    <p class="alert alert-warning">Não há distribuiçao realizada.</p>
+                {% endif %}
+    
+                {% for dados in dados_semestre_rit %}
+                    {% with saldo_externo=dados.saldo_externo %}
+                        {% box dados.get_tipo_display %}
+                            <div class="table-responsive">
+                                <table class="info large">
+                                    <tbody>
+                                        <tr>
+                                            <td>Período</td>
+                                            <td>
+                                                {{ saldo_externo.get_periodo_saldo_display }}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>Horas</td>
+                                            <td class="true">{{ saldo_externo.get_valor_saldo_display }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Distribuído em</td>
+                                            <td>{{ saldo_externo.data_cadastro|format }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% if not saldo_externo.compensacoes_informadas %}    
+                                <p class="alert alert-warning">Não há compensações realizadas.</p>
+                            {% endif %}    
+                            {% if saldo_externo.compensacoes_informadas %}    
+                                <div class="table-responsive">
+                                    <table>
+                                        <thead>
+                                            <th>Carga Horária Compensada</th>
+                                            <th>Data do Débito</th>
+                                        </thead>
+                                        <tbody>
+                                            {% for compensacao in saldo_externo.compensacoes_informadas %}
+                                                <tr>
+                                                    <td>{{ compensacao.ch_compensada|date:"H:i:s" }}</td>
+                                                    <td>
+                                                        {{ compensacao.data_aplicacao }}
+                                                    </td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% endif %}   
+                        {% endbox %} 
+                    {% endwith %}
+                {% endfor %}
+            </div>   
+    
+            <div class="tab-pane" data-title="Compensações Específicas">
+                {% if not dados_compensacao_especifica %}    
+                    <p class="alert alert-warning">Não há distribuiçao realizada.</p>
+                {% endif %}    
+    
+                {% for dados in dados_compensacao_especifica %}
+                    {% with saldo_externo=dados.saldo_externo %}
+                        <div class="table-responsive">
+                            <table class="info large">
+                                <tbody>
+                                    <tr>
+                                        <td>Período</td>
+                                        <td>
+                                            {{ saldo_externo.get_periodo_saldo_display }}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Horas</td>
+                                        <td class="true">{{ saldo_externo.get_valor_saldo_display }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Compensação Específica</td>
+                                        <td>{{ dados.compensacao_especifica }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Distribuído em</td>
+                                        <td>{{ saldo_externo.data_cadastro|format }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        {% if not saldo_externo.compensacoes_informadas %}    
+                            <p class="alert alert-warning">Não há compensações realizadas.</p>
+                        {% endif %}    
+                        {% if saldo_externo.compensacoes_informadas %}    
+                            <div class="table-responsive">
+                                <table>
+                                    <thead>
+                                        <th>Horas Distribuídas</th>
+                                        <th>Data do Débito Compensado</th>
+                                    </thead>
+                                    <tbody>
+                                        {% for compensacao in saldo_externo.compensacoes_informadas %}
+                                            <tr>
+                                                <td>{{ compensacao.ch_compensada|date:"H:i:s" }}</td>
+                                                <td>
+                                                    {{ compensacao.data_aplicacao }}
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% endif %}    
+                    {% endwith %}
+                {% endfor %}
+            </div>   
+
+            <div class="tab-pane" data-title="Saldos Externos Criados">
+                {% if not dados_saldos_externos_criados %}
+                    <p class="alert alert-warning">Nenhum saldo externo foi encontrado.</p>
+                {% else %}
+                    <table>
+                        <thead>
+                            <th>Valor do Saldo</th>
+                            <th>Período de Utilização do Saldo</th>
+                            <th>Valor Utilizado do Saldo</th>
+                            <th>Valor Disponível do Saldo</th>
+                            <th class="no-print">Ações</th>
+                        </thead>
+                        <tbody>
+                            {% for saldo_externo in dados_saldos_externos_criados %}
+                                <tr>
+                                    <td>{{ saldo_externo.get_valor_saldo_display }}</td>
+                                    <td>{{ saldo_externo.get_periodo_saldo_display }}</td>
+                                    <td>{{ saldo_externo.get_valor_saldo_utilizado_display }}</td>
+                                    <td>{{ saldo_externo.get_valor_saldo_restante_display }}</td>
+                                    <td class="no-print">
+                                        <ul class="action-bar">
+                                            <li>
+                                                <a class="btn default popup" href="/ponto/visualizar_saldo_externo_ch/{{ saldo_externo.id }}/">
+                                                    <span class="fa fa-search" aria-hidden="true"></span>Detalhes
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>    
+                        <tfoot>
+                            <tr>
+                                <td>{{ dados_saldos_externos_criados_totais.valor_saldo.1 }}</td>
+                                <td></td>
+                                <td>{{ dados_saldos_externos_criados_totais.valor_utilizado.1 }}</td>
+                                <td>{{ dados_saldos_externos_criados_totais.valor_restante.1 }}</td>
+                                <td></td>
+                            </tr>
+                        </thead>
+                    </table>
+                {% endif %}
+            </div>
+        {% endbox %}
+    {% endif %}
+
+{% endblock %}

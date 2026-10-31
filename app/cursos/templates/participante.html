@@ -1,0 +1,227 @@
+{% extends super_template|default:"admin/base_site.html" %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if pode_preencher_detalhamento %}
+            <li><a class="btn success popup" href="/cursos/preencher_detalhamento_atividade/{{ participante.id }}/">Preencher Detalhamento das Horas</a></li>
+        {% endif %}
+
+        {% if pode_avaliar_detalhamento %}
+            <li><a class="btn success confirm" href="/cursos/deferir_detalhamento_atividade/{{ participante.id }}/">Deferir Detalhamento das Horas</a></li>
+            <li><a class="btn danger popup no-confirm" href="/cursos/indeferir_detalhamento_atividade/{{ participante.id }}/">Indeferir Detalhamento das Horas</a></li>
+        {% endif %}                                    
+
+        <!-- {% if pode_gerar_documento_eletronico %}
+            <li><a class="btn confirm" href="/cursos/gerar_documento_eletronico_detalhamento_atividade/{{ participante.id }}/">Gerar Documento Eletrônico</a></li>
+        {% endif %} -->
+
+        {% if pode_notificar_detalhamento_atividade %}
+            <li><a class="btn confirm" href="/cursos/notificar_detalhamento_atividade/{{ participante.id }}/">Reenviar Notificação sobre Detalhamento das Horas</a></li>
+        {% endif %}
+
+        {% if pode_gerar_compensacao_especifica %}
+            <li><a class="btn confirm" href="/cursos/gerar_compensacao_especifica/{{ participante.id }}/">
+                Gerar {% if participante.compensacao_especifica %}Novamente {% else %}{% endif %}Débito Externo e Compensação Específica</a></li>
+        {% endif %}
+
+        <li><a href="/cursos/curso/{{ participante.curso.id }}/" class="btn default">Visualizar o Curso</a></li>
+    </ul>
+{% endblock %}
+
+{% block object-status %}
+{{ participante.get_situacao_html }}
+{% endblock %}
+
+{% block content %}   
+    {% box "Dados do Servidor" %}
+        <dl class="definition-list flex">
+
+            <div class="list-item">
+                <dt>Servidor</dt>
+                <dd>{{ participante.servidor|format }}</dd>
+            </div>
+
+            <div class="list-item">
+                <dt>Horas Disponíveis</dt>
+                <dd>{{ participante.horas_disponiveis_ano|format }}</dd>
+            </div>
+
+            <div class="list-item">
+                <dt>Horas Previstas</dt>
+                <dd>{{ participante.horas_prevista|format }}</dd>
+            </div>
+
+            <div class="list-item">
+                <dt>Horas Trabalhadas</dt>
+                <dd>{{ participante.horas_trabalhada|format }}</dd>
+            </div>
+
+            <div class="list-item">
+                <dt>Valor da Atividade</dt>
+                <dd>{{ participante.atividade.valor_hora|format }}</dd>
+            </div>
+
+            <div class="list-item">
+                <dt>Valor Total</dt>
+                <dd>{{ participante.valor_total|format }}</dd>
+            </div>
+
+            <div class="list-item">
+                <dt>Data de Registro de Pagamento</dt>
+                <dd>{{ participante.data_registro_pagamento|format }}</dd>
+            </div>
+
+            <div class="list-item">
+                <dt>Responsável pela Liberação</dt>
+                {% if participante.responsavel_liberacao %}
+                    <dd>{{ participante.responsavel_liberacao|format }}</dd>
+                {% elif participante.is_aguardando_liberar_participacao %}
+                    <dd><span class="status status-pendente">Aguardando {{ participante.get_chefes|join:', '}}</span></dd>
+                {% else %}
+                    <dd>-</dd>
+                {% endif %}
+            </div>
+
+            <div class="list-item">
+                <dt>Data de Liberação</dt>
+                <dd>{{ participante.data_liberacao|format }}</dd>
+            </div>
+
+            {% if participante.motivo_nao_liberacao %}
+                <div class="list-item">
+                    <dt>Motivo da não Liberação</dt>
+                    <dd>{{ participante.motivo_nao_liberacao|format }}</dd>
+                </div>
+            {% endif %}
+
+            <div class="list-item">
+                <dt>Data de Cadastro</dt>
+                <dd>{{ participante.data_cadastro|format }}</dd>
+            </div>
+        </dl>
+    {% endbox %}
+
+    {% box "Dados do Curso/Concurso" %}
+        <dl class="definition-list flex">
+            <div class="list-item flex-basis-100">
+                <dt>Curso/Concurso</dt>
+                <dd><a href="{{ participante.curso.get_absolute_url }}">{{ participante.curso }}</a></dd>
+            </div>
+
+            <div class="list-item">
+                <dt>Situação do Curso/Concurso</dt>
+                <dd>{{ participante.curso.get_situacao_html }}</dd>
+            </div>
+
+            <div class="list-item">
+                <dt>Atividade</dt>
+                <dd>{{ participante.atividade.descricao }}</dd>
+            </div>
+
+            <div class="list-item">
+                <dt>Mês Atividade</dt>
+                <dd>{{ participante.atividade_mes_display|format }}</dd>
+            </div>
+
+            <div class="list-item">
+                <dt>Mês/Ano Pagamento</dt>
+                <dd>{{ participante.mes_pagamento_display|format }}</dd>
+            </div>
+        </dl>
+    {% endbox %}
+
+    {% box "Detalhamento das Horas Trabalhadas" %}
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>Situação do Detalhamento das Horas</dt>
+                {% if participante.is_aguardando_avaliacao_detalhamento_horas %}
+                    <dd>
+                        {{ participante.get_situacao_detalhamento_display_html }}
+                        <span class="status status-alert">{{ participante.get_chefes|join:', '}}</span>
+                    </dd>
+                {% else %}
+                    <dd>{{ participante.get_situacao_detalhamento_display_html }}</dd>    
+                {% endif %}
+            </div>
+
+            <div class="list-item">
+                <dt>Horas Trabalhadas</dt>
+                <dd>{{ participante.horas_trabalhada|format }}</dd>
+            </div>
+
+            <div class="list-item">
+                <dt>Horas Trabalhadas Fora da Carga Horária</dt>
+                <dd>{{ participante.horas_trabalhadas_fora_ch|format }}</dd>
+            </div>
+
+            <div class="list-item">
+                <dt>Horas Trabalhadas Dentro da Carga Horária</dt>
+                <dd>{{ participante.horas_trabalhadas_dentro_ch|format }}</dd>
+            </div>
+
+            <div class="list-item flex-basis-50">
+                <dt>Data de Início da Atividade</dt>
+                <dd>{{ participante.data_inicio_atividade|format }}</dd>
+            </div>
+
+            <div class="list-item flex-basis-50">
+                <dt>Data de Fim da Atividade</dt>
+                <dd>{{ participante.data_fim_atividade|format }}</dd>
+            </div>
+
+            <div class="list-item flex-basis-100">
+                <dt>Descrição da Atividade</dt>
+                <dd>{{ participante.descricao_atividade|format }}</dd>
+            </div>
+
+            {% if participante.motivo_nao_deferimento_detalhamento %}
+                <div class="list-item">
+                    <dt>Motivo do Indeferimento do Detalhamento</dt>
+                    <dd>{{ participante.motivo_nao_deferimento_detalhamento|format }}</dd>
+                </div>
+            {% endif %}
+        </dl>
+    {% endbox %}
+    
+    {% box "Carga Horária Devida" %}
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>Débito Externo de Carga Horária</dt>
+                <dd>
+                    {% if participante.debito_externo %}
+                        <a class="popup" href="{{ participante.debito_externo.get_absolute_url }}">{{ participante.debito_externo }}</a>
+                        {% if participante.debito_externo.is_situacao_em_aberto %}
+                            <span class="status status-alert">O trâmite do Débito Externo ainda não está concluído</span>
+                        {% endif %}                                
+                    {% else %}
+                        {% if pode_gerar_compensacao_especifica %}
+                            <span class="status status-error">O Débito Externo não foi gerado</span>
+                        {% else %}    
+                            -
+                        {% endif %}
+                    {% endif %}    
+                </dd>
+            </div>
+
+            <div class="list-item">
+                <dt>Compensação Específica de Carga Horária</dt>
+                <dd>
+                    {% if participante.compensacao_especifica %}
+                        <a class="popup" href="{{ participante.compensacao_especifica.get_absolute_url }}">{{ participante.compensacao_especifica }}</a>
+                    {% else %}
+                        {% if pode_gerar_compensacao_especifica %}
+                            <span class="status status-error">A Compensação Específica não foi gerada</span>
+                        {% else %}    
+                            -
+                        {% endif %}                            
+                    {% endif %}    
+                </dd>
+            </div>
+            
+            <div class="list-item">
+                <dt>Responsável pela Geração do Débito Externo e da Compensação Específica</dt>
+                <dd>{{ participante.responsavel_compensacao_especifica|format }}</dd>
+            </div>
+        </dl>
+    {% endbox %}
+{% endblock %}

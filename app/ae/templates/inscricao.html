@@ -1,0 +1,118 @@
+{% extends super_template %}
+
+{% block object-status %}
+    {% if inscricao.ativa %}
+        <span class="status status-success">Ativa</span>
+    {% else %}
+        <span class="status status-error">Inativa</span>
+    {% endif %}
+{% endblock %}
+
+{% block action-bar %}
+    {% if perms.comum.is_assistente_social or perms.comum.is_coordenador_de_atividades_estudantis_sistêmico %}
+        <ul class="action-bar">
+            {% if inscricao.ativa %}
+                <li><a href="{% url 'inativar_inscricao' inscricao.pk %}" class="btn danger">{% icone "thumbs-down" %} Inativar</a></li>
+            {% else %}
+                <li><a href="{% url 'ativar_inscricao' inscricao.pk %}" class="btn success">{% icone "thumbs-up" %} Ativar</a></li>
+            {% endif %}
+        </ul>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+
+    <ul class="flex-container boxes services">
+        <li class="box-item">
+            <h4>Dados da Inscrição</h4>
+            <h5>{{ inscricao.data_cadastro|format }}</h5>
+            <dl>
+                <dt>Aluno:</dt>
+                <dd><a href="{{ inscricao.aluno.get_absolute_url }}">{{ inscricao.aluno }}</a></dd>
+                <dt>Programa:</dt>
+                <dd>{{ inscricao.programa }}</dd>
+                <dt>Motivo da Solicitação:</dt>
+                <dd>{{ inscricao.motivo|linebreaksbr }}</dd>
+                <dt>Edital:</dt>
+                <dd>{{ inscricao.periodo_inscricao }}</dd>
+            </dl>
+            {% if perms.comum.is_assistente_social or perms.comum.is_coordenador_de_atividades_estudantis_sistêmico %}
+                <ul class="action-bar">
+                    <li><a href="/ae/comprovante_inscricao/{{ inscricao.pk }}/" class="btn default">{% icone "file-alt" %} Comprovante de Inscrição</a></li>
+                </ul>
+            {% endif %}
+        </li>
+        <li class="box-item">
+            {{ inscricao.aluno.get_situacao_documentacao }}
+            <h4>Documentação do Aluno</h4>
+            <dl>
+                <dt>Registro de Entrega:</dt>
+                <dd>Por {{ inscricao.entrega_doc_atualizada_por|format }} em {{ inscricao.entrega_doc_atualizada_em|format }}</dd>
+            </dl>
+            {% if perms.comum.is_assistente_social or perms.comum.is_coordenador_de_atividades_estudantis_sistêmico %}
+                <ul class="action-bar">
+                    <li><a href="/edu/aluno/{{ inscricao.aluno.matricula }}/?tab=atividades_estudantis" class="btn">{% icone "folder" %} Documentação</a></li>
+                </ul>
+            {% endif %}
+        </li>
+        <li class="box-item">
+            <h4>Parecer do Serviço Social</h4>
+            {% if inscricao.parecer %}
+                <dl>
+                    <dt>Parecer:</dt>
+                    <dd>{{ inscricao.parecer|linebreaksbr }}</dd>
+                    <dt>Data:</dt>
+                    <dd>{{ inscricao.parecer_data|format }}</dd>
+                    <dt>Autor:</dt>
+                    <dd>{{ inscricao.parecer_autor_vinculo.pessoa.nome|format }}</dd>
+                </dl>
+            {% else %}
+                <p class="alert alert-warning">Nenhum parecer informado.</p>
+            {% endif %}
+            {% if perms.comum.is_assistente_social or perms.comum.is_coordenador_de_atividades_estudantis_sistêmico %}
+                <ul class="action-bar">
+                    {% if inscricao.possui_parecer %}
+                        <li><a href="/ae/parecer_inscricao/{{ inscricao.pk }}/" class="btn primary">{% icone "edit" %} Editar Parecer</a></li>
+                    {% else %}
+                        <li><a href="/ae/parecer_inscricao/{{ inscricao.pk }}/" class="btn success">{% icone "plus" %} Adicionar Parecer</a></li>
+                    {% endif %}
+                </ul>
+            {% endif %}
+        </li>
+    </ul>
+
+    {% box "Histórico de Participações" %}
+        {% if inscricao.participacao_set.exists %}
+            <ul class="timeline">
+                {% for participacao in inscricao.participacao_set.all|order:request %}
+                    <li>
+                        <div class="timeline-date">{{ participacao.data_inicio|format }}</div>
+                        <div class="timeline-icon"></div>
+                        <div class="timeline-content">
+                            <h4>Tornou-se Participante <small>por {{ participacao.atualizado_por.user|format }} em {{ participacao.atualizado_em }}</small></h4>
+                            <dl>
+                                {% if perms.ae.pode_ver_motivo_entrada %}
+                                    <dt>Motivo da Entrada:</dt>
+                                    <dd>{{ participacao.motivo_entrada|linebreaksbr }}</dd>
+                                {% endif %}
+                                {% if participacao.data_termino %}
+                                    <dt>Data de Saída:</dt>
+                                    <dd>{{ participacao.data_termino|format }} <small>(por {{ participacao.finalizado_por.user|format }} em {{ participacao.finalizado_em|format }})</small></dd>
+                                    <dt>Motivo da Saída:</dt>
+                                    <dd>{{ participacao.motivo_termino|linebreaksbr }}</dd>
+                                {% endif %}
+                            </dl>
+                        </div>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="alert alert-warning">O aluno não possui participações associadas a esta inscrição.</p>
+        {% endif %}
+    {% endbox %}
+
+{% endblock %}
+
+{% block action-links %}
+    <li>Última atualização por {{ inscricao.atualizado_por }} em {{ inscricao.atualizado_em }}</li>
+{% endblock %}

@@ -1,0 +1,455 @@
+{% extends super_template %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if eh_chefe_do_setor_hoje %}
+            <li><a class="btn primary" href="/processo_eletronico/permissoes/?setor={{ setor.pk }}">
+                {% icone "edit" %} Permissões para Documentos e Processos Eletrônicos</a></li>
+            <li><a class="btn primary popup" href="/rh/editar_bases_legais_setor/{{ setor.pk }}/">{% icone "edit" %} Editar Bases Legais</a></li>
+        {% endif %}
+        {% if perms.rh.pode_gerenciar_setor_telefone or eh_chefe_do_setor_hoje %}
+            <li><a class="btn primary" href="/comum/setor_adicionar_telefone/{{ setor.pk }}/">{% icone "edit" %} Editar Telefones</a></li>
+            <li><a class="btn primary" href="/comum/setor_editar_email/{{ setor.pk }}/">{% icone "edit" %} Editar E-mail </a></li>
+        {% endif %}
+        {% if perms.rh.pode_gerenciar_setor_historico_jornada %}
+            <li><a class="btn primary" href="/rh/setor_jornada_historico/{{ setor.pk }}/">{% icone "cog" %} Gerenciar Jornadas de Trabalho</a></li>
+        {% endif %}
+        {% if perms.rh.pode_gerar_carteira %}
+            <li class="has-child">
+                <a class="btn" href="#">Ações</a>
+                <ul>
+                    <li><a href="/rh/carteira_funcional_setor/{{ setor.pk }}/unregistered/">Gerar Carteiras Não Registradas</a></li>
+                    <li><a href="/rh/carteira_funcional_setor/{{ setor.pk }}/all/">Gerar Todas as Carteiras</a></li>
+                </ul>
+            </li>
+        {% endif %}
+        {% if tem_permissao_acessar_ldap %}
+            <li class="has-child">
+                <a class="btn" href="#"><span class="fas fa-square" aria-hidden="true"></span> {{ ldap_conf.get_solucao_display }}</a>
+                <ul>
+                    {% if tem_ldap_obj %}
+                        <li><a href="/ldap_backend/show_ou_setor/{{ setor.pk }}/">Ver Setor</a></li>
+                    {% endif %}
+                    {% if perms.ldap_backend.sync_ldap_user %}
+                        <li>
+                            <a href="/ldap_backend/sync_ou_setor/{{ setor.pk }}/">
+                                Sync Setor
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </li>
+        {% endif %}
+    </ul>
+{% endblock %}
+
+{% block object-status %}
+    {% if setor.excluido %}
+        <span class="status status-error">Excluído</span>
+    {% else %}
+        <span class="status status-success">Ativo</span>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+
+    {% if not setor.email %}
+        <p class="alert alert-warning">Nenhum E-mail cadastrado para o setor. {% if perms.rh.pode_gerenciar_setor_telefone or eh_chefe_do_setor_hoje %}<a href="/comum/setor_editar_email/{{ setor.pk }}/">Informe um E-mail</a>.{% endif %}</p>
+    {% endif %}
+
+    {% if not setor.setortelefone_set.exists %}
+        <p class="alert alert-warning">Nenhum Telefone cadastrado para o setor. {% if perms.rh.pode_gerenciar_setor_telefone or eh_chefe_do_setor_hoje %}<a href="/comum/setor_adicionar_telefone/{{ setor.pk }}/">Informe um telefone</a>.{% endif %}</p>
+    {% endif %}
+
+    {% box "Dados do setor" %}
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>Estrutura</dt>
+                <dd>
+                    {% for i in setor.get_caminho %}
+                        <a href="/rh/setor/{{ i.pk }}/" title="{{ i.nome }}">{{ i.sigla }}</a>{% if not forloop.last %}
+                        &nbsp;&rarr;&nbsp;{% endif %}
+                    {% endfor %}
+                </dd>
+            </div>
+            {% if setor.codigo %}
+                <div class="list-item">
+                    <dt>Código SIAPE</dt>
+                    <dd>{{ setor.codigo }}</dd>
+                </div>
+            {% endif %}
+            {% if setor.email %}
+                <div class="list-item">
+                    <dt>E-mail</dt>
+                    <dd>{{ setor.email }}</dd>
+                </div>
+            {% endif %}
+            {% if setor.setortelefone_set.exists %}
+                <div class="list-item">
+                    <dt>Telefones</dt>
+                    {% for t in setor.setortelefone_set.all %}
+                        <dd>{{ t }}</dd>
+                    {% endfor %}
+                </div>
+            {% endif %}
+            {% if filhos %}
+                <div class="list-item">
+                    <dt>Setores filhos</dt>
+                    <dd>
+                        {% for i in filhos %}
+                            <a href="/rh/setor/{{ i.pk }}/" title="{{ i.nome }}">{{ i.sigla }}</a>
+                            {% if not forloop.last %}&nbsp;|&nbsp;{% endif %}
+                        {% endfor %}
+                    </dd>
+                </div>
+            {% endif %}
+            {% if setor.setores_compartilhados.exists %}
+                <div class="list-item">
+                    <dt>Setores compartilhados</dt>
+                    <dd>
+                        {% for setor_compartilhado in setor.setores_compartilhados.all %}
+                            <a href="/rh/setor/{{ setor_compartilhado.pk }}/"
+                            title="{{ setor_compartilhado.nome }}">{{ setor_compartilhado.sigla }}</a>
+                            {% if not forloop.last %}&nbsp;|&nbsp;{% endif %}
+                        {% endfor %}
+                    </dd>
+                </div>
+            {% endif %}
+            {% if setor.areas_vinculacao.exists %}
+                <div class="list-item">
+                    <dt>Áreas de vinculação</dt>
+                    <dd>
+                        <ul class="tags">
+                            {% for area in setor.areas_vinculacao.all %}
+                                <li>{{ area }}</li>
+                            {% endfor %}
+                        </ul>
+                    </dd>
+                </div>
+            {% endif %}
+            {% if setor.data_criacao %}
+                <div class="list-item">
+                    <dt>Data de criação</dt>
+                    <dd>{{ setor.data_criacao }}</dd>
+                </div>
+            {% endif %}
+            {% if setor.horario_funcionamento %}
+                <div class="list-item">
+                    <dt>Horário de funcionamento</dt>
+                    <dd>{{ setor.horario_funcionamento|linebreaksbr }}</dd>
+                </div>
+            {% endif %}
+        </dl>
+
+        {% if setor.setorjornadahistorico_set.exists %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Histórico de jornadas de trabalho</caption>
+                    <thead>
+                        <tr>
+                            <th>Jornada</th>
+                            <th>Período</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for jornada in setor.setorjornadahistorico_set.all %}
+                        <tr>
+                            <td>
+                                {% if forloop.counter == 1 %}
+                                    <strong>{{ jornada.jornada_trabalho }} (atual)</strong>
+                                {% else %}
+                                    {{ jornada.jornada_trabalho }}
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if jornada.data_fim_da_jornada %}
+                                    De {{ jornada.data_inicio_da_jornada }} até {{ jornada.data_fim_da_jornada|format }}
+                                {% else %}
+                                    A partir de {{ jornada.data_inicio_da_jornada }}
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+    {% endbox %}
+
+    {% if servidores or servidores_com_acesso %}
+        <div class="tab-pane" data-title="Servidores">
+            {% if chefes_atuais %}
+                {% box "Chefes" badge="Hoje" %}
+                    <div class="card-container">
+                        {% for chefe in funcoes_chefes_atuais %}
+                            <div class="card">
+                                <div class="photo"><img src="{{ chefe.servidor.get_foto_75x100_url }}" alt="Foto de {{ chefe.servidor.pessoa_fisica.nome }}"/></div>
+                                <h4>{{ chefe.servidor.pessoa_fisica.nome }}</h4>
+                                <dl>
+                                    <dt>Matrícula:</dt>
+                                    <dd><a href="/rh/servidor/{{ chefe.servidor.matricula }}/">{{ chefe.servidor.matricula }}</a>
+                                    </dd>
+                                    {% if chefe.servidor.cargo_emprego.nome.capitalize %}
+                                        <dt>Cargo:</dt>
+                                        <dd>{{ chefe.servidor.cargo_emprego.nome.capitalize }}</dd>
+                                    {% endif %}
+                                    <dt>Função:</dt>
+                                    {% for funcao in chefe.funcoes %}
+                                        <dd>{% if funcao.funcao.eh_substituicao_chefia %}{{ funcao.funcao.nome }} ({{ funcao.atividade.nome }}){% else %}{{ funcao.atividade.nome }}{% endif %}</dd>
+                                    {% endfor %}
+                                    <dt>Setor:</dt>
+                                    <dd>{{ chefe.servidor.setor|format }}</dd>
+                                    {% if chefe.servidor.email_institucional %}
+                                        <dt>E-mail:</dt>
+                                        <dd>{{ chefe.servidor.email_institucional|format }}</dd>
+                                    {% endif %}
+                                    <dt>Em PGD:</dt>
+                                    <dd>{{ chefe.servidor.esta_em_pgd|format }}</dd>
+                                </dl>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endbox %}
+            {% endif %}
+
+            {% if servidores %}
+                {% box "Ativos" badge=servidores.count %}
+                    <div class="card-container">
+                        {% for servidor in servidores %}
+                            <div class="card">
+                                <div class="photo"><img src="{{ servidor.get_foto_75x100_url }}" alt="Foto de {{ servidor.pessoa_fisica.nome }}"/>
+                                </div>
+                                <h4>{{ servidor.pessoa_fisica.nome }}</h4>
+                                <dl>
+                                    <dt>Matrícula:</dt>
+                                    <dd><a href="/rh/servidor/{{ servidor.matricula }}/">{{ servidor.matricula }}</a>
+                                    </dd>
+                                    {% if servidor.cargo_emprego.nome.capitalize %}
+                                        <dt>Cargo:</dt>
+                                        <dd>{{ servidor.cargo_emprego.nome.capitalize }}</dd>
+                                    {% endif %}
+                                    {% if servidor.funcao %}
+                                        <dt>Função:</dt>
+                                        <dd {% if servidor.funcao_atividade.nome == "COORDENADOR DE CURSO" %} class="hint hint-bottom" aria-label="{% for curso_campus in servidor.cursocampus_set.all %}{{ curso_campus.descricao_historico }}{% if not forloop.last %}; {% endif %}{% endfor %}"{% endif %}>{{ servidor.funcao_atividade.nome }}</dd>
+                                    {% endif %}
+                                    {% if servidor.email_institucional %}
+                                        <dt>Email:</dt>
+                                        <dd>{{ servidor.email_institucional }}</dd>
+                                    {% endif %}
+                                    <dt>Em PGD:</dt>
+                                    <dd>{{ servidor.esta_em_pgd|format }}</dd>
+                                </dl>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endbox %}
+            {% endif %}
+
+            {% if servidores_com_acesso %}
+                {% box "Possui este Setor como adicional" badge=servidores_com_acesso.count %}
+                    <div class="card-container">
+                        {% for servidor in servidores_com_acesso %}
+                            <div class="card">
+                                <div class="photo">
+                                    <img src="{{ servidor.get_foto_75x100_url }}" alt="Foto de {{ servidor.pessoa_fisica.nome }}">
+                                </div>
+                                <h4>{{ servidor.pessoa_fisica.nome }}</h4>
+                                <dl>
+                                    <dt>Matrícula:</dt>
+                                    <dd><a href="/rh/servidor/{{ servidor.matricula }}/">{{ servidor.matricula }}</a>
+                                    </dd>
+                                    {% if servidor.cargo_emprego.nome.capitalize %}
+                                        <dt>Cargo:</dt>
+                                        <dd>{{ servidor.cargo_emprego.nome.capitalize }}</dd>
+                                    {% endif %}
+                                    {% if servidor.funcao %}
+                                        <dt>Função:</dt>
+                                        <dd>{{ servidor.funcao_atividade.nome }}</dd>
+                                    {% endif %}
+                                    <dt>Setor:</dt>
+                                    <dd>{{ servidor.setor|format }}</dd>
+                                    {% if servidor.email_institucional %}
+                                        <dt>Email:</dt>
+                                        <dd>{{ servidor.email_institucional|format }}</dd>
+                                    {% endif %}
+                                    <dt>Em PGD:</dt>
+                                    <dd>{{ servidor.esta_em_pgd|format }}</dd>
+                                </dl>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endbox %}
+            {% endif %}
+
+            {% if servidores_inativos %}
+                {% box "Já foram deste Setor" badge=servidores_inativos.count %}
+                    <div class="table-responsive">
+                        <table>
+                            <caption>Servidores que já foram deste Setor</caption>
+                            <thead>
+                                <tr>
+                                    <th>Servidor</th>
+                                    <th>Matrícula</th>
+                                    <th>Data de Início no Setor</th>
+                                    <th>Data de Saída do Setor</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for servidor in servidores_inativos %}
+                                    <tr>
+                                        <td>{{ servidor.servidor.pessoa_fisica.nome }}</td>
+                                        <td>{{ servidor.servidor.matricula }}</td>
+                                        <td>{{ servidor.data_inicio_no_setor|format }}</td>
+                                        <td>{{ servidor.data_fim_no_setor|format }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endbox %}
+            {% endif %}
+        </div>
+    {% endif %}
+
+    {% if estagiarios or estagiarios_com_acesso %}
+        <div class="tab-pane" data-title="Estagiários">
+            {% if estagiarios %}
+                {% box "Ativos" badge=estagiarios.count %}
+                    <div class="card-container">
+                        {% for estagiario in estagiarios %}
+                            <div class="card">
+                                <div class="photo"><img src="{{ estagiario.get_foto_75x100_url }}" alt="Foto do estagiário"/></div>
+                                <h4>{{ estagiario.pessoa_fisica.nome }}</h4>
+                                <dl>
+                                    <dt>Matrícula:</dt>
+                                    <dd>
+                                        <a href="/rh/servidor/{{ estagiario.matricula }}/">{{ estagiario.matricula }}</a>
+                                    </dd>
+                                    {% if estagiario.email_notificacao %}
+                                        <dt>Email:</dt>
+                                        <dd>{{ estagiario.email_notificacao }}</dd>
+                                    {% endif %}
+                                </dl>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endbox %}
+            {% endif %}
+
+            {% if estagiarios_com_acesso %}
+                {% box "Com acesso ao Setor" badge=estagiarios_com_acesso.count %}
+                    <div class="card-container">
+                        {% for estagiario in estagiarios_com_acesso %}
+                            <div class="card">
+                                <div class="photo"><img src="{{ estagiario.get_foto_75x100_url }}" alt="Foto do estagiário"/></div>
+                                <h4>{{ estagiario.pessoa_fisica.nome }}</h4>
+                                <dl>
+                                    <dt>Matrícula:</dt>
+                                    <dd>
+                                        <a href="/rh/servidor/{{ estagiario.matricula }}/">{{ estagiario.matricula }}</a>
+                                    </dd>
+                                    <dt>Setor:</dt>
+                                    <dd>{{ estagiario.setor|format }}</dd>
+                                    {% if estagiario.email_notificacao %}
+                                        <dt>Email:</dt>
+                                        <dd>{{ estagiario.email_notificacao }}</dd>
+                                    {% endif %}
+                                </dl>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endbox %}
+            {% endif %}
+        </div>
+    {% endif %}
+
+    {% if prestadores or prestadores_com_acesso %}
+        <div class="tab-pane" data-title="Prestadores de Serviço">
+            {% if prestadores %}
+                {% box "Ativos" badge=prestadores.count %}
+                    <div class="card-container">
+                        {% for prestador in prestadores %}
+                            <div class="card">
+                                <div class="photo"><img src="{{ prestador.get_foto_75x100_url }}" alt="Foto do prestador"/></div>
+                                <h4>{{ prestador.pessoa_fisica.nome }}</h4>
+                                <dl>
+                                    <dt>CPF:</dt>
+                                    <dd>
+                                        <a href="/admin/comum/prestadorservico/{{ prestador.id }}/">{{ prestador.pessoa_fisica.cpf }}</a>
+                                    </dd>
+                                    {% if prestador.email_notificacao %}
+                                        <dt>Email:</dt>
+                                        <dd>{{ prestador.email_notificacao|format }}</dd>
+                                    {% endif %}
+                                </dl>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endbox %}
+            {% endif %}
+
+            {% if prestadores_com_acesso %}
+                {% box "Com acesso ao Setor" badge=prestadores_com_acesso.count %}
+                    <div class="card-container">
+                        {% for prestador in prestadores_com_acesso %}
+                            <div class="card">
+                                <div class="photo"><img src="{{ prestador.get_foto_75x100_url }}" alt="Foto do prestador"/></div>
+                                <h4>{{ prestador.pessoa_fisica.nome }}</h4>
+                                <dl>
+                                    <dt>CPF:</dt>
+                                    <dd>
+                                        <a href="/admin/comum/prestadorservico/{{ prestador.id }}/">{{ prestador.pessoa_fisica.cpf }}</a>
+                                    </dd>
+                                    <dt>Setor:</dt>
+                                    <dd>{{ prestador.setor|format }}</dd>
+                                    {% if prestador.email_notificacao %}
+                                        <dt>Email:</dt>
+                                        <dd>{{ prestador.email_notificacao|format }}</dd>
+                                    {% endif %}
+                                </dl>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endbox %}
+            {% endif %}
+        </div>
+    {% endif %}
+
+    {% if bolsistas %}
+        <div class="tab-pane" data-title="Bolsistas">
+            {% box "Ativos" badge=bolsistas.count %}
+                <div class="card-container">
+                    {% for bolsista in bolsistas %}
+                        <div class="card">
+                            <div class="photo"><img src="{{ bolsista.participacao.aluno.get_foto_75x100_url }}"
+                                      alt="Foto do bolsista"/></div>
+                            <h4>{{ bolsista.participacao.aluno.pessoa_fisica.nome }}</h4>
+                            <dl>
+                                <dt>CPF:</dt>
+                                <dd>
+                                    <a href="/edu/aluno/{{ bolsista.participacao.aluno.matricula }}/">{{ bolsista.participacao.aluno.pessoa_fisica.cpf }}</a>
+                                </dd>
+                                {% if bolsista.participacao.aluno.email_academico %}
+                                    <dt class="visually-hidden">Email:</dt>
+                                    <dd>{{ bolsista.participacao.aluno.email_academico }}</dd>
+                                {% endif %}
+                            </dl>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endbox %}
+        </div>
+    {% endif %}
+
+    {% if setor.bases_legais_internas %}
+        <div class="tab-pane" data-title="Bases Legais">
+            {% box "Interna" %}
+                {{ setor.bases_legais_internas|safe }}
+            {% endbox %}
+            {% box "Externa" %}
+                {{ setor.bases_legais_externas|safe }}
+            {% endbox %}
+        </div>
+    {% endif %}
+
+{% endblock %}

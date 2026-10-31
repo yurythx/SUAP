@@ -1,0 +1,83 @@
+{% extends super_template %}
+
+{% block content %}
+
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {% render_form form render_full=False submit_label=False %}
+        {% if formset %}
+            <div class="input-group-append mb-3">
+                <input type="button" value="Adicionar mais empenhos" id="adicionar_mais">
+            </div>
+
+            {{ formset.management_form }}
+
+            <div id="form_set">
+                {% for fiscal_form in formset %}
+                    {% render_form fiscal_form False %}
+                {% endfor %}
+            </div>
+
+            <div id="empty_form" class="d-none">
+                {% render_form formset.empty_form submit_label=False %}
+            </div>
+
+        {% endif %}
+
+        <div class="submit-row">
+            <input class="default" value="Salvar" type="submit">
+        </div>
+
+    </form>
+
+    <script type="text/javascript">
+    var timer_calculo;
+
+    $(document).ready(function() {
+        recalcular_total();
+    });
+
+    // Evento ao digitar: aguarda 0.5s para calcular
+    $(document).on('input', 'input[name$=valor]', function() {
+        clearTimeout(timer_calculo);
+        timer_calculo = setTimeout(function() {
+            recalcular_total();
+        }, 500);
+    });
+
+    $(document).on('blur', 'input[name$=valor]', function() {
+        clearTimeout(timer_calculo); // Cancela o timer se o usuário sair do campo antes dos 0.5s
+        recalcular_total();
+    });
+
+    $('#adicionar_mais').click(function() {
+        var form_idx = $('#id_documentos_empenho_medicao-TOTAL_FORMS').val();
+        $('#form_set').append($('#empty_form').html().replace(/__prefix__/g, form_idx));
+        $('#id_documentos_empenho_medicao-TOTAL_FORMS').val(parseInt(form_idx) + 1);
+
+        sync_widgets();
+    });
+
+    function recalcular_total() {
+        const valor_executado_element = $('input[name=valor_executado]');
+        let totalFloat = 0;
+
+        $('input[name$=valor]').each(function(){
+            const valString = $(this).val();
+            if (valString) {
+                // Remove pontos de milhar e troca vírgula por ponto decimal
+                const cleanVal = valString.replace(/\./g, '').replace(',', '.');
+                const parsed = parseFloat(cleanVal);
+                if (!isNaN(parsed)) {
+                    totalFloat += parsed;
+                }
+            }
+        });
+
+        // Atualiza o valor total formatado
+        valor_executado_element.val(
+            totalFloat.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        );
+    }
+    </script>
+{% endblock %}

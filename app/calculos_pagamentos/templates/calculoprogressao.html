@@ -1,0 +1,106 @@
+{% extends "calculos_pagamentos/templates/calculo.html" %}
+
+{% block actionBar %}
+    {% if perms.calculos_pagamentos.add_pagamento %}
+        {% if not calculo.pagamentos.exists %}
+            <li><a class="btn primary" title="Enviar Pagamento" href="/calculos_pagamentos/criar_pagamento/{{ calculo.id }}/">Enviar para módulo de Pagamento</a></li>
+            <li><a class="btn" title="Enviar para módulo Pagamento como Lançado Manualmente No SIAPE" href="/calculos_pagamentos/pagamento_lancado_manualmente/?calculo_id={{ calculo.id }}">
+                Pagamento lançado manualmente no SIAPE
+            </a></li>
+        {% else %}
+            <li><a class="btn" title="Ver Pagamento" href="/admin/calculos_pagamentos/pagamento/?calculo__id={{ calculo.id }}">Ver Pagamentos</a></li>
+        {% endif %}
+    {% endif %}
+    {% if not relatorio %}
+        <li><a class="btn" title="Relatório Detalhado" href="/calculos_pagamentos/relatorio_detalhado/{{ calculo.id }}/">Relatório Detalhado</a></li>
+    {% endif %}
+{% endblock %}
+
+{% block periodos %}
+
+{% box "Períodos do Cálculo" %}
+
+	{% if calculo.periodoprogressao_set.exists %}
+		<table>
+		    <thead>
+		        <tr>
+                    <th colspan="3"></th>
+                    <th {% if calculo.servidor.eh_docente %}colspan="3"{% else %}colspan="2"{% endif %} class="text-center">Anterior</th>
+                    <th {% if calculo.servidor.eh_docente %}colspan="3"{% else %}colspan="2"{% endif %} class="text-center">Novo</th>
+                    <th colspan="5"></th>
+                </tr>
+                <tr style="word-break: break-word;"> {# IFMA/Tássio: Esse style funciona, mas não mostra hifens #}
+					<th>#</th>
+					<th>Data Inicial</th>
+					<th>Data Final</th>
+                    <th>{% if calculo.servidor.eh_docente %}Nível{% else %}Padrão{% endif %} de Ven&shy;ci&shy;men&shy;to</th>
+                    <th>Jornada de Trabalho</th>
+                    {% if calculo.servidor.eh_docente %}
+                        <th>Titulação</th>
+                    {% endif %}
+                    <th>{% if calculo.servidor.eh_docente %}Nível{% else %}Padrão{% endif %} de Ven&shy;ci&shy;men&shy;to</th>
+                    <th>Jornada de Trabalho</th>
+                    {% if calculo.servidor.eh_docente %}
+					    <th>Titulação</th>
+                    {% endif %}
+                    <th>Anuênio</th>
+                    <th>Ad. de Pe&shy;ri&shy;cu&shy;lo&shy;si&shy;da&shy;de</th>
+                    <th>Ad. de In&shy;sa&shy;lu&shy;bri&shy;da&shy;de</th>
+                    {% if not calculo.servidor.eh_docente %}
+                        <th>Inc. à Qua&shy;li&shy;fi&shy;ca&shy;ção</th>
+                    {% endif %}
+                    <th>Férias</th>
+		        </tr>
+		    </thead>
+		    <tbody>
+		        {% for periodo in calculo.periodoprogressao_set.all %}
+                    <tr>
+                        <td>{{ forloop.counter }}°</td>
+                        <td>{{ periodo.data_inicio|format }}</td>
+                        <td>{{ periodo.data_fim|format }}</td>
+                        {% if calculo.servidor.eh_docente %}
+                            <td>{{ periodo.nivel_passado|format }}</td>
+                        {% else %}
+                            <td>{{ calculo.servidor.cargo_classe }} - {{ periodo.padrao_vencimento_passado|format }}<br>({{ periodo.nivel_passado|format }})</td>
+                        {% endif %}
+                        <td>{{ periodo.jornada_passada|format }}</td>
+                        {% if calculo.servidor.eh_docente %}
+                            <td>{{ periodo.titulacao_passada|format|title }}</td>
+                        {% endif %}
+
+                        {% if calculo.servidor.eh_docente %}
+                            <td>{{ periodo.nivel|format }}</td>
+                        {% else %}
+                            <td>{{ calculo.servidor.cargo_classe }} - {{ periodo.padrao_vencimento_novo|format }}<br>({{ periodo.nivel|format }})</td>
+                        {% endif %}
+                        <td>{{ periodo.jornada|format }}</td>
+                        {% if calculo.servidor.eh_docente %}
+                            <td>{{ periodo.titulacao_nova|format|title }}</td>
+                        {% endif %}
+                        <td>{{ periodo.anuenio|format }}%</td>
+                        <td>{{ periodo.periculosidade|yesno:"10%,0%"|format }}</td>
+                        <td>{{ periodo.insalubridade|format }}%</td>
+                        {% if not calculo.servidor.eh_docente %}
+                            <td>{{ periodo.iq|format }}%</td>
+                        {% endif %}
+                        <td>
+                            <a class="btn success" href="/admin/calculos_pagamentos/{{ tipo_periodo }}/{{ periodo.id }}/change/">Escolher Férias</a>
+                            <p><br/>Férias cadastradas:</p>
+                            {% if periodo.get_ferias.exists %}
+                                {% for ferias in periodo.get_ferias.all %}
+                                    <p>- {{ ferias.ano_referencia|format }}: {{ ferias.data_inicio.month|format }}/{{ ferias.data_inicio.year|format }}</p>
+                                {% endfor %}
+                            {% else %}
+                                <p>- Nenhuma</p>
+                            {% endif %}
+                        </td>
+                    </tr>
+		        {% endfor %}
+		    </tbody>
+		</table>
+	{% else %}
+		<p class="alert alert-warning">OPS! Houve um erro ao buscar os períodos.</p>
+	{% endif %}
+{% endbox %}
+
+{% endblock %}

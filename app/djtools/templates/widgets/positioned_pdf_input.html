@@ -1,0 +1,297 @@
+<style>
+  #pdf-stamp-container {
+    position: absolute;
+    visibility: hidden;
+    z-index: 9;
+  }
+  #pdf-stamp {
+    cursor: move;
+  }
+  #pdf-contents {
+    visibility: hidden;
+  }
+  #pdf-meta {
+    align-items: center;
+    display: flex;
+    gap: 7rem;
+    margin-top: 1rem;
+  }
+  #pdf-buttons {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+  }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.2.228/pdf.min.js"></script>
+
+{{ widget }}
+<input type="hidden" id="pdf-coords" name="pdf-coords" value="0:0">
+<input type="hidden" id="pdf-page" name="pdf-page" value="1">
+
+<div id="pdf-stamp-label" class="grid-area-empty3 mt-4 text-end d-none">Posicione o carimbo em todas as páginas:</div>
+<div id="pdf-stamp-wrapper" class="grid-area-preview mt-4 d-none">
+  <div id="pdf-stamp-container">
+    <div id="pdf-stamp">
+      <img src="/static/comum/img/carimbo.png" width="170px" alt="Carimbo">
+    </div>
+  </div>
+  <div id="pdf-main-container" width="500px">
+    <div id="pdf-contents">
+      <canvas id="pdf-canvas" width="400"></canvas>
+      <div id="pdf-meta">
+        <div id="page-count-container">
+          Página <span id="pdf-current-page"></span> de <span id="pdf-total-pages"></span>
+        </div>
+        <div id="pdf-buttons">
+          <button id="pdf-prev" class="btn">Página anterior</button>
+          <button id="pdf-next" class="btn">Próxima página</button>
+        </div>
+      </div>
+      <div id="pdf-loader"></div>
+      <div id="page-loader"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  var _PDF_DOC,
+    _CURRENT_PAGE,
+    _TOTAL_PAGES,
+    _PAGE_RENDERING_IN_PROGRESS = 0,
+    _CANVAS = document.querySelector("#pdf-canvas"),
+    _WIDTH = 0,
+    _HEIGHT = 0;
+  var _TOP,
+    _LEFT = 0;
+
+  // initialize and load the PDF
+  async function showPDF(typedarray) {
+    document.querySelector("#pdf-stamp-wrapper").classList.remove("d-none");
+    document.querySelector("#pdf-stamp-label").classList.remove("d-none");
+    document.querySelector("#pdf-loader").style.display = "block";
+
+    // get handle of pdf document
+    try {
+      _PDF_DOC = await pdfjsLib.getDocument(typedarray); //({ url: pdf_url });
+    } catch (error) {
+      alert(error.message);
+    }
+
+    // total pages in pdf
+    _TOTAL_PAGES = _PDF_DOC.numPages;
+
+    // Hide the pdf loader and show pdf container
+    document.querySelector("#pdf-loader").style.display = "none";
+    document.querySelector("#pdf-contents").style.display = "block";
+    document.querySelector("#pdf-total-pages").innerHTML = _TOTAL_PAGES;
+
+    // show the first page
+    showPage(1);
+    function showStamp() {
+      resetStampPosition();
+      $("#pdf-contents").css("visibility", "visible");
+    }
+    setTimeout(showStamp, 1000);
+  }
+  function resetStampPosition() {
+    var canvas = $("#pdf-canvas");
+    var stamp = $("#pdf-stamp-container");
+
+    if (canvas.length && stamp.length) {
+      var pos = canvas.position();
+
+      // Posiciona exatamente no topo esquerdo do canvas
+      stamp.css({
+        top: pos.top + "px",
+        left: pos.left + "px",
+        visibility: "visible",
+      });
+
+      // Atualiza as variáveis globais e o input para 0:0
+      _TOP = "0.00";
+      _LEFT = "0.00";
+      $("#pdf-coords").val(_TOP + ":" + _LEFT);
+    }
+  }
+  // load and render specific page of the PDF
+  async function showPage(page_no) {
+    $("#pdf-page").val(page_no);
+    _PAGE_RENDERING_IN_PROGRESS = 1;
+    _CURRENT_PAGE = page_no;
+
+    // disable Previous & Next buttons while page is being loaded
+    document.querySelector("#pdf-next").disabled = true;
+    document.querySelector("#pdf-prev").disabled = true;
+
+    // while page is being rendered hide the canvas and show a loading message
+    document.querySelector("#pdf-canvas").style.display = "none";
+    document.querySelector("#page-loader").style.display = "block";
+
+    // update current page
+    document.querySelector("#pdf-current-page").innerHTML = page_no;
+
+    // get handle of page
+    try {
+      var page = await _PDF_DOC.getPage(page_no);
+    } catch (error) {
+      alert(error.message);
+    }
+
+    // original width of the pdf page at scale 1
+    var pdf_original_width = page.getViewport(1).width;
+
+    // as the canvas is of a fixed width we need to adjust the scale of the viewport where page is rendered
+    var scale_required = _CANVAS.width / pdf_original_width;
+
+    // get viewport to render the page at required scale
+    var viewport = page.getViewport(scale_required);
+
+    // set canvas height same as viewport height
+    _CANVAS.height = viewport.height;
+
+    // setting page loader height for smooth experience
+    document.querySelector("#page-loader").style.height = _CANVAS.height + "px";
+    document.querySelector("#page-loader").style.lineHeight =
+      _CANVAS.height + "px";
+
+    var render_context = {
+      canvasContext: _CANVAS.getContext("2d"),
+      viewport: viewport,
+    };
+
+    // render the page contents in the canvas
+    try {
+      await page.render(render_context);
+      setTimeout(resetStampPosition, 100);
+      _WIDTH = page.view[2];
+      _HEIGHT = page.view[3];
+
+      // AJUSTE DO CARIMBO APÓS RENDERIZAR
+      var stamp = $("#pdf-stamp-container");
+      var canvas = $("#pdf-canvas");
+
+      // Se o carimbo ficou abaixo do novo limite do canvas, sobe ele
+      var maxTop = canvas.position().top + canvas.height() - stamp.height();
+      if (stamp.position().top > maxTop) {
+        stamp.css("top", maxTop + "px");
+      }
+    } catch (error) {
+      alert(error.message);
+    }
+
+    _PAGE_RENDERING_IN_PROGRESS = 0;
+
+    // re-enable Previous & Next buttons
+    document.querySelector("#pdf-next").disabled = false;
+    document.querySelector("#pdf-prev").disabled = false;
+
+    // show the canvas and hide the page loader
+    document.querySelector("#pdf-canvas").style.display = "block";
+    document.querySelector("#page-loader").style.display = "none";
+    updateUI();
+  }
+
+  function updateUI() {
+    // Desabilita "Primeira Página" se estiver na página 1
+    document.querySelector("#pdf-prev").disabled = _CURRENT_PAGE <= 1;
+
+    // Desabilita "Última Página" se estiver na última
+    document.querySelector("#pdf-next").disabled =
+      _CURRENT_PAGE >= _TOTAL_PAGES;
+  }
+  // click on the "Previous" page button
+  document.querySelector("#pdf-prev").addEventListener("click", function () {
+    if (_CURRENT_PAGE > 1) showPage(_CURRENT_PAGE - 1);
+  });
+
+  // click on the "Next" page button
+  document.querySelector("#pdf-next").addEventListener("click", function () {
+    if (_CURRENT_PAGE < _TOTAL_PAGES) showPage(_CURRENT_PAGE + 1);
+  });
+
+  //Make the DIV element draggagle:
+  dragElement(document.getElementById("pdf-stamp-container"));
+
+  function dragElement(elmnt) {
+    var pos1 = 0,
+      pos2 = 0,
+      pos3 = 0,
+      pos4 = 0;
+    if (document.getElementById(elmnt.id + "header")) {
+      /* if present, the header is where you move the DIV from:*/
+      document.getElementById(elmnt.id + "header").onmousedown = dragMouseDown;
+    } else {
+      /* otherwise, move the DIV from anywhere inside the DIV:*/
+      elmnt.onmousedown = dragMouseDown;
+    }
+
+    function dragMouseDown(e) {
+      e = e || window.event;
+      e.preventDefault();
+      // get the mouse cursor position at startup:
+      pos3 = e.clientX;
+      pos4 = e.clientY;
+      document.onmouseup = closeDragElement;
+      // call a function whenever the cursor moves:
+      document.onmousemove = elementDrag;
+    }
+
+    function elementDrag(e) {
+      e = e || window.event;
+      e.preventDefault();
+
+      pos1 = pos3 - e.clientX;
+      pos2 = pos4 - e.clientY;
+      pos3 = e.clientX;
+      pos4 = e.clientY;
+
+      var canvas = $("#pdf-canvas");
+      var stamp = $("#pdf-stamp-container");
+
+      // Posição pretendida
+      var newTop = elmnt.offsetTop - pos2;
+      var newLeft = elmnt.offsetLeft - pos1;
+
+      // Limites baseados no PDF Canvas
+      var minTop = canvas.position().top;
+      var maxTop = minTop + canvas.height() - stamp.height();
+      var minLeft = canvas.position().left;
+      var maxLeft = minLeft + canvas.width() - stamp.width();
+
+      // Aplica restrição de movimento (Boundary Box)
+      if (newTop < minTop) newTop = minTop;
+      if (newTop > maxTop) newTop = maxTop;
+      if (newLeft < minLeft) newLeft = minLeft;
+      if (newLeft > maxLeft) newLeft = maxLeft;
+
+      // Define a posição final no estilo
+      elmnt.style.top = newTop + "px";
+      elmnt.style.left = newLeft + "px";
+
+      // Calcula a porcentagem relativa apenas ao conteúdo do PDF
+      _TOP = parseFloat((100 * (newTop - minTop)) / canvas.height()).toFixed(2);
+      _LEFT = parseFloat((100 * (newLeft - minLeft)) / canvas.width()).toFixed(
+        2,
+      );
+
+      $("#pdf-coords").val(_TOP + ":" + _LEFT);
+    }
+
+    function closeDragElement() {
+      /* stop moving when mouse button is released:*/
+      document.onmouseup = null;
+      document.onmousemove = null;
+    }
+  }
+
+  //showPDF('/static/fluxograma.pdf');
+  document.getElementById("{{ id }}").onchange = function (event) {
+    var file = event.target.files[0];
+    var fileReader = new FileReader();
+    fileReader.onload = function () {
+      var typedarray = new Uint8Array(this.result);
+      showPDF(typedarray);
+    };
+    fileReader.readAsArrayBuffer(file);
+  };
+</script>

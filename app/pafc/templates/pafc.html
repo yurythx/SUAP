@@ -1,0 +1,2014 @@
+{% extends super_template %}
+
+{% load pafc_tags %}
+
+{% block extrahead %}
+    <script>
+        $( document ).on("click", ".tab-changer", (evento) => {
+            evento.preventDefault();
+            change_tab($(evento.currentTarget).attr("data-tab-destino"));
+        })
+
+        function change_tab(aba){
+            if (aba.includes("/")) {
+                window.location.href = aba
+            } else {
+                if (aba.includes("#")) {
+                    a = aba.substring(0, aba.indexOf("#"));
+                    ancora = aba.substring(aba.indexOf("#")+1);
+                    changeTabs(a);
+                    const elemAncora = document.getElementById(ancora);
+                    if (elemAncora) elemAncora.scrollIntoView();
+                }
+                else{
+                    changeTabs(aba)
+                }
+            }
+        };
+    </script>
+{% endblock %}
+
+{% block object-status %}
+    <ul class="steps">
+        {% for descricao, ativo in obj.get_progresso %}
+            <li aria-label="{{ descricao }}" class="hint hint-bottom">
+                <span class="step-{% if descricao == 'Em solicitação' %}info{% elif descricao == 'Aprovado' or descricao == 'Finalizado' %}success{% else %}alert{% endif %} {% if ativo %}active{% endif %}">{{ descricao }}</span>
+            </li>
+        {% endfor %}
+    </ul>
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if pode_solicitar_portaria_comissao_elaboracao and obj.pode_ter_portaria_comissao_elaboracao_solicitada %}
+            <li><a class="btn success" href="?acao=solicitar_portaria_comissao_elaboracao">Solicitar Portaria da Comissão de Elaboração</a></li>
+        {% endif %}
+        {% if pode_solicitar_tramitacao_ad_referendum %}
+            <li><a class="btn success popup" href="{% url 'solicitar_tramitacao_ad_referendum_pafc' obj.pk %}">{% icone "clipboard-check" %} Solicitar tramitação Ad Referendum</a></li>
+        {% endif %}
+        {% for doc in documentos_emissao %}
+            <li><a class="btn success popup" href="/pafc/pafc/{{ obj.pk }}/emitir_documento/{{ doc }}/">{% icone "share" %} Emitir {{ doc }}</a></li>
+        {% endfor %}
+
+        {% if obj.em_elaboracao and is_elaborador and tem_permissao_edicao and obj.pode_ser_enviado_para_analise_preliminar %}
+            <li><a class="btn success" href="?acao=enviar_para_analise_preliminar">{% icone "share" %} Enviar para análise preliminar</a></li>
+        {% endif %}
+        {% if obj.em_elaboracao and is_elaborador and tem_permissao_edicao and obj.pode_ser_enviado_para_revisao_tecnica or obj.em_analise_preliminar and is_validador and tem_permissao_edicao and obj.pode_ser_enviado_para_revisao_tecnica %}
+            <li><a class="btn success" href="?acao=enviar_para_revisao_tecnica">{% icone "share" %} Enviar para revisão técnica</a></li>
+        {% endif %}
+        {% if pode_enviar_para_validacao and obj.pode_ser_enviado_para_validacao %}
+            <li><a class="btn success" href="?acao=enviar_para_validacao">{% icone "share" %} Enviar para validação</a></li>
+        {% endif %}
+        {% if pode_ter_curso_criado and pode_criar_curso %}
+            <li><a class="btn success popup" href="/pafc/pafc/{{ obj.pk }}/criar_curso">{% icone "folder-plus" %} Criar curso</a></li>
+        {% endif %}
+        {% if pode_ter_curso_atualizado and pode_atualizar_curso %}
+            <li><a class="btn success popup" href="/pafc/pafc/{{ obj.id }}/atualizar_curso">{% icone "save" %} Atualizar curso</a></li>
+        {% endif %}
+        {% if pode_convocar_camara %}
+            <li><a class="btn primary popup" href="/pafc/pafc/{{ obj.pk }}/convocar_camara/">{% icone "edit" %} {% if obj.data_convocacao_camara %}Editar{% else %}Informar{% endif %} dados da Câmara</a></li>
+        {% endif %}
+        {% if pode_convocar_consepex %}
+            <li><a class="btn primary popup" href="/pafc/pafc/{{ obj.pk }}/convocar_consepex/">{% icone "edit" %} {% if obj.data_convocacao_consepex or obj.consepex_inexistente %}Editar{% else %}Informar{% endif %} dados do CONSEPEX</a></li>
+        {% endif %}
+        {% if pode_convocar_consup %}
+            <li><a class="btn primary popup" href="/pafc/pafc/{{ obj.pk }}/convocar_consup/">{% icone "edit" %} {% if obj.data_convocacao_consup %}Editar{% else %}Informar{% endif %} dados do CONSUP</a></li>
+        {% endif %}
+        {% if pode_ser_finalizado and pode_finalizar %}
+            <li><a class="btn success popup" href="{% url 'finalizar_pafc' obj.pk %}">{% icone "lock" %} Finalizar</a></li>
+        {% endif %}
+        {% if obj.pode_ser_editado and obj|method:"pode_editar"|call:request.user %}
+            <li><a class="btn primary" href="/admin/pafc/pafc/{{ obj.id }}/">{% icone "edit" %}Editar</a></li>
+        {% endif %}
+        {% if pode_solicitar_correcao_nos_conselhos %}
+            <li><a class="btn warning popup" href="{% url 'solicitar_correcao_pafc' obj.pk %}">{% icone "tasks" %} Solicitar correção</a></li>
+        {% endif %}
+        {% if is_revisor_tecnico and tem_permissao_edicao or is_validador and tem_permissao_edicao %}
+            {% if obj.pode_ser_devolvido_para_elaboracao %}
+                <li><a class="btn danger" href="?acao=devolver_para_elaboracao">{% icone "undo" %} Devolver para elaboração</a></li>
+            {% endif %}
+        {% endif %}
+        {% if obj.pode_ser_arquivado and obj|method:"pode_arquivar"|call:request.user %}
+            <li><a class="btn danger popup" href="{% url 'arquivar_pafc' obj.pk %}">{% icone "archive" %}Arquivar</a></li>
+        {% endif %}
+        {% if obj.is_finalizado %}
+            <li><a class="btn" href="{% url 'pafc_pdf' obj.pk %}">{% icone "file-pdf" %} Baixar PAFC</a></li>
+        {% elif not obj.em_etapas_de_solicitacao %}
+            <li><a class="btn" href="{% url 'minuta_pafc' obj.pk %}">{% icone "file-pdf" %} Gerar minuta</a></li>
+        {% endif %}
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+    {% if obj.ad_referendum and obj.situacao == obj.AGUARDANDO_APROVACAO_CONSEPEX or obj.situacao == obj.AGUARDANDO_APROVACAO_CONSUP %}
+        <p class="alert alert-info"><strong>Atenção:</strong> Foi indicado pela {{ obj.proreitoria }} a tramitação Ad Referendum deste PAFC.</p>
+    {% endif %}
+
+    {% if obj.is_aprovado %}
+        {% if obj.is_pafc_criacao and obj.curso %}
+            <p class="alert alert-info"><strong>Atenção:</strong> O curso já foi criado.</p>
+        {% endif %}
+        {% if obj.is_pafc_adequacao and obj.data_atualizacao_curso %}
+            <p class="alert alert-info"><strong>Atenção:</strong> O curso foi atualizado com os dados do PAFC.</p>
+        {% endif %}
+    {% endif %}
+
+    {% if pendencias %}
+        <p class="alert alert-warning"><strong>Atenção:</strong> Este projeto possui <a href="#" class="tab-changer" data-tab-destino="pendencias#abas">pendências não resolvidas</a>.</p>
+    {% endif %}
+
+    {% if not pode_emitir_aprovacoes_conselhos %}
+        {% if obj.em_aprovacao_conselhos or obj.is_aprovado %}
+            <p class="alert alert-danger">
+                <strong>Atenção:</strong> O PPC associado a este PAFC ainda <strong>não foi aprovado</strong>.
+                Os conselhos só poderão emitir suas decisões após aprovação do PPC.
+            </p>
+        {% endif %}
+    {% endif %}
+
+    {% if is_elaborador or is_revisor_tecnico or is_validador and tem_permissao_edicao %}
+        {% if obj.justificativa_decisao_consepex or obj.justificativa_decisao_consup %}
+            <p class="alert alert-{% if is_elaborador %}danger{% else %}warning{% endif %}">
+                <strong>Atenção:</strong> o {% if obj.justificativa_decisao_consepex %}Consepex{% else %}Consup{% endif %} solicitou correção.
+                Acesse a aba correspondente e o documento anexado para mais detalhes sobre a decisão.
+            </p>
+        {% endif %}
+    {% endif %}
+
+    {% if obj.situacao == obj.AGUARDANDO_APROVACAO_CONSUP and obj.decisao_consepex == obj.DECISAO_REPROVAR %}
+        <p class="alert alert-danger"><strong>Atenção:</strong> O Consepex <strong>reprovou</strong> este PAFC.</p>
+    {% endif %}
+
+    {% box "Dados gerais" %}
+        <dl class="definition-list flex">
+            <div class="list-item flex-basis-100">
+                <dt>Nome do Curso</dt>
+                <dd>{{ obj.nome_curso }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Modelo</dt>
+                <dd><a href="{{ obj.modelo.get_absolute_url }}">{{ obj.modelo }}</a></dd>
+            </div>
+            <div class="list-item">
+                <dt>PPC</dt>
+                <dd><a href="{{ obj.ppc.get_absolute_url }}">{{ obj.ppc|format }}</a></dd>
+            </div>
+            <div class="list-item">
+                <dt>Tipo de tramitação</dt>
+                <dd>{{ obj.get_tipo_tramitacao }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Identificador do PAFC</dt>
+                <dd>{{ obj.id }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Situação</dt>
+                <dd>{{ obj.get_situacao_display|status }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Campus</dt>
+                <dd>
+                    {{ obj.setor.uo.nome|normalizar }}
+                </dd>
+            </div>
+            <div class="list-item">
+                <dt>Endereço do campus</dt>
+                <dd>
+                    <p>{{ obj.get_endereco_campus_normalizado }}</p>
+                </dd>
+            </div>
+            <div class="list-item">
+                <dt>Portaria da Comissão de Elaboração</dt>
+                <dd>
+                    {% if obj.portaria_comissao_elaboracao_vigente %}
+                        <a class="btn default" href="{{ obj.portaria_comissao_elaboracao_vigente.get_url_documento }}">Acessar documento</a>
+                    {% else %}
+                        -
+                    {% endif %}
+                </dd>
+            </div>
+            {% if obj.proreitoria %}
+                <div class="list-item">
+                    <dt>Pró-Reitoria</dt>
+                    <dd>
+                        {{ obj.proreitoria|format }}
+                        {% if obj.pode_ser_editado and tem_permissao_administrador %}
+                            <a class="btn primary popup" href="/pafc/pafc/{{ obj.id }}/editar_proreitoria/">Editar</a>
+                        {% endif %}
+                    </dd>
+                </div>
+            {% endif %}
+        </dl>
+    {% endbox %}
+
+    <span id="abas"></span>
+    <div class="tab-pane" data-title="Dados gerais" data-tab="dados_gerais">
+
+        {% box "Gestão" %}
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>Reitor</dt>
+                <dd>{{ obj.reitor }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Pro-Reitor de Ensino</dt>
+                <dd>{{ obj.pro_reitor_ensino }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Pro-Reitor de Pesquisa</dt>
+                <dd>{{ obj.pro_reitor_pesquisa }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Pro-Reitor de Extensão</dt>
+                <dd>{{ obj.pro_reitor_extensao }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Diretor Geral</dt>
+                <dd>{{ obj.diretor_geral }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Diretor Acadêmico</dt>
+                <dd>{{ obj.diretor_academico }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Coordenador de Pesquisa</dt>
+                <dd>{{ obj.coordenador_pesquisa }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Coordenador de Extensão</dt>
+                <dd>{{ obj.coordenador_extensao }}</dd>
+            </div>
+        </dl>
+        {% endbox %}
+
+        <span id="dados_curso"></span>
+        {% box "Dados do Curso" %}
+
+        {% if obj.pode_ser_editado and tem_permissao_edicao %}
+            <ul class="action-bar">
+                <li>
+                    <a class="btn primary popup" href="/pafc/editar_dados_do_curso/{{ obj.id }}/">
+                        {% icone "edit" %}Editar dados do curso
+                    </a>
+                </li>
+            </ul>
+        {% endif %}
+
+        <dl class="definition-list flex">
+            <div class="list-item flex-basis-50">
+                <dt>Curso já ofertado no campus</dt>
+                <dd>{{ obj.curso_ja_ofertado_campus|format }}</dd>
+            </div>
+            <div class="list-item flex-basis-50">
+                {% if obj.curso_ja_ofertado_campus %}
+                    <dt>Curso a ser atualizado</dt>
+                    <dd>
+                        <p><a href="{{ obj.curso.get_absolute_url }}">{{ obj.curso|format }}</a> (Atualizado em: {{ obj.data_atualizacao_curso|format }})</p>
+                    </dd>
+                {% else %}
+                    <dt>Ata do CODIAC autorizando solicitação do PAFC</dt>
+                    <dd><a class="btn default" href="{{ obj.ata_reuniao_codiac.get_absolute_url }}">Ver documento</a></dd>
+                {% endif %}
+            </div>
+            <div class="list-item flex-basis-50">
+                <dt>Total de vagas ofertadas anualmente</dt>
+                <dd>
+                    {{ obj.numero_vagas_curso|format }}
+                    {% if quantidade_de_vagas_aumentou %}
+                        <span class="obs false">
+                        {% if obj.curso.quantidade_vagas is None %}
+                            (o curso não definiu quantidade de vagas; o PAFC vai considerar que se trata de alteração)
+                        {% else %}
+                            (aumentou de {{ obj.curso.quantidade_vagas|format }} para {{ obj.numero_vagas_curso|format }})
+                        {% endif %}
+                        </span>
+                    {% elif quantidade_de_vagas_diminuiu %}
+                        <span class="obs true">
+                            (reduziu de {{ obj.curso.quantidade_vagas|format }} para {{ obj.numero_vagas_curso|format }})
+                        </span>
+                    {% else %}
+                        <span class="obs">
+                            (mesma quantidade atual)
+                        </span>
+                    {% endif %}
+                </dd>
+            </div>
+            <div class="list-item flex-basis-50">
+                <dt>Início da oferta</dt>
+                <dd>
+                    {% if not obj.ano_letivo_primeira_oferta %}
+                        <span class="status status-error">Não definido</span>
+                    {% else %}
+                        {{ obj.get_texto_inicio_oferta }}
+                    {% endif %}
+                </dd>
+            </div>
+            <div class="list-item flex-basis-25">
+                <dt>Previsto no PDI</dt>
+                <dd>{{ obj.previsto_pdi|format }}</dd>
+            </div>
+            {% if not obj.previsto_pdi %}
+            <div class="list-item flex-basis-75">
+                <dt>Justificativa de Ausência no PDI</dt>
+                <dd>{{ obj.justificativa_ausencia_pdi|format }}</dd>
+            </div>
+            {% endif %}
+            {% if obj.is_pafc_criacao and obj.curso %}
+            <div class="list-item flex-basis-100">
+                <dt>Curso criado por este PAFC</dt>
+                <dd><a href="{{ obj.curso.get_absolute_url }}">{{ obj.curso|format }}</a></dd>
+            </div>
+            {% endif %}
+        </dl>
+        {% endbox %}
+    </div>
+
+    <div class="tab-pane" data-title="Equipe" data-tab="equipe" data-checked="{{ is_equipe_definida }}">
+
+        <span id="comissao_elaboracao"></span>
+        {% box "Comissão de Elaboração" %}
+
+            {% with pode_alterar_elaboradores=obj|method:"pode_alterar_elaboradores"|call:request.user %}
+                {% if obj.pode_ter_comissao_editada and pode_alterar_elaboradores %}
+                    <ul class="action-bar">
+                        <li><a class="btn primary" href="/admin/pafc/pafc/{{ obj.pk }}/change/?comissao=1">Editar comissão</a></li>
+                    </ul>
+                {% endif %}
+
+                {% if obj.membrocomissaopafc_set.exists %}
+                    <div class="table-responsive">
+                        <table>
+                            <caption>Elaboradores cadastrados</caption>
+                            <thead>
+                                <tr>
+                                    {% if pode_alterar_elaboradores %}
+                                        <th>Ações</th>
+                                    {% endif %}
+                                    <th>#</th>
+                                    <th>Servidor</th>
+                                    <th>Função</th>
+                                    <th>Permissão</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for membro in obj.membrocomissaopafc_set.all %}
+                                    <tr>
+                                        {% if pode_alterar_elaboradores %}
+                                            <td>{% icon "edit" "/pafc/editar_elaborador_pafc/{{ membro.pk }}/" "Editar" "popup" %}</td>
+                                        {% endif %}
+                                        <td>{{ forloop.counter }}</td>
+                                        <td>{{ membro.servidor }}</td>
+                                        <td>{{ membro.get_funcao_display|format }}</td>
+                                        <td>{{ membro.get_permissao_display|format }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="alert alert-warning">Nenhum membro adicionado. O processo só poderá prosseguir quando os membros da comissão forem informados.</p>
+                {% endif %}
+            {% endwith %}
+        {% endbox %}
+
+        <span id="colaboradores"></span>
+        {% box "Colaboradores (opcional)" %}
+
+            {% with pode_alterar_colaboradores=obj|method:"pode_alterar_colaboradores"|call:request.user %}
+                {% if obj.pode_ter_colaboradores_editados and pode_alterar_colaboradores %}
+                    <ul class="action-bar">
+                        <li><a class="btn popup primary" href="/pafc/editar_colaboradores/{{ obj.id }}/">Editar colaboradores</a></li>
+                    </ul>
+                {% endif %}
+                <div class="alert alert-info">
+                    <p>Este espaço está destinado para dar crédito, caso seja necessário, às pessoas que contribuíram na
+                       elaboração deste PAFC, mas não fizeram parte de sua comissão de elaboração.
+                    </p>
+                </div>
+
+                {% if obj.colaboradores.exists %}
+                    <div class="table-responsive">
+                        <table>
+                            <caption>Colaboradores cadastrados</caption>
+                            <thead>
+                                <tr>
+                                    {% if obj.pode_ter_colaboradores_editados and pode_alterar_colaboradores %}
+                                        <th class="no-print field-get_acoes">
+                                            Ações
+                                        </th>
+                                    {% endif %}
+                                    <th>#</th>
+                                    <th>Colaborador</th>
+                                    <th>Vínculo</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for colaborador in obj.colaboradores.all|dictsort:"nome" %}
+                                    <tr>
+                                        {% if obj.pode_ter_colaboradores_editados and pode_alterar_colaboradores %}
+                                            <td class="no-print field-get_acoes">
+                                                {% icon "delete" "/pafc/remover_colaborador/{{ obj.pk }}/{{ colaborador.pk }}" "Remover" %}
+                                            </td>
+                                        {% endif %}
+                                        <td>{{ forloop.counter }}</td>
+                                        <td>
+                                            {% if not colaborador.eh_prestador %}
+                                                {{ colaborador.relacionamento|normalizar }}
+                                            {% else %}
+                                                {{ colaborador.pessoa.nome|normalizar }} ({{ colaborador.relacionamento.pessoa_fisica.cpf|anonimizar_cpf }})
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ colaborador.user.get_tipo }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="alert alert-warning">Nenhum colaborador adicionado.</p>
+                {% endif %}
+            {% endwith %}
+        {% endbox %}
+
+        <span id="revisores_tecnicos"></span>
+        {% box "Revisores Técnicos" %}
+
+            {% with pode_editar_revisores_tecnicos=obj|method:"pode_alterar_revisores_tecnicos"|call:request.user %}
+
+                {% if obj.pode_ter_equipe_revisao_tecnica_editada and pode_editar_revisores_tecnicos %}
+                    <ul class="action-bar">
+                        <li><a class="btn primary" href="/admin/pafc/pafc/{{ obj.pk }}/change/?revisao_tecnica=1">Editar revisores técnicos</a></li>
+                    </ul>
+                {% endif %}
+
+                {% if obj.revisortecnicopafc_set.exists %}
+                    <div class="table-responsive">
+                        <table>
+                            <caption>Revisores técnicos cadastrados</caption>
+                            <thead>
+                                <tr>
+                                    {% if pode_editar_revisores_tecnicos %}
+                                        <th>Ações</th>
+                                    {% endif %}
+                                    <th>#</th>
+                                    <th>Servidor</th>
+                                    <th>Função</th>
+                                    <th>Permissão</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for membro in obj.revisortecnicopafc_set.all %}
+                                    <tr>
+                                        {% if pode_editar_revisores_tecnicos %}
+                                            <td>{% icon "edit" "/pafc/editar_revisortecnico_pafc/{{ membro.pk }}/" "Editar" %}</td>
+                                        {% endif %}
+                                        <td>{{ forloop.counter }}</td>
+                                        <td>{{ membro.servidor }}</td>
+                                        <td>{{ membro.get_funcao_display|format }}</td>
+                                        <td>{{ membro.get_permissao_display|format }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="alert alert-warning">Nenhum revisor técnico adicionado.</p>
+                {% endif %}
+            {% endwith %}
+        {% endbox %}
+
+        <span id="validadores"></span>
+        {% box "Validadores" %}
+
+            {% with pode_editar_validadores=obj|method:"pode_alterar_validadores"|call:request.user %}
+                {% if obj.pode_ter_equipe_validacao_editada and pode_editar_validadores %}
+                    <ul class="action-bar">
+                        <li><a class="btn primary" href="/admin/pafc/pafc/{{ obj.pk }}/change/?validacao=1">Editar validadores</a></li>
+                    </ul>
+                {% endif %}
+
+                {% if obj.validadorpafc_set.exists %}
+                    <div class="table-responsive">
+                        <table>
+                            <caption>Validadores cadastrados</caption>
+                            <thead>
+                                <tr>
+                                    {% if pode_editar_validadores %}
+                                        <th>Ações</th>
+                                    {% endif %}
+                                    <th>#</th>
+                                    <th>Servidor</th>
+                                    <th>Função</th>
+                                    <th>Permissão</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for membro in obj.validadorpafc_set.all %}
+                                    <tr>
+                                        {% if pode_editar_validadores %}
+                                            <td>{% icon "edit" "/pafc/editar_validador_pafc/{{ membro.pk }}/" "Editar" "popup" %}</td>
+                                        {% endif %}
+                                        <td>{{ forloop.counter }}</td>
+                                        <td>{{ membro.servidor }}</td>
+                                        <td>{{ membro.get_funcao_display|format }}</td>
+                                        <td>{{ membro.get_permissao_display|format }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="alert alert-warning">Nenhum validador adicionado.</p>
+                {% endif %}
+            {% endwith %}
+        {% endbox %}
+    </div>
+
+    <div class="tab-pane" data-title="Servidores" data-tab="servidores" data-checked="{{ is_servidores_definidos }}">
+
+        {% if is_validador and obj.em_analise_preliminar or is_revisor_tecnico and obj.em_revisao_tecnica or is_validador and obj.em_validacao and not obj.parecer_validacao_ja_foi_emitido %}
+            <ul class="action-bar">
+                <li><a class="btn warning popup" href="/pafc/pafc/{{ obj.pk }}/adicionar_comentario_geral/servidores">{% icone "exclamation-triangle" %} Fazer observação</a></li>
+            </ul>
+        {% endif %}
+        {% if comentarios_servidores.exists %}
+            {% if is_elaborador and existem_comentarios_servidores_pendentes %}
+                <p class="alert alert-danger"><strong>Atenção:</strong> Existem observações pendentes de análise.</p>
+            {% endif %}
+            {% if is_elaborador or is_revisor_tecnico or is_validador or tem_permissao_administrador %}
+                {% include "includes/lista_comentarios.html" with pafc=obj comentarios=comentarios_servidores %}
+            {% endif %}
+        {% endif %}
+
+        {% box "Coordenador do Curso" %}
+
+            <ul class="action-bar">
+                {% if obj.pode_ser_elaborado and pode_elaborar %}
+                    <li>
+                        <a class="btn popup {% if not obj.coordenador_curso %}success{% else %}primary{% endif %}" href="/pafc/informar_coordenador_curso/{{ obj.id }}/">
+                            {% if not obj.coordenador_curso %}Definir{% else %}Editar{% endif %} o Coordenador
+                        </a>
+                    </li>
+                    {% if obj.coordenador_curso %}
+                        <li>
+                            <a class="btn danger" href="/pafc/remover_coordenador_curso/{{ obj.id }}/"
+                               data-confirm="Deseja realmente remover o coordenador?">
+                                Remover o Coordenador
+                            </a>
+                        </li>
+                    {% endif %}
+                {% endif %}
+            </ul>
+
+            {% if obj.coordenador_curso %}
+                <dl class="definition-list flex">
+                    <div class="list-item">
+                        <dt>Servidor</dt>
+                        <dd>{{ obj.coordenador_curso.pessoa_fisica.nome }} ({{ obj.coordenador_curso.matricula }})</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Regime de Trabalho</dt>
+                        <dd>{{ obj.coordenador_curso.regime_juridico|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Jornada de Trabalho</dt>
+                        <dd>{{ obj.coordenador_curso.jornada_trabalho|format }}</dd>
+                    </div>
+                    <div class="list-item flex-basis-50">
+                        <dt>Cargo</dt>
+                        <dd>{% if obj.coordenador_curso.cargo_emprego_area %}{{ obj.coordenador_curso.cargo_emprego_area }}{% else %}{{ obj.coordenador_curso.cargo_emprego|format }}{% endif %}</dd>
+                    </div>
+                    <div class="list-item flex-basis-50">
+                        <dt>Nível</dt>
+                        <dd>{% if obj.coordenador_curso.cargo_classe %}{{ obj.coordenador_curso.cargo_classe|format }} {{ obj.coordenador_curso.nivel_padrao|format }}{% else %}-{% endif %}</dd>
+                    </div>
+                    <div class="list-item flex-basis-50">
+                        <dt>Titulação máxima</dt>
+                        <dd>{{ obj.coordenador_curso.titulacao|format }}</dd>
+                    </div>
+                    <div class="list-item flex-basis-50">
+                        <dt>Área de Formação</dt>
+                        <dd>{{ obj.coordenador_curso.professor.get_area_ultima_titulacao_display|format }}</dd>
+                    </div>
+                </dl>
+            {% else %}
+                <p class="alert alert-warning">Nenhum coordenador definido para o curso.</p>
+            {% endif %}
+        {% endbox %}
+
+        {% box "Técnicos-Administrativos" %}
+
+            <ul class="action-bar">
+                {% if obj.pode_ser_elaborado and pode_elaborar %}
+                    <li><a class="btn success popup" href="/pafc/informar_tecnicos_administrativos/{{ obj.id }}/">Informar Técnicos Administrativos</a></li>
+                    <li>
+                        <a class="btn primary popup" title="Justificar indisponibilidade"
+                           href="/pafc/justificar_indisponibilidade_tecnicos_administrativos/{{ obj.pk }}/">
+                            {% if obj.justificativa_indisponibilidade_tecnicos_administrativos %}
+                                Editar justificativa
+                            {% else %}
+                                Justificar indisponibilidade
+                            {% endif %}
+                        </a>
+                    </li>
+                    {% if obj.justificativa_indisponibilidade_tecnicos_administrativos %}
+                        <li>
+                            <a class="btn danger" href="/pafc/remover_justificativa_indisponibilidade_tecnicos_administrativos/{{ obj.id }}/"
+                               data-confirm="Deseja realmente remover a justificativa de indisponibilidade?">
+                                Remover justificativa
+                            </a>
+                        </li>
+                    {% endif %}
+                {% endif %}
+            </ul>
+
+            {% if obj.justificativa_indisponibilidade_tecnicos_administrativos %}
+                <ul class="flex-container boxes texts">
+                    <li class="box-item">
+                        <h4><strong>Justificativa da indisponibilidade de técnicos-administrativos</strong></h4>
+                        {{ obj.justificativa_indisponibilidade_tecnicos_administrativos|linebreaksbr }}
+                    </li>
+                </ul>
+            {% endif %}
+
+            {% if obj.tecnicos_administrativos.exists %}
+                <div class="table-responsive">
+                    <table>
+                        <caption>Técnicos-administrativos informados</caption>
+                        <thead>
+                            <tr>
+                                {% if obj.pode_ser_elaborado and pode_elaborar %}
+                                    <th></th>
+                                {% endif %}
+                                <th>Matrícula</th>
+                                <th>Nome</th>
+                                <th>Regime de Trabalho</th>
+                                <th>Cargo</th>
+                                <th>Nível</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for servidor in obj.tecnicos_administrativos.all %}
+                                <tr>
+                                    {% if obj.pode_ser_elaborado and pode_elaborar %}
+                                        <td class="no-print field-get_acoes">
+                                            {% icon "delete" "/pafc/remover_tecnico_administrativo/{{ obj.pk }}/{{ servidor.pk }}" "Remover" %}
+                                        </td>
+                                    {% endif %}
+                                    <td>{{ servidor.matricula }}</td>
+                                    <td>{{ servidor.pessoa_fisica.nome }}</td>
+                                    <td>
+                                        {{ servidor.situacao.nome|format }}
+                                        {% if servidor.jornada_trabalho %}
+                                            ({{ servidor.jornada_trabalho.get_jornada_trabalho_semanal_abreviada }})
+                                        {% endif %}
+                                    </td>
+                                    <td>{% if servidor.cargo_emprego_area %}{{ servidor.cargo_emprego_area }}{% else %}{{ servidor.cargo_emprego|format }}{% endif %}</td>
+                                    <td>{% if servidor.cargo_classe %}{{ servidor.cargo_classe|format }} {{ servidor.nivel_padrao|format }}{% else %}-{% endif %}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% elif not obj.justificativa_indisponibilidade_tecnicos_administrativos %}
+                <p class="alert alert-warning">Nenhum servidor adicionado.</p>
+            {% endif %}
+        {% endbox %}
+
+        {% box "Docentes" %}
+            {% if obj.disciplinas.exists %}
+                {% if obj.pode_ser_elaborado and pode_elaborar %}
+                    <div class="alert alert-info">
+                        <p>
+                            Use o botão "Atribuir docentes" para associar os docentes às disciplinas.
+                            Caso não haja docente disponível no momento, use o botão "Justificar indisponibilidade".
+                        </p>
+                    </div>
+                {% endif %}
+                {% if obj.existe_disciplina_sem_docente %}
+                    <div class="alert alert-danger">
+                        <p><strong>Atenção:</strong> Há disciplinas sem docentes associados.</p>
+                    </div>
+                {% endif %}
+                <div class="table-responsive">
+                    <table>
+                        <caption>Relação de docentes e disciplinas</caption>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Disciplina</th>
+                                <th>Docentes</th>
+                                {% if obj.pode_ser_elaborado and pode_elaborar %}
+                                    <th>Ações</th>
+                                {% endif %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for disciplina in obj.disciplinas.all %}
+                                {% with qtd_docentes=disciplina.docentes.count %}
+                                <tr>
+                                    <td>{{ forloop.counter }}</td>
+                                    <td><span id="disciplina_{{ disciplina.id }}"></span>
+                                        <a href="{{ disciplina.plano_disciplina.get_absolute_url }}">
+                                            {{ disciplina }}
+                                        </a>
+                                    </td>
+                                    <td>
+                                        {% if qtd_docentes %}
+                                            <ul class="ms-1 mt-2 {% if qtd_docentes == 1 %}lista-inline{% endif %}">
+                                            {% for docente in disciplina.docentes.all|dictsort:"nome" %}
+                                                {% with docente_eh_do_mesmo_campus=obj|method:"pessoa_eh_do_mesmo_campus"|call:docente %}
+                                                <li class="{% if not docente_eh_do_mesmo_campus %}negrito false{% endif %}">
+                                                    {{ docente.pessoa_fisica.nome|format }} (<a href="{{ docente.get_absolute_url }}">{{ docente.matricula }}</a>)
+                                                    {% if not docente_eh_do_mesmo_campus %}
+                                                        <span class="badge">{% icone "exclamation-circle" %} Docente de outro campus</span>
+                                                    {% endif %}
+                                                </li>
+                                                {% endwith %}
+                                            {% endfor %}
+                                            </ul>
+                                        {% elif disciplina.justificativa_indisponibilidade_docentes %}
+                                            <span class="checklist success">Indisponibilidade justificada</span>
+                                            <p class="obs">{{ disciplina.justificativa_indisponibilidade_docentes }}</p>
+                                        {% else %}
+                                            <span class="checklist error">Nenhum docente associado</span>
+                                        {% endif %}
+                                    </td>
+                                    {% if obj.pode_ser_elaborado and pode_elaborar %}
+                                        <td>
+                                            {% if not disciplina.justificativa_indisponibilidade_docentes %}
+                                                <a class="btn primary mb-1 popup" title="{{ qtd_docentes }} docente{{ qtd_docentes|pluralize }} atribuído{{ qtd_docentes|pluralize }}"
+                                                   href="/pafc/editar_docentes_disciplina/{{ obj.pk }}/{{ disciplina.pk }}">
+                                                    {% icone "link" %} Atribuir docentes
+                                                    <span class="badge">{{ qtd_docentes }}</span>
+                                                </a>
+                                            {% endif %}
+                                            {% if qtd_docentes == 0 %}
+                                                <a class="btn mb-1 popup" title="Justificar indisponibilidade de docentes para esta disciplina"
+                                                   href="/pafc/justificar_indisponibilidade_docentes/{{ obj.pk }}/{{ disciplina.pk }}">
+                                                    {% if not disciplina.justificativa_indisponibilidade_docentes %}
+                                                        {% icone "comment" %} Justificar indisponibilidade
+                                                    {% else %}
+                                                        {% icone "pen" %} Editar justificativa
+                                                    {% endif %}
+                                                </a>
+                                                {% if disciplina.justificativa_indisponibilidade_docentes %}
+                                                    <a class="btn danger mb-1 no-confirm popup" href="/pafc/remover_justificar_indisponibilidade_docentes/{{ obj.pk }}/{{ disciplina.pk }}">
+                                                        {% icone "trash" %} Remover justificativa
+                                                    </a>
+                                                {% endif %}
+                                            {% endif %}
+                                        </td>
+                                    {% endif %}
+                                </tr>
+                                {% endwith %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="alert alert-warning">
+                    {% if obj.em_etapas_de_solicitacao %}
+                        Aguardando início da elaboração.
+                    {% else %}
+                        Aguardando matriz ser aprovada no PPC para listar as disciplinas aqui.
+                    {% endif %}
+                </p>
+            {% endif %}
+        {% endbox %}
+    </div>
+
+    <div class="tab-pane" data-title="Instalações e Equipamentos" data-tab="instalacoes" data-checked="{{ is_instalacoes_definidas }}">
+
+        {% if is_validador and obj.em_analise_preliminar or is_revisor_tecnico and obj.em_revisao_tecnica or is_validador and obj.em_validacao and not obj.parecer_validacao_ja_foi_emitido %}
+            <ul class="action-bar">
+                <li><a class="btn warning popup" href="/pafc/pafc/{{ obj.pk }}/adicionar_comentario_geral/instalacoes">{% icone "exclamation-triangle" %} Fazer observação</a></li>
+            </ul>
+        {% endif %}
+        {% if comentarios_instalacoes.exists %}
+            {% if is_elaborador and existem_comentarios_instalacoes_pendentes %}
+                <p class="alert alert-danger"><strong>Atenção:</strong> Existem observações pendentes de análise.</p>
+            {% endif %}
+            {% if is_elaborador or is_revisor_tecnico or is_validador or tem_permissao_administrador %}
+                {% include "includes/lista_comentarios.html" with pafc=obj comentarios=comentarios_instalacoes %}
+            {% endif %}
+        {% endif %}
+
+        {% box "Laboratórios" %}
+
+            <ul class="action-bar">
+                {% if obj.pode_ser_elaborado and pode_elaborar %}
+                    <li><a class="btn success popup" href="/pafc/informar_laboratorios/{{ obj.id }}/">Informar laboratórios</a></li>
+                    <li>
+                        <a class="btn primary popup" title="Justificar indisponibilidade"
+                           href="/pafc/justificar_indisponibilidade_laboratorios/{{ obj.pk }}/">
+                            {% if obj.justificativa_indisponibilidade_laboratorios %}
+                                Editar justificativa
+                            {% else %}
+                                Justificar indisponibilidade
+                            {% endif %}
+                        </a>
+                    </li>
+                    {% if obj.justificativa_indisponibilidade_laboratorios %}
+                        <li>
+                            <a class="btn danger" href="/pafc/remover_justificativa_indisponibilidade_laboratorios/{{ obj.id }}/"
+                               data-confirm="Deseja realmente remover a justificativa de indisponibilidade?">
+                                Remover justificativa
+                            </a>
+                        </li>
+                    {% endif %}
+                {% endif %}
+            </ul>
+
+            {% if obj.justificativa_indisponibilidade_laboratorios %}
+                <ul class="flex-container boxes texts">
+                    <li class="box-item">
+                        <h4><strong>Justificativa da indisponibilidade de laboratórios</strong></h4>
+                        {{ obj.justificativa_indisponibilidade_laboratorios|linebreaksbr }}
+                    </li>
+                </ul>
+            {% endif %}
+
+            {% if laboratorios %}
+                <div class="table-responsive">
+                    <table>
+                        <caption>Laboratórios informados</caption>
+                        <thead>
+                            <tr>
+                                {% if obj.pode_ser_elaborado and pode_elaborar %}
+                                    <th></th>
+                                {% endif %}
+                                <th>Nome</th>
+                                <th>Prédio</th>
+                                <th>Descrição</th>
+                                <th>Área (m²)</th>
+                                <th>Capacidade de atendimento (alunos)</th>
+                                {% if obj.possui_laboratorios_externos %}
+                                    <th>Opções</th>
+                                {% endif %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for laboratorio in laboratorios %}
+                                {% with laboratorio_eh_do_mesmo_campus=obj|method:"laboratorio_eh_do_mesmo_campus"|call:laboratorio %}
+                                <tr>
+                                    {% if obj.pode_ser_elaborado and pode_elaborar %}
+                                        <td class="no-print field-get_acoes">
+                                            {% icon "edit" "/pafc/editar_laboratorio/{{ obj.pk }}/{{ laboratorio.pk }}/" "Editar" "popup" %}
+                                            {% icon "delete" "/pafc/remover_laboratorio/{{ obj.pk }}/{{ laboratorio.pk }}" "Remover" %}
+                                        </td>
+                                    {% endif %}
+                                    <td {% if not laboratorio_eh_do_mesmo_campus %}class="false"{% endif %}>
+                                        {{ laboratorio.nome }}
+                                        {% if not laboratorio_eh_do_mesmo_campus %}
+                                            <span class="badge">{% icone "exclamation-circle" %} Laboratório de outro campus</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ laboratorio.predio }}</td>
+                                    <td>{{ laboratorio.descricao|format|quebrar_palavras_grandes }}</td>
+                                    <td>{{ laboratorio.area_util|format }}</td>
+                                    <td>{{ laboratorio.capacidade|format }}</td>
+                                </tr>
+                                {% endwith %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% elif not obj.justificativa_indisponibilidade_laboratorios %}
+                <p class="alert alert-warning">Nenhum laboratório adicionado.</p>
+            {% endif %}
+        {% endbox %}
+
+        {% if infraestruturas_externas %}
+            {% box "Comprovantes de disponibilidade de infraestrutura de outros campi" %}
+
+                {% if obj.pode_ser_elaborado and pode_elaborar %}
+                    <div class="alert alert-warning">
+                        <p>Abaixo, estão listados os laboratórios pertencentes a outros campi.</p>
+                        <p>Para cada um, é necessário submeter um documento que comprove a disponibilidade da infraestrutura do campus para uso pelo curso.</p>
+                    </div>
+                {% endif %}
+
+                <div class="table-responsive">
+                    <table>
+                    <caption>Laboratórios de outros campi</caption>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Campus</th>
+                            <th>Laboratórios</th>
+                            <th>Documento comprobatório</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for infra in infraestruturas_externas|dictsort:"campus.sigla" %}
+                            <tr>
+                                <td>{{ forloop.counter }}</td>
+                                <td>{{ infra.campus }}</td>
+                                <td>
+                                    {% if infra.laboratorios|length == 1 %}
+                                        {{ infra.laboratorios.0 }}
+                                    {% else %}
+                                        <ul>
+                                            {{ infra.laboratorios|unordered_list }}
+                                        </ul>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <ul class="action-bar">
+                                        {% if infra.comprovante_disponibilidade %}
+                                            <li>
+                                                <a class="btn default" href="{{ infra.comprovante_disponibilidade.get_url_documento }}">
+                                                    {% icone "eye" %} Visualizar
+                                                </a>
+                                            </li>
+
+                                            {% if obj.pode_ser_elaborado and pode_elaborar %}
+                                                <li>
+                                                    <a class="btn primary popup" href="{% url 'editar_comprovante_disponibilidade_infraestrutura_pafc' infra.id infra.comprovante_disponibilidade_id %}">
+                                                        {% icone "edit" %} Editar
+                                                    </a>
+                                                </li>
+                                                <li>
+                                                    <a class="btn danger popup" href="{% url 'remover_comprovante_disponibilidade_infraestrutura_pafc' infra.id infra.comprovante_disponibilidade_id %}">
+                                                        {% icone "trash" %} Remover
+                                                    </a>
+                                                </li>
+                                            {% endif %}
+                                        {% else %}
+                                            {% if obj.pode_ser_elaborado and pode_elaborar %}
+                                                <li>
+                                                    <a class="btn success popup" href="{% url 'cadastrar_comprovante_disponibilidade_infraestrutura_pafc' infra.id %}">
+                                                        {% icone "plus-circle" %} Cadastrar documento
+                                                    </a>
+                                                </li>
+                                            {% else %}
+                                                {{ 'Cadastro pendente'|status }}
+                                            {% endif %}
+                                        {% endif %}
+                                    </ul>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                    </table>
+                </div>
+
+            {% endbox %}
+        {% endif %}
+    </div>
+
+    {% if obj.modelo.possui_ch_ead %}
+        <div class="tab-pane" data-title="Infraestrutura EaD" data-tab="infraestrutura_ead" data-checked="{{ is_infraestrutura_ead_definida }}">
+
+            {% if is_validador and obj.em_analise_preliminar or is_revisor_tecnico and obj.em_revisao_tecnica or is_validador and obj.em_validacao and not obj.parecer_validacao_ja_foi_emitido %}
+                <ul class="action-bar">
+                    <li><a class="btn warning popup" href="/pafc/pafc/{{ obj.pk }}/adicionar_comentario_geral/infraestrutura-ead">{% icone "exclamation-triangle" %} Fazer observação</a></li>
+                </ul>
+            {% endif %}
+            {% if comentarios_infraestrutura_ead.exists %}
+                {% if is_elaborador and existem_comentarios_infraestrutura_ead_pendentes %}
+                    <p class="alert alert-danger"><strong>Atenção:</strong> Existem observações pendentes de análise.</p>
+                {% endif %}
+                {% if is_elaborador or is_revisor_tecnico or is_validador or tem_permissao_administrador %}
+                    {% include "includes/lista_comentarios.html" with pafc=obj comentarios=comentarios_infraestrutura_ead %}
+                {% endif %}
+            {% endif %}
+
+            {% if obj.modelo.eh_versao_totalmente_ead %}
+                <span id="polos"></span>
+                {% box "Polos" %}
+                    <ul class="action-bar">
+                        {% if obj.pode_ser_elaborado and pode_elaborar %}
+                            <li><a class="btn success" href="{% url 'admin:pafc_pafc_change' obj.pk %}?polos=1">Informar polos</a></li>
+                        {% endif %}
+                    </ul>
+
+                    {% if obj.pendencias_no_cadastro_de_polos_ead %}
+                        <div class="alert alert-danger">
+                            <p>O cadastro de polos está incompleto:</p>
+                            <ul>
+                                {{ obj.pendencias_no_cadastro_de_polos_ead|unordered_list }}
+                            </ul>
+                        </div>
+                    {% endif %}
+
+                    {% if obj.polos_ead.exists %}
+                        <div class="table-responsive">
+                            <table>
+                                <caption>Polos cadastrados</caption>
+                                <thead>
+                                <tr>
+                                    {% if obj.pode_ser_elaborado and pode_elaborar %}
+                                        <th class="no-print field-get_acoes">Ações</th>
+                                    {% endif %}
+                                    <th>Código</th>
+                                    <th>Nome</th>
+                                    <th>Endereço</th>
+                                    <th>Vagas ofertadas</th>
+                                    <th>Tipo de polo</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                {% for polo_pafc in obj.polos_ead.all %}
+                                    <tr>
+                                        {% if obj.pode_ser_elaborado and pode_elaborar %}
+                                            <td class="no-print field-get_acoes">
+                                                {% icon "delete" "/pafc/remover_polo/{{ polo_pafc.pk }}" "Remover" %}
+                                            </td>
+                                        {% endif %}
+                                        <td>{{ polo_pafc.polo.codigo_censup|format }}</td>
+                                        <td>{{ polo_pafc.polo.descricao|format }}</td>
+                                        <td>{{ polo_pafc.polo.get_endereco|format|normalizar }}</td>
+                                        <td>{{ polo_pafc.vagas_ofertadas }}</td>
+                                        <td>{{ polo_pafc.get_tipo_display|format }}</td>
+                                    </tr>
+                                {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="alert alert-warning">Nenhum polo cadastrado ainda.</p>
+                    {% endif %}
+                {% endbox %}
+            {% endif %}
+
+            <span id="tutores"></span>
+            {% box "Tutores e mediadores pedagógicos" %}
+                <ul class="action-bar">
+                    {% if obj.pode_ser_elaborado and pode_elaborar %}
+                        <li><a class="btn success" href="{% url 'admin:pafc_pafc_change' obj.pk %}?tutores=1">Informar tutores/mediadores</a></li>
+                    {% endif %}
+                </ul>
+
+                {% if not is_tutores_definidos %}
+                    <div class="alert alert-danger">
+                        <p>O cadastro de tutores e mediadores está incompleto:</p>
+                        <ul>
+                            {{ obj.pendencias_cadastro_tutores|unordered_list }}
+                        </ul>
+                    </div>
+                {% endif %}
+
+                <dl class="definition-list flex">
+                    <div class="list-item">
+                        <dt>Quantidade prevista de tutores/mediadores pedagógicos</dt>
+                        <dd>{{ obj.qtd_prevista_tutores|format }}</dd>
+                    </div>
+                    {% if obj.justificativa_indisponibilidade_tutores %}
+                        <div class="list-item">
+                            <dt>Justificativa de indisponibilidade de tutores/mediadores pedagógicos</dt>
+                            <dd>{{ obj.justificativa_indisponibilidade_tutores|format }}</dd>
+                        </div>
+                    {% endif %}
+                </dl>
+
+                {% if obj.tutores_ead.exists %}
+                    <div class="table-responsive">
+                        <table>
+                            <caption>Tutores/mediadores pedagógicos cadastrados</caption>
+                            <thead>
+                            <tr>
+                                {% if obj.pode_ser_elaborado and pode_elaborar %}
+                                    <th class="no-print field-get_acoes">Ações</th>
+                                {% endif %}
+                                <th>#</th>
+                                <th>Tutor/mediador pedagógico</th>
+                                <th>Vínculo com o IFRN</th>
+                                <th>Categoria</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for tutor in obj.tutores_ead.all %}
+                                <tr>
+                                    {% if obj.pode_ser_elaborado and pode_elaborar %}
+                                        <td class="no-print field-get_acoes">
+                                            {% icon "delete" "/pafc/remover_tutor/{{ tutor.pk }}" "Remover" %}
+                                        </td>
+                                    {% endif %}
+                                    <td>{{ forloop.counter }}</td>
+                                    <td>
+                                        {% if not tutor.vinculo.eh_prestador %}
+                                            {{ tutor.vinculo.relacionamento|normalizar }}
+                                        {% else %}
+                                            {{ tutor.pessoa.nome|normalizar }} ({{ tutor.vinculo.relacionamento.pessoa_fisica.cpf|anonimizar_cpf }})
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ tutor.vinculo.user.get_tipo }}</td>
+                                    <td>{{ tutor.get_categoria_display }}</td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="alert alert-warning">Nenhum tutor ou mediador pedagógico adicionado.</p>
+                {% endif %}
+            {% endbox %}
+        </div>
+    {% endif %}
+
+    <div class="tab-pane" data-title="Matrizes" data-tab="matrizes" data-counter="{{ matrizes|length }}" data-checked="{{ is_matrizes_pomc_definidos }}">
+
+        {% if is_validador and obj.em_analise_preliminar or is_revisor_tecnico and obj.em_revisao_tecnica or is_validador and obj.em_validacao and not obj.parecer_validacao_ja_foi_emitido %}
+            <ul class="action-bar">
+                <li><a class="btn warning popup" href="/pafc/pafc/{{ obj.pk }}/adicionar_comentario_geral/matrizes">{% icone "exclamation-triangle" %} Fazer observação</a></li>
+            </ul>
+        {% endif %}
+        {% if comentarios_matrizes.exists %}
+            {% if is_elaborador and existem_comentarios_matrizes_pendentes %}
+                <p class="alert alert-danger"><strong>Atenção:</strong> Existem observações pendentes de análise.</p>
+            {% endif %}
+            {% if is_elaborador or is_revisor_tecnico or is_validador or tem_permissao_administrador %}
+                {% include "includes/lista_comentarios.html" with pafc=obj comentarios=comentarios_matrizes %}
+            {% endif %}
+        {% endif %}
+
+        {% with qtd_matrizes=matrizes|length %}
+
+            {% box "Matriz{{ qtd_matrizes|pluralize:'es' }} vinculada{{ qtd_matrizes|pluralize }} ao PAFC" %}
+                {% if obj.pode_ser_elaborado and pode_elaborar and obj.existem_matrizes_para_vincular %}
+                    <ul class="action-bar">
+                        <li><a class="btn success popup" href="{% url 'vincular_matriz_pafc' obj.pk %}">{% icone "plus" %} Vincular matriz</a></li>
+                    </ul>
+                {% endif %}
+                {% if qtd_matrizes > 0 %}
+                    {% if not obj.existem_matrizes_para_vincular %}
+                        <p class="alert alert-info">Todas as matrizes do PPC foram vinculadas.</p>
+                    {% endif %}
+
+                    <div class="table-responsive">
+                    <table>
+                        <caption>Relação de matrizes</caption>
+                        <thead>
+                            <tr>
+                                <th class="no-print">Ações</th>
+                                <th>Nome</th>
+                                <th>Turno</th>
+                                <th>Quantidade de períodos</th>
+                                <th>Situação da matriz no PPC</th>
+                                {% if obj.ppc.diretriz.possui_modalidadepraticaprofissional %}
+                                    <th>Situação da prática profissional no PPC</th>
+                                {% endif %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for matriz in matrizes %}
+                                <tr>
+                                    <td class="no-print">
+                                        {% icon "view" "{{ matriz.matriz_ppc.get_absolute_url }}" %}
+                                        {% if matriz|method:"pode_excluir"|call:request.user %}
+                                            {% icon "delete" "/pafc/desvincular_matriz_pafc/{{ matriz.pk }}" %}
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ matriz }}</td>
+                                    <td>{{ matriz.matriz_ppc.turno|format }}</td>
+                                    <td>{{ matriz.matriz_ppc.quantidade_periodos }}</td>
+                                    <td>
+                                        {{ matriz.matriz_ppc.get_situacao_matriz_display|status }}
+                                    </td>
+                                    {% if obj.ppc.diretriz.possui_modalidadepraticaprofissional %}
+                                        <td>
+                                            {{ matriz.matriz_ppc.get_situacao_modalidadepraticaprofissional_display|status }}
+                                        </td>
+                                    {% endif %}
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                    <p class="alert alert-warning">Nenhuma matriz vinculada ainda.</p>
+                {% endif %}
+            {% endbox %}
+
+            {% if obj.implementa_pomc or obj.pode_ter_pomc_implementado %}
+                <span id="pomc"></span>
+                {% box "Plano de Organização e Desenvolvimento da Matriz Curricular do Curso (POMC)" %}
+                    {% if obj.implementa_pomc %}
+                        {% if obj.pode_ser_elaborado and pode_elaborar and not obj.pomc_eh_obrigatorio %}
+                            <ul class="action-bar">
+                                <li><a class="btn danger popup" href="{% url 'cancelar_elaboracao_pomc_pafc' obj.pk %}">{% icone "times" %} Cancelar elaboração do POMC</a></li>
+                            </ul>
+                        {% endif %}
+                        {% box "Ata de Aprovação do Colegiado do Curso" %}
+                            {% if obj.pode_ser_elaborado and pode_elaborar %}
+                                {% if pode_elaborar or is_diretor_academico %}
+                                <ul class="action-bar">
+                                    {% if obj.comprovante_aprovacao_pomc is None %}
+                                        <li><a class="btn success popup" href="{% url 'editar_comprovante_aprovacao_pomc' obj.pk %}">{% icone "file-alt" %} Anexar Ata</a></li>
+                                    {% else %}
+                                        <li><a class="btn primary popup" href="{% url 'editar_comprovante_aprovacao_pomc' obj.pk %}">{% icone "edit" %} Editar Ata</a></li>
+                                    {% endif %}
+                                    {% if obj.comprovante_aprovacao_pomc %}
+                                        <li><a class="btn danger popup" href="{% url 'remover_comprovante_aprovacao_pomc' obj.pk %}">{% icone "trash" %}Remover Ata</a></li>
+                                    {% endif %}
+                                </ul>
+                                {% endif %}
+                            {% endif %}
+                            {% if obj.comprovante_aprovacao_pomc %}
+                                <dl class="definition-list flex">
+                                    <div class="list-item">
+                                        <dt>Documento</dt>
+                                        <dd><a class="btn default" href="{{ obj.comprovante_aprovacao_pomc.get_url_documento }}">{% icone "eye" %} Visualizar o documento</a></dd>
+                                    </div>
+                                    <div class="list-item">
+                                        <dt>Cadastrada por</dt>
+                                        <dd>{{ obj.cadastrador_comprovante_aprovacao_pomc|format }}</dd>
+                                    </div>
+                                    <div class="list-item">
+                                        <dt>Data do cadastro</dt>
+                                        <dd>{{ obj.data_cadastro_comprovante_aprovacao_pomc|format }}</dd>
+                                    </div>
+                                </dl>
+                            {% else %}
+                                <p class="alert alert-warning">Aguardando cadastro da ata da reunião do colegiado que aprovou o POMC (Plano de Organização e Desenvolvimento da Matriz Curricular do Curso).</p>
+                            {% endif %}
+                        {% endbox %}
+
+                        {% box "Tópicos Específicos encontrados na{{ qtd_matrizes|pluralize }} matriz{{ qtd_matrizes|pluralize:'es' }}" %}
+                            <ul class="action-bar">
+                                {% if is_validador and pode_ter_planos_revisados_em_massa %}
+                                    <li>
+                                        <a class="btn success confirm popup" href="{% url 'concluir_revisao_planodisciplina_em_massa_pafc' obj.pk %}"
+                                           data-confirm="Tem certeza que deseja marcar todos os planos como revisados?">
+                                            {% icone "check-double" %}
+                                            {% if obj.em_analise_preliminar %}
+                                                Marcar todos como analisados
+                                            {% elif obj.em_validacao %}
+                                                Marcar todos como validados
+                                            {% else %}
+                                                Marcar todos como revisados
+                                            {% endif %}
+                                        </a>
+                                    </li>
+                                {% endif %}
+                            </ul>
+                            <div class="table-responsive">
+                                <table>
+                                <caption>Planos de disciplina</caption>
+                                <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Nome</th>
+                                    <th>Situação</th>
+                                    <th>Opções</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                {% for plano in obj.planos_disciplina_modificados.all|dictsort:'nome_disciplina' %}
+                                    {% with pode_elaborar_plano=plano|method:"pode_elaborar"|call:request.user pode_revisar_plano=plano|method:"pode_revisar"|call:request.user %}
+                                    <tr class="{% if plano.possui_revisoes_nao_resolvidas %}highlight{% endif %}">
+                                        <td>{{ forloop.counter }}</td>
+                                        <td>
+                                            {{ plano.nome_disciplina }}
+                                            {% if plano.possui_revisoes_nao_resolvidas %}
+                                                <p class="false">Possui comentários pendentes de resolução.</p>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <span class="status status-{% if plano.em_situacao_conclusiva %}success{% else %}alert{% endif %}">
+                                                {{ plano.get_situacao_display }}
+                                            </span>
+                                            {% if plano.em_elaboracao %}
+                                                <p class="obs text-center">{{ plano.progresso_elaboracao }} seções concluídas</p>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <ul class="action-bar">
+                                                <li>
+                                                    <a class="btn default" href="{% url 'visualizar_planodisciplina_pafc' plano.pk %}">
+                                                        {% if pode_elaborar_plano and plano.em_elaboracao %}
+                                                            {% icone "external-link-alt" %} Abrir para editar
+                                                        {% elif pode_revisar_plano and plano.pode_receber_revisao %}
+                                                            {% icone "external-link-alt" %} Abrir para revisar
+                                                        {% else %}
+                                                            {% icone "eye" %} Visualizar
+                                                        {% endif %}
+                                                    </a>
+                                                </li>
+                                                {% if pode_elaborar_plano and plano.elaboracao_pode_ser_retomada %}
+                                                    <li><a class="btn danger popup" href="{% url 'retomar_edicao_planodisciplina_pafc' plano.pk %}">{% icone "undo" %} Retomar edição</a></li>
+                                                {% endif %}
+                                                {% if pode_revisar_plano %}
+                                                    {% if plano.revisao_pode_ser_retomada or plano.validacao_pode_ser_retomada %}
+                                                        <li><a class="btn danger popup" href="{% url 'retomar_revisao_planodisciplina_pafc' plano.pk %}">{% icone "undo" %} Retomar revisão</a></li>
+                                                    {% endif %}
+                                                {% endif %}
+                                            </ul>
+                                        </td>
+                                    </tr>
+                                    {% endwith %}
+                                {% endfor %}
+                                </tbody>
+                                </table>
+                            </div>
+                        {% endbox %}
+                    {% else %}
+                        <div class="alert alert-info">
+                            <p><strong>Atenção:</strong> Este PAFC pode incluir alterações no Plano de Organização e Desenvolvimento da Matriz Curricular do Curso (POMC).</p>
+
+                            {% if obj.pode_ser_elaborado and pode_elaborar %}
+                                {% if qtd_matrizes %}
+                                    <p><a class="popup" href="{% url 'habilitar_elaboracao_pomc_pafc' obj.id %}">Clique aqui</a> para visualizar o que pode ser alterado e habilitar a elaboração do POMC neste PAFC.</p>
+                                {% endif %}
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                {% endbox %}
+            {% endif %}
+
+        {% endwith %}
+    </div>
+
+    <div class="tab-pane ajax-rendered" data-title="Bibliografia" data-tab="bibliografia" data-checked="{{ is_bibliografia_definida }}">
+        <ul class="action-bar">
+            {% if is_validador and obj.em_analise_preliminar or is_revisor_tecnico and obj.em_revisao_tecnica or is_validador and obj.em_validacao and not obj.parecer_validacao_ja_foi_emitido %}
+                <li><a class="btn warning popup" href="/pafc/pafc/{{ obj.pk }}/adicionar_comentario_geral/bibliografia">{% icone "exclamation-triangle" %} Fazer observação</a></li>
+            {% endif %}
+
+            {% if tem_permissao_edicao and obj.em_elaboracao and obj.bibliografia_pode_ser_importada_do_ppc %}
+                <li><a class="btn" href="{% url 'reprocessar_bibliografia_do_pafc' obj.pk %}">{% icone "cogs" %} Reprocessar bibliografia</a></li>
+            {% endif %}
+
+            {% if bibliografias %}
+                <li><a class="btn default popup" href="{% url 'pre_visualizar_bibliografia_pafc' obj.pk %}">Pré-visualizar</a></li>
+            {% endif %}
+        </ul>
+        {% if comentarios_bibliografia.exists %}
+            {% if is_elaborador and existem_comentarios_bibliografia_pendentes %}
+                <p class="alert alert-danger"><strong>Atenção:</strong> Existem observações pendentes de análise.</p>
+            {% endif %}
+            {% if is_elaborador or is_revisor_tecnico or is_validador or tem_permissao_administrador %}
+                {% include "includes/lista_comentarios.html" with pafc=obj comentarios=comentarios_bibliografia %}
+            {% endif %}
+        {% endif %}
+
+        {% if bibliografias %}
+            {% if pode_elaborar %}
+                {% if not quantitativos_bibliografia_informados %}
+                    <p class="alert alert-danger">
+                        <strong>Atenção:</strong> É preciso definir os quantitativos de exemplares de todas as bibliografias.
+                        Os registros com pendência estarão destacados abaixo.
+                    </p>
+                {% endif %}
+            {% endif %}
+
+            {% regroup bibliografias by get_tipo_bibliografia_display as bibliografias_por_tipo %}
+            {% for bibliografia in bibliografias_por_tipo %}
+                {% with primeiro_item=bibliografia.list.0 %}
+                    {% if primeiro_item and primeiro_item.tipo_bibliografia == primeiro_item.BIBLIOGRAFIA_BASICA %}
+                        <span id="basica"></span>
+                    {% elif primeiro_item and primeiro_item.tipo_bibliografia == primeiro_item.BIBLIOGRAFIA_COMPLEMENTAR %}
+                        <span id="complementar"></span>
+                    {% endif %}
+
+                    {% box "{{ bibliografia.grouper }}" %}
+                        {% if bibliografia.list %}
+
+                            {% include "includes/forms_bibliografia.html" with bibliografias=bibliografia.list %}
+
+                        {% else %}
+                            <p class="alert alert-warning">Nenhuma bibliografia cadastrada.</p>
+                        {% endif %}
+
+                    {% endbox %}
+                {% endwith %}
+            {% endfor %}
+        {% else %}
+            <p class="alert alert-info">Aguardando definição da bibliografia no PPC. Quando isso acontecer, ela será importada automaticamente aqui.</p>
+        {% endif %}
+    </div>
+
+    <div class="tab-pane ajax-rendered" data-title="Conteúdo" data-tab="conteudo" data-counter="{{ conteudos.count }}" data-checked="{{ aba_conteudo_foi_resolvida }}">
+    {% if request.GET.tab == "conteudo" %}
+        {% if is_elaborador or is_revisor_tecnico or is_validador or tem_permissao_edicao %}
+            <ul class="action-bar">
+                {% if is_elaborador and tem_permissao_edicao %}
+                    {% if obj.pode_ser_enviado_para_analise_preliminar %}
+                        <li><a class="btn success" href="?acao=enviar_para_analise_preliminar">{% icone "share" %} Enviar para análise preliminar</a></li>
+                    {% endif %}
+                    {% if obj.pode_ser_enviado_para_revisao_tecnica %}
+                        <li><a class="btn success" href="?acao=enviar_para_revisao_tecnica">{% icone "share" %} Enviar para revisão técnica</a></li>
+                    {% endif %}
+                    {% if pode_enviar_para_validacao and obj.pode_ser_enviado_para_validacao %}
+                        <li><a class="btn success" href="?acao=enviar_para_validacao">{% icone "share" %} Enviar para validação</a></li>
+                    {% endif %}
+                {% elif is_revisor_tecnico and tem_permissao_edicao or is_validador and tem_permissao_edicao %}
+                    {% if obj.pode_ser_enviado_para_revisao_tecnica %}
+                        <li><a class="btn success" href="?acao=enviar_para_revisao_tecnica">{% icone "share" %} Enviar para revisão técnica</a></li>
+                    {% endif %}
+                    {% if pode_enviar_para_validacao and obj.pode_ser_enviado_para_validacao %}
+                        <li><a class="btn success" href="?acao=enviar_para_validacao">{% icone "share" %} Enviar para validação</a></li>
+                    {% endif %}
+                    {% if pode_marcar_tudo_como_revisado %}
+                        <li>
+                            <a class="btn success confirm" title="Revisar todas as seções (apenas seções sem revisor serão afetadas)."
+                               href="?acao=marcar_tudo_como_revisado" data-confirm="Tem certeza que deseja marcar todo o conteúdo como revisado de uma só vez?">
+                                {% icone "check-double" %} Marcar tudo como revisado
+                            </a>
+                        </li>
+                    {% endif %}
+                    {% if is_validador and obj.em_validacao and obj.percentual_validacao < 100 %}
+                        <li>
+                            <a class="btn success confirm" title="Validar todas as seções (apenas seções sem validador serão afetadas)."
+                               href="?acao=marcar_tudo_como_validado" data-confirm="Tem certeza que deseja validar todo o conteúdo?">
+                                {% icone "check-double" %} Marcar tudo como validado
+                            </a>
+                        </li>
+                    {% endif %}
+                    {% if obj.pode_ser_devolvido_para_elaboracao %}
+                        <li><a class="btn danger" href="?acao=devolver_para_elaboracao">Devolver para elaboração</a></li>
+                    {% endif %}
+                {% endif %}
+                {% if pode_pre_visualizar %}
+                    <li><a class="btn default popup" href="/pafc/visualizar_conteudo_pafc/{{ obj.id }}/">Pré-visualizar</a></li>
+                {% endif %}
+            </ul>
+        {% endif %}
+
+        <ul class="pills">
+            {% for secao in secoes %}
+                <li><a href="#" class="tab-changer" data-tab-destino="conteudo#secao_{{ secao.id }}">{{ secao.titulo|upper }}</a></li>
+            {% endfor %}
+        </ul>
+
+        {% if obj.em_elaboracao %}
+            {% progressbar obj.percentual_elaboracao %}
+            <p class="progress-description">Progresso da elaboração</p>
+        {% endif %}
+
+        {% if obj.em_revisao_tecnica %}
+            {% progressbar obj.percentual_revisao_tecnica %}
+            <p class="progress-description">Progresso da revisão</p>
+        {% endif %}
+
+        {% if obj.em_validacao %}
+            {% progressbar obj.percentual_validacao %}
+            <p class="progress-description">Progresso da validação</p>
+        {% endif %}
+
+        {% if obj.em_elaboracao or obj.em_revisao_tecnica or obj.em_validacao %}
+            {% if obj.em_elaboracao or obj.em_revisao_tecnica %}
+                {% if abas_com_pendencias %}
+                    <div class="alert alert-danger">
+                        <p>
+                            {% with qtd_pendencias=abas_com_pendencias|length %}
+                                <strong>Atenção:</strong> Há pendências na{{ qtd_pendencias|pluralize }}
+                                aba{{ qtd_pendencias|pluralize }} {{ abas_com_pendencias|format }}.
+                            {% endwith %}
+                        </p>
+                    </div>
+                {% endif %}
+            {% endif %}
+            <div class="alert alert-info">
+                <span id="marcadores"></span>
+                <p>
+                    Você pode usar os seguintes marcadores para gerar conteúdo dinamicamente:
+                </p>
+                <ul>
+                    {% for marcador, descricao in marcadores.items %}
+                        {% with marcador_display="{{ "|add:marcador|add:" }}" %}
+                            <li>{{ marcador_display }}: {{ descricao }}</li>
+                        {% endwith %}
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+
+        {% for secao in secoes %}
+            <span id="secao_{{ secao.pk }}"></span>
+            {% box secao.titulo %}
+                {% if secao.possui_conteudo_editavel %}
+                    <ul class="action-bar">
+                        {% if pode_elaborar %}
+                            {% if secao.pode_ter_edicao_iniciada %}
+                            <li><a class="btn primary" href="?iniciar_edicao={{ secao.pk }}">Iniciar edição da seção</a></li>
+                            {% endif %}
+                            {% if secao.editor == servidor or tem_permissao_administrador %}
+                                {% if secao.pode_ter_edicao_concluida %}
+                                    <li><a class="btn success confirm" href="?concluir_edicao={{ secao.pk }}" data-confirm="Tem certeza que deseja concluir a edição?">Concluir edição da seção</a></li>
+                                {% endif %}
+                                {% if secao.pode_ter_edicao_liberada %}
+                                <li><a class="btn primary confirm" href="?liberar_edicao={{ secao.pk }}" data-confirm="Tem certeza que deseja concluir a edição?">Liberar edição da seção</a></li>
+                                {% endif %}
+                                {% if secao.pode_cancelar_conclusao_edicao %}
+                                <li><a class="btn danger" href="?cancelar_conclusao_edicao={{ secao.pk }}" data-confirm="Tem certeza que deseja cancelar a conclusão da elaboração da seção?">Cancelar conclusão da edição</a></li>
+                                {% endif %}
+                            {% endif %}
+                        {% endif %}
+
+                        {% if is_revisor_tecnico and tem_permissao_edicao and not is_diretor_academico %}
+                            {% if secao.pode_ter_revisao_tecnica_iniciada %}
+                            <li><a class="btn primary " href="?iniciar_revisao_tecnica={{ secao.pk }}">Iniciar revisão técnica da seção</a></li>
+                            {% endif %}
+                            {% if secao.revisor_tecnico == servidor or tem_permissao_administrador %}
+                                {% if secao.pode_ter_revisao_tecnica_concluida %}
+                                <li><a class="btn success confirm" href="?concluir_revisao_tecnica={{ secao.pk }}" data-confirm="Tem certeza que deseja concluir a revisão técnica?">Concluir revisão técnica da seção</a></li>
+                                {% endif %}
+                                {% if secao.pode_ter_revisao_tecnica_liberada %}
+                                <li><a class="btn primary confirm" href="?liberar_revisao_tecnica={{ secao.pk }}" data-confirm="Tem certeza que deseja liberar a revisão técnica?">Liberar revisão técnica da seção</a></li>
+                                {% endif %}
+                                {% if secao.pode_cancelar_conclusao_revisao_tecnica %}
+                                <li><a class="btn danger" href="?cancelar_conclusao_revisao_tecnica={{ secao.pk }}" data-confirm="Tem certeza que deseja cancelar a conclusão da revisão da seção?">Cancelar conclusão da revisão técnica da seção</a></li>
+                                {% endif %}
+                            {% endif %}
+                        {% endif %}
+
+                        {% if is_validador and tem_permissao_edicao and not is_diretor_academico %}
+                            {% if secao.pode_ter_validacao_iniciada %}
+                                <li><a class="btn success confirm" href="?marcar_como_validada={{ secao.pk }}" data-confirm="Tem certeza que deseja concluir a validação da seção?">{% icone "check" %} Marcar seção como validada</a></li>
+                                <li><a class="btn primary" href="?iniciar_validacao={{ secao.pk }}">Iniciar análise da seção</a></li>
+                            {% endif %}
+                            {% if secao.validador == servidor or tem_permissao_administrador %}
+                                {% if secao.pode_ter_validacao_concluida %}
+                                    <li><a class="btn success confirm" href="?concluir_validacao={{ secao.pk }}" data-confirm="Tem certeza que deseja concluir a validação da seção?">Concluir validação da seção</a></li>
+                                {% endif %}
+                                {% if secao.pode_ter_validacao_liberada %}
+                                    <li><a class="btn primary confirm" href="?liberar_validacao={{ secao.pk }}" data-confirm="Tem certeza que deseja liberar a validação da seção?">Liberar seção para outro validador</a></li>
+                                {% endif %}
+                                {% if secao.pode_cancelar_conclusao_validacao %}
+                                    <li><a class="btn danger" href="?cancelar_conclusao_validacao={{ secao.pk }}" data-confirm="Tem certeza que deseja cancelar a conclusão da validação da seção?">Cancelar conclusão da validação da seção</a></li>
+                                {% endif %}
+                            {% endif %}
+                        {% endif %}
+                    </ul>
+                    <dl class="definition-list flex compact">
+                        <div class="list-item">
+                            <dt>Edição</dt>
+                            <dd>{{ secao.editor|format }}
+                                {% if secao.editor %}
+                                    {% if secao.data_conclusao_edicao %}
+                                        <small>(em {{ secao.data_conclusao_edicao|format }})</small>
+                                    {% else %}
+                                        <small>(em andamento)</small>
+                                    {% endif %}
+                                {% endif %}
+                            </dd>
+                        </div>
+                        <div class="list-item">
+                            <dt>Revisão Técnica</dt>
+                            <dd>{{ secao.revisor_tecnico|format }}
+                                {% if secao.revisor_tecnico %}
+                                    {% if secao.data_revisao_tecnica %}
+                                        <small>(em {{ secao.data_revisao_tecnica|format }})</small>
+                                    {% else %}
+                                        <small>(em andamento)</small>
+                                    {% endif %}
+                                {% endif %}
+                            </dd>
+                        </div>
+                        <div class="list-item">
+                            <dt>Validação</dt>
+                            <dd>{{ secao.validador|format }}
+                                {% if secao.validador %}
+                                    {% if secao.data_validacao %}
+                                        <small>(em {{ secao.data_validacao|format }})</small>
+                                    {% else %}
+                                        <small>(em andamento)</small>
+                                    {% endif %}
+                                {% endif %}
+                            </dd>
+                        </div>
+                    </dl>
+                {% endif %}
+
+                {% for conteudo in secao.get_conteudos %}
+                    {% with marcadores_invalidos=conteudo.get_marcadores_invalidos %}
+                        <div class="general-box {% if obj.em_elaboracao and conteudo.requer_correcao or marcadores_invalidos %}danger{% endif %}">
+                            <div class="primary-info">
+                                <div class="status-info-container">
+                                    {% if conteudo.editavel %}
+                                        {% if obj.em_elaboracao and conteudo.requer_correcao %}
+                                            <span class="status status-error with-title" title="É preciso resolver todos os comentários antes de prosseguir.">
+                                                Requer correção
+                                            </span>
+                                        {% elif obj.em_analise_preliminar and conteudo.requer_correcao_analise_preliminar or obj.em_revisao_tecnica and secao.data_revisao_tecnica and conteudo.requer_correcao_revisao_tecnica or obj.em_validacao and secao.data_validacao and conteudo.requer_correcao_validacao %}
+                                            <span class="status status-error">
+                                                Pronto para devolver para elaboração
+                                            </span>
+                                        {% else %}
+                                            <span class="status status-{% if conteudo.em_situacao_espera %}info{% elif conteudo.em_situacao_concluido %}success{% else %}alert{% endif %}">
+                                                {{ conteudo.get_situacao_display }}
+                                            </span>
+                                        {% endif %}
+                                        {% if marcadores_invalidos %}
+                                            <span class="status status-error">
+                                                Possui marcadores inválidos
+                                            </span>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="status status-default">Não editável</span>
+                                    {% endif %}
+                                </div>
+                                <h4>
+                                    <small>{{ conteudo.ordem_exibicao }}</small>
+                                </h4>
+                                <ul class="action-bar">
+                                    {% if is_validador and conteudo.pode_receber_observacao_analise_preliminar or secao.revisor_tecnico == servidor and conteudo.pode_receber_observacao_tecnica or secao.validador == servidor and conteudo.pode_receber_observacao_final %}
+                                        <li><a class="btn warning popup" href="/pafc/revisar_conteudo/{{ conteudo.pk }}/">{% icone "comment" %} Fazer observação</a></li>
+                                    {% endif %}
+                                    {% if tem_permissao_edicao and conteudo.pode_ser_editado or tem_permissao_administrador %}
+                                        {% if obj.em_elaboracao and secao.editor == servidor or obj.em_validacao and secao.validador == servidor or is_validador and obj.em_analise_preliminar or conteudo.editavel and tem_permissao_administrador %}
+                                            <li><a class="btn popup" href="/pafc/editar_conteudopafc/{{ conteudo.pk }}/">{% icone "edit" %} Editar conteúdo</a></li>
+                                        {% endif %}
+                                    {% endif %}
+                                    {% if conteudo.editavel %}
+                                        <li><a class="btn default popup" href="/pafc/historico_conteudo_pafc/{{ conteudo.pk }}/">{% icone "history" %} Histórico</a></li>
+                                    {% endif %}
+                                </ul>
+                                <div class="extra-info">
+                                    {% if marcadores_invalidos %}
+                                        <div class="alert alert-danger">
+                                            <p>
+                                                <strong>Atenção:</strong> os marcadores abaixo são inválidos.
+                                                Veja os marcadores permitidos <a href="#marcadores">clicando aqui</a>.
+                                            </p>
+                                            <ul>
+                                                {% for marcador in marcadores_invalidos %}
+                                                    <li>{{ marcador }}</li>
+                                                {% endfor %}
+                                            </ul>
+                                        </div>
+                                    {% endif %}
+                                    {{ conteudo.texto|safe }}
+                                </div>
+                            </div>
+                            {% if conteudo.orientacao_preenchimento %}
+                                <dl class="secondary-info">
+                                    <div class="list-item">
+                                        <dt>{% icone "exclamation-triangle" %} Orientações de preenchimento</dt>
+                                        <dd>{{ conteudo.orientacao_preenchimento }}</dd>
+                                    </div>
+                                </dl>
+                            {% endif %}
+                            {% if conteudo.comentarios_revisao.exists %}
+                                {% if is_elaborador or is_revisor_tecnico or is_validador or tem_permissao_administrador %}
+                                    <dl class="secondary-info">
+                                        <div class="list-item">
+                                            <dt>{% icone "comment" %} Comentários da revisão</dt>
+                                            <dd>
+                                                {% for comentario in conteudo.comentarios_revisao.all %}
+                                                <div class="list-item flex-basis-100">
+                                                    <div>
+                                                        <p>“{{ comentario.comentario|format }}” {% if comentario.resolvido %}<span class="badge negrito text-uppercase">{% icone "check" %} Resolvido</span>{% endif %}</p>
+                                                        <p class="obs">
+                                                            — {{ comentario.servidor.pessoa_fisica.nome }} ({{ comentario.servidor.matricula }})
+                                                            em {{ comentario.data|format }},
+                                                            durante {{ comentario.get_tipo_revisao_display|lower }}.
+                                                        </p>
+                                                    </div>
+                                                    {% if not comentario.resolvido %}
+                                                        {% if obj.em_elaboracao and secao.editor == servidor and conteudo.pode_ser_editado %}
+                                                            <div>
+                                                                <a class="btn popup" href="/pafc/resolver_observacao_conteudo/{{ comentario.pk }}">
+                                                                    {% icone "check" %} Marcar como resolvido
+                                                                </a>
+                                                            </div>
+                                                        {% elif conteudo.pode_receber_observacao_analise_preliminar or conteudo.pode_receber_observacao_tecnica or conteudo.pode_receber_observacao_final %}
+                                                            {% if comentario.servidor == servidor %}
+                                                                <div>
+                                                                    <a class="btn confirm" href="/pafc/remover_observacao_conteudo/{{ comentario.pk }}" data-confirm="Tem certeza que deseja remover este comentário?">
+                                                                        {% icone "trash" %} Remover
+                                                                    </a>
+                                                                </div>
+                                                            {% endif %}
+                                                        {% endif %}
+                                                    {% endif %}
+                                                </div>
+                                                {% endfor %}
+                                            </dd>
+                                        </div>
+                                    </dl>
+                                {% endif %}
+                            {% endif %}
+                        </div>
+                    {% endwith %}
+                {% empty %}
+                    <p class="alert alert-warning">Nenhum conteúdo adicionado.</p>
+                {% endfor %}
+            {% endbox %}
+        {% empty %}
+            {% if obj.em_etapas_de_solicitacao %}
+                <p class="alert alert-warning">O conteúdo ficará disponível quando a Comissão de Elaboração for aprovada.</p>
+            {% else %}
+                <p class="alert alert-warning">Nenhuma seção cadastrada.</p>
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+    </div>
+
+    {% if not obj.em_etapas_de_solicitacao and not obj.em_elaboracao and not obj.em_revisao_tecnica and not obj.em_validacao or obj.decisao_consepex is not None or obj.decisao_consup is not None %}
+        {% if camara %}
+            <div class="tab-pane" data-title="Câmara" data-tab="camara">
+                {% box "{{ camara }}" %}
+                    <dl class="definition-list flex">
+                        <div class="list-item">
+                            <dt>Coordenador</dt>
+                            <dd>{{ camara.coordenador }}</dd>
+                        </div>
+                        <div class="list-item">
+                            <dt>Secretário</dt>
+                            <dd>{{ camara.secretario }}</dd>
+                        </div>
+                        <div class="list-item">
+                            <dt>Data da reunião</dt>
+                            <dd>{{ obj.data_convocacao_camara|format }}</dd>
+                        </div>
+                        <div class="list-item">
+                            <dt>Decisão</dt>
+                            <dd>{{ obj.get_decisao_camara_display|format }}</dd>
+                        </div>
+                    </dl>
+                {% endbox %}
+            </div>
+        {% endif %}
+
+        <div class="tab-pane" data-title="CONSEPEX" data-tab="consepex">
+
+            <dl class="definition-list flex">
+                <div class="list-item">
+                    <dt>Secretaria</dt>
+                    <dd>{{ obj.ppc.get_setor_conselhos }}</dd>
+                </div>
+                {% if obj.consepex_inexistente %}
+                    <div class="list-item flex-basis-100">
+                        <dt>Status</dt>
+                        <dd>{{ "CONSEPEX não instituído"|status }}</dd>
+                    </div>
+                {% else %}
+                    <div class="list-item">
+                        <dt>Data da reunião</dt>
+                        <dd>{{ obj.data_convocacao_consepex|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Decisão</dt>
+                        <dd>{{ obj.get_decisao_consepex_display|format }}</dd>
+                    </div>
+                    {% if obj.justificativa_decisao_consepex %}
+                        <div class="list-item flex-basis-100">
+                            <dt>Justificativa da decisão</dt>
+                            <dd>{{ obj.justificativa_decisao_consepex|linebreaks }}</dd>
+                        </div>
+                    {% endif %}
+                {% endif %}
+            </dl>
+            {% if solicitacoes_tramitacao_ad_referendum_consepex and pode_visualizar_solicitacoes_tramitacao_ad_referendum %}
+                {% include "includes/lista_solicitacoes_tramitacao_ad_referendum.html" with solicitacoes=solicitacoes_tramitacao_ad_referendum_consepex %}
+            {% endif %}
+        </div>
+
+        {% if obj.is_pafc_criacao %}
+            <div class="tab-pane" data-title="CONSUP" data-tab="consup">
+
+                <dl class="definition-list flex">
+                    <div class="list-item">
+                        <dt>Secretaria</dt>
+                        <dd>{{ obj.ppc.get_setor_conselhos }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Data da reunião</dt>
+                        <dd>{{ obj.data_convocacao_consup|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Decisão</dt>
+                        <dd>{{ obj.get_decisao_consup_display|format }}</dd>
+                    </div>
+                    {% if obj.justificativa_decisao_consup %}
+                        <div class="list-item flex-basis-100">
+                            <dt>Justificativa da decisão</dt>
+                            <dd>{{ obj.justificativa_decisao_consup|linebreaks }}</dd>
+                        </div>
+                    {% endif %}
+                </dl>
+
+                {% if solicitacoes_tramitacao_ad_referendum_consup and pode_visualizar_solicitacoes_tramitacao_ad_referendum %}
+                    {% include "includes/lista_solicitacoes_tramitacao_ad_referendum.html" with solicitacoes=solicitacoes_tramitacao_ad_referendum_consup %}
+                {% endif %}
+            </div>
+        {% endif %}
+
+    {% endif %}
+
+    <div class="tab-pane" data-title="Documentos" data-tab="documentos" data-checked="{{ is_documentos_anexados }}">
+
+        {% box "Relatório da Análise Preliminar" %}
+            {% if obj.em_analise_preliminar and tem_permissao_edicao %}
+                <ul class="action-bar">
+                    <li>
+                        <a class="btn {% if obj.relatorio_analise_preliminar %}primary{% else %}success{% endif %} popup"
+                           href="/pafc/anexar_relatorio_analise_preliminar/{{ obj.id }}/">
+                            {% if not obj.relatorio_analise_preliminar %}
+                                {% icone "link" %} Anexar Relatório
+                            {% else %}
+                                {% icone "edit" %} Editar Relatório
+                            {% endif %}
+                        </a>
+                    </li>
+                    {% if obj.relatorio_analise_preliminar %}
+                        <li>
+                            <a class="btn popup danger" href="/pafc/remover_relatorio_analise_preliminar/{{ obj.id }}/"
+                               data-confirm="Deseja realmente remover o arquivo do Relatório da Análise Preliminar?">
+                                {% icone "trash" %}Remover Relatório
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            {% endif %}
+            {% if obj.relatorio_analise_preliminar %}
+                <dl class="definition-list flex">
+                    <div class="list-item">
+                        <dt>Relatório</dt>
+                        <dd><a class="btn default" href="{{ obj.relatorio_analise_preliminar.url }}">{% icone "eye" %} Visualizar o arquivo</a></dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Cadastrado por</dt>
+                        <dd>{{ obj.relatorio_analise_preliminar_cadastrado_por|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Data do cadastro</dt>
+                        <dd>{{ obj.data_upload_relatorio_analise_preliminar|format }}</dd>
+                    </div>
+                </dl>
+            {% else %}
+                <p class="alert alert-warning">O relatório ainda não foi cadastrado.</p>
+            {% endif %}
+        {% endbox %}
+
+        {% box "Ficha de Revisão Técnica" %}
+            {% if obj.em_revisao_tecnica and tem_permissao_edicao %}
+                <ul class="action-bar">
+                    <li>
+                        <a class="btn {% if obj.ficha_revisao_tecnica %}primary{% else %}success{% endif %} popup"
+                           href="/pafc/anexar_ficha_revisao_tecnica/{{ obj.id }}/">
+                            {% if not obj.ficha_revisao_tecnica %}
+                                {% icone "link" %} Anexar Ficha
+                            {% else %}
+                                {% icone "edit" %} Editar Ficha
+                            {% endif %}
+                        </a>
+                    </li>
+                    {% if obj.ficha_revisao_tecnica %}
+                        <li>
+                            <a class="btn popup danger" href="/pafc/remover_ficha_revisao_tecnica/{{ obj.id }}/"
+                               data-confirm="Deseja realmente remover o arquivo da Ficha de revisão técnica?">
+                                {% icone "trash" %}Remover Ficha
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            {% endif %}
+            {% if obj.ficha_revisao_tecnica %}
+                <dl class="definition-list flex">
+                    <div class="list-item">
+                        <dt>Ficha</dt>
+                        <dd><a class="btn default" href="{{ obj.ficha_revisao_tecnica.url }}">{% icone "eye" %} Visualizar o arquivo</a></dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Cadastrado por</dt>
+                        <dd>{{ obj.ficha_revisao_tecnica_cadastrada_por|format }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>Data do cadastro</dt>
+                        <dd>{{ obj.data_upload_ficha_revisao_tecnica|format }}</dd>
+                    </div>
+                </dl>
+            {% else %}
+                <p class="alert alert-warning">A ficha ainda não foi cadastrada.</p>
+            {% endif %}
+        {% endbox %}
+
+        {# Documentos emitidos #}
+        {% regroup documentos_emitidos by documento.get_tipo_display as documentos_por_etapa %}
+        {% for group in documentos_por_etapa %}
+            {% box group.grouper %}
+                {% for documento in group.list %}
+                    {% with doc=documento.get_documento doc_hibrido=documento.documento usa_doc_eletronico=documento.documento.usa_documento_eletronico %}
+                        <div class="general-box {% if not doc_hibrido.estah_finalizado %}warning{% endif %}">
+                            <div class="primary-info">
+                                <div class="status-info-container">
+                                    {% if usa_doc_eletronico %}
+                                        {{ doc.get_status_display|status }}
+                                    {% elif not doc_hibrido.documento_existe %}
+                                        <span class="status status-error">Removido</span>
+                                    {% else %}
+                                        <span class="status status-success">Finalizado</span>
+                                    {% endif %}
+                                    {% if documento.ad_referendum %}
+                                        <span class="status status-info">Ad Referendum</span>
+                                    {% endif %}
+                                    {% if documento.reprovacao %}
+                                        <span class="status status-error">{{ group.grouper }} de reprovação</span>
+                                    {% endif %}
+                                </div>
+                                <h4>{{ doc_hibrido.get_identificador_documento|format }}</h4>
+                                <ul class="action-bar">
+                                    <li><a href="{{ doc_hibrido.get_url_documento }}" class="btn success">{% icone "external-link-alt" %} Acessar documento</a></li>
+                                    {% if servidor == documento.emissor or perms.pafc.change_documentohibrido %}
+                                        <li><a href="/pafc/pafc/substituir_documento/{{ documento.pk }}/" class="btn primary popup">{% icone "exchange-alt" %} Substituir documento</a></li>
+                                    {% endif %}
+                                    {% if documento.situacao_pafc == obj.situacao and documento|method:"can_delete"|call:request.user %}
+                                        <li><a href="/pafc/pafc/remover_documento/{{ documento.pk }}/" class="btn danger popup">{% icone "trash" %} Remover</a></li>
+                                    {% endif %}
+                                </ul>
+                                <div class="extra-info">
+                                    <h5>Assunto:</h5>
+                                    <p>{{ doc_hibrido.get_assunto_documento|format }}</p>
+                                </div>
+                            </div>
+                            <dl class="secondary-info">
+                                <div class="list-item">
+                                    <dt>Emitido por:</dt>
+                                    {% if usa_doc_eletronico %}
+                                        <dd>{{ doc.usuario_criacao|format }} em {{ doc.data_criacao|format }}</dd>
+                                    {% else %}
+                                        <dd>{{ documento.emissor|format }} em {{ documento.data_emissao|format }}</dd>
+                                    {% endif %}
+                                </div>
+                                <div class="list-item">
+                                    <dt>Situação do PAFC na emissão:</dt>
+                                    <dd>{{ documento.get_situacao_pafc_display }}</dd>
+                                </div>
+                                {% if usa_doc_eletronico %}
+                                    {% if doc.tem_assinaturas %}
+                                        <div class="list-item">
+                                            <dt>Assinado por:</dt>
+                                            <dd>{{ doc.get_assinado_por|safe|format }}</dd>
+                                        </div>
+                                    {% endif %}
+                                    {% if doc.estah_finalizado %}
+                                        <div class="list-item">
+                                            <dt>Finalizado em:</dt>
+                                            <dd>{{ doc.get_data_finalizacao|format }}</dd>
+                                        </div>
+                                    {% elif doc.estah_cancelado %}
+                                        <div class="list-item">
+                                            <dt>Cancelado em:</dt>
+                                            <dd>{{ doc.data_cancelamento|format }}</dd>
+                                        </div>
+                                        <div class="list-item">
+                                            <dt>Motivo do cancelamento:</dt>
+                                            <dd>{{ doc.justificativa_cancelamento }}</dd>
+                                        </div>
+                                    {% endif %}
+                                {% endif %}
+                                {% if documento.decisao %}
+                                    <div class="list-item">
+                                        <dt>Decisão:</dt>
+                                        <dd>{{ documento.get_decisao_display|format }}</dd>
+                                    </div>
+                                {% endif %}
+                            </dl>
+                        </div>
+                    {% endwith %}
+                {% endfor %}
+            {% endbox %}
+        {% endfor %}
+    </div>
+
+    <div class="tab-pane" data-title="Pendências" data-tab="pendencias" {% if pendencias %}data-counter="{{ pendencias|length }}"{% else %}data-checked="True"{% endif %}>
+         {% for grupo in pendencias %}
+            {% box grupo.0 %}
+                {% for item in grupo.1 %}
+                    <p class="checklist error">{% if item.1 %}<a href="#" class="tab-changer" data-tab-destino="{{ item.1 }}">{% endif %}{{ item.0 }}{% if item.1 %}</a>{% endif %}<strong>Pendente</strong></p>
+                    {% empty %}
+                    <p class="alert alert-info">Nenhuma pendência encontrada.</p>
+                {% endfor %}
+            {% endbox %}
+         {% empty %}
+             <p class="alert alert-info">Nenhuma pendência encontrada.</p>
+         {% endfor %}
+    </div>
+
+    <div class="tab-pane" data-title="Histórico de movimentações" data-tab="movimentacoes">
+        {% if movimentacoes %}
+            {% autopaginate movimentacoes 30 %}
+            <ul class="timeline compact">
+                {% for movimentacao in movimentacoes %}
+                    {% with situacao=movimentacao.get_situacao_display eh_nova_situacao=movimentacao.eh_nova_situacao %}
+                    <li class="{% if not eh_nova_situacao %}obs{% elif situacao == 'Em solicitação' %}info{% elif situacao == 'Aprovado' or situacao == 'Finalizado' %}success{% elif situacao == 'Arquivado' or situacao == 'Reprovado' %}danger{% else %}warning{% endif %}">
+                        <div class="timeline-date">{{ movimentacao.data|format }}</div>
+                        <div class="timeline-icon"></div>
+                        <div class="timeline-content">
+                            <h4>
+                                {% if eh_nova_situacao %}{{ situacao }}{% endif %}
+                                {% if movimentacao.usuario %}
+                                    <small class="{% if not eh_nova_situacao %}mb-2{% endif %}">
+                                        por {{ movimentacao.usuario|format }}
+                                    </small>
+                                {% endif %}
+                            </h4>
+                            {% if movimentacao.descricao %}<p>{{ movimentacao.descricao }}</p>{% endif %}
+                        </div>
+                    </li>
+                    {% endwith %}
+                {% endfor %}
+            </ul>
+            {% paginate %}
+        {% else %}
+            <p class="alert alert-warning">Ainda não houve movimentação.</p>
+        {% endif %}
+    </div>
+
+{% endblock %}

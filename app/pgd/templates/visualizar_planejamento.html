@@ -1,0 +1,168 @@
+{% extends "base_super_pgd.html" %}
+
+{% block bodyclass %}hasAsideRight{% endblock %}
+
+{% block object-status %}
+    {{ rit.pit.get_situacao_virtual.1|status }}
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if pode_servidor_solicitar_aprovacao_pit_rit %}
+            <li>
+                <a href="{% url 'servidor_solicitar_aprovacao_pit_rit' rit.id %}" class="btn success">Solicitar Aprovação</a>
+            </li>
+        {% endif %}
+        {% if pode_editar %}
+            <li>
+                <a href="{% url 'adicionar_selecionar_atividade_rit' rit.id %}" class="btn success">Adicionar Atividade</a>
+            </li>
+            <li>
+                <a href="{% url 'copiar_planejamento' rit.id %}" class="btn">Copiar Atividades de Outro PIT</a>
+            </li>
+        {% endif %}
+        {% if pode_recalcular_pit_rit %}
+            <li>
+                <a href="{% url 'recalcular_pit_rit' rit.pit.id %}" class="btn confirm" data-confirm="Essa funcionalidade irá recalcular as horas informadas e devidas no seu PIT/RIT.">Recalcular Horas</a>
+            </li>
+        {% endif %}
+        <li>
+            <a href="{% url 'visualizar_plano_individual_trabalho' rit.pit.id %}" class="btn">Voltar para PIT/RIT</a>
+        </li>
+    </ul>
+{% endblock %}
+
+{% block asideright %}
+
+    <aside class="right">
+
+        <button id="collapseAsideRight"><span class="visually-hidden">Minimizar barra lateral</span></button>
+
+        <details open="open">
+            <summary>Histórico</summary>
+            {% autopaginate registros_acoes %}
+            {% paginate %}
+            <div class="details-container">
+                <ul class="timeline">
+                    {% for registro_acao in registros_acoes %}
+                        <li>
+                            <div class="timeline-date">{{ registro_acao.data|format }}</div>
+                            <div class="timeline-icon"></div>
+                            <div class="timeline-content">
+                                <h4><strong>{{ registro_acao.get_tipo_display }}</strong> <small>por {{ registro_acao.user|format }}</small></h4>
+                                <p>{{ registro_acao.observacao }}</p>
+                            </div>
+                        </li>
+                    {% endfor %}
+                </ul>
+                {% paginate %}
+            </div>
+        </details>
+
+    </aside>
+
+{% endblock %}
+
+{% block content %} {{ block.super }}
+
+    <p class="alert alert-info">Antes de trabalhar com o Planejamento leia as <a href="/pgd/visualizar_plano_individual_trabalho/{{ rit.pit.id }}/?tab=orientacoes">Orientações Gerais</a> disponíveis no seu PIT/RIT.</p>
+
+    {% if quem_deve_aprovar_atividades or quem_deve_autorizar_pit %}
+        {% box 'Pendências para Autorização' %}
+            <p class="alert alert-info">Chefes de setor não podem autorizar seus próprios PITs. Nesse caso deverá ser avaliado pela chefia de algum setor superior</p>
+            <p class="alert alert-info">Considerando as características atuais deste PIT e das suas Atividades.</p>
+            {% if quem_deve_autorizar_pit %}
+                <p class="checklist error">{{ quem_deve_autorizar_pit }} (chefia do setor OU do setor superior quando for o caso): Autorizar PIT após todas as atividades serem autorizadas<strong>Não concluído</strong></p>
+            {% endif %}
+            {% for aa in quem_deve_aprovar_atividades %}
+                {% if quem_deve_autorizar_pit %}
+                    {% if quem_deve_autorizar_pit == aa.setor %}
+                        <p class="checklist error">{{ aa.setor }} (chefia OU do setor superior quando for o caso): Autorizar as atividades relacionadas ao PTS deste setor antes da autorização do PIT<strong>Não concluído</strong></p>
+                    {% else %}
+                        <p class="checklist error">{{ aa.setor }} (chefia): Autorizar as atividades relacionadas ao PTS deste setor antes da autorização do PIT<strong>Não concluído</strong></p>
+                    {% endif %}
+                    
+                {% endif %}
+            {% endfor %}
+        {% endbox %}
+    {% endif %}
+
+    <ul class="flex-container boxes infos">
+        <li class="box-item">
+            <p class="stat">{{ rit.pit.tempo_previsto|format_hours }}</p>
+            <p class="title">Total previsto em horas para ser planejado para o período</p>
+        </li>
+        <li class="box-item warning">
+            <p class="stat">{{ rit.pit.tempo_planejado_cadastrado|format_hours }}</p>
+            <p class="title">Tempo planejado sem aprovação</p>
+        </li>
+        <li class="box-item success">
+            <p class="stat">{{ rit.pit.tempo_planejado_autorizado|format_hours }}</p>
+            <p class="title">Tempo planejado aprovado</p>
+        </li>
+        {% if rit.get_total_tempo_planejado_cancelado %}
+            <li class="box-item error">
+                <p class="stat">{{ rit.pit.tempo_planejado_cancelado|format_hours }}</p>
+                <p class="title">Tempo planejado cancelado</p>
+            </li>
+        {% endif %}
+    </ul>
+
+    {% if atividades_rit %}
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th class="no-print">Ações</th>
+                        <th>PTS</th>
+                        <th>Atividade</th>
+                        <th>Tempo Planejado</th>
+                        <th>Prazo</th>
+                        <th>Descrição</th>
+                        <th>Situação</th>
+                        <th class="no-print">Opções</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for atividade_rit in atividades_rit %}
+                        {% if not atividade_rit.tem_espelho %}
+                            <tr>
+                                <td class="no-print">
+                                {% if atividade_rit.pode_editar %}
+                                    {% icon "edit" "/pgd/editar_atividade_rit/{{ atividade_rit.id }}" %}
+                                {% endif %}
+                                </td>
+                                <td> 
+                                    {{ atividade_rit.atividade_pts.plano_trabalho_setorial }}
+                                    {% if not atividade_rit.atividade_estah_vinculada_a_adesao_pts_vigente_do_servidor %}
+                                        <p class="alert alert-info">Desligado deste PTS. Maiores detalhes no Meu PGD.</p>
+                                    {% endif %}
+                                </td>
+                                <td>{{ atividade_rit.atividade_pts }}</td>
+                                <td>{{ atividade_rit.tempo_planejado|format_hours }}</td>
+                                <td>{{ atividade_rit.data_prazo|format }}</td>
+                                <td>{{ atividade_rit.descricao|format }}</td>
+                                <td>{{ atividade_rit.get_situacao_display|status }}</td>
+                                <td class="no-print">
+                                    {% if atividade_rit.pode_cancelar %}
+                                        {% if atividade_rit.eh_espelho %}
+                                            <a href="/pgd/cancelar_espelho_atividade_rit/{{ atividade_rit.id }}" class="btn danger">Cancelar Edição</a>
+                                        {% else %}
+                                            <a href="/pgd/cancelar_atividade_rit/{{ atividade_rit.id }}" class="btn danger">Cancelar</a>
+                                        {% endif %}
+                                    {% endif %}
+                                    {% if atividade_rit.pode_remover %}
+                                        <a href="/pgd/remover_atividade_rit/{{ atividade_rit.id }}" class="btn danger">Remover</a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="alert alert-warning">Nenhuma atividade foi cadastrada.</p>
+    {% endif %}
+
+{% endblock %}

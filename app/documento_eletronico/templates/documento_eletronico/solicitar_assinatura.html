@@ -1,0 +1,132 @@
+{% extends super_template %}
+{% load static %}
+
+{% block extrahead %}
+    {{ formset.media }}
+{% endblock %}
+
+{% block bodyclass %}hasAsideRight{% endblock %}
+
+{% block content %}
+    <p class="alert alert-info">
+        <strong>1)</strong> A assinatura da <strong>solicitação principal</strong> será a responsável pela númeração do documento, conforme o tipo e o setor dono do próprio documento.
+        <br/>
+        <strong>2)</strong> Não é permitida a solicitação principal de assinatura para Alunos.
+    </p>
+    {% if form.errors or formset.errors %}
+		<p class="errornote">Por favor, corrija os erros abaixo.</p>
+	{% endif %}
+    {% csrf_token %}
+    {% box 'Preencher solicitações em lote' class=mostrar_formulario_preencher_lote %}
+        <p class="alert alert-info">Ao preencher solicitações em lote, todas as solicitações serão substituídas pelas pessoas informadas em lote.</p>
+        <p class="alert alert-info">O SUAP só irá processar, por vez, até 50 usuários.</p>
+        {% render_form preencher_solicitacao_assinaturas_form %}
+    {% endbox %}
+    {% box 'Solicitações de assinaturas' %}
+        <form action="." method="post">
+            {% csrf_token %}
+            <div class="module-row">
+                <div class="inline-related">
+                    <h3>Solicitação principal</h3>
+                    <fieldset class="module">
+                        <div class="required form-row">
+                            {{ main_form }}
+                        </div>
+                    </fieldset>
+                </div>
+            </div>
+            <div id="formset" data-formset-prefix="{{ formset.prefix }}">
+                {{ formset.management_form }}
+                <div data-formset-body>
+                    {% for form in formset %}
+                        {% include "documento_eletronico/solicitacao_form.html" with form=form index=forloop.counter only %}
+                    {% endfor %}
+                </div>
+                <script type="form-template" data-formset-empty-form>
+                    {% escapescript %}
+                        {% include "documento_eletronico/solicitacao_form.html" with form=formset.empty_form index=formset.activeFormCount only %}
+                    {% endescapescript %}
+                </script>
+                <div class="add-row">
+                    <button type="button" class="btn" data-formset-add>Adicionar solicitação</button>
+                </div>
+            </div>
+            <div class="submit-row">
+                <input type="submit" name="{{ form.ID }}" class="default" value="Enviar solicitações">
+                <button type="button" onclick="javascript:history.back(-1)" class="btn btn-default">Cancelar</button>
+            </div>
+        </form>
+        <script>jQuery(function($) {
+            $("#formset").formset({
+                'animateForms': true,
+                'reorderMode': 'animate'
+            }).on('formAdded', function()
+            {
+                // console.log("Form added:", this, arguments);
+            }).on('formDeleted', function()
+            {
+                // console.log("Form deleted", this, arguments);
+            });
+        });</script>
+    {% endbox %}
+    {% if outras_solicitacoes_complementares.count %}
+        {% box "Outras solicitações de assinatura" %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Outras solicitação das assinaturas</caption>
+                    <thead>
+                        <tr>
+                            <th>Ordem</th>
+                            <th>Solicitado a</th>
+                            <th>Situação</th>
+                            <th>Solicitante</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for solicitacao_assinatura in outras_solicitacoes_complementares %}
+                            <tr>
+                                <td>{% if solicitacao_assinatura.ordem_assinatura %}{{ solicitacao_assinatura.ordem_assinatura }}{% else %}Principal{% endif %}</td>
+                                <td>
+                                    <p>{{ solicitacao_assinatura.solicitado|format }}</p>
+                                    {% if solicitacao_assinatura.solicitado.eh_aluno and solicitacao_assinatura.solicitado.relacionamento.eh_menor_idade %}
+                                        <span class="status status-info hint hint-bottom" aria-label="{{ solicitacao_assinatura.solicitado.relacionamento.get_texto_condicao_incapacidade_idade }}">Aluno menor de 18 anos.</span>
+                                    {% endif %}
+                                    {% if solicitacao_assinatura.condicionantes.exists %}
+                                        <dl>
+                                            <dt>Condicionada a:</dt>
+                                            <dd>{{ solicitacao_assinatura.condicionantes.all|join:", " }}</dd>
+                                        </dl>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <p>{{ solicitacao_assinatura.get_status_display|status }}</p>
+                                    {% if solicitacao_assinatura.justificativa_rejeicao %}
+                                        <dl>
+                                            <dt>Justificativa da Rejeição:</dt>
+                                            <dd>{{ solicitacao_assinatura.justificativa_rejeicao|format }}</dd>
+                                        </dl>
+                                    {% endif %}
+                                </td>
+                                <td>{{ solicitacao_assinatura.solicitante|format }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endbox %}
+    {% endif %}
+{% endblock %}
+
+{% block asideright %}
+
+    <aside class="right">
+
+        <details open="open">
+            <summary>Dados gerais</summary>
+            <div class="details-container">
+                {% include "includes/documento_details.html" %}
+            </div>
+        </details>
+    </aside>
+
+{% endblock %}

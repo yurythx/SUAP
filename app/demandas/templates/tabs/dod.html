@@ -1,0 +1,165 @@
+<div class="tab-pane" data-tab="dod" data-title="Consolidação" data-checked="{% if demanda.ja_foi_aprovada %}True{% else %}False{% endif %}" {% if eh_analista %}data-public="{{ dod_visibilidade }}"{% endif %}>
+    {% if not demanda.aprovada %}
+        {% if demanda.em_analise and eh_demandante %}
+            <ul class="action-bar">
+                <li><a href="{% url 'dod_aprovar' demanda.pk dod.pk %}" class="btn success">{% icone "thumbs-up" %} Aprovar</a></li>
+                <li><a href="{% url 'dod_reprovar' demanda.pk dod.pk %}" class="btn danger">{% icone "thumbs-down" %} Reprovar</a></li>
+            </ul>
+        {% endif %}
+    {% endif %}
+
+    {% if exibir_consolidacao %}
+        
+        <ul class="action-bar">
+            {% if demanda.em_negociacao and pode_add_or_change_especificacao %}
+                <li><a href="{% url 'dod_especificacao_add' demanda.pk dod.pk %}" class="btn success">{% icone "plus" %} Adicionar especificação</a></li>
+            {% endif %}
+            {% if not dod.validacao_revisao_solicitada and demanda|method:"pode_revisar_consolidacao"|call:request.user %}
+                <li><a href="{% url 'adicionar_revisaoespecificacao' dod.pk %}" class="btn success confirm" data-confirm="A consolidação desta demanda já foi aprovada. Para adicionar nova especificação, será necessário solicitar a aprovação posterior aos demandantes.">{% icone "plus" %} Adicionar especificação</a></li>
+                {% if tem_consolidacao_modificada %}
+                    <li><a href="{% url 'solicitar_aprovacao_modificacoes_dod' dod.pk %}" class="btn success">{% icone "check" %} Solicitar validação das alterações</a></li>
+                {% endif %}
+            {% endif %}
+            {% if demanda.em_negociacao and eh_analista %}
+                <li><a href="{% url 'dod_alterar' demanda.pk dod.pk %}" class="btn primary">{% icone "edit" %} Editar</a></li>
+            {% endif %}
+            {% if pode_exportar_contexto %}
+                {% include "includes/exportar_markdown_actionbar.html" %}
+            {% endif %}
+        </ul>
+        
+        {% if eh_demandante and demanda.situacao == "Em análise" %}
+            <div class="alert alert-info">
+                <p><strong>O que analisar?</strong></p>
+                <ul>
+                    <li>Verifique se a Consolidação atende às suas necessidades;</li>
+                    <li>Verifique se todos os grupos de usuários envolvidos foram contemplados;</li>
+                    <li>Verifique se todas as funcionalidades necessárias estão contempladas nas especificações;</li>
+                    <li>Verifique se há alguma dúvida ou algo que precise ser melhor detalhado.</li>
+                </ul>
+                <p>O texto da Consolidação deve ser escrito em linguagem comum (não-técnica) e se houver qualquer dúvida, esta demanda deve ser reprovada para que as dúvidas possam ser sanadas e a consolidação melhorada.</p>
+            </div>
+        {% endif %}
+
+        <dl class="definition-list mb-5">
+            <dt>Descrição</dt>
+            <dd>{{ dod.descricao|safe|default:"Não definido" }}</dd>
+            {% if dod.detalhamento %}
+                <dt>Detalhamento</dt>
+                <dd>{{ dod.detalhamento|safe|default:"Não definido" }}</dd>
+            {% endif %}
+            {% if dod.grupos_envolvidos_names %}
+                <dt>Grupos de usuários envolvidos</dt>
+                <dd>
+                    <ul class="tags mt-1">
+                        {% for grupo in dod.grupos_envolvidos_names %}
+                            <li>{{ grupo }}</li>
+                        {% endfor %}
+                    </ul>
+                </dd>
+            {% endif %}
+        </dl>
+
+        {% if dod.revisaoespecificacao_set.exists and not dod.validacao_revisao_solicitada %}
+            <p class="alert alert-warning">Esta demanda contém <strong>alterações na consolidação a serem submetidas a validação</strong> pelos demandantes.</p>
+        {% elif dod.validacao_revisao_solicitada %}
+            <p class="alert alert-warning">Esta demanda contém <strong>alterações na consolidação pendentes</strong> de validação pelos demandantes.{% if dod.validacao_revisao_solicitada and eh_demandante %} <a href="{% url 'validar_modificacoes_dod' dod.id %}">Valide as alterações da consolidação</a>.{% endif %}</p>
+        {% endif %}
+
+        {% for especificacao in dod.especificacao_set.all %}
+            {% with especificacao.revisaoespecificacao_set.first as revisao %}
+                {% box especificacao %}
+                    <ul class="action-bar">
+                        {% if demanda.em_negociacao %}
+                            {% if pode_add_or_change_especificacao %}
+                                <li><a href="{% url 'dod_especificacao_change' demanda.pk dod.pk especificacao.pk %}" class="btn primary" title="Editar">{% icone "edit" %}<span class="visually-hidden">Editar</span></a></li>
+                                <li><a href="{% url 'dod_especificacao_delete' demanda.pk dod.pk especificacao.pk %}" class="btn danger" title="Remover">{% icone "trash" %}<span class="visually-hidden">Remover</span></a></li>
+                            {% endif %}
+                        {% endif %}
+                        {% if demanda|method:"pode_revisar_consolidacao"|call:request.user %}
+                            {% if not dod.validacao_revisao_solicitada %}
+                                {% if revisao %}
+                                    {% if not revisao.remocao_solicitada %}
+                                        <li><a href="{% url 'editar_revisaoespecificacao' revisao.pk %}" class="btn primary">{% icone "edit" %} Editar</a></li>
+                                    {% endif %}
+                                    <li><a href="/comum/excluir/demandas/revisaoespecificacao/{{ revisao.pk }}/" class="btn danger popup">{% icone "trash" %} Remover revisão</a></li>
+                                {% else %}
+                                    <li><a href="{% url 'revisar_especificacao' especificacao.pk %}" class="btn primary">{% icone "edit" %} Revisar</a></li>
+                                    <li><a href="{% url 'solicitar_remocao_especificacao' especificacao.pk %}" class="btn danger">{% icone "trash" %} Remover</a></li>
+                                {% endif %}
+                            {% endif %}
+                            {% if revisao %}
+                                <li><a href="{% url 'visualizar_especificacao' especificacao.pk %}" class="btn default popup">{% icone "eye" %} Versão atual</a></li>
+                            {% endif %}
+                        {% endif %}
+                        {% if demanda.aprovada or demanda.em_desenvolvimento %}
+                            {% if perms.demandas.atende_demanda %}
+                                <li class="has-child">
+                                    <a href="#" class="btn">{% icone "gitlab fab" %} GitLab</a>
+                                    <ul>
+                                        {% if especificacao.gitlab_issue_url %}
+                                            <li><a href="{{ especificacao.gitlab_issue_url }}">Acessar Issue</a></li>
+                                            <li><a href="/demandas/vincular_issue_gitlab/{{ especificacao.id }}/" class="popup">Alterar Issue</a></li>
+                                        {% else %}
+                                            <li><a href="/demandas/criar_issue_gitlab/{{ especificacao.id }}">Criar Issue</a></li>
+                                            <li><a href="/demandas/vincular_issue_gitlab/{{ especificacao.id }}" class="popup">Vincular Issue</a></li>
+                                        {% endif %}
+                                    </ul>
+                                </li>
+                            {% endif %}
+                        {% endif %}
+                    </ul>
+
+                    {% if eh_analista and revisao %}
+                        {% if dod.validacao_revisao_solicitada %}
+                            <p class="alert alert-warning">A revisão realizada nessa especificação <strong>ainda não foi aprovada</strong> pelos demandantes.</p>
+                        {% else %}
+                            <p class="alert alert-warning">Esta especificação foi alterada, mas <strong>ainda é necessário solicitar a validação</strong> pelos demandantes.</p>
+                        {% endif %}
+                        {% if revisao.nome != especificacao.nome %}
+                            <p class="alert alert-info"><strong>Novo título:</strong> {{ revisao.nome }}</p>
+                        {% endif %}
+                        {% if revisao.remocao_solicitada %}
+                            <p class="alert alert-danger">Será solicitada a remoção desta espeficiação da consolidação da demanda.</p>
+                        {% else %}
+                            <div class="richtext">{{ revisao.atividades|safe }}</div>
+                        {% endif %}
+                    {% elif especificacao.atividades %}
+                        <div class="richtext">{{ especificacao.atividades|safe }}</div>
+                    {% else %}
+                        <p class="alert alert-warning">Nenhuma atividade cadastrada.</p>
+                    {% endif %}
+                {% endbox %}
+            {% endwith %}
+        {% empty %}
+            <p class="alert alert-warning">Nenhuma especificação cadastrada.</p>
+        {% endfor %}
+
+        {% if demanda|method:"pode_revisar_consolidacao"|call:request.user %}
+            {% for revisao in dod.get_revisoes_sem_especificacao %}
+                {% box revisao.get_titulo %}
+                    {% if not dod.validacao_revisao_solicitada %}
+                        <ul class="action-bar">
+                            <li><a href="{% url 'editar_revisaoespecificacao' revisao.pk %}" class="btn primary">{% icone "edit" %} Editar</a></li>
+                            <li><a href="/comum/excluir/demandas/revisaoespecificacao/{{ revisao.pk }}/" class="btn danger popup">{% icone "trash" %} Remover</a></li>
+                        </ul>
+                    {% endif %}
+                    <p class="alert alert-warning">Esta especificação <strong>ainda não foi aprovada</strong> pelos demandantes.</p>
+                    <div class="richtext">{{ revisao.atividades|safe }}</div>
+                {% endbox %}
+            {% endfor %}
+        {% endif %}
+    {% else %}
+        <p class="alert alert-warning">Consolidação em construção.</p>
+    {% endif %}
+
+    {% if perms.demandas.atende_demanda and demanda.especificacao_tecnica %}
+        {% box "Especificação Técnica" %}
+            <ul class="action-bar">
+                <li><a href="{% url 'demanda_especificacao_tecnica' demanda.pk %}" class="btn primary">Editar</a></li>
+            </ul>
+
+            {{ demanda.especificacao_tecnica|safe }}
+        {% endbox %}
+    {% endif %}
+</div>

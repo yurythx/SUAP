@@ -1,0 +1,371 @@
+
+{% if inscricoes.exists %}
+    <ul class="action-bar mt-2 mb-4">
+        <li><a href="{{ request.get_full_path }}&pdf=1&tipo={{ tipo }}" class="btn default" target="_blank">{% icone "file-pdf" %} Exportar resultado</a></li>
+    </ul>
+    <form method="post" id="bolsas_form" action="/ae/analise_inscricoes/">
+        {% csrf_token %}
+
+        <div class="actions">
+            <label>Ação:
+                <select name="action">
+                    <option selected="selected">Validar documentação</option>
+                    <option>Invalidar documentação</option>
+                    <option>Alterar parecer para Deferido</option>
+                    <option>Alterar parecer para Indeferido</option>
+                    <option>Alterar parecer para Deferido mas sem recurso disponível</option>
+                    <option>Analisado neste programa</option>
+                    <option>Analisado em todos os programas</option>
+                    <option>Não analisado</option>
+                    <option>Ativar inscrição</option>
+                    <option>Inativar inscrição</option>
+                </select>
+            </label>
+            <button value="0" name="index" title="Executar ação selecionada" class="button" type="submit">Aplicar</button>
+        </div>
+
+        <div class="table-responsive sticky-head-line">
+            <table class="sticky-second-column">
+                <caption>Lista das inscrições</caption>
+                <thead>
+                    <tr>
+                        <th class="no-print"><input type="checkbox" onchange="var is = this.parentNode.parentNode.parentNode.parentNode.getElementsByTagName('input');for(var i=0; i<is.length; i++){ is[i].checked = this.checked;}"></th>
+                        <th>Aluno</th>
+                        <th>Renda bruta familiar</th>
+                        <th>Renda per capita</th>
+                        <th>Quantidade de pessoas</th>
+                        <th>Faixa etária</th>
+                        <th>Situação de trabalho do principal responsável financeiro</th>
+                        <th>Tipo de zona domiciliar</th>
+                        <th>Origem escolar</th>
+                        <th>Há pessoas do núcleo familiar com 60 anos ou mais?</th>
+                        <th>Há pessoas do núcleo familiar com idade inferior a 14 anos?</th>
+                        <th>Há pessoas do núcleo familiar com deficiências?</th>
+                        <th>Há pessoas do núcleo familiar com doenças crônicas?</th>
+                        <th>Há pessoas do núcleo familiar com despesas contínuas com medicamentos e/ou tratamento de saúde?</th>
+                        <th>Beneficiário de programa social</th>
+                        <th>Tipo de imóvel</th>
+                        <th>Curso/Modalidade</th>
+                        <th>Semestre/Ano</th>
+                        <th>Turno</th>
+                        <th>Situação de matrícula</th>
+                        {% if tipo_do_programa != programa.TIPO_IDIOMA %}
+                            <th>Participante de bolsa interna ou externa</th>
+                            <th>Aluno participante de bolsa da assistência estudantil</th>
+                        {% endif %}
+                        {% if tipo_do_programa == programa.TIPO_ALIMENTACAO %}
+                            <th>Motivo da solicitação</th>
+                            <th>Refeições solicitadas por dia</th>
+                            <th>Refeições solicitadas por semana</th>
+                            <th>Município em que reside atualmente</th>
+                        {% elif tipo_do_programa == programa.TIPO_TRANSPORTE %}
+                            <th>Dados bancários</th>
+                            <th>Município em que reside atualmente</th>
+                            <th>Valor gasto mensal</th>
+                        {% elif tipo_do_programa == programa.TIPO_TRABALHO %}
+                            <th>Turno de disponibilidade</th>
+                            <th>Existência de reprovação</th>
+                            <th>Cumpriu toda a carga horária de disciplinas</th>
+                            <th>Participante de bolsa interna ou externa</th>
+                            <th>Aluno participante de bolsa da assistência estudantil</th>
+                            <th>Município em que reside atualmente</th>
+                            <th>Situação de trabalho do estudante</th>
+                        {% else %}
+                            <th>Município de origem</th>
+                            <th>Município em que reside atualmente</th>
+                            {% for pergunta in perguntas %}
+                                <th>{{ pergunta.pergunta }}</th>
+                            {% endfor %}
+                        {% endif %}
+                        <th>Participação</th>
+                        <th>Parecer</th>
+                        <th>Observações</th>
+                        <th>Avaliação Social por especificidade</th>
+                        <th>Documentação</th>
+                        <th class="text-center">Pontuação</th>
+                        {% if tipo_do_programa == programa.TIPO_ALIMENTACAO or tipo_do_programa == programa.TIPO_TRANSPORTE %}
+                            <th>Sugestão de resultado</th>
+                        {% endif %}
+                        {% if tipo_do_programa != programa.TIPO_IDIOMA %}
+                            <th>Simulação de resultado</th>
+                        {% endif %}
+
+                        <th class="no-print text-end">Opções</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for inscricao in inscricoes %}
+                        <tr id="inscricao-{{ forloop.counter }}">
+                            <td class="no-print"><input type="checkbox" name="registros" value="{{ inscricao.inscricao_id }}"></td>
+                            <td>{{ inscricao.get_nome_aluno_sem_matricula }} (<a href="/edu/aluno/{{ inscricao.matricula }}/">{{ inscricao.matricula }}</a>){% if inscricao.foi_analisada %}{% icone "star" %}{% endif %}{% if inscricao.possui_criterio_restritivo %}<span class="status status-error">Critério restritivo</span>{% endif %}{% if inscricao.inscricao.info_cadunico %}<span class="status status-info">CadÚnico</span>{% endif %}{% if inscricao.possui_documento_caracterizacao_pendente_validacao %}<span class="status status-alert">Documentação específica para a aprovação</span>{% endif %}</td>
+                            <td>{{ inscricao.get_renda_familiar_bruta_por_faixa }}</td>
+                            <td>{{ inscricao.get_renda_familiar_per_capita_por_faixa }}</td>
+                            <td>{{ inscricao.qtd_pessoas }}</td>
+                            <td>{{ inscricao.faixa_etaria }}</td>
+                            <td>{{ inscricao.situacao_trabalho }}</td>
+                            <td>{{ inscricao.zona_domiciliar }}</td>
+                            <td>{{ inscricao.origem_escolar }}</td>
+                            <td>{{ inscricao.composicao_maior_60 }}</td>
+                            <td>{{ inscricao.composicao_menor_14 }}</td>
+                            <td>{{ inscricao.composicao_deficiencia }}</td>
+                            <td>{{ inscricao.doenca_cronica }}</td>
+                            <td>{{ inscricao.despesa_medicamentos }}</td>
+                            <td>{{ inscricao.beneficiario_programa_social }}</td>
+                            <td>{{ inscricao.despesas_basicas_volumosas }}</td>
+                            <td>{{ inscricao.curso }}</td>
+                            <td>{{ inscricao.semestre_atual }}</td>
+                            <td>{{ inscricao.turno|format }}</td>
+                            <td>
+                                {% if inscricao.situacao.pk == 100 %}
+                                    <span class="status status-error">{{ inscricao.situacao|format }}</span>
+                                {% else %}
+                                    {% if inscricao.situacao.pk == 6 %}
+                                        <span class="status status-success">{{ inscricao.situacao|format }}</span>
+                                    {% else %}
+                                        <span class="status status-info">{{ inscricao.situacao|format }}</span>
+                                        {% if inscricao.is_integralizado_cursando %}
+                                            <span class="status status-success">Integralizado Fase Escolar</span>
+                                        {% endif %}
+                                    {% endif %}
+                                {% endif %}
+                            </td>
+                            {% if not tipo_do_programa == programa.TIPO_IDIOMA %}
+                                <td>
+                                    {% with tem_bolsas=inscricao.tem_bolsa_interna_externa %}
+                                        {{ tem_bolsas|format }}
+
+                                        {% if tem_bolsas %}
+                                            <small>{{ inscricao.quais_bolsas_interna_externa|format }}</small>
+                                        {% endif %}
+                                    {% endwith %}
+
+                                </td>
+                                <td>{{ inscricao.recebe_bolsa }}</td>
+                            {% endif %}
+                            {% if tipo_do_programa == programa.TIPO_ALIMENTACAO %}
+                                <td>{{ inscricao.motivo_atendimento|format }}</td>
+                                <td>
+                                    <dl>
+                                        <dt>Seg:</dt>
+                                        <dd>({{ inscricao.refeicao_seg }}) {{ inscricao.inscricao.sub_instance.get_seg }}</dd>
+                                        <dt>Ter:</dt>
+                                        <dd>({{ inscricao.refeicao_ter }}) {{ inscricao.inscricao.sub_instance.get_ter }}</dd>
+                                        <dt>Qua:</dt>
+                                        <dd>({{ inscricao.refeicao_qua }}) {{ inscricao.inscricao.sub_instance.get_qua }}</dd>
+                                        <dt>Qui:</dt>
+                                        <dd>({{ inscricao.refeicao_qui }}) {{ inscricao.inscricao.sub_instance.get_qui }}</dd>
+                                        <dt>Sex:</dt>
+                                        <dd>({{ inscricao.refeicao_sex }}) {{ inscricao.inscricao.sub_instance.get_sex }}</dd>
+                                    </dl>
+                                </td>
+                                <td class="text-end">({{ inscricao.total_refeicoes }}) {{ inscricao.inscricao.sub_instance.get_por_semana }}</td>
+                                <td>{{ inscricao.cidade }}</td>
+                            {% elif tipo_do_programa == programa.TIPO_TRANSPORTE %}
+                                <td>
+                                    {% if inscricao.banco %}
+                                        <dl>
+                                            <dt>Banco:</dt>
+                                            <dd>{{ inscricao.banco|format }}</dd>
+                                            <dt>Agência:</dt>
+                                            <dd>{{ inscricao.agencia|format }}</dd>
+                                            <dt>Operação:</dt>
+                                            <dd>{{ inscricao.operacao|format }}</dd>
+                                            <dt>Conta:</dt>
+                                            <dd>{{ inscricao.conta|format }}</dd>
+                                        </dl>
+                                    {% endif %}
+                                </td>
+                                <td>{{ inscricao.cidade }}</td>
+                                <td>
+                                    {% if inscricao.gasto_transporte %} R$ {{ inscricao.gasto_transporte }}{% else %}Não informado{% endif %}
+                                    <a href="/ae/editar_valor_gasto_mensal/{{ inscricao.pk }}/?analise_id={{ forloop.counter|add:'-1' }}" class="btn primary">{% icone 'edit' %}<span class="visually-hidden">Editar</span></a>
+                                </td>
+                            {% elif tipo_do_programa == programa.TIPO_TRABALHO %}
+                                <td>
+                                    {{ inscricao.get_turno_escolhido }}
+                                    <a href="/ae/editar_turno_disponibilidade/{{ inscricao.pk }}/?analise_id={{ forloop.counter|add:'-1' }}" class="btn primary">{% icone 'edit' %}<span class="visually-hidden">Editar</span></a>
+                                </td>
+                                <td>{{ inscricao.existe_reprovacao }}</td>
+                                <td>{{ inscricao.cumpriu_toda_ch }}</td>
+                                <td>{{ inscricao.recebe_bolsa }}</td>
+                                <td>{{ inscricao.participacoes }}</td>
+                                <td>{{ inscricao.cidade }}</td>
+                                <td>{{ inscricao.aluno.caracterizacao.trabalho_situacao.descricao|format }}</td>
+                            {% else %}
+                                <td>{{ inscricao.aluno.naturalidade }}</td>
+                                <td>{{ inscricao.cidade }}</td>
+                                {% for resposta in inscricao.inscricao.get_respostas_inscricao_para_analise %}
+                                    <td>{{ resposta.resposta|format }}</td>
+                                {% endfor %}
+                            {% endif %}
+                            <td>
+                                {% if inscricao.inscricao.get_participacao_aberta %}
+                                    <a href="/ae/editar_participacao/{{ inscricao.inscricao.get_participacao_aberta.id }}/?analise_id={{ forloop.counter|add:'-1' }}" class="btn primary">{% icone 'edit' %}<span class="visually-hidden">Editar</span></a>
+                                {% else %}
+                                    <a href="/ae/adicionar_participacao/{{ programa.id }}/{{ inscricao.inscricao_id }}/?analise_id={{ forloop.counter|add:'-1' }}" class="btn success">{% icone 'plus' %}<span class="visually-hidden">Adicionar</span></a>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {{ inscricao.parecer_da_inscricao|status|safe }}
+                                <hr class="my-4">
+                                <ul class="action-bar">
+                                    <li>
+                                        {% if inscricao.parecer_da_inscricao != 'Sem parecer' %}
+                                            <a href="/ae/parecer_inscricao/{{ inscricao.inscricao_id }}/?analise_id={{ forloop.counter|add:'-1' }}" class="btn primary">{% icone 'edit' %}<span class="visually-hidden">Editar</span></a>
+                                        {% else %}
+                                            <a href="/ae/parecer_inscricao/{{ inscricao.inscricao_id }}/?analise_id={{ forloop.counter|add:'-1' }}" class="btn success">{% icone 'plus' %}<span class="visually-hidden">Adicionar</span></a>
+                                        {% endif %}
+                                    </li>
+                                    {% if inscricao.parecer_da_inscricao != 'Sem parecer' %}
+                                        <li><a href="/ae/historico_parecer/{{ inscricao.inscricao_id }}/" class="btn default popup">{% icone 'history' %}<span class="visually-hidden">Histórico</span></a></li>
+                                    {% endif %}
+                                </ul>
+                            </td>
+                            <td>
+                                {{ inscricao.observacoes|format }}
+                                <hr class="my-4">
+                                <ul class="action-bar">
+                                    {% if inscricao.observacoes %}
+                                        <li><a href="/ae/cadastrar_obs_analise/{{ inscricao.pk }}/?analise_id={{ forloop.counter|add:'-1' }}" class="btn primary">{% icone 'edit' %}<span class="visually-hidden">Editar</span></a></li>
+                                        {% if inscricao.observacoes_por == request.user.get_vinculo %}
+                                            <li><a href="/ae/excluir_obs_analise/{{ inscricao.pk }}/?analise_id={{ forloop.counter|add:'-1' }}" class="btn danger">{% icone 'trash' %}<span class="visually-hidden">Excluir</span></a></li>
+                                        {% endif %}
+                                    {% else %}
+                                        <li><a href="/ae/cadastrar_obs_analise/{{ inscricao.pk }}/?analise_id={{ forloop.counter|add:'-1' }}" class="btn primary success">{% icone 'plus' %}<span class="visually-hidden">Adicionar</span></a></li>
+                                    {% endif %}
+                                </ul>                
+                            </td>
+                            <td>
+                                {% if inscricao.pontuacao_especificidade %}
+                                    {{ inscricao.pontuacao_especificidade }} pontos
+                                {% else %}
+                                    Nenhuma.
+                                {% endif %}
+                                <hr class="my-4">
+                                <ul class="action-bar">
+                                    <li>
+                                        {% if inscricao.pontuacao_especificidade %}
+                                            <a href="/ae/pontuacao_especificidade/{{ inscricao.pk }}/?analise_id={{ forloop.counter|add:'-1' }}" class="btn primary">{% icone 'edit' %}<span class="visually-hidden">Editar</span></a>
+                                        {% else %}
+                                            <a href="/ae/pontuacao_especificidade/{{ inscricao.pk }}/?analise_id={{ forloop.counter|add:'-1' }}" class="btn success">{% icone 'plus' %}<span class="visually-hidden">Adicionar</span></a>
+                                        {% endif %}
+                                    </li>
+                                    {% if inscricao.pontuacao_especificidade %}
+                                        <li><a href="/ae/ver_avaliacao_especificidade/{{ inscricao.id }}/" class="btn default popup">{% icone 'search' %} Ver avaliação</a></li>
+                                    {% endif %}
+                                </ul>
+                            </td>
+                            <td>
+                                {{ inscricao.aluno.get_situacao_documentacao|safe }}
+                                <hr class="my-4">
+                                <ul class="action-bar">
+                                    <li><a href="/ae/documentacao_pendente/{{ inscricao.id_do_aluno }}/{{ inscricao.inscricao_id }}/" class="btn default" target="_blank">{% icone 'search' %} Documentação</a></li>
+                                </ul>
+                            </td>
+                            <td class="text-center fs-1">{{ inscricao.pontuacao_total }}</td>
+                            {% if tipo_do_programa == programa.TIPO_ALIMENTACAO or tipo_do_programa == programa.TIPO_TRANSPORTE %}
+                                <td>{{ inscricao.get_sugestoes|safe }}</td>
+                            {% endif %}
+                            {% if tipo_do_programa != programa.TIPO_IDIOMA %}
+                                <td>
+                                    {{ inscricao.get_simulacao_resultado|safe }}<br>
+                                    {% if tipo_do_programa == programa.TIPO_ALIMENTACAO %}
+                                        <dl>
+                                            <dt>Seg:</dt>
+                                            <dd>{{ inscricao.analiseinscricaoalimentacao_set.last.get_seg|default:"0" }}</dd>
+                                            <dt>Ter:</dt>
+                                            <dd>{{ inscricao.analiseinscricaoalimentacao_set.last.get_ter|default:"0" }}</dd>
+                                            <dt>Qua:</dt>
+                                            <dd>{{ inscricao.analiseinscricaoalimentacao_set.last.get_qua|default:"0" }}</dd>
+                                            <dt>Qui:</dt>
+                                            <dd>{{ inscricao.analiseinscricaoalimentacao_set.last.get_qui|default:"0" }}</dd>
+                                            <dt>Sex:</dt>
+                                            <dd>{{ inscricao.analiseinscricaoalimentacao_set.last.get_sex|default:"0" }}</dd>
+                                        </dl>
+                                    {% endif %}
+                                    <hr class="my-4">
+                                    <ul class="action-bar">
+                                        {% if tipo_do_programa == programa.TIPO_ALIMENTACAO or tipo_do_programa == programa.TIPO_TRANSPORTE %}
+                                            <li><a href="/ae/cadastrar_simulacao_resultado/{{ inscricao.id }}/?analise_id={{ forloop.counter|add:'-1' }}" class="btn success">{% icone 'plus' %}<span class="visually-hidden">Informar</span></a></li>
+
+                                        {% else %}
+                                            <li><a href="/ae/cadastrar_simulacao_resultado_texto/{{ inscricao.id }}/?analise_id={{ forloop.counter|add:'-1' }}" class="btn success">{% icone 'plus' %}<span class="visually-hidden">Informar</span></a></li>
+
+                                        {% endif %}
+                                    </ul>
+                                </td>
+                            {% endif %}
+                            <td class="no-print">
+                                <ul class="action-bar">
+                                    {% if inscricao.inscricao.get_participacao_aberta %}
+                                        <li><a href="/ae/editar_participacao/{{ inscricao.inscricao.get_participacao_aberta.id }}/?analise_id={{ forloop.counter|add:'-1' }}" class="btn primary">{% icone "edit" %} Editar participação</a></li>
+                                    {% else %}
+                                        <li><a href="/ae/adicionar_participacao/{{ programa.id }}/{{ inscricao.inscricao_id }}/?analise_id={{ forloop.counter|add:'-1' }}" class="btn success">{% icone "plus" %} Adicionar participação</a></li>
+                                    {% endif %}
+                                    <li><a href="/ae/atualizar_caracterizacao/{{ inscricao.pk }}/?analise_id={{ forloop.counter|add:'-1' }}" class="btn primary">{% icone "edit" %} Atualizar caracterização</a></li>
+                                    <li><a href="/ae/comprovante_inscricao/{{ inscricao.inscricao_id }}/" class="btn default" target="_blank">{% icone "file-alt" %} Comprovante de inscrição</a></li>
+                                    <li><a href="/ae/ver_descricao_pontuacao_analise/{{ inscricao.pk }}/" class="btn popup default">Detalhamento da pontuação</a></li>
+                                    {% if inscricao.inscricao.termo_compromisso_digitalizado %}
+                                        <li><a href="{{ inscricao.inscricao.termo_compromisso_digitalizado.url }}" class="btn default">Termo de Compromisso</a></li>
+                                    {% elif inscricao.inscricao.id_documento_termo_compromisso and inscricao.inscricao.validacao_termo_compromisso == inscricao.inscricao.VALIDADO %}
+                                        <li><a href="/documento_eletronico/visualizar_documento/{{ inscricao.inscricao.id_documento_termo_compromisso }}/" class="btn default">Termo de Compromisso</a></li>
+                                    {% endif %}
+                                    {% if edital_estah_ativo %}
+                                        <li><a href="/ae/excluir_analise_aluno/{{ inscricao.id }}/?analise_id={{ forloop.counter|add:'-1' }}" class="btn danger" data-confirm="Esta análise será excluída, assim como todas as informações inseridas pelos profissionais relativas à esta inscrição. Deseja prosseguir?">{% icone "trash" %}Excluir Análise</a></li>
+                                        <li><a href="/ae/recalcular_sugestao_resultado/{{ inscricao.id }}/?analise_id={{ forloop.counter|add:'-1' }}" class="btn success confirm" data-confirm="Tem certeza que deseja prosseguir?">Recalcular Sugestão de Resultado</a></li>
+                                    {% endif %}
+
+                                </ul>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    {% if tipo_do_programa == programa.TIPO_ALIMENTACAO %}
+                        <tr>
+                            <td colspan="23">Total:</td>
+                            <td>
+                                <dl>
+                                    <dt>Seg:</dt>
+                                    <dd>({{ contadores_finais.0 }}) {{ contadores_finais.8 }}</dd>
+                                    <dt>Ter:</dt>
+                                    <dd>({{ contadores_finais.1 }}) {{ contadores_finais.9 }}</dd>
+                                    <dt>Qua:</dt>
+                                    <dd>({{ contadores_finais.2 }}) {{ contadores_finais.10 }}</dd>
+                                    <dt>Qui:</dt>
+                                    <dd>({{ contadores_finais.3 }}) {{ contadores_finais.11 }}</dd>
+                                    <dt>Sex:</dt>
+                                    <dd>({{ contadores_finais.4 }}) {{ contadores_finais.12 }}</dd>
+                                </dl>
+                            </td>
+                            <td>({{ contadores_finais.5 }}) {{ contadores_finais.13 }}</td>
+                            <td colspan="7">&nbsp;</td>
+                            <td>{{ contadores_finais.6|format }}</td>
+                            <td>Total de refeições: {{ contadores_finais.7|format }}<br>
+                                <dl>
+                                    <dt>Seg:</dt>
+                                    <dd>{{ contadores_finais.14|default:0 }}</dd>
+                                    <dt>Ter:</dt>
+                                    <dd>{{ contadores_finais.15|default:0 }}</dd>
+                                    <dt>Qua:</dt>
+                                    <dd>{{ contadores_finais.16|default:0 }}</dd>
+                                    <dt>Qui:</dt>
+                                    <dd>{{ contadores_finais.17|default:0 }}</dd>
+                                    <dt>Sex:</dt>
+                                    <dd>{{ contadores_finais.18|default:0 }}</dd>
+                                </dl>
+
+                            </td>
+                        </tr>
+                    {% elif tipo_do_programa == programa.TIPO_TRANSPORTE %}
+                        <tr>
+                            <td colspan="31">Total:</td>
+                            <td>R$ {{ contadores_finais.0|format }}</td>
+                            <td>R$ {{ contadores_finais.1|format }}</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </form>
+{% else %}
+    <p class="alert alert-warning">Não há inscritos nessas condições.</p>
+{% endif %}

@@ -1,0 +1,190 @@
+{% extends super_template %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if pode_editar %}
+            <li><a href="/ponto/editar_debito_externo_ch_cadastro/{{ debito_externo_cadastro.id }}/" class="btn primary">Editar</a></li>
+        {% endif %}    
+        {% if pode_encaminhar_para_validacao %}
+            <li><a href="/ponto/encaminhar_validacao_debito_externo_ch_cadastro/{{ debito_externo_cadastro.id }}" class="btn success confirm">Encaminhar para Validação</a></li>
+        {% endif %}    
+        {% if pode_validar %}
+            <li><a href="/ponto/validar_debito_externo_ch_cadastro/{{ debito_externo_cadastro.id }}" class="btn warning popup">Validar</a></li>
+        {% endif %}    
+        {% if pode_cancelar_validacao %}
+            <li><a href="/ponto/cancelar_validacao_debito_externo_ch_cadastro/{{ debito_externo_cadastro.id }}" class="btn warning confirm">Cancelar Validação</a></li>
+        {% endif %}    
+        {% if pode_excluir %}
+            <li><a href="/admin/ponto/debitoexternocadastro/{{ debito_externo_cadastro.id }}/delete/" class="btn danger">Remover</a></li>
+        {% endif %}    
+        {% if pode_tentar_compensar and dias_dos_debitos_first and dias_dos_debitos_last %}
+            <li><a href="/ponto/informar_compensacao_v2/{{ dias_dos_debitos_first.data_debito|date:'dmY' }}/{{ dias_dos_debitos_last.data_debito|date:'dmY' }}/?periodo_objetivo=compensar_o_debito_do_periodo" class="btn default">Informar Compensação</a></li>
+        {% endif %}
+        <li><a href="/admin/ponto/debitoexternocadastro/" class="btn default">Débitos Externos</a></li>
+    </ul>
+{% endblock %}
+
+{% block object-status %}
+    {{ debito_externo_cadastro.get_situacao_display_html }}    
+{% endblock %}
+
+{% block content %}
+    {% if tem_compensacoes_informadas and not pode_visualizar_compensacao_debito %}
+        <p class="alert alert-warning"><strong>Atenção: </strong>o servidor já compensou parte ou todo o débito.</p>
+    {% endif %}
+
+    {% box "Dados gerais" %}
+        <div class="table-responsive">
+            <table class="info large">
+                <tbody>
+                    <tr>
+                        <td>Servidor (Destinatário)</td>
+                        <td>{{ debito_externo_cadastro.servidor|format }}</td>
+                    </tr>
+                    <tr>
+                        <td>Total do Débito</td>
+                        <td class="false">{{ debito_externo_cadastro.get_total_debito_display }}</td>
+                    </tr>
+                    {% if pode_visualizar_compensacao_debito %}
+                        <tr>
+                            <td>Total Compensado do Débito</td>
+                            <td class="true">{{ debito_externo_cadastro.get_total_debito_compensado_display }}</td>
+                        </tr>
+                        <tr>
+                            <td>Total Restante do Débito</td>
+                            <td class="false">{{ debito_externo_cadastro.get_total_debito_restante_display }}</td>
+                        </tr>
+                    {% endif %}    
+                    <tr>
+                        <td>Detalhamento</td>
+                        <td>{{ debito_externo_cadastro.detalhamento|format }}</td>
+                    </tr>
+                    {% if debito_externo_cadastro.origem %}
+                        <tr>
+                            <td>Origem da Informação</td>
+                            <td>
+                                {% if debito_externo_cadastro.origem.get_absolute_url %}
+                                    <a href="{{ debito_externo_cadastro.origem.get_absolute_url }}">
+                                        {{ debito_externo_cadastro.get_origem_display }}
+                                    </a>
+                                {% else %}
+                                    {{ debito_externo_cadastro.get_origem_display }}
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endif %}    
+                    <tr>
+                        <td>Validador</td>
+                        <td>
+                            {% if debito_externo_cadastro.validador %}
+                                {{ debito_externo_cadastro.validador|format }}&nbsp;
+                                {% if debito_externo_cadastro.validador == debito_externo_cadastro.servidor and not validador_eh_reitor_hoje %}
+                                    <span class="status status-error">A auto-validação não é permitida.</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="status status-error">Você deverá escolher um Validador através da opção 'Editar'.</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% if debito_externo_cadastro.validador_observacoes %}
+                        <tr>
+                            <td>Observações sobre a validação</td>
+                            <td>{{ debito_externo_cadastro.validador_observacoes|format }}</td>
+                        </tr>
+                    {% endif %}    
+                    <tr>
+                        <td>Situação</td>
+                        <td>{{ debito_externo_cadastro.get_situacao_display_html }}</td>
+                    </tr>
+                    <tr>
+                        <td>Cadastro</td>
+                        <td>{{ debito_externo_cadastro.data_cadastro|format }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    {% endbox %}
+
+    {% box "Dias dos Débitos" badge=dias_dos_debitos_count %}
+        {% if pode_editar %}
+            <ul class="action-bar">
+                <li><a class="btn success popup" href="/ponto/adicionar_debito_externo_ch/{{ debito_externo_cadastro.id }}">Adicionar Dia</a></li>
+            </ul>
+        {% endif %}
+
+        {% if dias_dos_debitos_exists %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            {% if pode_editar %}
+                                <th class="no-print">Ações</th>
+                            {% endif %}
+                            <th>Data do Débito</th>
+                            <th>Valor do Débito</th>
+                            <th>Observações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for dia_do_debito in debito_externo_cadastro.get_dias_dos_debitos %}
+                            <tr>
+                                {% if pode_editar %}
+                                    <td class="no-print">
+                                        {% icon "edit" "/ponto/editar_debito_externo_ch/{{ dia_do_debito.id }}" "Editar" "popup" %}
+                                        {% icon "delete" "/ponto/excluir_debito_externo_ch/{{ dia_do_debito.id }}" "Excluir" "danger" %}
+                                    </td>
+                                {% endif %}
+                                <td>{{ dia_do_debito.data_debito }}</td>
+                                <td>{{ dia_do_debito.get_valor_debito_display }}</td>
+                                <td>{{ dia_do_debito.observacoes|format }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Nenhum dia foi cadastrado. Isso é necessário para que seja possível a validação.</p>
+        {% endif %}
+    {% endbox %}
+
+    {% if tem_compensacoes_informadas and pode_visualizar_compensacao_debito %}
+        {% box 'Detalhamento da Compensação do Débito' %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Duração</th>
+                            <th>Data da Compensação/Saldo</th>
+                            <th>Saldo Externo Utilizado</th>
+                            <th class="no-print">Opções</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for compensacao in debito_externo_cadastro.compensacoes_informadas %}
+                            <tr>
+                                <td>{{ compensacao.ch_compensada|date:"H:i:s" }}</td>
+                                <td>
+                                    {{ compensacao.data_compensacao|format }}
+                                </td>
+                                <td>
+                                    {% if compensacao.saldo_externo_compensacao %}
+                                        <a class="popup" href="{{ compensacao.saldo_externo_compensacao.get_absolute_url }}">{{ compensacao.saldo_externo_compensacao }}</span>
+                                    {% else %}    
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td class="no-print">
+                                    <ul class="action-bar">
+                                        <li>
+                                            <a class="btn default popup" href="/ponto/abrir_compensacao_horario/{{ compensacao.id }}/?_popup=1"><span class="fa fa-search" aria-hidden="true"></span>Detalhes do Informe</a>
+                                        </li>
+                                    </ul>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endbox %}
+    {% endif %}
+{% endblock %}

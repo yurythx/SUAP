@@ -1,0 +1,150 @@
+{% extends super_template %}
+{% load static %}
+
+{% block extracss %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static 'rsc_tae/css/rsc-tae.css' %}">
+{% endblock %}
+
+{% block content %}
+
+{% box 'Finalizar avaliação' %}
+<span class="status status-info">
+    <strong>Informação:</strong>
+    {% if finalizara_processo_agora %}
+        Esta ação vai finalizar sua avaliação. Após a finalização de todos os avaliadores, o processo será encaminhado à CRSC para deliberação final.
+    {% else %}
+        Esta ação vai finalizar sua avaliação. O processo será encaminhado à CRSC quando todos os avaliadores finalizarem.
+    {% endif %}
+</span>
+
+{% if not pode_finalizar %}
+    <div class="mt-2">
+        <span class="status status-danger">
+            <strong>Não é possível finalizar:</strong> existem {{ anexos_pendentes }} arquivo(s) pendente(s) de análise.
+        </span>
+    </div>
+{% endif %}
+
+{% if pode_finalizar and not sera_deferido %}
+    <div class="alert alert-danger mt-2">
+        <p><strong>Esta avaliação resultará em indeferimento:</strong> após a sua análise, o processo não atinge os critérios do nível RSC-{{ processo.nivel_requisitado.ordem_romana }}:</p>
+        <ul>
+            {% for motivo in motivos_criterios_nao_atingidos %}
+                <li>{{ motivo }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+{% endif %}
+<dl class="definition-list flex">
+    <div class="list-item">
+        <dt>Processo</dt>
+        <dd>{{ processo }}</dd>
+    </div>
+    <div class="list-item">
+        <dt>Pontos validados (itens)</dt>
+        <dd>{{ total_pontos_validados|format }}</dd>
+    </div>
+    {% if criterios.saldo_anterior > 0 %}
+    <div class="list-item">
+        <dt>Saldo de concessão anterior</dt>
+        <dd>{{ criterios.saldo_anterior|format }}</dd>
+    </div>
+    {% endif %}
+    <div class="list-item">
+        <dt>Pontuação considerada</dt>
+        <dd>
+            {% if criterios.pontos_minimos > 0 %}
+                {{ criterios.total_pontos|format }}/{{ criterios.pontos_minimos|format }}
+                {% if criterios.atingiu_pontos %}
+                    <span class="status status-success">Atingida</span>
+                {% else %}
+                    <span class="status status-danger">Abaixo do mínimo</span>
+                {% endif %}
+            {% else %}
+                {{ criterios.total_pontos|format }}
+            {% endif %}
+        </dd>
+    </div>
+    <div class="list-item">
+        <dt>Itens validados</dt>
+        <dd>
+            {% if itens_requeridos %}
+                {{ itens_validados }}/{{ itens_requeridos }}
+                {% if criterios.atingiu_itens %}
+                    <span class="status status-success">Atingido</span>
+                {% else %}
+                    <span class="status status-danger">Insuficiente</span>
+                {% endif %}
+            {% else %}
+                {{ itens_validados }}
+            {% endif %}
+        </dd>
+    </div>
+    {% if criterios.requisito_obrigatorio_aplicavel %}
+    <div class="list-item">
+        <dt>Requisito obrigatório</dt>
+        <dd>
+            {% if criterios.atingiu_requisito_obrigatorio %}
+                <span class="status status-success">Atendido</span>
+            {% else %}
+                <span class="status status-danger">Não atendido</span>
+            {% endif %}
+            <span class="text-muted">({{ criterios.labels_requisitos_obrigatorios|join:", " }})</span>
+        </dd>
+    </div>
+    {% endif %}
+    <div class="list-item">
+        <dt>Resultado</dt>
+        <dd>
+            {% if sera_deferido %}
+                <span class="status status-success">Deferido</span>
+            {% else %}
+                <span class="status status-danger">Indeferido</span>
+            {% endif %}
+        </dd>
+    </div>
+</dl>
+
+<dl class="definition-list flex">
+    <div class="list-item">
+        <dt>Arquivos analisados</dt>
+        <dd>{{ anexos_analisados }}/{{ anexos_total }}</dd>
+    </div>
+</dl>
+
+{% if finalizara_processo_agora %}
+<dl class="definition-list flex">
+    <div class="list-item">
+        <dt>Projeção dos avaliadores (por maioria)</dt>
+        <dd>
+            {% if sera_deferido_maioria %}
+                <span class="status status-success">Deferido</span>
+            {% else %}
+                <span class="status status-danger">Indeferido</span>
+            {% endif %}
+            <span class="text-muted">
+                ({{ deferidos_anteriores }} deferido(s) + sua avaliação de {{ total_avaliadores }} avaliador(es)) — decisão final cabe à CRSC
+            </span>
+        </dd>
+    </div>
+</dl>
+{% endif %}
+
+<form method="post" action="">
+    {% csrf_token %}
+
+    {% if pode_finalizar %}
+        <div class="mt-3">
+            {% render_form form %}
+        </div>
+    {% endif %}
+
+    <div class="mt-3">
+        <a href="{% url 'rsc_tae:avaliar' processo.id %}" class="btn default">Cancelar</a>
+    </div>
+</form>
+
+{% endbox %}
+
+{% endblock %}

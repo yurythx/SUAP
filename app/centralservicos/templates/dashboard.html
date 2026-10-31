@@ -1,0 +1,124 @@
+{% extends super_template %}
+{% load static %}
+
+{% block favicon %}
+	{% if qtd_favicon > 0 %}
+		<link rel="shortcut icon" href="{% static 'comum/img/favicon-warning.png' %}">
+	{% else %}
+		<link rel="shortcut icon" href="{% static 'comum/img/favicon.png' %}">
+	{% endif %}
+{% endblock %}
+
+{% block title %}{% if qtd_favicon > 0 %}({{ qtd_favicon }}){% endif %} {{ title }} - {% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<script src="/static/djtools/graficos/highcharts.js"></script>
+<script src="/static/djtools/graficos/exporting.js"></script>
+<script>
+    {{ dados_grafico|safe }}
+    setTimeout("location.reload(true);", 30000); //30 segundos
+</script>
+{% endblock %}
+
+{% block content %}
+
+<p class="alert alert-warning mb-5">Estes dados não incluem chamados com situação "Fechado", "Resolvido" ou "Cancelado".</p>
+
+<div class="search-and-filters">
+    <form id="filtro" method="get">
+        {% csrf_token %}
+        <div class="filter filter-large-select">
+            <label>Área:</label>
+            <select name="area" onchange="$('#filtro').submit();">
+                <option value="">Todas</option>
+                {% for item in areas %}
+                    <option value="{{ item.id }}" {% if area.id == item.id %}selected="selected"{% endif %}>{{ item.nome }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="filter filter-large-select">
+            <label>Grupo de Atendimento:</label>
+            <select name="grupo_atendimento" onchange="$('#filtro').submit();">
+                <option value="">Todos</option>
+                {% for item in grupos_atendimento %}
+                    <option value="{{ item.id }}" {% if grupo_atendimento.id == item.id %}selected="selected"{% endif %}>{{ item.nome }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="filter filter-large-select">
+            <label>Unidade Organizacional:</label>
+            <select name="uo" onchange="$('#filtro').submit();">
+                <option value="">Todas</option>
+                {% for item in uos %}
+                    <option value="{{ item.id }}" {% if uo.id == item.id %}selected="selected"{% endif %}>{{ item.nome }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </form>
+</div>
+
+<div class="grid-container grid-columns-60-40">
+    <div class="grid-item">
+        {% box "Chamados Atribuidos a Mim" %}
+            {% autopaginate qs_atribuidos_a_mim 20 %}
+            {% paginate %}
+            {% for chamado in qs_atribuidos_a_mim %}
+                {% include "includes/box_chamado.html" %}
+            {% empty %}
+                <p class="alert alert-warning">Não foram encontrados chamados atribuídos a você.</p>
+            {% endfor %}
+            {% paginate %}
+        {% endbox %}
+    </div>
+
+    <div class="grid-item">
+        {% box "Chamados de Incidentes" %}
+            <div class="total-container flex-container no-icon">
+                <a href="/centralservicos/listar_chamados_suporte/?tipo=INC&atribuicoes=1{{ filtro_area }}{{ filtro_grupo_atendimento }}{{ filtro_uo }}" class="total-item">
+                    <p class="total">{{ qtd_incidentes_atribuidos_a_mim }}</p>
+                    <p class="description">Atribuídos a Mim</p>
+                </a>
+                <a href="/centralservicos/listar_chamados_suporte/?tipo=INC&atribuicoes=3{{ filtro_area }}{{ filtro_grupo_atendimento }}{{ filtro_uo }}" class="total-item">
+                    <p class="total {% if qtd_incidentes_nao_atribuidos > 0 %}false{% endif %}">{{ qtd_incidentes_nao_atribuidos }}</p>
+                    <p class="description">Não Atribuídos</p>
+                </a>
+                <a href="/centralservicos/listar_chamados_suporte/?tipo=INC&atribuicoes=2{{ filtro_area }}{{ filtro_grupo_atendimento }}{{ filtro_uo }}" class="total-item">
+                    <p class="total">{{ qtd_incidentes_atribuidos_a_outros }}</p>
+                    <p class="description">Atribuídos a Outros</p>
+                </a>
+            </div>
+        {% endbox %}
+
+        {% box "Chamados de Requisições" %}
+            <div class="total-container flex-container no-icon">
+                <a href="/centralservicos/listar_chamados_suporte/?tipo=REQ&atribuicoes=1{{ filtro_area }}{{ filtro_grupo_atendimento }}{{ filtro_uo }}" class="total-item">
+                    <p class="total">{{ qtd_requisicoes_atribuidas_a_mim }}</p>
+                    <p class="description">Atribuídos a Mim</p>
+                </a>
+                <a href="/centralservicos/listar_chamados_suporte/?tipo=REQ&atribuicoes=3{{ filtro_area }}{{ filtro_grupo_atendimento }}{{ filtro_uo }}" class="total-item">
+                    <p class="total {% if qtd_requisicoes_nao_atribuidas > 0 %}false{% endif %}">{{ qtd_requisicoes_nao_atribuidas }}</p>
+                    <p class="description">Não atribuídos</p>
+                </a>
+                <a href="/centralservicos/listar_chamados_suporte/?tipo=REQ&atribuicoes=2{{ filtro_area }}{{ filtro_grupo_atendimento }}{{ filtro_uo }}" class="total-item">
+                    <p class="total">{{ qtd_requisicoes_atribuidas_a_outros }}</p>
+                    <p class="description">Atribuídos a Outros</p>
+                </a>
+            </div>
+        {% endbox %}
+
+        {% if grafico_categorias %}
+            {% box "Estatísticas" %}
+                <div id="div_grafico"></div>
+            {% endbox %}
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}
+
+{% block action-links %}
+    <li>Esta página é atualizada automaticamente a cada 30 segundos.</li>
+{% endblock %}

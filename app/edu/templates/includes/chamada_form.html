@@ -1,0 +1,260 @@
+<style>
+    .abono-indeferido{
+        color: red !important;
+    }
+    .abono-pendente{
+        color: var(--warning-700, #d97706) !important;
+    }
+</style>
+<form method="post">
+    {% for matriculas in boxes_matriculas %}
+        {% box matriculas.0.matricula_periodo.aluno.polo|default:'Faltas' class="marginless box_faltas" %}
+            <script>
+                jQuery(document).ready(function () {
+                    $('input.pq.text-center').each(function (i) {
+                        $(this).attr('tabindex', i + 1);
+                    });
+                    var qtd_dias_aulas = {{ qtd_aulas_passadas }};
+                    var qtd_alunos = {{ matriculas.count }};
+                    $("#chamada-form").keydown(function (e) {
+                        if (e.keyCode == 9 || e.keyCode == 37 || e.keyCode == 38 || e.keyCode == 39 || e.keyCode == 40) {
+                            var tab = parseInt($(document.activeElement).attr("tabindex"));
+                            var linha_atual = parseInt(tab / qtd_dias_aulas);
+                            switch (e.keyCode) {
+                                case 9:
+                                    if (linha_atual < qtd_alunos - 1 || tab == qtd_dias_aulas * (qtd_alunos - 1)) {
+                                        tab += qtd_dias_aulas;
+                                    } else {
+                                        tab = (tab % qtd_dias_aulas) + 1;
+                                    }
+                                    e.preventDefault();
+                                    break;
+                                case 37:
+                                    tab--;
+                                    e.preventDefault();
+                                    break;
+                                case 38:
+                                    tab = tab - qtd_dias_aulas;
+                                    e.preventDefault();
+                                    break;
+                                case 39:
+                                    tab++;
+                                    e.preventDefault();
+                                    break;
+                                case 40:
+                                    tab = tab + qtd_dias_aulas;
+                                    e.preventDefault();
+                                    break;
+                            }
+                            $("#chamada-form").find("[tabindex='" + tab + "']").focus().select();
+                        }
+                    });
+                    $("input[type='text']").click(function () {
+                        $(this).select();
+                    });
+                });
+            </script>
+
+            {% csrf_token %}
+
+            {% if aulas %}
+                <div class="alert alert-info">
+                    <p>As aulas marcadas com {% icone "list-alt" %} possuem atestado no respectivo período.</p>
+                    <p>Os alunos sem destaque estão com o período letivo fechado.</p>
+                    <p>É possível utilizar as teclas direcionais do teclado para percorrer as caixas de texto.</p>
+                </div>
+                <div class="checkbox">
+                    <input id="chamada_input_ocultar" type="checkbox" onchange="exibirAlunosInativosFaltas(this)">
+                    <label for="chamada_input_ocultar">Exibir alunos inativos</label>
+                </div>
+                <div class="checkbox">
+                    <input id="input_inverter" type="checkbox" onchange="inverterOrdemPorData()">
+                    <label for="input_inverter">Inverter ordenação por data</label>
+                </div>
+                <div class="table-responsive">
+                    <table class="sticky-first-column" id="table_faltas">
+                        <caption>Registro de faltas</caption>
+                        <thead>
+                            <tr>
+                                <th>Aluno</th>
+                                {% for aula in aulas %}
+                                    {% if aula.data <= data_atual %}
+                                        <th class="text-center">
+                                            {{ aula.data|format }}
+                                            <small>{{ aula.data|date:"D" }}, {{ aula.quantidade }} aula{% if aula.quantidade > 1 %}s{% endif %}</small>
+                                        </th>
+                                    {% endif %}
+                                {% endfor %}
+                                <th>Situação da frequência</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for matricula_diario in matriculas %}
+                            {% with esteve_reprovado=matricula_diario.esteve_reprovado %}
+                                <tr {% if not matricula_diario.habilitada %} class="disabled"
+                                                                             title="Período letivo deste aluno está fechado"
+                                                                             style="display: none;"{% else %}
+                                                                             {% if esteve_reprovado and matricula_diario.is_em_dependencia %}class="dependencia"
+                                                                             {% endif %}{% endif %}>
+                                    <td>
+                                        <div class="person smallest borderless my-0">
+                                            <div class="photo-circle smallest">
+                                                <img src="{{ matricula_diario.matricula_periodo.aluno.get_foto_75x100_url }}" alt="Foto de {{ matricula_diario.matricula_periodo.aluno.get_nome }}" />
+                                            </div>
+                                            <dl>
+                                                <dt class="visually-hidden">Aluno</dt>
+                                                <dd>
+                                                    <span class="alunoCounter">{{ forloop.counter }}</span> - <a href="{{ matricula_diario.matricula_periodo.aluno.get_absolute_url }}">{{ matricula_diario.matricula_periodo.aluno.get_nome|normalizar }}</a>
+                                                    <span class="hide-sm">
+                                                        (<a href="{{ matricula_diario.matricula_periodo.aluno.get_absolute_url }}">{{ matricula_diario.matricula_periodo.aluno.matricula }}</a>)
+                                                    </span>
+                                                </dd>
+                                            </dl>
+                                        </div>
+                                        {% if matricula_diario.matricula_periodo.aluno.possui_nee %}<p class="false">Possui NEE</p>{% endif %}
+                                    </td>
+                                    {% for falta in matricula_diario.faltas %}
+                                        {% if falta.pode_ser_registrada %}
+                                            <td class="text-center">
+                                                {% if falta.pode_ser_registrada and acesso_total and pode_manipular_etapa and matricula_diario.is_cursando and perms.edu.add_falta %}
+                                                    {% if not falta.aula.etapa == 5 or falta.aula.etapa == 5 and matricula_diario.is_em_prova_final %}
+                                                        <div>
+                                                            <span class="hint hint-top" aria-label="{{ falta.aula.data|format }} - {{ falta.aula.data|date:'D' }}, {{ falta.aula.quantidade }} aula{% if falta.aula.quantidade > 1 %}s{% endif %}">
+                                                            <input name="{{ matricula_diario.pk }};{{ falta.aula.pk }}"
+                                                                   type="text" class="pq text-center"
+                                                                   value="{{ falta.quantidade }}"
+                                                                    {% if not falta.aula.professor_diario.professor.pk == professor_diario.professor.pk and not pode_manipular_etapa %}
+                                                                   readonly {% endif %}
+                                                                   onfocus="this.oldvalue = this.value;"
+                                                                   onblur="javascript:
+                                                                           if((this.value > {{ falta.aula.quantidade }}) || (this.value < 0) || (this.value != parseInt(this.value, 10))) {
+                                                                           alert('Quantidade de faltas inválida.');
+                                                                           $(this).addClass('errors');
+                                                                           $(this).val({{ falta.quantidade }});
+                                                                           return true;
+                                                                           }
+                                                                           if(this.value != this.oldvalue){
+                                                                            $.ajax({
+                                                                                url: '/edu/registrar_chamada_ajax/{{ matricula_diario.pk }}/{{ falta.aula.pk }}/{{ quantidade }}'+this.value+'/',
+                                                                                method: 'GET',
+                                                                                context: this,
+                                                                                error: function() {
+                                                                                    $( this ).addClass( 'errors' ); $(this).val({{ falta.quantidade }}); 
+                                                                                },
+                                                                                success: function(data) {
+                                                                                    if(Number.isInteger(+data)){
+                                                                                        $( this ).removeClass( 'errors' );
+                                                                                        $( this ).addClass( 'ac_filled_hidden' );
+                                                                                        $('#nfaltas-{{ matricula_diario.pk }}').text(data + ' falta(s) no diário');
+                                                                                    } else {
+                                                                                        alert(data);
+                                                                                    }
+                                                                                }
+                                                                            });
+                                                                           }
+                                                                           "/>
+                                                            </span>
+                                                            {% if falta.abono_faltas and falta.quantidade > 0 %}
+                                                                {% if falta.abono_faltas.deferido is False %}
+                                                                    <a href='/edu/abonofaltas/{{ falta.abono_faltas.pk }}/' class="btn default popup ms-3 abono-indeferido" title="Visualizar faltas justificadas (indeferidas)">{% icone "list-alt" %}<span class="visually-hidden">Visualizar faltas justificadas (indeferidas)</span></a>
+                                                                {% elif falta.abono_faltas.deferido is None %}
+                                                                    <a href='/edu/abonofaltas/{{ falta.abono_faltas.pk }}/' class="btn default popup ms-3 abono-pendente" title="Visualizar faltas justificadas (aguardando avaliação)">{% icone "list-alt" %}<span class="visually-hidden">Visualizar faltas justificadas (aguardando avaliação)</span></a>
+                                                                {% elif falta.contabilizar %}
+                                                                    <a href='/edu/abonofaltas/{{ falta.abono_faltas.pk }}/' class="btn default popup ms-3 abono-pendente" title="Visualizar justificativa deferida (não abonada)">{% icone "list-alt" %}<span class="visually-hidden">Visualizar justificativa deferida (não abonada)</span></a>
+                                                                {% else %}
+                                                                    <a href='/edu/abonofaltas/{{ falta.abono_faltas.pk }}/' class="btn default popup ms-3" title="Visualizar faltas justificadas (abonadas)">{% icone "list-alt" %}<span class="visually-hidden">Visualizar faltas justificadas (abonadas)</span></a>
+                                                                {% endif %}
+                                                            {% endif %}
+                                                        </div>
+                                                    {% else %}
+                                                        {{ falta.quantidade }}
+                                                    {% endif %}
+                                                {% else %}
+                                                    {{ falta.quantidade }}
+                                                    {% if falta.quantidade > 0 and falta.abono_faltas_id and falta.abono_faltas.deferido %}
+                                                        <a href='/edu/abonofaltas/{{ falta.abono_faltas_id }}/' class="btn default popup ms-3" title="Visualizar faltas justificadas">{% icone "list-alt" %}<span class="visually-hidden">Visualizar faltas justificadas</span></a>
+                                                    {% endif %}
+                                                {% endif %}
+                                            </td>
+                                        {% endif %}
+                                    {% endfor %}
+
+                                    <td>
+                                        {% with nfaltas=matricula_diario.get_numero_faltas %}
+                                            {% if matriculas.0.diario.componente_curricular.qtd_avaliacoes == 0 %}
+                                                <span class="status status-{{ matricula_diario.get_situacao_frequencia.status }}">{{ matricula_diario.get_situacao_frequencia.rotulo }}</span>
+                                            {% endif %}
+                                            {% if nfaltas %}
+                                                <span class="status status-alert" id="nfaltas-{{ matricula_diario.pk }}">{{ nfaltas }} falta(s) no diário</span>
+                                            {% endif %}
+                                        {% endwith %}
+                                    </td>
+                                </tr>
+                            {% endwith %}
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="alert alert-warning">Nenhuma aula cadastrada nessa etapa.</p>
+            {% endif %}
+        {% endbox %}
+    {% endfor %}
+    {% if acesso_total %}
+        {% if pode_manipular_etapa and perms.edu.add_falta %}
+            <div class="submit-row">
+                <input type="submit" value="Salvar alterações">
+            </div>
+        {% endif %}
+    {% endif %}
+</form>
+<script>
+    function exibirAlunosInativosFaltas(e) {
+        if (e.checked) {
+            $('#table_faltas > tbody > tr.disabled').show();
+            recontar_index_linha(true);
+        } else {
+            $('#table_faltas > tbody > tr.disabled').hide();
+            recontar_index_linha(false);
+        }
+    }
+
+    function recontar_index_linha(exibir_alunos_inativos) {
+        if (exibir_alunos_inativos) {
+            $('#table_faltas > tbody > tr').each(function (index) {
+                var target_td = $('td .alunoCounter', this);
+                $(target_td).html(index + 1);
+            });
+        } else {
+            $('#table_faltas > tbody > tr').not('.disabled').each(function (index) {
+                var target_td = $('td .alunoCounter', this);
+                $(target_td).html(index + 1);
+            });
+        }
+    }
+
+    jQuery.moveColumn = function (table, from, to) {
+        var rows = jQuery('tr', table);
+        var cols;
+        rows.each(function () {
+            cols = jQuery(this).children('th, td');
+            cols.eq(from).detach().insertBefore(cols.eq(to));
+        });
+    };
+
+    function inverterOrdemPorData() {
+        var tbl = document.getElementById('table_faltas');
+        colunas = tbl.rows[0].cells.length;
+
+        while (colunas > 2) {
+            colunas--;
+            jQuery.moveColumn(tbl, 1, colunas);
+        }
+    }
+
+    function onChangeTabs() {
+        if (current_tab == 'faltas') {
+            recontar_index_linha(false);
+        }
+    }
+</script>

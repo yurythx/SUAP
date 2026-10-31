@@ -1,0 +1,512 @@
+{% extends super_template %}
+{% block extra %}hasAsideRight{% endblock %}
+{% block bodyclass %}hasAsideRight{% endblock %}
+{% block action-bar %}
+    <script>
+      window.onload = function() {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      };
+    </script>
+    <ul class="action-bar">
+        {% if requisicao_despesa.pode_adicionar_natureza_despesa %}
+            <li>
+                <a class="btn success popup"
+                   href="/plan_estrategico/adicionar_naturezadespesa/{{ requisicao_despesa.id }}/">
+                    Adicionar natureza de despesa
+                </a>
+            </li>
+        {% endif %}
+        {% if requisicao_despesa.pode_encaminhar_para_emissao_cdo %}
+            <li>
+                <a class="btn success popup"
+                   href="/plan_estrategico/encaminhar_emissao_cdo/{{ requisicao_despesa.id }}/">
+                    Encaminhar para Emissão de CDO
+                </a>
+            </li>
+        {% endif %}
+        {% if requisicao_despesa.pode_encaminhar_validacao_siafi %}
+            <li>
+                <a class="btn success popup"
+                   href="/plan_estrategico/encaminhar_validacao_siafi/{{ requisicao_despesa.id }}/">
+                    Encaminhar validação SIAFI
+                </a>
+            </li>
+        {% endif %}
+        {% if requisicao_despesa.pode_emitir_cdo and requisicao_despesa.valor == requisicao_despesa.total_naturezas_despesa %}
+            <li>
+                <a class="btn success popup"
+                   href="/plan_estrategico/emitir_cdo_empenho/{{ requisicao_despesa.id }}/">Emitir CDO</a>
+            </li>
+        {% endif %}
+        {% if requisicao_despesa.pode_emitir_cdo_provisorio %}
+            <li>
+                <a class="btn success popup"
+                   href="/plan_estrategico/emitir_cdo_provisoria/{{ requisicao_despesa.id }}/">
+                    Emitir CDO provisório
+                </a>
+            </li>
+        {% endif %}
+        {% if requisicao_despesa.pode_anuir_despesa %}
+            <li>
+                <a class="btn success popup"
+                   href="/plan_estrategico/anuir_despesa/{{ requisicao_despesa.id }}/">Anuência de Despesa</a>
+            </li>
+        {% endif %}
+        {% if requisicao_despesa.pode_avaliar_despesa and not requisicao_despesa.cdo and not requisicao_tipo_reforco_ou_anulacao %}
+            <li>
+                <a class="btn success popup"
+                   href="/plan_estrategico/autorizar_despesa_provisoria/{{ requisicao_despesa.id }}/">
+                    Autorizar Despesa provisória
+                </a>
+            </li>
+        {% elif requisicao_despesa.pode_avaliar_despesa and not requisicao_despesa.cdo and requisicao_tipo_reforco_ou_anulacao %}
+            <li>
+                <a class="btn success popup"
+                   href="/plan_estrategico/autorizar_despesa/{{ requisicao_despesa.id }}/">Autorizar Despesa</a>
+            </li>
+        {% elif requisicao_despesa.pode_avaliar_despesa and requisicao_despesa.cdo %}
+            <li>
+                <a class="btn success popup"
+                   href="/plan_estrategico/autorizar_despesa/{{ requisicao_despesa.id }}/">Autorizar Despesa</a>
+            </li>
+        {% endif %}
+        {% if requisicao_despesa.pode_gerar_despesa_definitiva %}
+            <li>
+                <a class="btn success popup"
+                   href="/plan_estrategico/gerar_despesa_definitiva/{{ requisicao_despesa.id }}/">
+                    Gerar Requisição Definitiva
+                </a>
+            </li>
+        {% endif %}
+        {% if requisicao_despesa.pode_cancelar_dotacao_provisoria %}
+            <li>
+                <a class="btn danger popup no-confirm"
+                   href="/plan_estrategico/cancelar_requisicaodespesa/{{ requisicao_despesa.id }}/">Cancelar</a>
+            </li>
+        {% endif %}
+    </ul>
+{% endblock %}
+{% block object-status %}{{ requisicao_despesa.get_status|safe }}{% endblock %}
+{% block content %}
+    {% if requisicao_despesa.motivo_cancelamento %}
+        <p class="alert alert-warning">
+            <strong>Motivo do cancelamento</strong>: {{ requisicao_despesa.motivo_cancelamento|format }}
+        </p>
+    {% endif %}
+    {% if requisicao_despesa.pode_emitir_cdo and requisicao_despesa.valor != requisicao_despesa.total_naturezas_despesa %}
+        <p class="alert alert-warning">
+            O valor total das naturezas de despesa está diferente do valor da requisição. Ajuste os valores das naturezas de despesa para que correspondam ao valor da requisição e possa prosseguir com a emissão do CDO.
+        </p>
+    {% endif %}
+    {% box 'Dados gerais' %}
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>Macroprocesso</dt>
+                <dd>
+                    {{ requisicao_despesa.macroprocesso|format }}
+                </dd>
+            </div>
+            <div class="list-item">
+                <dt>Origem de recurso</dt>
+                <dd>
+                    {{ requisicao_despesa.origem_recurso|format }}
+                </dd>
+            </div>
+            <div class="list-item">
+                <dt>Plano interno</dt>
+                <dd>
+                    {{ requisicao_despesa.plano_interno|format }}
+                </dd>
+            </div>
+            <div class="list-item">
+                <dt>Atividade</dt>
+                <dd>
+                    {{ requisicao_despesa.atividade|format }}
+                </dd>
+            </div>
+            <div class="list-item">
+                <dt>Unidade</dt>
+                <dd>
+                    {{ requisicao_despesa.unidade_gestora|format }}
+                </dd>
+            </div>
+            {% if requisicao_despesa.unidade_gestora.ug_secundaria %}
+                <div class="list-item">
+                    <dt>Despesa vinculada à</dt>
+                    <dd>{{ requisicao_despesa.get_ua_vinculada_display }}</dd>
+                </div>
+            {% endif %}
+            <div class="list-item">
+                <dt>Processo administrativo</dt>
+                <dd>
+                    <a href="/processo_eletronico/processo/{{ requisicao_despesa.processo.id }}/">{{ requisicao_despesa.processo|format }}</a>
+                </dd>
+            </div>
+        </dl>
+        <h4>Requisição</h4>
+        <ul class="flex-container boxes texts">
+            {% if requisicao_despesa.valor_inicial %}
+                <li class="box-item">
+                    <h4>Valor inicial</h4>
+                    <p class="stat fs-1">
+                        <small>R$</small> {{ requisicao_despesa.valor_inicial|format_money }}
+                    </p>
+                </li>
+            {% endif %}
+            {% if requisicao_despesa.valor_provisorio %}
+                <li class="box-item">
+                    <h4>Valor provisório</h4>
+                    <p class="stat fs-1">
+                        <small>R$</small> {{ requisicao_despesa.valor_provisorio|format_money }}
+                    </p>
+                </li>
+            {% endif %}
+            {% if requisicao_despesa.valor %}
+                <li class="box-item">
+                    <h4>Valor</h4>
+                    <p class="stat fs-1">
+                        <small>R$</small> {{ requisicao_despesa.valor|format_money }}
+                    </p>
+                </li>
+            {% endif %}
+            <li class="box-item">
+                <h4>Tipo da requisição</h4>
+                <p class="description">{{ requisicao_despesa.get_tipo_requisicao_display|format }}</p>
+            </li>
+        </ul>
+        <dl class="definition-list flex">
+            {% if requisicao_despesa.tipo_finalidade %}
+            <div class="list-item flex-basis-100">
+                <dt>Tipo de Finalidade</dt>
+                <dd>{{ requisicao_despesa.get_tipo_finalidade_display }}</dd>
+            </div>
+            {% endif %}
+            <div class="box-item flex-basis-100">
+                <dt>Finalidade</dt>
+                <dd>
+                    {{ requisicao_despesa.finalidade|format }}
+                </dd>
+            </div>
+            {% if requisicao_despesa.cdo_provisorio %}
+                <div class="list-item">
+                    <dt>CDO provisório</dt>
+                    <dd>
+                        <a href="{% url 'visualizar_documento' requisicao_despesa.cdo_provisorio.id %}">{{ requisicao_despesa.cdo_provisorio|format }}</a>
+                    </dd>
+                </div>
+            {% endif %}
+            {% if requisicao_despesa.cdo %}
+                <div class="list-item">
+                    <dt>CDO</dt>
+                    <dd>
+                        <a href="{% url 'visualizar_documento' requisicao_despesa.cdo.id %}">{{ requisicao_despesa.cdo|format }}</a>
+                    </dd>
+                </div>
+            {% endif %}
+        </dl>
+        {% if requisicao_despesa.vinculo_autorizacao_provisoria %}
+            <h4>Autorização Provisória</h4>
+            <dl class="definition-list flex">
+                <div class="list-item">
+                    <dt>Autorizado</dt>
+                    <dd>
+                        {{ requisicao_despesa.vinculo_autorizacao_provisoria|format_bool }}
+                    </dd>
+                </div>
+                <div class="list-item">
+                    <dt>Autorizado por</dt>
+                    <dd>
+                        {{ requisicao_despesa.vinculo_autorizacao_provisoria|format }}
+                    </dd>
+                </div>
+                <div class="list-item">
+                    <dt>Autorizado em</dt>
+                    <dd>
+                        {{ requisicao_despesa.data_autorizacao_provisoria|format }}
+                    </dd>
+                </div>
+                <div class="list-item">
+                    <dt>Despacho da autorização provisória</dt>
+                    <dd>
+                        {{ requisicao_despesa.despacho_autorizacao_provisoria|format }}
+                    </dd>
+                </div>
+            </dl>
+        {% endif %}
+        {% if requisicao_despesa.vinculo_anuencia %}
+            <h4>Anuência</h4>
+            <dl class="definition-list flex">
+                <div class="list-item">
+                    <dt>Anuído por</dt>
+                    <dd>
+                        {{ requisicao_despesa.vinculo_anuencia|format }}
+                    </dd>
+                </div>
+                <div class="list-item">
+                    <dt>Anuído em</dt>
+                    <dd>
+                        {{ requisicao_despesa.data_anuencia|format }}
+                    </dd>
+                </div>
+                <div class="list-item">
+                    <dt>Despacho da anuência</dt>
+                    <dd>
+                        {{ requisicao_despesa.despacho_anuencia|format }}
+                    </dd>
+                </div>
+            </dl>
+        {% endif %}
+        {% if requisicao_despesa.vinculo_autorizacao_despesa %}
+            <h4>Autorização</h4>
+            <dl class="definition-list flex">
+                <div class="list-item">
+                    <dt>Autorizado</dt>
+                    <dd>
+                        {{ requisicao_despesa.vinculo_autorizacao_despesa|format_bool }}
+                    </dd>
+                </div>
+                <div class="list-item">
+                    <dt>Autorizado por</dt>
+                    <dd>
+                        {{ requisicao_despesa.vinculo_autorizacao_despesa|format }}
+                    </dd>
+                </div>
+                <div class="list-item">
+                    <dt>Autorizado em</dt>
+                    <dd>
+                        {{ requisicao_despesa.data_autorizacao_despesa|format }}
+                    </dd>
+                </div>
+                <div class="list-item">
+                    <dt>Despacho da autorização</dt>
+                    <dd>
+                        {{ requisicao_despesa.despacho_autorizacao_despesa|format }}
+                    </dd>
+                </div>
+            </dl>
+        {% endif %}
+        {% if requisicao_despesa.autorizacao_ordenador_declarada_no_processo %}
+            <h4>Autorização</h4>
+            <div class="list-item">
+                <dt>Autorizado</dt>
+                <dd>
+                    {{ requisicao_despesa.autorizacao_ordenador_declarada_no_processo|format_bool }}
+                </dd>
+            </div>
+
+            <div class="list-item">
+                <p class="alert alert-warning">
+                    A autorização de despesa pelo ordenador não foi realizada diretamente nesta RD.
+                    O requisitante declarou que a autorização desta despesa foi realizada pelo
+                    ordenador diretamente no processo vinculado.
+                </p>
+            </div>
+        {% endif %}
+    {% endbox %}
+        {% box 'Detalhamento da despesa' %}
+                {% if requisicao_despesa.pode_adicionar_natureza_despesa or requisicao_despesa.pode_emitir_empenho %}
+                <ul class="action-bar">
+                    <li>
+                        <a class="btn success popup"
+                        href="/plan_estrategico/adicionar_naturezadespesa/{{ requisicao_despesa.id }}/">
+                            Adicionar natureza de despesa
+                        </a>
+                    </li>
+                </ul> 
+                {% endif %}
+                {% if requisicao_despesa.pode_adicionar_natureza_despesa %}
+                    <p class="alert alert-info" title="Cadastre cada linha da natureza de despesa correspondente a cada nota de empenho que será necessário emitir.">Cadastre cada linha da natureza de despesa correspondente a cada nota de empenho que será necessário emitir.</p>   
+                {% endif %}
+                {% if requisicao_despesa.pode_emitir_empenho %}
+                    <p class="alert alert-info" title="Cada linha da natureza de despesa corresponderá a uma nota de empenho.">Cada linha da natureza de despesa corresponderá a uma nota de empenho.</p>
+                    <p class="alert alert-info" title="O valor total da soma das novas linhas de ND deverá ser igual ou inferior ao valor autorizado nesta Requisição.">O valor total da soma das novas linhas de ND deverá ser igual ou inferior ao valor autorizado nesta Requisição.</p>   
+                {% endif %}
+            <div class="table-responsive">
+                {% if requisicao_despesa.empenhos.exists %}
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Natureza de despesa</th>
+                                <th class="text-end">Valor</th>
+                                <th class="text-end">Número do empenho</th>
+                                {% if exibir_coluna_ro %}<th class="text-end">Número RO</th>{% endif %}
+                                {% if requisicao_despesa.pode_ver_status_empenho %}<th class="text-end">Situação</th>{% endif %}
+                                {% if requisicao_despesa.pode_editar_empenho or requisicao_despesa.pode_emitir_cdo_provisorio or requisicao_despesa.pode_emitir_cdo or requisicao_despesa.pode_editar_natureza_despesa %}
+                                    <th class="no-print">Opções</th>
+                                {% endif %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for empenho in requisicao_despesa.empenhos.all %}
+                                <tr>
+                                    <td>{{ empenho.naturezadespesa|format }}</td>
+                                    <td class="text-end">{{ empenho.valor|format_money }}</td>
+                                    <td class="text-end">{{ empenho.numero_empenho|format }}</td>
+                                    {% if exibir_coluna_ro %}<th class="text-end">{{ empenho.numero_ro|format }}</th>{% endif %}
+                                    {% if requisicao_despesa.pode_ver_status_empenho %}
+                                        <th class="no-print">
+                                            {% if empenho.status == empenho.STATUS_INCONSISTENTE %}
+                                                {{ empenho.get_status_conferencia|safe }}
+                                            {% else %}
+                                                {{ empenho.get_status|safe }}
+                                            {% endif %}
+                                        </th>
+                                    {% endif %}
+                                    {% if requisicao_tipo_reforco_ou_anulacao %}
+                                        {% if requisicao_despesa.pode_emitir_cdo %}
+                                            <td class="no-print text-end">
+                                                <a class="btn primary popup"
+                                                href="/plan_estrategico/editar_naturezadespesa/{{ empenho.id }}/">Editar natureza de despesa</a>
+                                            </td>
+                                        {% elif requisicao_despesa.pode_editar_empenho and empenho.numero_ro %}
+                                            <td class="no-print">
+                                                <ul class="action-bar">
+                                                    <li>
+                                                        <a class="btn primary popup"
+                                                        href="/plan_estrategico/adicionar_ro/{{ empenho.id }}/">Editar RO</a>
+                                                    </li>
+                                                    <li><a class="btn primary popup"
+                                                    href="/plan_estrategico/editar_valorempenho/{{ empenho.id }}/">Editar valor RO</a></li>
+                                                    {% if requisicao_despesa.pode_emitir_empenho %}
+                                                        {% if empenho.pode_remover_reforco %}
+                                                            <li><a class="btn danger" href="/plan_estrategico/remover_notaempenho/{{ empenho.id }}/">Remover</a></li>
+                                                        {% endif %}
+                                                    {% endif %}
+                                                </ul>
+                                            </td>
+                                        {% elif requisicao_despesa.pode_emitir_empenho and not empenho.numero_ro %}
+                                            <td class="no-print">
+                                                <ul class="action-bar">
+                                                    <li>
+                                                        <a class="btn success popup"
+                                                        href="/plan_estrategico/adicionar_ro/{{ empenho.id }}/">
+                                                            Registrar RO
+                                                        </a>
+                                                    </li>
+                                                    <li><a class="btn primary popup"
+                                                href="/plan_estrategico/editar_valorempenho/{{ empenho.id }}/">Editar valor RO</a></li>
+                                                    {% if empenho.pode_remover_reforco %}
+                                                    <li>
+                                                        <a class="btn danger"
+                                                        href="/plan_estrategico/remover_notaempenho/{{ empenho.id }}/">
+                                                            Remover
+                                                        </a>
+                                                    </li>
+                                                    {% endif %}
+                                                </ul>
+                                            </td>
+                                        {% endif %}
+                                    {% else %}
+                                        {% if requisicao_despesa.pode_emitir_cdo_provisorio or requisicao_despesa.pode_emitir_cdo or requisicao_despesa.pode_editar_natureza_despesa %}
+                                             <td class="no-print">
+                                                <ul class="action-bar">
+                                                    <li>    
+                                                <a class="btn primary popup" href="/plan_estrategico/editar_naturezadespesa/{{ empenho.id }}/">Editar natureza de despesa</a>
+                                                    </li>    
+                                                    <li><a class="btn primary popup"
+                                                    href="/plan_estrategico/editar_valornaturezadespesa/{{ empenho.id }}/">Editar valor</a></li>
+                                                <li><a class="btn danger" href="/plan_estrategico/remover_notaempenho/{{ empenho.id }}/">Remover</a></li>
+                                                    </ul>
+                                            </td>
+                                        {% elif requisicao_despesa.pode_editar_empenho and empenho.numero_empenho %}
+                                            <td class="no-print">
+                                                <ul class="action-bar">
+                                                    {% if empenho.numero_ro %}
+                                                        <li><a class="btn primary popup"
+                                                        href="/plan_estrategico/adicionar_ro/{{ empenho.id }}/">Editar RO</a></li>
+                                                    {% else %}
+                                                        <li><a class="btn primary popup"
+                                                        href="/plan_estrategico/adicionar_notaempenho/{{ empenho.id }}/">Editar empenho</a></li>
+                                                    {% endif %}
+                                                    <li><a class="btn primary popup"
+                                                    href="/plan_estrategico/editar_valorempenho/{{ empenho.id }}/">Editar valor</a></li>
+                                                    {% if requisicao_despesa.pode_emitir_empenho %}
+                                                        <li><a class="btn danger" href="/plan_estrategico/remover_notaempenho/{{ empenho.id }}/">Remover</a></li>
+                                                    {% endif %}
+                                                    {% if empenho.pode_reforcar %}
+                                                        <li><a class="btn success popup"
+                                                        href="/plan_estrategico/reforcar_empenho/{{ empenho.id }}/">Reforçar Empenho</a></li>
+                                                    {% endif %}
+                                                </ul>
+                                            </td>
+                                        {% elif requisicao_despesa.pode_emitir_empenho and not empenho.numero_empenho %}
+                                            <td class="no-print">
+                                                <ul class="action-bar">
+                                                <li><a class="btn success popup"
+                                                href="/plan_estrategico/adicionar_notaempenho/{{ empenho.id }}/">Emitir empenho</a></li>
+                                                <li><a class="btn primary popup" href="/plan_estrategico/editar_naturezadespesa/{{ empenho.id }}/">Editar natureza de despesa</a></li>
+                                                <li><a class="btn primary popup"
+                                                href="/plan_estrategico/editar_valorempenho/{{ empenho.id }}/">Editar valor</a></li>
+                                                <li><a class="btn danger" href="/plan_estrategico/remover_notaempenho/{{ empenho.id }}/">Remover</a></li>
+                                                </ul>
+                                            </td>
+                                        {% endif %}
+                                    {% endif %}
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="1">Total:</td>
+                                <td class="text-end">{{ requisicao_despesa.total_naturezas_despesa|format_money }}</td>
+                                {% if exibir_coluna_ro and not requisicao_tipo_reforco_ou_anulacao %}<td></td>{% endif %}
+                                {% if requisicao_despesa.pode_ver_status_empenho and requisicao_tipo_reforco_ou_anulacao %}
+                                    {% if requisicao_despesa.pode_editar_empenho %}
+                                        <td colspan="4"></td>
+                                    {% else %}
+                                        <td colspan="3"></td>
+                                    {% endif %}
+                                {% elif not requisicao_tipo_reforco_ou_anulacao and requisicao_despesa.pode_editar_empenho %}
+                                    <td colspan="3"></td>
+                                {% elif not requisicao_tipo_reforco_ou_anulacao and requisicao_despesa.pode_emitir_cdo_provisorio or requisicao_despesa.pode_emitir_cdo or requisicao_despesa.pode_adicionar_natureza_despesa or requisicao_despesa.pode_editar_natureza_despesa %}
+                                    <td colspan="4"></td>
+                                {% elif requisicao_tipo_reforco_ou_anulacao %}
+                                    <td colspan="2"></td>
+                                {% else %}
+                                    <td></td>
+                                {% endif %}
+                            </tr>
+                        </tfoot>
+                    </table>
+                {% else %}
+                    <p class="alert alert-warning">Nenhuma natureza de despesa cadastrada.</p>
+                {% endif %}
+            </div>
+        {% endbox %}
+{% endblock %}
+{% block asideright %}
+    <aside class="right">
+        <details open="open">
+            <summary>Dados de cadastro</summary>
+            <dl class="details-container">
+                <dt>Cadastrado por:</dt>
+                <dd>
+                    {{ requisicao_despesa.usuario }}
+                </dd>
+                <dt>Data do cadastro:</dt>
+                <dd>
+                    {{ requisicao_despesa.data_cadastro|format }}
+                </dd>
+            </dl>
+        </details>
+        {% if historico_requisicaodespesa %}
+            <details open="open">
+                <summary>Histórico de situações</summary>
+                <ul class="timeline compact">
+                    {% for historico in historico_requisicaodespesa %}
+                        <li class="{{ historico.get_status_class }}">
+                            <div class="timeline-date">{{ historico.alterado_em }}</div>
+                            <div class="timeline-icon"></div>
+                            <div class="timeline-content">
+                                <h4>
+                                    {{ historico.get_status_display }}
+                                    {% if historico.alterado_por %}<small>por {{ historico.alterado_por }}</small>{% endif %}
+                                </h4>
+                            </div>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </details>
+        {% endif %}
+    </aside>
+{% endblock %}

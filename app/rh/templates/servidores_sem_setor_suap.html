@@ -1,0 +1,80 @@
+{% extends super_template %}
+
+{% block content %}
+
+<ul class="action-bar">
+    {% if apenas_do_meu_campus_siape %}
+        <li><a class="btn" href="/rh/servidores_sem_setor_suap/">Mostrar servidores de qualquer campus SIAPE</a></li>
+    {% else %}
+        <li><a class="btn" href="/rh/servidores_sem_setor_suap/?meu_campus_siape">Mostrar apenas servidores do meu campus SIAPE ({{ meu_campus_siape|default:"Nenhum" }})</a></li>
+    {% endif %}
+</ul>
+
+<div class="alert alert-info">
+	<p>Cada servidor deve ter, necessariamente, {{ nomenclatura.o_campus }} setor SUAP igual ao campus do setor de exercício SIAPE.</p>
+	<p>Excepcionalmente, servidores cedidos e estagiários poderão ser alocados em qualquer setor SUAP, sem nenhuma restrição por campus.</p>
+</div>
+
+<p>
+	{% if apenas_do_meu_campus_siape %}
+		Listando apenas os servidores do seu campus SIAPE ({{ meu_campus_siape|default:"Nenhum" }})
+	{% else %}
+		Listando servidores de qualquer campus SIAPE
+	{% endif %}
+	- <b>{{ servidores|length }}</b> servidores
+<p>
+
+{% if servidores %}
+	<form method="post" action="#">
+		{% csrf_token %}
+		{% autopaginate servidores 25 %}
+		{% paginate %}
+		<div class="card-container">
+			{% for servidor in servidores %}
+				<div class="card">
+					<div class="photo"><img src="{{ servidor.get_foto_75x100_url }}" alt="{{ servidor.pessoa_fisica.nome }}" /></div>
+					<h5>{{ servidor.pessoa_fisica.nome }}</h5>
+					<dl>
+						<dt>Matrícula:</dt>
+						<dd><a href="/admin/rh/servidor/{{ servidor.id }}/">{{ servidor.matricula }}</a></dd>
+						<dt>Lotação SIAPE:</dt>
+						<dd>{{ servidor.setor_lotacao.get_caminho_as_html|safe|format }}</dd>
+						<dt>Exercício SIAPE:</dt>
+						<dd>{{ servidor.setor_exercicio.get_caminho_as_html|safe|format }}</dd>
+						<dt>Cargo:</dt>
+						<dd>{{ servidor.cargo_emprego|format }}</dd>
+						<dt>Categoria:</dt>
+						<dd>{{ servidor.categoria|format }}</dd>
+					</dl>
+					<div class="content">
+						{% if servidores_sem_suap|getkey:servidor.id %}
+							<div class="alert alert-info">
+								<h6>Definir Setor</h6>
+								<select name="setor_{{ servidor.matricula }}">
+									<option value="0">-- Escolha o setor --</option>
+									{% with servidores_sem_suap|getkey:servidor.id as setores_suap %}
+										{% for setor_suap in setores_suap %}
+											<option value="{{ setor_suap.id }}">{{ setor_suap }}</option>
+										{% endfor %}
+									{% endwith %}
+								</select>
+							</div>
+						{% else %}
+							<ul class="action-bar">
+								<li><a href="/admin/rh/servidor/{{ servidor.id }}/" class="btn primary">Editar Setor</a></li>
+							</ul>
+						{% endif %}
+					</div>
+				</div>
+			{% endfor %}
+		</div>
+		{% paginate %}
+		<div class="submit-row">
+			<input type="submit" id="btn_salvar" value="Salvar Alterações" />
+		</div>
+	</form>
+{% else %}
+	<p class="alert alert-warning">Nenhum servidor encontrado.</p>
+{% endif %}
+
+{% endblock %}

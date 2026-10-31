@@ -1,0 +1,67 @@
+{% extends super_template %}
+{% block content %}
+    <ul class="action-bar">
+        {% if not evento.possui_avaliacao_pendente %}
+            {% if user|in_group:"Coordenador de Comunicação Sistêmico" and evento.pode_processar_avaliacoes %}
+                <li>
+                    <a href="{% url 'processar_avaliacoes' evento.id %}" class="btn primary">Processar avaliações</a>
+                </li>
+            {% elif user|in_group:"Coordenador de Comunicação Sistêmico" and evento.pode_processar_resultados_para_avaliacao_presencial %}
+                <li>
+                    <a href="{% url 'processar_resultados_para_avaliacao_presencial' evento.id %}"
+                       class="btn primary">Processar resultados para avaliação presencial</a>
+                </li>
+            {% elif user|in_group:"Coordenador de Comunicação Sistêmico" and evento.pode_processar_resultados_finais %}
+                <li>
+                    <a href="{% url 'processar_resultados_finais' evento.id %}"
+                       class="btn primary">Processar resultados finais</a>
+                </li>
+            {% endif %}
+        {% endif %}
+        <li>
+            <a class="btn"
+               href="/eventos/evento/{{ evento.pk }}/?tab=submissao_trabalhos#fluxo-de-submissao">{% icone "return" %} Voltar para Evento</a>
+        </li>
+    </ul>
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <caption>Logs de Processamento de Submissões - {{ evento.nome }}</caption>
+                <tr>
+                    <th class="no-print">Ações</th>
+                    <th>ID</th>
+                    <th>Data</th>
+                    <th>Mensagem</th>
+                    <th>Fluxo</th>
+                    <th>Usuário</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                    <tr>
+                        <td class="list-display-icons no-print">
+                            {% if user|in_group:"Coordenador de Comunicação Sistêmico" %}
+                                <form method="post"
+                                      action="{% url 'remover_log_processamento_submissao' evento.id log.id %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn danger">{% icone "trash-alt" %}</button>
+                                </form>
+                            {% endif %}
+                        </td>
+                        <td>{{ log.id }}</td>
+                        <td>{{ log.data_hora|format }}</td>
+                        <td>{{ log.mensagem }}</td>
+                        <td>
+                            {% if log.fluxo_submissao %}{{ log.fluxo_submissao.get_etapa_display }}{% endif %}
+                        </td>
+                        <td>{{ log.get_executado_por }}</td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="6">Nenhum log encontrado.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}

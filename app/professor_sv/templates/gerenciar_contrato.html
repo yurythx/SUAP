@@ -1,0 +1,265 @@
+{% extends super_template %}
+{% block object-status %}{{ contrato.get_situacao_display }}{% endblock %}
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if pode_editar.0 %}
+            <li>
+                <a href="{% url 'editar_contrato' contrato.id %}" class="btn primary">{% icone "edit" %} Editar</a>
+            </li>
+        {% endif %}
+        {% if pode_finalizar.0 %}
+            <li>
+                <a href="{% url 'finalizar_contrato' contrato.id %}" class="btn success">Encerrar</a>
+            </li>
+        {% endif %}
+        {% if pode_remover_finalizacao.0 %}
+            <li>
+                <a class="btn danger confirm"
+                   href="{% url 'remover_finalizacao_contrato' contrato.id %}">{% icone "times" %} Desfazer conclusão</a>
+            </li>
+        {% endif %}
+        {% if pode_cancelar.0 %}
+            <li>
+                <a class="btn danger confirm"
+                   href="{% url 'cancelar_contrato' contrato.id %}">{% icone "times" %} Cancelar</a>
+            </li>
+        {% endif %}
+    </ul>
+{% endblock %}
+{% block content %}
+    {% if msg_motivo_nao_pode_editar %}
+        <p class="alert alert-danger"><strong>Atenção</strong>: {{ msg_motivo_nao_pode_editar }}</p>
+    {% endif %}
+    {% if estah_com_uo_diferente_entre_docente_e_vaga %}
+        <p class="alert alert-danger"><strong>Atenção</strong>: O campus do “Professor Substituto/Visitante” não é o mesmo campus do Grupo Dono relacionado à vaga.</p>
+    {% endif %}
+    {% box "Vaga" %}
+        {% include "includes/dados_vaga.html" with exibir_cod_vaga=True %}
+    {% endbox %}
+    {% box "Dados gerais" %}
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>Professor Substituto/Visitante</dt>
+                <dd>
+                    {{ contrato.servidor_docente|format }}
+                </dd>
+            </div>
+            <div class="list-item">
+                <dt>Campus Professor Substituto/Visitante</dt>
+                <dd>
+                    {{ contrato.get_servidor_docente_uo|format }}
+                </dd>
+            </div>
+            <div class="list-item">
+                <dt>Documento Eletrônico Contrato</dt>
+                <dd>
+                    <a href="{% url 'visualizar_documento' contrato.documento_eletronico.id %}">{{ contrato.documento_eletronico }}</a>
+                </dd>
+            </div>
+            <div class="list-item">
+                <dt>Docente Efetivo / Código de Vaga</dt>
+                <dd>
+                    {{ contrato.get_docente_efetivo|format }} 
+                    {% if estah_afastado_ou_de_ferias %}
+                        <span class="status status-default">{{ estah_afastado_ou_de_ferias }}</span>
+                    {% endif %}
+                </dd>
+            </div>
+        </dl>
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>Data início</dt>
+                <dd>
+                    {{ contrato.data_inicio|format }}
+                </dd>
+            </div>
+            <div class="list-item">
+                <dt>Data de Término</dt>
+                <dd>
+                    {{ contrato.data_fim|format }}
+                </dd>
+            </div>
+            <div class="list-item">
+                <dt>Data de Expiração</dt>
+                <dd>
+                    {{ contrato.data_expira|format }}
+                    {% if contrato.get_info_aditivo %}({{ contrato.get_info_aditivo|format }}){% endif %}
+                </dd>
+            </div>
+        </dl>
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>Período executado</dt>
+                <dd>
+                    {% progressbar contrato.get_percentual_dias_executado %}
+                    <p class="progress-description">
+                        <span class="{% if contrato.get_qtd_dias_executado > contrato.get_qtd_dias_total %}false{% else %}true{% endif %}"><strong>{{ contrato.get_qtd_dias_executado }}</strong> dias</span> de <strong>{{ contrato.get_qtd_dias_total }} dias</strong>
+                    </p>
+                </dd>
+            </div>
+        </dl>
+    {% endbox %}
+    {% if contrato.concluido %}
+        {% box "Conclusão" %}
+            <dl class="definition-list flex">
+                <div class="list-item">
+                    <dt>Encerrado</dt>
+                    <dd>
+                        {{ contrato.concluido|format }}
+                    </dd>
+                </div>
+                <div class="list-item">
+                    <dt>Data de Conclusão</dt>
+                    <dd>
+                        {{ contrato.data_conclusao|format }}
+                    </dd>
+                </div>
+                <div class="list-item">
+                    <dt>Justificativa</dt>
+                    <dd>
+                        {{ contrato.justificativa_conclusao|format }}
+                    </dd>
+                </div>
+            </dl>
+        {% endbox %}
+    {% endif %}
+    {% box "Aditivos de Tempo" %}
+        <ul class="action-bar">
+            {% if pode_adicionar_aditivo_tempo.0 %}
+                <li>
+                    <a href="{% url 'cadastrar_aditivo_tempo_contrato' contrato.id %}"
+                       class="btn success">Adicionar aditivo de tempo</a>
+                </li>
+            {% endif %}
+        </ul>
+        {% if not aditivos_tempo %}
+            <p class="alert alert-warning">Não há aditivos de tempo cadastrados.</p>
+        {% else %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Documento</th>
+                            <th>Justificativa</th>
+                            <th>Data de Início</th>
+                            <th>Data de Término</th>
+                            <th class="no-print">Opções</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for publicacao in aditivos_tempo %}
+                            <tr>
+                                <td>
+                                    <a href="{% url 'visualizar_documento' publicacao.documento_eletronico.id %}">{{ publicacao.documento_eletronico }}</a>
+                                </td>
+                                <td>{{ publicacao.justificativa }}</td>
+                                <td>{{ publicacao.data_inicio|format }}</td>
+                                <td>{{ publicacao.data_fim|format }}</td>
+                                <td class="no-print">
+                                    <ul class="action-bar">
+                                        {% if pode_remover_aditivo_tempo.0 %}
+                                            <li>
+                                                <a class="btn danger confirm"
+                                                   href="{% url 'remover_aditivo_tempo_contrato' publicacao.id %}">Remover</a>
+                                            </li>
+                                        {% endif %}
+                                    </ul>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+    {% endbox %}
+    {% box "Outros Aditivos" %}
+        <ul class="action-bar">
+            {% if pode_adicionar_aditivo.0 %}
+                <li>
+                    <a href="{% url 'cadastrar_aditivo_contrato' contrato.id %}"
+                       class="btn success">Adicionar aditivo</a>
+                </li>
+            {% endif %}
+        </ul>
+        {% if not aditivos %}
+            <p class="alert alert-warning">Não há aditivos cadastrados.</p>
+        {% else %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Documento</th>
+                            <th>Justificativa</th>
+                            <th class="no-print">Opções</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for publicacao in aditivos %}
+                            <tr>
+                                <td>
+                                    <a href="{% url 'visualizar_documento' publicacao.documento_eletronico.id %}">{{ publicacao.documento_eletronico }}</a>
+                                </td>
+                                <td>{{ publicacao.justificativa }}</td>
+                                <td class="no-print">
+                                    <ul class="action-bar">
+                                        {% if pode_remover_aditivo.0 %}
+                                            <li>
+                                                <a class="btn danger confirm"
+                                                   href="{% url 'remover_aditivo_contrato' publicacao.id %}">Remover</a>
+                                            </li>
+                                        {% endif %}
+                                    </ul>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+    {% endbox %}
+    {% box "Documentos" %}
+        <ul class="action-bar">
+            {% if pode_adicionar_publicacao_documento.0 %}
+                <li>
+                    <a href="{% url 'cadastrar_publicacao_contrato' contrato.id %}"
+                       class="btn success">Adicionar Documento</a>
+                </li>
+            {% endif %}
+        </ul>
+        {% if not publicacoes %}
+            <p class="alert alert-warning">Não há documentos cadastrados.</p>
+        {% else %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Documento</th>
+                            <th>Justificativa</th>
+                            <th class="no-print">Opções</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for publicacao in publicacoes %}
+                            <tr>
+                                <td>
+                                    <a href="{% url 'visualizar_documento' publicacao.documento_eletronico.id %}">{{ publicacao.documento_eletronico }}</a>
+                                </td>
+                                <td>{{ publicacao.justificativa }}</td>
+                                <td class="no-print">
+                                    <ul class="action-bar">
+                                        {% if pode_remover_publicacao_documento.0 %}
+                                            <li>
+                                                <a class="btn danger confirm"
+                                                   href="{% url 'remover_publicacao_contrato' publicacao.id %}">Remover</a>
+                                            </li>
+                                        {% endif %}
+                                    </ul>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+    {% endbox %}
+{% endblock %}

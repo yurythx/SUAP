@@ -1,0 +1,94 @@
+{% extends super_template %}
+
+{% block action-bar %}
+{% if user|in_group:"Coordenador de Almoxarifado Sistêmico,Coordenador de Almoxarifado,Operador de Almoxarifado" %}
+	<ul class="action-bar">
+		<li><a class="btn success" href="/almoxarifado/entrada_compra/">Efetuar Entrada de Compra</a></li>
+		<li><a class="btn success" href="/almoxarifado/entrada_doacao/">Efetuar Entrada de Doação</a></li>
+	</ul>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+
+{% box "Formulários" %}
+	{% render_form form %}
+{% endbox %}
+
+<div id="resposta">
+	{% if entradas %}
+		{% box "Entradas" %}
+			<dl class="lista-simples">
+				<dt>Total da Busca:</dt>
+				<dd>R$ {{ total_entradas|format_money_almox }}</dd>
+			</dl>
+			<table>
+				<thead>
+					<tr>
+						<th class="no-print">Ações</th>
+						<th>Nº NF</th>
+						<th>Data</th>
+						<th>Campus</th>
+						<th>Fornecedor</th>
+						<th>Processo</th>
+						<th>Empenho</th>
+						<th>Material</th>
+						<th>Valor</th>
+					</tr>
+				</thead>
+				<tbody>
+					{% autopaginate entradas %}
+					{% for e in entradas %}
+					<tr>
+						<td class="no-print">{% icon "view" "{{ e.get_absolute_url }}" %}</td>
+						<td>{{ e.numero_nota_fiscal|format }}</td>
+						<td align="center">{{ e.get_data }}</td>
+						<td>{{ e.uo.setor.sigla }}</td>
+						<td><a href="{{ e.vinculo_fornecedor.pessoa.get_absolute_url }}">{{ e.vinculo_fornecedor.pessoa.nome|format }}</a></td>
+						{% if e.processo %}
+							<td align="center"><a href="{{ e.processo.get_absolute_url }}">{{ e.processo|format }}</a></td>
+						{% else %}
+							<td align="center"><a href="{{ e.get_empenho.processo.get_absolute_url }}">{{ e.get_empenho.processo|format }}</a></td>
+						{% endif %}
+						<td align="center"><a href="{{ e.get_empenho.get_absolute_url }}">{{ e.get_empenho|format }}</a></td>
+						<td align="center">{{ e.tipo_material.nome.capitalize }}</td>
+						<td align="right">{{ e.get_valor|format }}</td>
+					</tr>
+					{% endfor %}
+				</tbody>
+			</table>
+			{% paginate %}
+		{% endbox %}
+
+		{% box "Total por Elemento de Despesa" %}
+			<table>
+				<thead>
+					<tr>
+						<th class="no-print">Ações</th>
+                        <th>Código</th>
+                        <th>Conta Contábil</th>
+						<th>Elemento de Despesa</th>
+						<th>Total</th>
+					</tr>
+				</thead>
+				<tbody>
+					{% for key, value in elementos_despesas.items %}
+					<tr>
+						<td class="no-print">{% icon "view" "/almoxarifado/detalhar_elemento_despesa/{{ key }}/?{{ parametros }}" %}</td>
+						<td>{{ value.codigo }}</td>
+                        <td>{{ value.planocontas }}</td>
+                        <td>{{ value.titulo }}</td>
+						<td align="right">{{ value.total|format_money_almox }}</td>
+					</tr>
+					{% endfor %}
+				</tbody>
+			</table>
+		{% endbox %}
+	{% else %}
+		{% box "Resultados" %}
+			<p class="alert alert-warning">Nenhum item encontrado.</p>
+		{% endbox %}
+	{% endif %}
+</div>
+
+{% endblock %}

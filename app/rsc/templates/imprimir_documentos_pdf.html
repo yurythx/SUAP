@@ -1,0 +1,522 @@
+{% extends "relatorio_pdf.html" %}
+
+{% load rsc_tags %}
+
+{% block cabecalho %}
+{% endblock %}
+
+{% block page_settings %}
+    @page {
+        size: a4 {% block page_orientation %}portrait{% endblock %};
+        background-image: url(/static/comum/img/logo_if_portrait.png);
+        background-position: right bottom;
+        background-repeat: no-repeat;
+        margin-top: 0.5cm; /* HeaderHeight */
+        margin-bottom: 1cm; /* FooterHeight */
+        margin-left: 0.5cm;
+        margin-right: 0.5cm;
+        @bottom-right {
+            content: "Página " counter(page) " de " counter(pages);
+        }
+    }
+    header{
+        top: -2cm; /* -HeaderHeight */
+        height: 2cm; /* HeaderHeight */
+        position: fixed;
+        width:98%;
+        padding-top: 0.5cm;
+    }
+    main{
+
+    }
+    footer{
+        bottom: 0cm; /* -FooterHeight */
+        height: 1cm; /* FooterHeight */
+        position: fixed;
+        width: 100%;
+        text-align: center;
+    }
+{% endblock %}
+
+{% block style %}
+    td, th {
+        font-size: 8pt !important;
+    }
+    h2 {
+        text-align: center;
+        color: white;
+        background-color: black;
+        padding-top: 6px;
+        margin-bottom: 2px;
+    }
+    .font-12 {
+        font-size: 12px;
+    }
+    .font-14 {
+        font-size: 14px;
+    }
+    .logotipo {
+        height: 50px;
+    }
+    .width-225 {
+        width: 225px;
+    }
+    .width-33 {
+        width: 33%;
+    }
+    .texto-justificado {
+        text-indent: 30px; 
+        text-align: justify;
+    }
+    .corpo-texto {
+        margin-left: 30px; 
+        text-align: justify;
+    }
+{% endblock %}
+
+{% block content %}
+	<table>
+        <tr>
+            <td rowspan="3" width="100px"><img src="/static/comum/img/brazao_colorido.jpg" alt="Brasão do Brasil" class="logotipo" /></td>
+            <td class="titulo">SERVIÇO PÚBLICO FEDERAL</td>
+            <td rowspan="3"><img src={% get_logo_instituicao %} alt="Logotopo do {% get_valor_por_chave "comum" "instituicao_sigla" %}" class="logotipo" /></td>
+        </tr>
+        <tr>
+            <td>INSTITUTO FEDERAL DE EDUCAÇÃO, CIÊNCIA E TECNOLOGIA DO RIO GRANDE DO NORTE</td>
+        </tr>
+        <tr>
+            <td class="titulo">REQUERIMENTO</td>
+        </tr>
+    </table>
+
+<div class="corpo">
+    <h2>DADOS DO REQUERENTE</h2>
+    <table class="info">
+        <tbody>
+            <tr>
+                <td colspan="3">Nome: {{ processo.servidor.pessoa_fisica.nome }}</td>
+                <td>Matrícula SIAPE: {{ processo.servidor.matricula }}</td>
+            </tr>
+            <tr>
+                <td>Titulação: </td>
+                <td><img src="/static/comum/img/quadrado.png" alt="quadrado"/>&nbsp;Graduação/Aperfeiçoamento</td>
+                <td><img src="/static/comum/img/quadrado.png" alt="quadrado"/>&nbsp;Especialização</td>
+                <td><img src="/static/comum/img/quadrado.png" alt="quadrado"/>&nbsp;Mestrado</td>
+            </tr>
+            <tr>
+                <td>Requer: </td>
+                <td><img alt="quadrado" src="/static/comum/img/quadrado{% if processo.tipo_rsc.nome == 'RSC-I' %}_marcado{% endif %}.png"/>&nbsp;RSC-I</td>
+                <td><img alt="quadrado" src="/static/comum/img/quadrado{% if processo.tipo_rsc.nome == 'RSC-II' %}_marcado{% endif %}.png"/>&nbsp;RSC-II</td>
+                <td><img alt="quadrado" src="/static/comum/img/quadrado{% if processo.tipo_rsc.nome == 'RSC-III' %}_marcado{% endif %}.png"/>&nbsp;RSC-III</td>
+            </tr>
+            <tr>
+                <td colspan="2">Data de Retroatividade Requerida: {{ processo.get_data_referencia_retroativa|format }}</td>
+                <td colspan="2">Pontuação Requerida: {{ processo.pontuacao_pretendida|format }}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>RESULTADO FINAL DA AVALIAÇÃO</h2>
+    <table class="info">
+        <tbody>
+            <tr>
+                <td><strong>Resultado Final:</strong> {{ estado_atual_processo|format }}</td>
+            </tr>
+            <tr>
+                <td><strong>Data de Retroatividade:</strong> {{ data_retroatividade|format }}</td>
+            </tr>
+            <tr>
+                <td><strong>Data de Referência dos Documentos:</strong> {{ data_referencia_arquivos|format }}</td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="bordered">
+        <thead>
+            <tr>
+                <th>Avaliadores</th>
+                <th>Pontuação Validada</th>
+                <th>Data de Referência Validada</th>
+                <th>Resultado</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for avaliador in avaliadores_resumo %}
+            <tr>
+                <td>{{ avaliador.nome|normalizar }}</td>
+                <td class="text-center">{{ avaliador.pontuacao_validada|format }}</td>
+                <td class="text-center">{{ avaliador.data_referencia_validada|format }}</td>
+                <td class="text-center">{{ avaliador.avaliacao_status|format }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <br />
+    <table class="bordered">
+        <tbody>
+            <tr>
+                <td>Data consolidada dos documentos apresentados para atingimento da pontuação mínima do RSC pretendido</td>
+                <td class="width-225 text-center">{{ data_consolidada_documentos }}</td>
+            </tr>
+            <tr>
+                <td>Data de início de exercício no cargo</td>
+                <td class="text-center">{{ data_exercio_carreira|format|safe }}</td>
+            </tr>
+            <tr>
+                <td>Data do diploma/certificado da titulação que habilita à RSC requerida</td>
+                <td class="text-center">{{ data_conclusao_titulacao_rsc_pretendido|format|safe }}</td>
+            </tr>
+            <tr>
+                <td>Data da última RT concedida</td>
+                <td class="text-center">{{ data_concessao_ultima_rt|format|safe }}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>DADOS DO AVALIADOR INTERNO</h2>
+    {% for avaliador in avaliadores_resumo %}
+    {% if avaliador.eh_interno %}
+    <table class="bordered">
+        <thead>
+            <tr>
+                <th colspan="3">{{ avaliador.vinculo.user.get_profile.nome|upper }}</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="width-33"><strong>Matrícula:</strong> {{ avaliador.matricula|format }}</td>
+                <td class="width-33"><strong>Data Nascimento:</strong> {{ avaliador.vinculo.user.get_profile.nascimento_data|format }}</td>
+                <td class="width-33"><strong>CPF:</strong> {{ avaliador.vinculo.user.get_profile.cpf }}</td>
+            </tr>
+            <tr>
+                <td><strong>Telefone:</strong> {{ avaliador.vinculo.user.get_profile.telefones }}</td>
+                <td colspan="2"><strong>E-mail:</strong> {{ avaliador.vinculo.email_notificacao }}</td>
+            </tr>
+        </tbody>
+    </table>
+    <br />
+    {% endif %}
+    {% endfor %}
+
+    <h2>DADOS DOS AVALIADORES EXTERNOS</h2>
+    {% for avaliacao in avaliacoes %}
+    {% if avaliacao.avaliador.eh_externo %}
+    <table class="bordered">
+        <thead>
+            <tr>
+                <th colspan="3">{{ avaliacao.avaliador.vinculo.user.get_profile.nome|upper }}</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Matrícula:</strong> {{ avaliacao.avaliador.matricula_siape|format }}</td>
+                <td colspan="2"><strong>Data Nascimento:</strong> {{ avaliacao.avaliador.vinculo.user.get_profile.nascimento_data|format }}</td>
+            </tr>
+            <tr>
+                <td><strong>CPF:</strong> {{ avaliacao.avaliador.vinculo.user.get_profile.cpf|format }}</td>
+                <td colspan="2"><strong>Telefone:</strong> {{ avaliacao.avaliador.vinculo.user.get_profile.telefones }}</td>
+            </tr>
+            <tr>
+                <td><strong>E-mail para contato:</strong> {{ avaliacao.avaliador.email_contato|format }}</td>
+                <td colspan="2"><strong>Instituição de Origem:</strong> {{ avaliacao.avaliador.instituicao_origem|format }}</td>
+            </tr>
+            <tr>
+                <td><strong>Número do Documento de Identificação:</strong> {{ avaliacao.avaliador.numero_documento_identificacao|format }}</td>
+                <td colspan="2"><strong>Emissor do Documento de Identificação:</strong> {{ avaliacao.avaliador.emissor_documento_identificacao|format }}</td>
+            </tr>
+            <tr>
+                <td><strong>PIS/PASEP:</strong> {{ avaliacao.avaliador.pis_pasep|format }}</td>
+            </tr>
+            <tr>
+                <td><strong>Logradouro:</strong> {{ avaliacao.avaliador.endereco_logradouro|format }}</td>
+                <td><strong>Número:</strong> {{ avaliacao.avaliador.endereco_numero|format }}</td>
+                <td><strong>Município:</strong> {{ avaliacao.avaliador.endereco_municipio|format }}</td>
+            </tr>
+            <tr>
+                <td><strong>Complemento:</strong> {{ avaliacao.avaliador.endereco_complemento|format }}</td>
+                <td><strong>Bairro:</strong> {{ avaliacao.avaliador.endereco_bairro|format }}</td>
+                <td><strong>CEP:</strong> {{ avaliacao.avaliador.endereco_cep|format }}</td>
+            </tr>
+            <tr>
+                <td><strong>Banco:</strong> {{ avaliacao.avaliador.banco|format }}</td>
+                <td><strong>Número da Agência:</strong> {{ avaliacao.avaliador.numero_agencia|format }}</td>
+                <td><strong>Tipo da Conta:</strong> {{ avaliacao.avaliador.tipo_conta|format }}</td>
+            </tr>
+            <tr>
+                <td><strong>Número da Conta:</strong> {{ avaliacao.avaliador.numero_conta|format }}</td>
+                <td><strong>Operação:</strong> {{ avaliacao.avaliador.operacao|format }}</td>
+            </tr>
+        </tbody>
+    </table>
+    <br />
+    {% endif %}
+    {% endfor %}
+
+    {% for avaliador_resumo in avaliadores_resumo %}
+        {% for avaliacao in avaliador_resumo.avaliacao_quadro_resumo %}
+            <h1>Avaliação do avaliador {{ avaliacao.avaliador.vinculo.user.get_profile }}</h1>
+            {% regroup avaliacao.itens by arquivo.criterio.diretriz.tipo_rsc.nome as avaliacaoitens_tiporsc %}
+            {% for avaliacao_item in avaliacaoitens_tiporsc %}
+                <p class="negrito">
+                    Itens da {{ avaliacao_item.grouper }}
+                </p>
+                <table class="bordered">
+                    <thead>
+                        <tr>
+                            <th rowspan="2" width="30px">Nº</th>
+                            <th rowspan="2" width="200px">Descrição</th>
+                            <th rowspan="2">Fator de Pontuação</th>
+                            <th rowspan="2">Peso</th>
+                            <th colspan="3">Requerente</th>
+                            <th colspan="3">Avaliador</th>
+                        </tr>
+                        <tr>
+                            <th>Quantidade de Itens</th>
+                            <th>Data de Referência</th>
+                            <th>Pontuação</th>
+                            <th>Quantidade de Itens</th>
+                            <th>Data de Referência</th>
+                            <th>Pontuação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% regroup avaliacao_item.list by arquivo.criterio.diretriz as arquivos_diretriz %}
+                        {% for arquivo_diretriz in arquivos_diretriz %}
+                            <tr>
+                                <td colspan="10" class="negrito">{{ arquivo_diretriz.grouper }}</td>
+                            </tr>
+                            {% for arquivo_rsc in arquivo_diretriz.list %}
+                                <tr>
+                                    <td class="text-center" {% if arquivo_rsc.justificativa %} rowspan="2" {% endif %}>{{ arquivo_rsc.arquivo.criterio.numero }}</td>
+                                    <td>{{ arquivo_rsc.arquivo.criterio.nome }}</td>
+                                    <td class="text-center">{{ arquivo_rsc.arquivo.criterio.fator }}</td>
+                                    <td class="text-center">{{ arquivo_rsc.arquivo.criterio.diretriz.peso }}</td>
+                                    <td class="text-center">{{ arquivo_rsc.arquivo.qtd_itens }}</td>
+                                    <td class="text-center">{{ arquivo_rsc.arquivo.data_referencia }}</td>
+                                    <td class="text-center">{{ arquivo_rsc.arquivo.nota_pretendida }}</td>
+                                    <td class="text-center">{{ arquivo_rsc.qtd_itens_validado|format }}</td>
+                                    <td class="text-center">{{ arquivo_rsc.data_referencia|format }}</td>
+                                    <td class="text-center"> {{ arquivo_rsc.pontuacao_validada|format }} </td>
+                                </tr>
+                                {% if arquivo_rsc.justificativa %}
+                                <tr>
+                                    <td colspan="9">
+                                        <p><strong>Justificativa da alteração: </strong> {{ arquivo_rsc.justificativa }}</p>
+                                    </td>
+                                </tr>
+                                {% endif %}
+                    
+                                {% if forloop.last %}
+                                    <tr>
+                                        <td class="text-end" colspan="9"><strong>Subtotal com teto* da diretriz:</strong></td>
+                                        <td class="text-center"><strong> {% if avaliador_resumo.ponto_teto_diretriz|tem_chave:arquivo_rsc.arquivo.criterio.diretriz.id %}
+                                        {{ avaliador_resumo.ponto_teto_diretriz|get_value_dict:arquivo_rsc.arquivo.criterio.diretriz.id }}
+                                        {% else %}
+                                        0
+                                        {% endif %} </strong></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-end" colspan="9">Subtotal global da diretriz: </td>
+                                        <td class="text-center"> {% if avaliador_resumo.ponto_global_diretriz|tem_chave:arquivo_rsc.arquivo.criterio.diretriz.id %}
+                                        {{ avaliador_resumo.ponto_global_diretriz|get_value_dict:arquivo_rsc.arquivo.criterio.diretriz.id }}
+                                        {% else %}
+                                        0
+                                        {% endif %} </td>
+                                    </tr>
+                                {% endif %}
+                            {% endfor %}
+                        {% endfor %}
+                        <tr>
+                            <td class="text-end" colspan="9"><strong>Subtotal pontuação com teto* por RSC:</strong></td>
+                            <td class="text-center"><strong> {% if avaliacao_item.grouper == 'RSC-I' %}
+                            {{ avaliacao.subtotal_teto_rsc1 }}
+                            {% endif %}
+                            {% if avaliacao_item.grouper == 'RSC-II' %}
+                            {{ avaliacao.subtotal_teto_rsc2 }}
+                            {% endif %}
+                            {% if avaliacao_item.grouper == 'RSC-III' %}
+                            {{ avaliacao.subtotal_teto_rsc3 }}
+                            {% endif %} </strong></td>
+                        </tr>
+                        <tr>
+                            <td class="text-end" colspan="9"><strong>Subtotal Pontuação Global por RSC:</strong></td>
+                            <td class="text-center"> {% if avaliacao_item.grouper == 'RSC-I' %}
+                            {{ avaliacao.subtotal_rsc1 }}
+                            {% endif %}
+                            {% if avaliacao_item.grouper == 'RSC-II' %}
+                            {{ avaliacao.subtotal_rsc2 }}
+                            {% endif %}
+                            {% if avaliacao_item.grouper == 'RSC-III' %}
+                            {{ avaliacao.subtotal_rsc3 }}
+                            {% endif %} </td>
+                        </tr>
+                    </tbody>
+                </table>
+            {% endfor %}
+        
+            <p class="alert alert-warning">
+                * Refere-se à pontuação solicitada em cada documento apresentado, sem considerar as regras e cortes para pontuação mínima necessária previstos na Resolução.
+            </p>
+        {% endfor %}
+    {% endfor %}
+
+    <div class="page-break"></div>
+
+    <p class="text-center">
+        <img src="/static/comum/img/brazao_colorido.jpg" alt="Brasão do Brasil" />
+        <br />
+        <strong> SERVIÇO PÚBLICO FEDERAL
+        <br />
+        INSTITUTO FEDERAL DE EDUCAÇÃO, CIÊNCIA E TECNOLOGIA DO RIO GRANDE DO NORTE
+        <br />
+        Comissão Permanente do Pessoal Docente </strong>
+    </p>
+
+    <p class="text-center">
+        <strong>DESPACHO</strong>
+    </p>
+    <br />
+
+    <table>
+        <tbody>
+            <tr>
+                <td width="100px"><strong>Da: </strong></td>
+                <td>CPPD</td>
+            </tr>
+            <tr>
+                <td><strong>Para: </strong></td>
+                <td>GABIN/REITORIA</td>
+            </tr>
+            <tr>
+                <td><strong>Assunto:</strong></td>
+                <td>Encaminha resultado final de avaliação de RSC para homologação</td>
+            </tr>
+            <tr>
+                <td><strong>Processo:</strong></td>
+                <td>{{ processo.protocolo.numero_processo }}</td>
+            </tr>
+            <tr>
+                <td><strong>Interessado:</strong></td>
+                <td>{{ processo.servidor.pessoa_fisica.nome|normalizar }}</td>
+            </tr>
+        </tbody>
+    </table>
+    <br />
+
+    <p class="texto-justificado">
+        Magnífico Reitor,
+    </p>
+    <p class="texto-justificado">
+        Considerando o que consta no art. 12 da Resolução nº 15/2014-CONSUP/IFRN, encaminhamos o processo de análise para concessão de Reconhecimento de Saberes e Competências (RSC) em tela para:
+    </p>
+    <p class="corpo-texto">
+        i. emissão da portaria de constituição da banca de avaliadores;
+        <br />
+        ii. homologação do resultado final;
+        <br />
+        iii. encaminhamento à(ao) <strong>{{ setor_encaminhamento }}</strong> {{ texto_encaminhamento_despacho_cppd }}
+    </p>
+    <p class="texto-justificado">
+        Para tanto, apresentamos a seguinte consolidação dos pareceres emitidos pela Comissão Especial de Avaliação:
+    </p>
+    <br />
+
+    <table class="bordered">
+        <thead>
+            <tr>
+                <th>Nome do Avaliador</th>
+                <th>Matrícula SIAPE</th>
+                <th>Resultado</th>
+                <th>Data de Referência Validada</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for avaliador in avaliadores_resumo %}
+            <tr>
+                <td>{{ avaliador.nome|normalizar }}</td>
+                <td class="text-center">{{ avaliador.matricula }}</td>
+                <td class="text-center">{{ avaliador.avaliacao_status|format }}</td>
+                <td class="text-center">{{ avaliador.data_referencia_validada|format }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <br />
+
+    <p class="texto-justificado">
+        Apresentamos, ainda, as seguintes datas de referência para consolidação da retroatividade prevista no art. 15 da Resolução nº 01/2014-CPRSC/SETEC/MEC:
+    </p>
+    <table class="bordered">
+        <tbody>
+            <tr>
+                <td>Data consolidada dos documentos apresentados para atingimento da pontuação mínima do RSC pretendido</td>
+                <td class="text-center width-225">{{ data_consolidada_documentos }}</td>
+            </tr>
+            <tr>
+                <td>Data de início de exercício no cargo</td>
+                <td class="text-center">{{ data_exercio_carreira|format|safe }}</td>
+            </tr>
+            <tr>
+                <td>Data do diploma/certificado da titulação que habilita à RSC requerida</td>
+                <td class="text-center">{{ data_conclusao_titulacao_rsc_pretendido|format|safe }}</td>
+            </tr>
+            <tr>
+                <td>Data da última RT concedida</td>
+                <td class="text-center">{{ data_concessao_ultima_rt|format|safe }}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <p class="texto-justificado">
+        {{ texto_final_despacho_reitor|safe }}
+    </p>
+    <p class="texto-justificado">
+        {{ data_extenso }}
+    </p>
+</div>
+
+<div class="page-break"></div>
+
+<p class="text-center font-14">
+    <img src="/static/comum/img/brazao_colorido.jpg" alt="Brasão do Brasil" />
+    <br />
+    <i>SERVIÇO PÚBLICO FEDERAL</i>
+    <br />
+    <strong> <strong>INSTITUTO FEDERAL DE EDUCAÇÃO, CIÊNCIA E TECNOLOGIA DO RIO GRANDE DO NORTE</strong>
+    <br />
+    </strong>
+</p>
+<br />
+<table class="info">
+    <tbody>
+        <tr>
+            <td width="100px" class="font-12"><strong>Processo:</strong></td>
+            <td class="font-12">{{ processo.protocolo.numero_processo }}</td>
+        </tr>
+        <tr>
+            <td class="font-12"><strong>Interessado:</strong></td>
+            <td class="font-12">{{ processo.servidor.pessoa_fisica.nome|normalizar }}</td>
+        </tr>
+    </tbody>
+</table>
+
+<br />
+<p class="text-center">
+    DESPACHO
+</p>
+<br />
+
+<p class="corpo-texto font-12">
+    {{ texto_despacho_homologacao|safe }}
+</p>
+<p class="corpo-texto font-12">
+    À(Ao) <strong>{{ setor_encaminhamento }}</strong> {{ texto_encaminhamento_despacho_reitor }}
+</p>
+<br />
+<p class="corpo-texto font-12">
+    {{ data_extenso }}
+</p>
+
+{% endblock %}
+
+{% block footer %}
+{% endblock %}

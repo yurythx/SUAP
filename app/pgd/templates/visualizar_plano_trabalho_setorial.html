@@ -1,0 +1,259 @@
+{% extends "base_super_pgd.html" %}
+
+{% block bodyclass %}hasAsideRight{% endblock %}
+
+{% block object-status %}
+    {% if pts.cancelado %}
+        <span class="status status-error">Cancelado</span>
+    {% else %}
+        {% if pts.estah_vigente %}
+            <span class="status status-success">Vigente</span>
+        {% else %}
+            <span class="status status-error">Não vigente</span>
+        {% endif %}
+        {% if pts.publicado %}
+            <span class="status status-success">Publicado e aprovado</span>
+        {% else %}
+            <span class="status status-error">Não publicado</span>
+        {% endif %}
+        {% if pts.estah_alinhado_com_habilitacao_setor %}
+            <span class="status status-success">Período alinhado com a habilitação do setor</span>
+        {% else %}
+            <span class="status status-error">Período não alinhado com a habilitação do setor</span>
+        {% endif %}
+        {% if pts.pode_receber_solicitacao_adesao %}
+            <span class="status status-success">Pode receber solicitações e adesão</span>
+        {% else %}
+            <span class="status status-error">Não pode receber solicitações e adesão</span>
+        {% endif %}
+    {% endif %}
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if pode_publicar %}
+            <li>
+                <a href="{% url 'publicar_pts' pts.id %}" class="btn success">{% icone "upload" %} Publicar e Aprovar</a>
+            </li>
+        {% endif %}
+        {% if pode_editar_vigencia %}
+            <li>
+                <a href="{% url 'editar_vigencia_pts' pts.id %}" class="btn primary">{% icone "edit" %} Editar Vigência</a>
+            </li>
+        {% endif %}
+        {% if pode_despublicar %}
+            <li>
+                <a href="{% url 'despublicar_pts' pts.id %}" class="btn warning">{% icone "power-off" %} Despublicar</a>
+            </li>
+        {% endif %}
+        {% if pode_cancelar %}
+            <li>
+                <a href="{% url 'cancelar_pts' pts.id %}" class="btn danger" title="Cancelar PTS">{% icone "times" %}<span class="visually-hidden">Cancelar</span></a>
+            </li>
+        {% endif %}
+    </ul>
+{% endblock %}
+
+{% block asideright %}
+
+    <aside class="right">
+
+        <button id="collapseAsideRight"><span class="visually-hidden">Minimizar barra lateral</span></button>
+
+        <details open="open">
+            <summary>Histórico</summary>
+            {% if registros_acoes %}
+                <ul class="action-bar">
+                    <li>
+                        <a class="btn default" href="{% url 'visualizar_plano_trabalho_setorial_linha_tempo' pts.id %}">Visualizar Histórico de Registros</a>
+                    </li>
+                </ul>
+            {% endif %}
+            {% autopaginate registros_acoes %}
+            {% paginate %}
+            <div class="details-container">
+                <ul class="timeline">
+                    {% for registro_acao in registros_acoes %}
+                        <li>
+                            <div class="timeline-date">{{ registro_acao.data|format }}</div>
+                            <div class="timeline-icon"></div>
+                            <div class="timeline-content">
+                                <h4><strong>{{ registro_acao.get_tipo_display }}</strong> <small>por {{ registro_acao.user|format }}</small></h4>
+                                <p>{{ registro_acao.observacao }}</p>
+                            </div>
+                        </li>
+                    {% endfor %}
+                </ul>
+                {% paginate %}
+            </div>
+        </details>
+
+    </aside>
+
+{% endblock %}
+
+{% block content %} {{ block.super }}
+
+    <dl class="definition-list flex">
+        <div class="list-item">
+            <dt>Setor</dt>
+            <dd>{{ pts.setor|format }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Vigência</dt>
+            <dd>
+                {% if pts.data_fim %}
+                    {{ pts.data_inicio|format }} a {{ pts.data_fim|format }}
+                {% else %}
+                    A partir de {{ pts.data_inicio|format }}
+                {% endif %}
+            </dd>
+        </div>
+    </dl>
+
+    <div class="tab-pane" data-title="Orientações Gerais" data-tab="orientacoes" data-checked="{% if orientacoes_vigentes_sistemico or orientacoes_vigentes_nao_sistemico %}True{% else %}False{% endif %}">
+        <div class="alert alert-info">
+            <p><strong>Importante</strong>:</p>
+            <ol>
+                <li>Essas <strong>Orientações Gerais de Preenchimento do Plano de Trabalho Setorial</strong> devem ser lidas antes do preenchimento deste plano.</li>
+                <li>Essas orientações são disponibilizados pela Gestão e nelas constam conceitos, regras e demais detalhes que devem ser considerados durante o preenhcimento e a vigência do plano.</li>
+            </ol>
+        </div>
+        {% if orientacoes_vigentes_sistemico %}
+            {% box "Orientações Sistêmicas" %}
+                {% for orientacao in orientacoes_vigentes_sistemico %}
+                    {{ orientacao.orientacao|format|safe }}
+                {% endfor %}
+            {% endbox %}
+        {% endif %}
+
+        {% if orientacoes_vigentes_nao_sistemico %}
+            {% box "Orientações Locais" %}
+                {% for orientacao in orientacoes_vigentes_nao_sistemico %}
+                    {{ orientacao.orientacao|format|safe }}
+                {% endfor %}
+            {% endbox %}
+        {% endif %}
+    </div>
+
+    <div class="tab-pane" data-title="Documentação" data-tab="documentacao" data-checked="{% if pts.doc_horario_funcionamento_setor and pts.doc_escala_trabalho_setor and pts.doc_regras_planejamento_setor and pts.doc_infraestrutura_minima and pts.doc_cohecimento_tecnico %}True{% else %}False{% endif %}">
+        {% if pode_editar_documentacao %}
+            <ul class="action-bar">
+                <li>
+                    <a href="{% url 'editar_documentacao_pts' pts.id %}" class="btn primary">{% icone "edit" %} Editar Documentação</a>
+                </li>
+            </ul>
+        {% endif %}
+
+        <div class="alert alert-info">
+            <p><strong>Importante</strong>:</p>
+            <ol>
+                <li>Antes de criar a documentação, leia as <strong>Orientações Gerais de Preenchimento do Plano de Trabalho Setorial</strong>.</li>
+                <li>Esta documentação será exibida para o Servidor no momento da sua Adesão a este PTS.</li>
+            </ol>
+        </div>
+
+        <dl class="definition-list">
+            <dt>{{ pts|verbose:'doc_horario_funcionamento_setor' }}</dt>
+            <dd>{{ pts.doc_horario_funcionamento_setor|format|safe }}</dd>
+
+            <dt>{{ pts|verbose:'doc_escala_trabalho_setor' }}</dt>
+            <dd>{{ pts.doc_escala_trabalho_setor|format|safe }}</dd>
+
+            <dt>{{ pts|verbose:'doc_regras_planejamento_setor' }}</dt>
+            <dd>{{ pts.doc_regras_planejamento_setor|format|safe }}</dd>
+
+            <dt>{{ pts|verbose:'doc_infraestrutura_minima' }}</dt>
+            <dd>{{ pts.doc_infraestrutura_minima|format|safe }}</dd>
+
+            <dt>{{ pts|verbose:'doc_cohecimento_tecnico' }}</dt>
+            <dd>{{ pts.doc_cohecimento_tecnico|format|safe }}</dd>
+        </dl>
+    </div>
+
+    <div class="tab-pane" data-title="Atividades" data-tab="atividades" data-counter="{{ atividades_ativas.count }}" data-checked="{% if not atividades_ativas %}False{% endif %}">
+        {% if pode_vincular_atividades %}
+            <ul class="action-bar">
+                <li>
+                    <a href="/pgd/quadro_atividades/addptslote/{{ pts.id }}/" class="btn success">{% icone "plus" %} Vincular Atividades</a>
+                </li>
+            </ul>
+        {% endif %}
+        <p class="alert alert-info">Antes de vincular atividades, leia as <strong>Orientações Gerais de Preenchimento do Plano de Trabalho Setorial.</strong></p>
+        {% if atividades %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="no-print">Ações</th>
+                            <th>Temática -> Macroprocesso -> Serviço</th>
+                            <th>Atividade</th>
+                            <th>Ativo no QTA</th>
+                            <th>Ativo no PTS</th>
+                            <th class="no-print">Opções</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for atividade in atividades %}
+                            <tr {% if not atividade.ativo %}class="disabled"{% endif %}>
+                                <td class="no-print">
+                                    {% icon "view" "/pgd/visualizar_atividade/{{ atividade.atividade.id }}" "Visualizar" "popup" %}
+                                    {% if atividade.pode_remover_atividade %}
+                                        {% icon "delete" "/pgd/remover_atividade_pts/{{ atividade.id }}" %}
+                                    {% endif %}
+                                </td>
+                                <td>{{ atividade.atividade.hierarquia|format }}</td>
+                                <td>
+                                    <dl>
+                                        <dt>Atividade:</dt><dd>{{ atividade.atividade.titulo|format }}</dd>
+                                        {% if atividade.descricao %}
+                                            <dt>Descrição:</dt><dd>{{ atividade.atividade.descricao|format }}</dd>
+                                        {% endif %}
+                                        <dt>Descrição das Entregas:</dt><dd>{{ atividade.atividade.descricao_entregas }}</dd>
+                                        <dt>Ganho de Produtividade:</dt><dd>{{ atividade.atividade.ganho_produtividade|format }}%</dd>
+                                    </dl>
+                                </td>
+                                <td>{{ atividade.atividade.estah_ativa|format }}</td>
+                                <td>{{ atividade.ativo|format }}</td>
+                                <td class="no-print">
+                                    {% if pode_editar %}
+                                        {% if atividade.pode_ativar_atividade %}
+                                            <a href="/pgd/ativar_atividade_pts/{{ atividade.id }}" class="btn success confirm">{% icone "toggle-off" %} Ativar</a>
+                                        {% endif %}
+                                        {% if atividade.pode_desativar_atividade %}
+                                            <a href="/pgd/desativar_atividade_pts/{{ atividade.id }}" class="btn danger">{% icone "toggle-on" %} Inativar</a>
+                                        {% endif %}
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Nenhuma atividade foi vinculada.</p>
+        {% endif %}
+    </div>
+
+    <div class="tab-pane" data-title="Auxiliares" data-tab="auxiliares" data-counter="{{ auxiliares.count }}">
+        {% box "Auxiliares" %}
+            {% if pode_editar_auxiliares %}
+                <ul class="action-bar">
+                    <li>
+                        <a href="{% url 'editar_auxiliares_pts' pts.id %}" class="btn primary">{% icone "edit" %} Editar Auxiliares</a>
+                    </li>
+                </ul>
+            {% endif %}
+            {% if auxiliares %}
+                <ol>
+                    {% for auxiliar in auxiliares %}
+                        <li>{{ auxiliar|format }}</li>
+                    {% endfor %}
+                </ol>
+            {% else %}
+                <p class="alert alert-warning">Nenhum auxiliar foi cadastrado.</p>
+            {% endif %}
+        {% endbox %}
+    </div>
+
+{% endblock %}

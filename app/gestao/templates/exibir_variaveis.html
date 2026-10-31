@@ -1,0 +1,173 @@
+{% extends super_template %}
+
+{% block extrahead %}
+    <script>
+        function getValor(element_id, pk, uo_pk, valor, exibir_link) {
+            function setValor(element_id, uo_pk, valor, exibir_link) {
+                var conteudo;
+                if (exibir_link) {
+                    if (uo_pk > 0) {
+                        conteudo = '<a href="/gestao/detalhar_variavel/' + element_id.split("_")[0] + '/' + uo_pk + '/">' + valor + '</a>';
+                    } else {
+                        conteudo = '<a href="/gestao/detalhar_variavel/' + element_id + '/Todas/" class="btn default">Detalhar Variável</a>';
+                    }
+                } else {
+                    conteudo = valor;
+                }
+                div_valor = document.getElementById('valor_' + element_id);
+                div_link = document.getElementById('link_' + element_id);
+                if (uo_pk == null && exibir_link) {
+                    if (div_link) {
+                        div_valor.innerHTML = valor;
+                        div_link.innerHTML = conteudo;
+                    }
+                } else {
+                    div_valor.innerHTML = conteudo;
+                }
+            }
+            if (!valor) {
+                $.ajax({
+                    contentType: 'application/json',
+                    type: "GET",
+                    url: "/gestao/ajax/recuperar_valor/",
+                    data: {
+                        "uo_pk": uo_pk,
+                        "pk": pk
+                    },
+                    dataType: "json",
+                    beforeSend: function() {
+                        setValor(element_id, uo_pk, '<i class="fa fa-spinner fa-pulse fa-fw"></i>', exibir_link)
+                    },
+                    success: function (response) {
+                        setValor(element_id, uo_pk, response.valor, exibir_link);
+                    }
+                });
+            } else {
+                 setValor(element_id, uo_pk, valor, exibir_link);
+            }
+        }
+
+        $(function(){
+            $('div[onload]').trigger('onload');
+        });
+
+    </script>
+{% endblock %}
+
+{% block action-bar %}
+<ul class="action-bar">
+    <li><a class="btn primary popup" href="/gestao/definir_periodo_referencia/">Editar Período de Referência</a></li>
+    <li class="has-child">
+        <a class="btn" href="#">Detalhar por Campus</a>
+        <ul>
+            <li><a href="?por_campus">Visualizar</a></li>
+            <li><a href="?por_campus_xls">Exportar para XLS</a></li>
+        </ul>
+    </li>
+    <li class="has-child">
+        <a class="btn" href="#">Detalhar somente para {{ setor_usuario_logado.uo }}</a>
+        <ul>
+            <li><a href="?pelo_meu_campus">Visualizar</a></li>
+            <li><a href="?pelo_meu_campus_xls">Exportar para XLS</a></li>
+        </ul>
+    </li>
+</ul>
+{% endblock %}
+
+{% block content %}
+
+    <dl class="definition-list flex mb-2">
+        <div class="list-item">
+            <dt>Período de Referência</dt>
+            <dd>{{ data_base|format }} a {{ data_limite|format }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Ano de Referência</dt>
+            <dd>{{ ano_referencia }}</dd>
+        </div>
+    </dl>
+
+    {% box "Variáveis" %}
+        {% if tipo == 'Academico' %}
+            <ul class="tabs">
+                <li {% if vinculo_aluno_convenio == "AlunosTodos" %}class="active"{% endif %}>
+                    <a href="/gestao/exibir_variaveis/Academico/AlunosTodos/">Todos os alunos</a>
+                </li>
+                <li {% if vinculo_aluno_convenio == 'AlunosComConvenio' %}class="active"{% endif %}>
+                    <a href="/gestao/exibir_variaveis/Academico/AlunosComConvenio/">Alunos extraordinários (com convênio)</a>
+                </li>
+                <li {% if vinculo_aluno_convenio == 'AlunosSemConvenio' %}class="active"{% endif %}>
+                    <a href="/gestao/exibir_variaveis/Academico/AlunosSemConvenio/">Alunos ordinários (sem convênio)</a>
+                </li>
+                <li {% if vinculo_aluno_convenio == 'AlunosEquivalentes' %}class="active"{% endif %}>
+                    <a href="/gestao/exibir_variaveis/Academico/AlunosEquivalentes/">Alunos equivalentes</a>
+                </li>
+            </ul>
+        {% endif %}
+        <table>
+            <thead>
+            <tr>
+                <th>Nome</th>
+                <th class="text-center">Sigla</th>
+                <th>Descrição</th>
+                <th>Fonte</th>
+                <th class="text-end">Valor</th>
+                <th class="no-print">Opções</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for variavel in variaveis_cache.values %}
+                <tr>
+                    <td><strong>{{ variavel.nome }}</strong></td>
+                    <td align="center">{{ variavel.sigla }}</td>
+                    <td>{{ variavel.descricao }}</td>
+                    <td>{{ variavel.fonte }}</td>
+                    <td class="text-end">
+                        <div id="valor_{{variavel.sigla }}" onload="getValor('{{variavel.sigla }}', {{variavel.pk }}, null, '{{variavel.valor}}', {{ variavel.has_detalhamento_variavel|yesno:"true,false" }})"></div>
+                    </td>
+                    <td class="no-print">
+                        <div id="link_{{variavel.sigla }}"> - </div>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% endbox %}
+
+    {% if linhas %}
+        {% box "Valores por Campus" %}
+            <table>
+                <thead>
+                <tr>
+                    <th>Variável</th>
+                    {% for uo in uos %}
+                        <th>{{ uo.sigla }}</th>
+                    {% endfor %}
+                </tr>
+                </thead>
+                <tbody>
+                {# Linhas é um matrix (lista de listas). Cada lista contém como primeiro elemento a variável em si. #}
+                {# Os próximos elementos são os valores para cada campus (UO). #}
+                {% for linha in linhas %}
+                    <tr>
+                        {% with linha.0.has_detalhamento_variavel as exibir_link_detalhamento %}
+                            {% for col in linha %}
+                                {% if forloop.first %}
+                                    {# No caso col, na posição 0, é objeto Variavel em si #}
+                                    <th>{{ col.sigla }}</th>
+                                {% else %}
+                                    {# Nas posições seguintes trata-se do valor da variável para cada campus (UO). #}
+                                    <td>
+                                        <div id="valor_{{ linha.0.sigla }}_{{ col.uo.pk }}" onload="getValor('{{ linha.0.sigla }}_{{ col.uo.pk }}', {{ linha.0.pk }}, {{ col.uo.pk }}, '{{ col.valor }}', {{ exibir_link_detalhamento|yesno:"true,false" }})"></div>
+                                    </td>
+                                {% endif %}
+                            {% endfor %}
+                        {% endwith %}
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% endbox %}
+    {% endif %}
+
+{% endblock %}

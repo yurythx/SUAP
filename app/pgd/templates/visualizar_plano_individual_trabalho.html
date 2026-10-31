@@ -1,0 +1,206 @@
+{% extends "base_super_pgd.html" %}
+
+{% block bodyclass %}hasAsideRight{% endblock %}
+
+{% block object-status %}
+    {{ pit.get_situacao_virtual.1|status }}
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        <li>
+            <a href="{% url 'visualizar_pit_completo' pit.id %}" class="btn default" title="Visualzar PIT Completo">
+                {% icone "eye" %} Visualizar PIT/RITs Completo
+            </a>
+        </li>
+        {% if pode_servidor_cancelar_pit %}
+            <li>
+                <a href="{% url 'cancelar_pit' pit.id %}" class="btn danger" title="Cancelar PIT">{% icone "times" %}<span class="visually-hidden">Cancelar PIT</span></a>
+            </li>
+        {% endif %}
+    </ul>
+{% endblock %}
+
+{% block asideright %}
+
+    <aside class="right">
+
+        <button id="collapseAsideRight"><span class="visually-hidden">Minimizar barra lateral</span></button>
+
+        {% include "includes/details_dados_servidor.html" %}
+        
+        <details open="open">
+            <summary>Histórico</summary>
+            {% autopaginate registros_acoes %}
+            {% paginate %}
+            <div class="details-container">
+                <ul class="timeline">
+                    {% for registro_acao in registros_acoes %}
+                        <li>
+                            <div class="timeline-date">{{ registro_acao.data|format }}</div>
+                            <div class="timeline-icon"></div>
+                            <div class="timeline-content">
+                                <h4><strong>{{ registro_acao.get_tipo_display }}</strong> <small>por {{ registro_acao.user|format }}</small></h4>
+                                <p>{{ registro_acao.observacao }}</p>
+                            </div>
+                        </li>
+                    {% endfor %}
+                </ul>
+                {% paginate %}
+            </div>
+        </details>
+
+    </aside>
+
+{% endblock %}
+
+{% block content %} {{ block.super }}
+
+    {% box 'Dados gerais' %}
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>Adesão</dt>
+                <dd>{{ pit.adesao|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Competência</dt>
+                <dd>{{ pit.periodo_pit_rit|format }}</dd>
+            </div>
+            {% if pit.data_verificacao_ponto %}
+                <div class="list-item">
+                    <dt>{{ pit|verbose:'data_verificacao_ponto' }}</dt>
+                    <dd>{{ pit.data_verificacao_ponto|format }}</dd>
+                </div>
+            {% endif %}
+            <div class="list-item">
+                <dt>{{ pit|verbose:'data_inicial' }}</dt>
+                <dd>{{ pit.get_data_inicial|format|safe }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>{{ pit|verbose:'percentual_presencial' }}</dt>
+                <dd>{{ pit.percentual_presencial|format|safe }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>{{ pit|verbose:'percentual_teletrabalho' }}</dt>
+                <dd>{{ pit.percentual_teletrabalho|format|safe }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Situação PIT</dt>
+                <dd>{{ pit.get_situacao_display|status }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>PIT foi homologado em definitivo</dt>
+                <dd>
+                    {% if pit.homologado_definitivo %}
+                        <span class="status status-success">Sim</span>
+                    {% else %}
+                        -
+                    {% endif %}
+                </dd>
+            </div>
+        </dl>
+    {% endbox %}
+
+    {% box 'Etapas'%}
+        <p class="alert alert-info">Antes de trabalhar com os Planejamentos e os RITs leia as <strong>Orientações Gerais.</strong></p>
+        {% if planejamentos %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Etapa</th>
+                            <th>Entregue</th>
+                            <th>Aprovado</th>
+                            <th>Homologado</th>
+                            <th class="no-print">Opções</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for planejamento in planejamentos %}
+                            <tr>
+                                <td>{{ planejamento.get_verbose_planejamento }}</td>
+                                <td>{{ planejamento.entregue|format }}</td>
+                                <td>{{ planejamento.aprovado_definitivo|format }}</td>
+                                <td>{{ planejamento.homologado_definitivo|format }}</td>
+                                <td class="no-print">
+                                    <ul class="action-bar">
+                                        <li><a href="/pgd/visualizar_planejamento/{{ planejamento.id }}" class="btn">{% icone "eye" %} Planejamento (PIT)</a></li>
+
+                                        {% comment %}
+                                        <li><a href="/pgd/visualizar_rit/{{ planejamento.id }}" class="btn">RIT</a></li>
+                                        {% endcomment %}
+
+                                        <li><a href="/admin/pgd/relatorioindividualtrabalhoatividadeentregaservidorregistrar/?rit_atividade__rit={{ planejamento.id }}" class="btn">{% icone "eye" %} Execução (RIT - Entregas)</a></li>
+
+                                        {% comment %}
+                                        <li><a href="#" class="btn">Avaliação e Homologação (RIT)</a></li>
+                                        {% endcomment %}
+                                    </ul>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Nenhum PIT/RIT foi encontrado.</p>
+        {% endif %}
+    {% endbox %}
+
+    <div class="tab-pane" data-title="Orientações Gerais" data-tab="orientacoes" data-checked="{% if orientacoes_vigentes_sistemico or orientacoes_vigentes_nao_sistemico %}True{% else %}False{% endif %}">
+        <div class="alert alert-info">
+            <p><strong>Importante</strong>:</p>
+            <ol>
+                <li>Essas <strong>Orientações Gerais de Preenchimento Individual de Trabalho do Servidor</strong> devem ser lidas antes do preenchimento deste plano.</li>
+                <li>Essas orientações são disponibilizados pela Gestão e nelas constam conceitos, regras e demais detalhes que devem ser considerados para o preenhcimento deste plano.</li>
+            </ol>
+        </div>
+        {% if orientacoes_vigentes_sistemico %}
+            {% box "Orientações Sistêmicas" %}
+                {% for orientacao in orientacoes_vigentes_sistemico %}
+                    {{ orientacao.orientacao|format|safe }}
+                {% endfor %}
+            {% endbox %}
+        {% endif %}
+
+        {% if orientacoes_vigentes_nao_sistemico %}
+            {% box "Orientações Locais" %}
+                {% for orientacao in orientacoes_vigentes_nao_sistemico %}
+                    {{ orientacao.orientacao|format|safe }}
+                {% endfor %}
+            {% endbox %}
+        {% endif %}
+    </div>
+
+    <div class="tab-pane" data-title="Dados Específicos" data-tab="especificacao" data-checked="{% if pit.tem_dados_especificos %}True{% else %}False{% endif %}">
+        {% if pode_editar_dado_especifico %}
+            <ul class="action-bar">
+                <li>
+                    <a href="{% url 'editar_dados_especificos_pit' pit.id %}" class="btn primary">{% icone "edit" %} Editar</a>
+                </li>
+            </ul>
+        {% endif %}
+
+        <div class="alert alert-info">
+            <p><strong>Importante</strong>:</p>
+            <ol>
+                <li>Antes preencher esses dados leia as <strong>Orientações Gerais</strong>.</li>
+            </ol>
+        </div>
+
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>{{ pit|verbose:'data_inicial' }}</dt>
+                <dd>{{ pit.get_data_inicial|format|safe }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>{{ pit|verbose:'percentual_presencial' }}</dt>
+                <dd>{{ pit.percentual_presencial|format|safe }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>{{ pit|verbose:'percentual_teletrabalho' }}</dt>
+                <dd>{{ pit.percentual_teletrabalho|format|safe }}</dd>
+            </div>
+        </dl>
+    </div>
+{% endblock %}

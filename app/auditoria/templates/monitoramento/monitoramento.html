@@ -1,0 +1,151 @@
+{% extends super_template %}
+
+{% block object-status %}
+    {% if not monitoramento.situacao_terminal %}
+        {{ monitoramento|method:"get_steps"|call:request.user|safe }}
+    {% else %}
+        {{ monitoramento.get_status_display|status}}
+    {% endif %}
+{% endblock %}
+
+{% block action-bar %}
+
+    <ul class="action-bar">
+        {% if monitoramento|method:"pode_adicionar_manifestacao"|call:request.user %} 
+            <li>
+                <a href="{% url 'auditoria:adicionar_manifestacao_monitoramento' monitoramento.id %}" class="btn success"> 
+                    Adicionar manifestação
+                </a>
+            </li>
+            <li>
+                <a href="{% url 'auditoria:solicitar_prorrogacao_manifestacao' monitoramento.id %}" class="btn"> 
+                    Solicitar prorrogação de prazo
+                </a>
+            </li>
+        {% endif %}
+        {% if monitoramento|method:"pode_designar_servidor"|call:request.user %} 
+            <li>
+                <a href="{% url 'auditoria:designar_servidor_para_monitoramento' monitoramento.id %}" class="btn primary"> 
+                    Designar servidor
+                </a>
+            </li>
+        {% endif %}
+        {% if monitoramento|method:"pode_finalizar"|call:request.user %} 
+            <li>
+                <a href="{% url 'auditoria:solicitar_prorrogacao_manifestacao' monitoramento.id %}" class="btn"> 
+                    Solicitar prorrogação de prazo
+                </a>
+            </li>
+        {% endif %} 
+    </ul>
+
+{% endblock %}
+
+{% block content %}
+    
+    {% box "Dados gerais" %}
+        <dl class="definition-list flex">
+            <div class="list-item">
+                <dt>Relatório</dt>
+                <dd><a href="{{ recomendacao.relatorio.get_absolute_url}}">{{ recomendacao.relatorio }} </a></dd>
+            </div>
+            <div class="list-item">
+                <dt>Ação</dt>
+                <dd>{{ recomendacao.relatorio.acao }}</dd>
+            </div> 
+            <div class="list-item">
+                <dt>Ano/PAINT</dt>
+                <dd>{{ recomendacao.relatorio.ano_paint }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Núcleo executor</dt>
+                <dd>{{ recomendacao.nucleo }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Prazo para atendimento</dt>
+                <dd class="false">{{ monitoramento.ultima_solicitacao.prazo_atual|date|default:"A definir" }}</dd>
+            </div>
+            <div class="list-item flex flex-basis-100">
+                <dt>Descrição</dt>
+                <dd>{{ recomendacao.descricao|safe }}</dd>
+            </div>
+        </dl>
+    {% endbox %} 
+    <div class="tab-pane" data-title="Solicitações da providência" data-tab="solicitacoes">
+        <ul class="general-box-container">
+            {% for solicitacao in monitoramento.solicitacoes_ordenadas %} 
+                <li>
+                    {% include 'monitoramento/box_providencia.html' %}
+                    {% with manifestacoes=solicitacao.manifestacoes %}
+                        {% if manifestacoes.exists %}
+                            <ul>
+                                {% include "monitoramento/tabs/manifestacoes.html" with manifestacoes=manifestacoes %}
+                            </ul>
+                        {% endif %}
+                    {% endwith %}
+                </li>
+            {% empty %}
+                <p class="alert alert-warning">Nenhuma solicitação de providência.</p>
+            {% endfor %}
+        </ul>
+    </div>
+    <div class="tab-pane" data-title="Servidores designados" data-tab="indicacoes" data-counter="{{ monitoramento.indicacoes.count }}">
+        {% box 'Servidores com permissão nessa recomendação' %}
+            {% if monitoramento.indicacoes.exists %}
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Servidor</th>
+                                <th>Instruções</th>
+                                <th>Concluida</th>
+                                <th>Concluida em</th>
+                                <th>Indicado por</th>
+                                <th>Designado em</th>
+                                <th>Revogada por</th>
+                                <th>Revogada em</th>
+                                <th>Ativa</th>
+                                <th class="no-print">Opções</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for indicacao in monitoramento.indicacoes.all %}
+                                <tr>
+                                    <td>{{ indicacao.servidor|format }}</td>
+                                    <td>{{ indicacao.instrucoes }}</td>
+                                    <td>{{ indicacao.tarefa_realizada|format }}</td>
+                                    <td>{{ indicacao.data_realizacao_tarefa|format }}</td>
+                                    <td>{{ indicacao.indicado_por|format }}</td>
+                                    <td>{{ indicacao.data_indicacao|format }}</td>
+                                    <td>{{ indicacao.revogada_por|format }}</td>
+                                    <td>{{ indicacao.revogada_em|format }}</td>
+                                    <td>{{ indicacao.ativa|format }}</td>
+                                    <td class="no-print">
+                                        {% if monitoramento|method:"pode_revogar"|call:request.user and indicacao.ativa %}
+                                            <a class="btn danger" href="{% url 'auditoria:revogar_indicacao_monitoramento' indicacao.id %}">Remover Permissão</a>
+                                        {% endif %}
+                                        {% if indicacao|method:"pode_concluir"|call:request.user %}
+                                            <a class="btn success" href="{% url 'auditoria:concluir_indicacao_monitoramento' indicacao.id %}">Concluir Tarefa</a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="alert alert-warning">Não há servidores designados.</p>
+            {% endif %}
+        {% endbox %}
+    </div>
+    <div class="tab-pane" data-title="Relatórios de Monitoramento" data-tab="relatorios">
+        {% for recomendacao_documento in recomendacao.documentos.all %}
+            <div class="general-box {% if recomendacao_documento.removido_em %} danger doc-error {% endif %}">
+                {% include 'recomendacao/documento.html' with documento=recomendacao_documento obj=recomendacao %}
+            </div>
+        {% empty %}
+            <p class="alert alert-warning">Nenhum documento eletrônico associado.</p>
+        {% endfor %}
+    </div>
+
+{% endblock %}

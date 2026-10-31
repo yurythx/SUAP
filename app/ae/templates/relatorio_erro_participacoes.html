@@ -1,0 +1,199 @@
+{% extends super_template %}
+
+{% block content %}
+
+    {% if participacoes_abertas %}
+        <p class="alert alert-warning"><strong>Atenção!</strong> As participações a seguir devem ser corrigidas para o funcionamento normal do sistema. Esta página exibe somente as 4 primeiras.</p>
+
+        <div class="card-container">
+            {% for participacao, participacao_aberta in participacoes_abertas.items %}
+                <div class="card">
+                    {% with aluno=participacao.aluno pessoa_fisica=participacao.aluno.pessoa_fisica programa=participacao.programa %}
+                    <div class="photo"><img src="{{ aluno.get_foto_75x100_url }}" title="{{ pessoa_fisica.nome }}" alt="Foto de {{ pessoa_fisica.nome }}" /></div>
+                    <h4>{{ pessoa_fisica.nome }}</h4>
+                    <dl>
+                        <dt>Matrícula:</dt>
+                        <dd>
+                            {% if is_nutricionista %}
+                                {{ aluno.matricula }}
+                            {% else %}
+                                <a href="{{ aluno.get_absolute_url }}">{{ aluno.matricula }}</a>
+                            {% endif %}
+                        </dd>
+                        <dt>Programa:</dt>
+                        <dd><strong>{{ participacao.inscricao.programa|format }}</strong></dd>
+                        <dt>Inscrito em:</dt>
+                        <dd>{{ participacao.inscricao.data_cadastro|format }}</dd>
+                        {% if perms.ae.pode_ver_motivo_solicitacao %}
+                            <dt>Motivo da solicitação:</dt>
+                            <dd>{{ participacao.inscricao.motivo }}</dd>
+                        {% endif %}
+                        {% with sub_inscricao=participacao.inscricao.sub_instance %}
+                        {% if programa.get_tipo == programa.TIPO_ALIMENTACAO %}
+                            {% if sub_inscricao.solicitacao_cafe.valida %}
+                                <dt>Café da manhã:</dt>
+                                <dd>{{ sub_inscricao.solicitacao_cafe|format }}</dd>
+                            {% endif %}
+                            {% if sub_inscricao.solicitacao_almoco.valida %}
+                                <dt>Almoço:</dt>
+                                <dd>{{ sub_inscricao.solicitacao_almoco|format }}</dd>
+                            {% endif %}
+                            {% if sub_inscricao.solicitacao_janta.valida %}
+                                <dt>Jantar:</dt>
+                                <dd>{{ sub_inscricao.solicitacao_janta|format }}</dd>
+                            {% endif %}
+                        {% endif %}
+                        {% if programa.get_tipo == programa.TIPO_IDIOMA %}
+                            <dt>Primeira Opção:</dt>
+                            <dd>{{ sub_inscricao.primeira_opcao|format }}<dd>
+                            <dt>Segunda Opção:</dt>
+                            <dd>{{ sub_inscricao.segunda_opcao|format }}</dd>
+                        {% endif %}
+                        {% if programa.get_tipo == programa.TIPO_TRABALHO %}
+                            <dt>Setor Preferencial:</dt>
+                            <dd>{{ sub_inscricao.setor_preferencia|format }}</dd>
+                            <dt>Turno:</dt>
+                            <dd>{{ sub_inscricao.get_turno_display|format }}</dd>
+                            <dt>Habilidades:</dt>
+                            <dd>{{ sub_inscricao.habilidades|format }}</dd>
+                        {% endif %}
+                        {% if programa.get_tipo == programa.TIPO_TRANSPORTE %}
+                            <dt>Tipo de Passe:</dt>
+                            <dd>{{ sub_inscricao.get_tipo_passe_display|format }}</dd>
+                        {% endif %}
+                        {% endwith %}
+                    </dl>
+
+                    <div class="content">
+                        {% if participacao_aberta %}
+                            <div class="alert alert-success">
+                                <h5>Participação Atual</h5>
+                                <dl>
+                                    <dt>Entrada em:</dt>
+                                    <dd class="false">{{ participacao_aberta.data_inicio|format }}</dd>
+                                    {% if participacao_aberta.motivo_entrada and perms.ae.pode_ver_motivo_entrada %}
+                                        <dt>Motivo da Entrada:</dt>
+                                        <dd>{{ participacao_aberta.motivo_entrada|format }}</dd>
+                                    {% endif %}
+                                </dl>
+                                <dl>
+                                    {% if participacao_aberta.programa.get_tipo == programa.TIPO_ALIMENTACAO %}
+                                        {% if participacao_aberta.sub_instance.solicitacao_atendida_cafe.valida %}
+                                            <dt>Café da manhã:</dt>
+                                            <dd>{{ participacao_aberta.sub_instance.solicitacao_atendida_cafe|format }}</dd>
+                                        {% endif %}
+                                        {% if participacao_aberta.sub_instance.solicitacao_atendida_almoco.valida %}
+                                            <dt>Almoço:</dt>
+                                            <dd>{{ participacao_aberta.sub_instance.solicitacao_atendida_almoco|format }}</dd>
+                                        {% endif %}
+                                        {% if participacao_aberta.sub_instance.solicitacao_atendida_janta.valida %}
+                                            <dt>Jantar:</dt>
+                                            <dd>{{ participacao_aberta.sub_instance.solicitacao_atendida_janta|format }}</dd>
+                                        {% endif %}
+                                        <dt>Categoria:</dt>
+                                        <dd>{{ participacao_aberta.sub_instance.categoria|format }}</dd>
+                                    {% endif %}
+                                    {% if participacao_aberta.programa.get_tipo == programa.TIPO_IDIOMA %}
+                                        <dt>Turma:</dt>
+                                        <dd>{{ participacao_aberta.sub_instance.turma_selecionada|format }}</dd>
+                                    {% endif %}
+                                    {% if participacao_aberta.programa.get_tipo == programa.TIPO_TRABALHO %}
+                                        <dt>Bolsa:</dt>
+                                        <dd>{{ participacao_aberta.sub_instance.bolsa_concedida|format }}</dd>
+                                    {% endif %}
+                                    {% if participacao_aberta.programa.get_tipo == programa.TIPO_TRANSPORTE %}
+                                        <dt>Tipo de Passe:</dt>
+                                        <dd>{{ participacao_aberta.sub_instance.get_tipo_passe_concedido_display|format }}</dd>
+                                        <dt>Valor:</dt>
+                                        <dd>R$ {{ participacao_aberta.sub_instance.valor_concedido|format }}</dd>
+                                    {% endif %}
+                                </dl>
+                                <ul class="action-bar inside-container">
+                                    {% if perms.ae.pode_editar_participacao %}
+                                        <li><a href="/ae/corrigir_participacao/{{ participacao_aberta.pk }}/" class="btn primary popup">Corrigir</a></li>
+                                    {% endif %}
+                                    {% if perms.ae.pode_revogar_participacao %}
+                                        <li><a class="btn danger popup" href="/ae/revogar_participacao/{{ participacao_aberta.pk }}/">Finalizar</a></li>
+                                    {% endif %}
+                                </ul>
+                            </div>
+                        {% elif perms.ae.add_participacao or perms.ae.add_participacaoalimentacao %}
+                            <ul class="action-bar inside-container">
+                                <li><a class="btn success popup" href="/ae/adicionar_participacao/{{ programa.id }}/{{ participacao.inscricao.id }}/">Adicionar Participação</a></li>
+                            </ul>
+                        {% endif %}
+                        {% for p in aluno.participacao_set.all %}
+                            {% if p.data_termino and p.programa.get_tipo == programa.get_tipo and p.id != participacao_aberta.id %}
+                                <div class="alert alert-{% if p.tem_conflito or p.data_termino <= p.data_inicio %}danger{% else %}info{% endif %}">
+                                    <h5>Participação Finalizada</h5>
+                                    {% if p.tem_conflito %}
+                                        <span class="status status-error"><strong>Atenção!</strong> Participação em conflito de datas com outra participação.</span>
+                                    {% endif %}
+                                    {% if p.data_termino <= p.data_inicio %}
+                                        <span class="status status-error"><strong>Atenção!</strong> Data final menor ou igual a data inicial.</span>
+                                    {% endif %}
+                                    <dl>
+                                        <dt>Entrada em:</dt>
+                                        <dd class="false">{{ p.data_inicio }}</dd>
+                                        {% if perms.ae.pode_ver_motivo_entrada %}
+                                            <dt>Motivo da Entrada:</dt>
+                                            <dd>{{ p.motivo_entrada|format }}</dd>
+                                        {% endif %}
+                                    </dl>
+                                    <dl>
+                                        {% if p.inscricao.programa.get_tipo == programa.TIPO_TRANSPORTE %}
+                                            <dt>Tipo de Passe:</dt>
+                                            <dd>{{ p.sub_instance.get_tipo_passe_concedido_display|format }}</dd>
+                                            <dt>Valor:</dt>
+                                            <dd>R$ {{ p.sub_instance.valor_concedido }}</dd>
+                                        {% endif %}
+                                        {% if p.programa.get_tipo == programa.TIPO_ALIMENTACAO %}
+                                            {% if p.sub_instance.solicitacao_atendida_cafe.valida %}
+                                                <dt>Café da Manhã:</dt>
+                                                <dd>{{ p.sub_instance.solicitacao_atendida_cafe|format }}</dd>
+                                            {% endif %}
+                                            {% if p.sub_instance.solicitacao_atendida_almoco.valida %}
+                                                <dt>Almoço:</dt>
+                                                <dd>{{ p.sub_instance.solicitacao_atendida_almoco|format }}</dd>
+                                            {% endif %}
+                                            {% if p.sub_instance.solicitacao_atendida_janta.valida %}
+                                                <dt>Jantar:</dt>
+                                                <dd>{{ p.sub_instance.solicitacao_atendida_janta|format }}</dd>
+                                            {% endif %}
+                                            <dt>Categoria:</dt>
+                                            <dd>{{ p.sub_instance.categoria|format }}</dd>
+                                        {% endif %}
+                                        {% if p.programa.get_tipo == programa.TIPO_TRABALHO %}
+                                            <dt>Bolsa:</dt>
+                                            <dd>{{ p.sub_instance.bolsa_concedida|format }}</dd>
+                                        {% endif %}
+                                        {% if p.programa.get_tipo == programa.TIPO_IDIOMA %}
+                                            <dt>Turma:</dt>
+                                            <dd>{{ p.sub_instance.turma_selecionada|format }}</dd>
+                                        {% endif %}
+                                    </dl>
+                                    <dl>
+                                        <dt>Saída em:</dt>
+                                        <dd class="false">{{ p.data_termino|format }}</dd>
+                                        <dt>Motivo da Saída:</dt>
+                                        <dd>{{ p.motivo_termino|format }}</dd>
+                                    </dl>
+                                    {% if perms.ae.pode_editar_participacao %}
+                                        <ul class="action-bar">
+                                            <li><a href="/ae/corrigir_participacao/{{ p.pk }}/" class="btn primary popup">Corrigir</a></li>
+                                        </ul>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                    {% endwith %}
+
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="alert alert-warning">Nenhuma participação conflitante encontrada.</p>
+    {% endif %}
+
+{% endblock %}

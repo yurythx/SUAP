@@ -1,0 +1,100 @@
+{% extends super_template %}
+
+{% block extracss %}
+<link rel="stylesheet" href="/static/planejamento/css/planejamento.css" />
+<link rel="stylesheet" href="/static/comum/deprecated/css/ui-lightness/jquery-ui-1.8.4.custom.css" />
+{% endblock %}
+
+{% block extrahead %}
+<script src="/static/planejamento/js/MetaUnidadeForm.js"></script>
+{% endblock %}
+
+{% block content %}
+   
+<h2>{{ form.TITLE }}</h2>
+
+{% if not unidades_adm.exists %}
+	<p class="alert alert-warning">Não existem unidades administrativas cadastradas que podem ser associadas a esta meta.</p>
+{% endif %}
+
+{% box 'Dados gerais' %}
+    <table>
+        <tr>
+            <td>Objetivo Estratégico</td>
+			<td>{{ meta.objetivo_estrategico.get_codigo_completo }} - {{ meta.objetivo_estrategico }}</td>
+		</tr>
+		<tr>
+            <td>Meta</td>
+			<td>{{ meta.get_codigo_completo }} - {{ meta.titulo }}</td>
+		</tr>
+		<tr>
+			<td>Unidade de Medida</td><td>{{ meta.unidade_medida }}</td>
+            <td>Execução</td><td>de {{ meta.data_inicial|date:"F" }} a {{ meta.data_final|date:"F" }}</td>
+        </tr>
+    </table>
+{% endbox %}
+	
+	{% if meta.metaunidade_set.all %}
+	{% box 'Unidades Administrativas Associadas' %}
+    <table>
+        <thead>
+            <tr>
+           		{% if meta.objetivo_estrategico.configuracao.periodo_sistemico %}
+            		<th>Ações</th>
+            	{% endif %}
+				<th>Nome</th>
+				<th>Quantidade</th>
+				<th>Valor Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for meta_unidade in meta.metaunidade_set.all %}
+	            <tr>
+	            	{% if meta.objetivo_estrategico.configuracao.periodo_sistemico %}
+		                <td>
+		                	<a id="lnk_editar_meta_unidade" href="/planejamento/meta/{{ meta.id }}/metaunidade/{{ meta_unidade.id }}/#fcad" class="icon icon-edit" title="Editar Unidade"><span class="visually-hidden">Editar</span></a>
+							{% icon "delete" "/planejamento/meta/{{ meta.id }}/metaunidade/{{ meta_unidade.id }}/remover/" %}
+						</td>
+					{% endif %}
+					<td>{{ meta_unidade.unidade }}</td>
+					<td>{{ meta_unidade.quantidade }}</td>
+					<td>{{ meta_unidade.valor_total|mascara_dinheiro }}</td>
+	            </tr>
+            {% endfor %}
+        </tbody>
+		<tfoot>				
+			<tr>
+				<td {% if meta.objetivo_estrategico.configuracao.periodo_sistemico %} colspan="3" {% endif %} class="right_label negrito_label">Total</td>
+				<td>{{ meta.get_quantidade_total }}</td>
+				<td class="right_label negrito_label">{{ meta.get_valor_total|mascara_dinheiro }}</td>
+			</tr>
+		</tfoot>
+    </table>
+	{% endbox %}
+	{% endif %}
+	
+	<a name="fcad" />
+	
+	<div id="botoes" class="botoes" >
+		{% with meta.metaunidade_set.count as qtd_metaunidades %}
+		{% if qtd_metaunidades != unidades_adm.count %}
+		<a id="btn_cadastrar" href="#fcad" class="lnk_botao{% if form.instance.pk or not meta.objetivo_estrategico.configuracao.periodo_sistemico %} invisivel{% endif %}">Associar Unidade Administrativa</a>
+		<a id="btn_reset_forms" href="#fcad" class="lnk_botao{% if not form.instance.pk %} invisivel{% endif %}">Cancelar</a>
+		{% endif %}
+		{% if not qtd_metaunidades and unidades_adm.count %}
+		<a id="btn_associar_todos_campi" href="#" class="lnk_botao {% if not meta.objetivo_estrategico.configuracao.periodo_sistemico %}invisivel{% endif %}">Associar Todos os Campi</a>
+		<a id="btn_reset_form_todos_campi" href="#" class="lnk_botao {% if not form_todos_campi.is_valid %}invisivel{% endif %}">Cancelar</a>
+		{% endif %}
+		{% endwith %}
+   	</div>
+	
+	<div {% if not form.instance.pk and not form.errors %}class="invisivel"{% endif %}>
+		{% render_form form %}
+	</div>
+	
+	<div {% if not form_todos_campi.errors %}class="invisivel"{% endif %}>
+		{% if form_todos_campi %} 
+		{% render_form form_todos_campi %}
+		{% endif %}
+	</div>
+{% endblock %}

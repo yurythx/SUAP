@@ -1,0 +1,74 @@
+{% extends super_template %}
+
+
+{% block extrahead %}
+<script src="/static/djtools/graficos/highcharts.js"></script>
+<script src="/static/djtools/graficos/exporting.js"></script>
+{% endblock %}
+
+{% block content %}
+
+	<p class="alert alert-warning">Este relatório desconsidera os alunos da modalidade FIC.</p>
+
+	<div class="search-and-filters">
+		<form id="filtro" method="get">
+			{% csrf_token %}
+			<div class="filter">
+				<label>Campus:</label>
+				<select name="campus" onchange="$('#filtro').submit();">
+					{% for item in campi %}
+						<option value="{{ item.id }}" {% if campus.id == item.id %}selected="selected"{% endif %}>{{ item.setor.sigla }}</option>
+					{% endfor %}
+				</select>
+			</div>
+			<div class="filter">
+				<label>Curso:</label>
+				<select name="curso" onchange="$('#filtro').submit();">
+					<option value="" {% if not curso %}selected="selected"{% endif %}>Todos</option>
+					{% for item in cursos %}
+						<option value="{{ item.id }}" {% if curso == item.id %}selected="selected"{% endif %}>{{ item.descricao }}</option>
+					{% endfor %}
+				</select>
+			</div>
+		</form>
+	</div>
+
+	{% if user|in_group:"Coordenador de Atividades Estudantis Sistêmico" %}
+		<script>
+			{{ grafico1|safe }}
+		</script>
+		<div class="grafico-item" id="grafico1"></div>
+	{% endif %}
+
+	{% if alunos_ativos_sem_caracterizacao %}
+		<dl class="lista-simples">
+			<dt>Quantidade de alunos ativos {% if curso %}no curso{% endif %}:</dt>
+			<dd>{{ total_alunos_ativos }}</dd>
+		</dl>
+		<table>
+		    <thead>
+		        <tr>
+		            <th>#</th>
+		            <th>Aluno</th>
+					<th>Turma</th>
+					<th>Situação da Matrícula</th>
+		        </tr>
+			</thead>
+			<tbody>
+			    {% autopaginate alunos_ativos_sem_caracterizacao 100 %}
+		        {% for aluno in alunos_ativos_sem_caracterizacao %}
+		            <tr>
+		                <td>{{ page_obj.start_index|add:forloop.counter0 }}</td>
+		                <td>{{ aluno.pessoa_fisica.nome|format }} <a href="{{ aluno.get_absolute_url }}">({{ aluno.matricula|format }})</a></td>
+						<td>{{ aluno.get_ultima_matricula_periodo.turma|format }}</td>
+		                <td>{{ aluno.situacao }}</td>
+		            </tr>
+		        {% endfor %}
+			</tbody>
+	    </table>
+	    {% paginate %}
+	{% else %}
+	    <p class="alert alert-warning">Nenhum aluno foi encontrado.</p>
+	{% endif %}
+
+{% endblock %}

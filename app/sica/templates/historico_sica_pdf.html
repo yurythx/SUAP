@@ -1,0 +1,167 @@
+{% extends "relatorio_pdf.html" %}
+
+{% block css_variables %}
+    --page-mt: 10.5cm;
+    --page-mb: 3cm;
+{% endblock %}
+
+{% block style %}
+    header {
+        top: -10cm;
+    }
+    footer {
+        bottom: -2cm;
+    }
+{% endblock %}
+
+{% block cabecalho %}
+    <header>
+        <table>
+            <tr>
+                <td rowspan="6" class="w-100px"><img src="/static/comum/img/brazao_colorido.jpg" alt="Brasão do Brasil">
+                </td>
+                <td class="titulo">MINISTÉRIO DA EDUCAÇÃO</td>
+            </tr>
+            <tr>
+                <td class="titulo">SECRETARIA DE EDUCAÇÃO TECNOLÓGICA</td>
+            </tr>
+            <tr>
+                <td class="titulo">INSTITUTO FEDERAL DE EDUCAÇÃO, CIÊNCIA E TECNOLOGIA DO RIO GRANDE DO NORTE</td>
+            </tr>
+            <tr>
+                <td>CAMPUS NATAL CENTRAL - Telefone: (84) 4005-9843</td>
+            </tr>
+            <tr>
+                <td>
+                    Avenida Senador Salgado Filho, 1559, Tirol, 59015-000, Natal-RN
+                </td>
+            </tr>
+            <tr>
+                <td>CNPJ: 10.877.412/0010-59 - Código INEP: 24059110</td>
+            </tr>
+        </table>
+
+        <h1 class="pdf-title">HISTÓRICO ESCOLAR</h1>
+
+        <h2 class="pdf-caption">Dados Pessoais</h2>
+        <table class="definicoes">
+            <tr>
+                <td colspan="3"><strong>Nome:</strong> {{ obj.aluno.pessoa_fisica.nome|normalizar }}</td>
+                <td><strong>CPF:</strong> {{ obj.aluno.pessoa_fisica.cpf|format }}</td>
+            </tr>
+            <tr>
+                <td><strong>Data de Nasc.:</strong> {{ obj.aluno.pessoa_fisica.nascimento_data|format }}</td>
+                <td><strong>Sexo:</strong> {{ obj.aluno.pessoa_fisica.sexo }}</td>
+                <td><strong>Identidade:</strong> Nº {{ obj.aluno.numero_rg|format }}
+                    - {{ obj.aluno.orgao_emissao_rg|format }}/{{ obj.aluno.uf_emissao_rg.get_sigla|format }}
+                    - {{ obj.aluno.data_emissao_rg|format }}
+                </td>
+                <td><strong>Naturalidade:</strong> {{ obj.aluno.naturalidade|format }}</td>
+            </tr>
+            <tr>
+                <td colspan="2"><strong>Nome do Pai:</strong> {{ obj.aluno.nome_pai|format|normalizar }}</td>
+                <td colspan="2"><strong>Nome da Mãe:</strong> {{ obj.aluno.nome_mae|format|normalizar }}</td>
+            </tr>
+        </table>
+    </header>
+{% endblock %}
+
+{% block content %}
+
+    <h2 class="pdf-caption">Dados Acadêmicos</h2>
+    <table class="definicoes">
+        <tr>
+            <td><strong>Matrícula:</strong> {{ obj.aluno.matricula }}</td>
+            <td><strong>Situação:</strong> {{ obj.aluno.situacao|format }}</td>
+        </tr>
+        <tr>
+            <td><strong>Curso:</strong> {{ obj.aluno.curso_campus.descricao_historico|normalizar|format }}</td>
+            <td><strong>Matriz:</strong> {{ obj.matriz.nome|normalizar|format }}</td>
+        </tr>
+        <tr>
+            <td colspan="2"><strong>Reconhecimento / Autorização:</strong> {{ obj.matriz.reconhecimento|format }}</td>
+        </tr>
+    </table>
+
+    {% if registro_emissao %}
+        <h2 class="pdf-caption">Diploma</h2>
+        <table class="definicoes">
+            <tr>
+                <td colspan="2"><strong>Livro/Folha:</strong> Livro {{ registro_emissao.livro|format }} Folha Nº{{ registro_emissao.folha|format }}</td>
+            </tr>
+            <tr>
+                <td><strong>Número do Registro:</strong> {{ registro_emissao.numero_registro|format }}</td>
+                <td><strong>Data de Expedição:</strong> {{ registro_emissao.data_expedicao|format }}</td>
+            </tr>
+        </table>
+    {% endif %}
+
+    {% for tipo, registros in obj.get_registros %}
+        {% if registros %}
+            <h2 class="pdf-caption">Disciplinas {{ tipo }}</h2>
+            <table class="bordered" repeat="2">
+                <thead>
+                    <tr>
+                        <th rowspan="2" width="7%">Período Letivo</th>
+                        <th colspan="4">Componentes Curriculares</th>
+                        <th rowspan="2" width="4%">C.H.</th>
+                        <th rowspan="2" width="7%">Nota/ Conceito</th>
+                        <th rowspan="2" width="5%">% Freq.</th>
+                        <th rowspan="2" width="10%">Situação</th>
+                    </tr>
+                    <tr>
+                        <th width="8%">Nível</th>
+                        <th width="8%">Código</th>
+                        <th width="39%">Descrição</th>
+                        <th width="15%">Turma</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for registro in registros %}
+                    <tr>
+                        <td class="text-center">{{ registro.ano|format }}/{{ registro.periodo|format }}</td>
+                        <td class="text-center">{{ registro.periodo_matriz|format }}</td>
+                        <td class="text-center">{{ registro.componente.codigo|format }}</td>
+                        <td>{{ registro.componente.nome|format|normalizar }}</td>
+                        <td class="text-center">{{ registro.turma|format }}</td>
+                        <td class="text-center">{{ registro.get_carga_horaria|format }}</td>
+                        <td class="text-center">{{ registro.get_nota|format }}</td>
+                        <td class="text-center">{{ registro.get_frequencia|format }}</td>
+                        <td class="text-center">{{ registro.get_situacao|format }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="9" class="text-center">Nenhum componente concluído.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+    {% endfor %}
+
+    <table class="definicoes">
+        <tr>
+            <td><strong>C.H. Total</strong> {{ obj.get_ch_cumprida|default:0 }}</td>
+            <td><strong>C.H. Geral</strong> {{ obj.get_ch_geral|default:0 }}</td>
+            <td><strong>C.H. Especial</strong> {{ obj.get_ch_especial|default:0 }}</td>
+            <td><strong>C.H. de Estágio</strong> {{ obj.carga_horaria_estagio|default:0 }}</td>
+        </tr>
+    </table>
+
+    <footer class="pdf-keep-with-next-true">
+        <p class="cidade">
+            Natal-RN, {{ hoje|format }}.
+        </p>
+    </footer>
+    <!--
+    <table>
+        <tr>
+            <td style="width: 10px"></td>
+            <td class="assinatura">COORDENADOR(A) DE REGISTROS ACADÊMICOS</td>
+            <td></td>
+            <td class="assinatura">DIRETOR(A) GERAL DO CAMPUS</td>
+            <td style="width: 10px"></td>
+        </tr>
+    </table>
+    -->
+{% endblock %}

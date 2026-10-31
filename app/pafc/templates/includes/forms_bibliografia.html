@@ -1,0 +1,160 @@
+<script>
+    function esconder(...elementos) {
+        elementos.forEach(elemento => {
+            elemento.addClass("d-none");
+        });
+    }
+
+    function exibir(...elementos) {
+        elementos.forEach(elemento => {
+            elemento.removeClass("d-none");
+        });
+    }
+
+    function itemEstaValido(prefixo) {
+        let quantidadeInput = $(`#${prefixo}_quantidade`);
+        let observacaoSelect = $(`#${prefixo}_observacaoSelect`);
+        let detalhesObservacaoInput = $(`#${prefixo}_detalhes_observacao`);
+
+        return quantidadeInput.val() > 0 || $.inArray(observacaoSelect.val(), ['1', '2', '3']) !== -1 || observacaoSelect.val() === '4' && detalhesObservacaoInput.val() !== "";
+    }
+
+    function processarQuantidade(input, prefixo) {
+        let observacaoDiv = $(`#${prefixo}_observacao_div`);
+        let detalhesObservacaoDiv = $(`#${prefixo}_detalhes_observacao_div`);
+        let observacaoSelect = $(`#${prefixo}_observacaoSelect`);
+        let detalhesObservacaoInput = $(`#${prefixo}_detalhes_observacao`);
+        if ($(input).val() > 0) {
+            esconder(observacaoDiv, detalhesObservacaoDiv);
+            observacaoSelect.prop("selectedIndex", 0);
+            detalhesObservacaoInput.val("");
+            submeterItem(prefixo);
+        }
+        else {
+            exibir(observacaoDiv);
+        }
+    }
+
+    function processarObservacao(input, prefixo) {
+        let detalhesObservacaoDiv = $(`#${prefixo}_detalhes_observacao_div`);
+        let detalhesObservacaoInput = $(`#${prefixo}_detalhes_observacao`);
+        if ($(input).val() === '4') {
+            exibir(detalhesObservacaoDiv);
+        }
+        else {
+            esconder(detalhesObservacaoDiv);
+            detalhesObservacaoInput.val("");
+            submeterItem(prefixo);
+        }
+    }
+
+    function processarDetalhesObservacao(input, prefixo) {
+        if ($(input).val() !== "") {
+            submeterItem(prefixo);
+        }
+    }
+
+    async function submeterItem(prefixo) {
+        let form = $(`#${prefixo}_form`).get(0);
+        let url = form.action;
+
+        let msgErro = $(`#${prefixo}_msgErro`);
+        let msgSucesso = $(`#${prefixo}_msgSucesso`);
+        let msgEspera = $(`#${prefixo}_msgEspera`);
+
+        exibir(msgEspera);
+        $.ajax({
+            url: url,
+            method: 'POST',
+            data: $(form).serialize(),
+            error: function(retorno, status) {
+                $(form).parent().addClass("errors");
+                msgErro.html(retorno.responseText);
+                exibir(msgErro);
+                esconder(msgEspera, msgSucesso);
+            },
+            success: function() {
+                if (itemEstaValido(prefixo)) {
+                    $(form).parent().removeClass("errors");
+                    exibir(msgSucesso);
+                    esconder(msgEspera, msgErro);
+                }
+            }
+        });
+    }
+</script>
+
+{% if bibliografias %}
+
+    <div class="table-responsive">
+        <table>
+        <caption>Obras bibliográficas</caption>
+        <thead>
+        <tr>
+            <th>#</th>
+            <th>Disciplina(s)</th>
+            <th>Descrição</th>
+            <th>Quantitativo de exemplares no campus</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for item_bibliografico in bibliografias|dictsort:"disciplinas" %}
+            {% with disciplinas=item_bibliografico.get_disciplinas_como_lista primeira_disciplina=item_bibliografico.get_disciplinas_como_lista.0 %}
+            <tr>
+                <td rowspan="{{ disciplinas|length }}">{{ forloop.counter }}</td>
+                <td>
+                    {{ primeira_disciplina }}
+                </td>
+                <td rowspan="{{ disciplinas|length }}">{{ item_bibliografico.descricao }}</td>
+                <td rowspan="{{ disciplinas|length }}" class="{% if not item_bibliografico.quantitativo_valido %}errors{% endif %}">
+                    {% if is_elaborador and tem_permissao_edicao and obj.pode_ser_elaborado or tem_permissao_administrador and obj.pode_ser_elaborado %}
+                        <form id="item{{ item_bibliografico.pk }}_form" method="post" action="/pafc/atualizar_bibliografia/{{ item_bibliografico.pk }}/">
+                            {% csrf_token %}
+                            <p class="alert alert-light text-nowrap"><strong>Recomendado:</strong> {{ item_bibliografico.quantidade_ideal|format }}</p>
+                            <p id="item{{ item_bibliografico.pk }}_msgErro" class="errorlist d-none"></p>
+                            <div class="field-box" id="item{{ item_bibliografico.pk }}_quantidade_no_campus_div">
+                                <label for="item{{ item_bibliografico.pk }}_quantidade">Quantidade no campus:</label>
+                                <input type="number" min="0" id="item{{ item_bibliografico.pk }}_quantidade" name="quantidade_no_campus"
+                                       value="{{ item_bibliografico.quantidade_no_campus }}" onblur="processarQuantidade(this, 'item{{ item_bibliografico.pk }}')"/>
+                            </div>
+                            <div class="field-box {% if item_bibliografico.quantidade_no_campus %}d-none{% endif %}" id="item{{ item_bibliografico.pk }}_observacao_div">
+                                <label for="item{{ item_bibliografico.pk }}_observacaoSelect">Observação:</label>
+                                <select name="observacao" id="item{{ item_bibliografico.pk }}_observacaoSelect" onchange="processarObservacao(this, 'item{{ item_bibliografico.pk }}')">
+                                    <option value="">--------------</option>
+                                    {% for opcao in item_bibliografico.OBSERVACAO_CHOICES %}
+                                        <option value="{{ opcao.0 }}" {% if item_bibliografico.observacao == opcao.0 %}selected{% endif %}>{{ opcao.1 }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div id="item{{ item_bibliografico.pk }}_detalhes_observacao_div" class="field-box {% if item_bibliografico.quantidade_no_campus or item_bibliografico.observacao != 4 %}d-none{% endif %}">
+                                <label for="item{{ item_bibliografico.pk }}_detalhes_observacao">Detalhes da observação:</label>
+                                <input type="text" name="detalhes_observacao" id="item{{ item_bibliografico.pk }}_detalhes_observacao"
+                                       value="{{ item_bibliografico.detalhes_observacao|default:'' }}" onblur="processarDetalhesObservacao(this, 'item{{ item_bibliografico.pk }}')"/>
+                            </div>
+
+                            <div class="submit-row">
+                                <span id="item{{ item_bibliografico.pk }}_msgSucesso" class="true d-none">{% icone "check" %} Salvo.</span>
+                                <span id="item{{ item_bibliografico.pk }}_msgEspera" class="obs d-none"><span class="fas fa-spinner fa-spin" aria-hidden="true"></span> Enviando...</span>
+                            </div>
+                        </form>
+                    {% else %}
+                        <p class="alert alert-light text-nowrap"><strong>Recomendado:</strong> {{ item_bibliografico.quantidade_ideal|format }}.</p>
+                        <p><strong>Valor informado:</strong> {{ item_bibliografico.get_texto_quantitativo|format }}</p>
+                    {% endif %}
+                </td>
+            </tr>
+            {% for disciplina in disciplinas %}
+                {% if disciplina != primeira_disciplina %}
+                <tr>
+                    <td>{{ disciplina }}</td>
+                </tr>
+                {% endif %}
+            {% endfor %}
+            {% endwith %}
+        {% endfor %}
+        </tbody>
+        </table>
+    </div>
+{% else %}
+    <p class="alert alert-warning">Nenhuma bibliografia cadastrada.</p>
+{% endif %}

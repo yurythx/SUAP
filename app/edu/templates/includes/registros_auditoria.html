@@ -1,0 +1,334 @@
+{% if obj|method:"pode_ver_registros"|call:request.user %} 
+        {% if registros %}
+            <script>
+                let filterTimeout_{{ tab }} = null;
+                function debouncedFilterTable_{{ tab }}() {
+                    clearTimeout(filterTimeout_{{ tab }});
+                    filterTimeout_{{ tab }} = setTimeout(filterTable_{{ tab }}, 200);
+                }
+
+                function filterTable_{{ tab }}() {
+                    const input = document.getElementById('filterInput_{{ tab }}');
+                    const select = document.getElementById('filterSituacao_{{ tab }}');
+                    const filter = input ? input.value.toLowerCase().trim() : '';
+                    const situacaoFilter = select ? select.value.toLowerCase() : '';
+
+                    const table = document.getElementById('table_{{ tab }}');
+                    if (!table) return;
+                    const tbody = table.querySelector('tbody');
+                    if (!tbody) return;
+                    const rows = tbody.querySelectorAll('tr:not(.group-header-row)');
+
+                    for (let i = 0; i < rows.length; i++) {
+                        const row = rows[i];
+                        const rowSituacao = (row.getAttribute('data-situacao') || '').toLowerCase();
+                        const matchesSituacao = !situacaoFilter || rowSituacao === situacaoFilter;
+
+                        let matchesText = true;
+                        if (filter) {
+                            matchesText = false;
+                            const cells = row.getElementsByTagName('td');
+                            for (let j = 0; j < cells.length; j++) {
+                                if (cells[j]) {
+                                    const cellText = cells[j].textContent || '';
+                                    if (cellText.toLowerCase().indexOf(filter) > -1) {
+                                        matchesText = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (!matchesText && rowSituacao.indexOf(filter) > -1) {
+                                matchesText = true;
+                            }
+                        }
+
+                        row.style.display = (matchesSituacao && matchesText) ? '' : 'none';
+                    }
+
+                    updateGroupHeaders_{{ tab }}();
+                }
+
+                function applyGrouping_{{ tab }}() {
+                    const table = document.getElementById('table_{{ tab }}');
+                    if (!table) return;
+                    const tbody = table.querySelector('tbody');
+                    if (!tbody) return;
+
+                    const groupBySelect = document.getElementById('groupBySituacao_{{ tab }}');
+                    const groupBy = groupBySelect ? groupBySelect.value : 'none';
+                    const theadTr = table.querySelector('thead tr');
+                    const colCount = theadTr ? theadTr.children.length : 10;
+
+                    // Remove cabeçalhos de grupo existentes
+                    const existingHeaders = tbody.querySelectorAll('.group-header-row');
+                    existingHeaders.forEach(function(h) { h.remove(); });
+
+                    const rows = Array.from(tbody.querySelectorAll('tr:not(.group-header-row)'));
+
+                    if (groupBy === 'situacao') {
+                        const groups = [
+                            { id: 'pendente', label: 'Pendente' },
+                            { id: 'resolvido', label: 'Resolvido' },
+                            { id: 'ignorado', label: 'Ignorado' }
+                        ];
+
+                        groups.forEach(function(group) {
+                            const groupRows = rows.filter(function(row) {
+                                return (row.getAttribute('data-situacao') || '') === group.id;
+                            });
+
+                            if (groupRows.length > 0) {
+                                const trHeader = document.createElement('tr');
+                                trHeader.className = 'highlight group-header-row';
+                                trHeader.setAttribute('data-group', group.id);
+                                const th = document.createElement('th');
+                                th.colSpan = colCount;
+                                th.innerHTML = '<strong>Situação: ' + group.label + ' (<span class="group-count">' + groupRows.length + '</span>)</strong>';
+                                trHeader.appendChild(th);
+                                tbody.appendChild(trHeader);
+
+                                groupRows.forEach(function(row) {
+                                    tbody.appendChild(row);
+                                });
+                            }
+                        });
+
+                        const known = ['pendente', 'resolvido', 'ignorado'];
+                        const otherRows = rows.filter(function(row) {
+                            return !known.includes(row.getAttribute('data-situacao') || '');
+                        });
+                        otherRows.forEach(function(row) {
+                            tbody.appendChild(row);
+                        });
+                    } else {
+                        // Restaura ordem original
+                        rows.sort(function(a, b) {
+                            const indexA = parseInt(a.getAttribute('data-original-index') || '0', 10);
+                            const indexB = parseInt(b.getAttribute('data-original-index') || '0', 10);
+                            return indexA - indexB;
+                        });
+                        rows.forEach(function(row) {
+                            tbody.appendChild(row);
+                        });
+                    }
+
+                    filterTable_{{ tab }}();
+                }
+
+                function updateGroupHeaders_{{ tab }}() {
+                    const table = document.getElementById('table_{{ tab }}');
+                    if (!table) return;
+                    const tbody = table.querySelector('tbody');
+                    if (!tbody) return;
+
+                    const groupHeaders = tbody.querySelectorAll('.group-header-row');
+                    groupHeaders.forEach(function(header) {
+                        const group = header.getAttribute('data-group');
+                        let visibleCount = 0;
+                        const rows = tbody.querySelectorAll('tr[data-situacao="' + group + '"]:not(.group-header-row)');
+                        rows.forEach(function(row) {
+                            if (row.style.display !== 'none') {
+                                visibleCount++;
+                            }
+                        });
+
+                        const countSpan = header.querySelector('.group-count');
+                        if (countSpan) {
+                            countSpan.textContent = visibleCount;
+                        }
+                        header.style.display = visibleCount > 0 ? '' : 'none';
+                    });
+                }
+
+                function toggleSelectAll_{{ tab }}(masterCheckbox) {
+                    const table = document.getElementById('table_{{ tab }}');
+                    if (!table) return;
+                    const checkboxes = table.querySelectorAll('tbody tr .registros-checkbox');
+                    checkboxes.forEach(function(checkbox) {
+                        const row = checkbox.closest('tr');
+                        if (row && row.style.display !== 'none') {
+                            checkbox.checked = masterCheckbox.checked;
+                        } else if (!masterCheckbox.checked) {
+                            checkbox.checked = false;
+                        }
+                    });
+                }
+
+                document.addEventListener("DOMContentLoaded", function() {
+                    const input = document.getElementById("filterInput_{{ tab }}");
+                    if (input) input.value = "";
+                    const filterSituacao = document.getElementById("filterSituacao_{{ tab }}");
+                    if (filterSituacao) filterSituacao.value = "";
+                    const groupBy = document.getElementById("groupBySituacao_{{ tab }}");
+                    if (groupBy) groupBy.value = "none";
+
+                    {% if acoes_em_lote %}
+                        const table = document.getElementById("table_{{ tab }}");
+                        const link = document.getElementById("resolver_{{ tab }}");
+
+                        if (link && table) {
+                            link.addEventListener("click", function(event) {
+                                event.preventDefault(); // Impede o link de seguir o href original
+
+                                const checkboxes = table.querySelectorAll(".registros-checkbox");
+                                const valoresSelecionados = [];
+                                checkboxes.forEach(function(checkbox) {
+                                    const row = checkbox.closest('tr');
+                                    if (checkbox.checked && (!row || row.style.display !== 'none')) {
+                                        valoresSelecionados.push(checkbox.value);
+                                    }
+                                });
+
+                                if (valoresSelecionados.length > 0) {
+                                    const baseHref = link.dataset.baseHref || link.getAttribute("href");
+                                    link.dataset.baseHref = baseHref;
+                                    const novoHref = baseHref + valoresSelecionados.join(",") + "/";
+                                    window.location.href = novoHref;
+                                } else {
+                                    alert("Nenhum registro foi selecionado.");
+                                }
+                            });
+                        }
+
+                        const link_ignorar = document.getElementById("ignorar_{{ tab }}");
+                        if (link_ignorar && table) {
+                            link_ignorar.addEventListener("click", function(event) {
+                                event.preventDefault(); // Impede o link de seguir o href original
+
+                                const checkboxes = table.querySelectorAll(".registros-checkbox");
+                                const valoresSelecionados = [];
+                                checkboxes.forEach(function(checkbox) {
+                                    const row = checkbox.closest('tr');
+                                    if (checkbox.checked && (!row || row.style.display !== 'none')) {
+                                        valoresSelecionados.push(checkbox.value);
+                                    }
+                                });
+
+                                if (valoresSelecionados.length > 0) {
+                                    const baseHref = link_ignorar.dataset.baseHref || link_ignorar.getAttribute("href");
+                                    link_ignorar.dataset.baseHref = baseHref;
+                                    const novoHref = baseHref + valoresSelecionados.join(",") + "/";
+                                    window.location.href = novoHref;
+                                } else {
+                                    alert("Nenhum registro foi selecionado.");
+                                }
+                            });
+                        }
+                   {% endif %}
+                });
+            </script>
+            <form action="" method="post">
+                {% csrf_token %}
+
+                {% if acoes_em_lote %}
+                    <ul class="action-bar">
+                        <li><a class="btn success" href="/edu/informar_situacao_registro_auditoria_lote/{{ obj.pk }}/1/" name="resolver" id="resolver_{{ tab }}">Marcar selecionados como Resolvido</a></li>
+                        <li><a class="btn warning" href="/edu/informar_situacao_registro_auditoria_lote/{{ obj.pk }}/2/" name="ignorar" id="ignorar_{{ tab }}">Marcar selecionados como Ignorado</a></li>
+                    </ul>
+                {% endif %}
+
+                <div class="search-and-filters">
+                    <div class="filter large">
+                        <label for="filterInput_{{ tab }}">Buscar:</label>
+                        <input type="text" id="filterInput_{{ tab }}" placeholder="Pesquise pelo valor de qualquer coluna" oninput="debouncedFilterTable_{{ tab }}()" />
+                    </div>
+                    {% if exibe_situacao %}
+                        <div class="filter">
+                            <label for="filterSituacao_{{ tab }}">Situação do atendimento:</label>
+                            <select id="filterSituacao_{{ tab }}" onchange="filterTable_{{ tab }}()">
+                                <option value="">Todas</option>
+                                <option value="pendente">Pendente</option>
+                                <option value="resolvido">Resolvido</option>
+                                <option value="ignorado">Ignorado</option>
+                            </select>
+                        </div>
+                        <div class="filter">
+                            <label for="groupBySituacao_{{ tab }}">Agrupar por situação:</label>
+                            <select id="groupBySituacao_{{ tab }}" onchange="applyGrouping_{{ tab }}()">
+                                <option value="none">Não</option>
+                                <option value="situacao">Sim</option>
+                            </select>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <div class="table-responsive">
+                <table id="table_{{ tab }}">
+                    <caption>Registros da Auditoria</caption>
+                    <thead>
+                        <tr>
+                            {% if acoes_em_lote %}
+                                <th><input type="checkbox" onchange="toggleSelectAll_{{ tab }}(this)"/></th>
+                            {% endif %}
+                            <th>#</th>
+                            {% for item in obj.get_header %}
+                                <th>{{ item }}</th>
+                            {% endfor %}
+                            {% if exibe_situacao %}
+                                <th>Situação do atendimento</th>
+                            {% endif %}
+                            {% if exibe_acoes %}
+                                <th>Opções</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for registro in registros %}
+                            <tr data-situacao="{% if not registro.obj.divergente and not registro.ignorado %}convergente{% elif registro.ignorado or registro.obj.situacao == '2' or registro.obj.situacao == 2 %}ignorado{% elif registro.obj.situacao == '1' or registro.obj.situacao == 1 %}resolvido{% else %}pendente{% endif %}" data-original-index="{{ forloop.counter0 }}">
+                                {% if acoes_em_lote %}
+                                    <td><input value="{{ registro.obj.pk }}" name="registros_selecionadas" type="checkbox" class="registros-checkbox"/></td>
+                                {% endif %}
+                                <td> {{ forloop.counter }}</td>
+                                {% for item in registro.itens %}
+                                    <td>
+                                        {% if obj.tipo_auditoria != '8' or registro.itens.3 == 'Aluno' %}
+                                            {% if forloop.first %}
+                                                {% if is_auditoria_sistec and registro.itens.5 == 'DUPLICADO' %}
+                                                    {% for i in item|split:"| " %}
+                                                        <a class="popup" href='/edu/aluno/{{ i }}/'>{{ i }}</a><br>
+                                                    {% endfor %}
+                                                {% else %}
+                                                    <a class="popup" href='/edu/aluno/{{ item }}/'>{{ item }}</a>
+                                                {% endif %}
+                                            {% elif forloop.counter == 2 %}
+                                                <a class="popup" href='/admin/edu/aluno/?q={{ item }}&tab=tab_any_data'>{{ item }}</a>
+                                            {% else %}
+                                                {{ item }}
+                                            {% endif %}
+                                        {% else %}
+                                            {{ item }}
+                                        {% endif %}
+                                    </td>
+                                {% endfor %}
+                                {% if exibe_situacao %}
+                                    <td>
+                                        {{ registro.obj.get_situacao_display|format }}
+                                    </td>
+                                {% endif %}
+
+                                {% if exibe_acoes %}
+                                <td>
+                                    <ul class="action-bar">
+                                        {% if registro.ignorado %}
+                                            <li> <a class="btn default" href="{{ registro.obj.auditoria_ensino.get_absolute_url }}">Visualizar Auditoria</a></li>
+                                        {% elif pode_resolver %}
+                                            {% if obj.possui_form_correcao %}
+                                                <li><a class="btn primary popup" href="/edu/informar_correcao_registro_auditoria/{{ registro.obj.pk }}/">Informar correção</a></li>
+                                                <li><a class="btn warning" href="/edu/ignorar_registro_auditoria/{{ registro.obj.pk }}/">Ignorar</a></li>
+                                            {% else %}
+                                                <li><a class="btn primary popup" href="/edu/informar_situacao_registro_auditoria/{{ registro.obj.pk }}/">Informar situação</a></li>
+                                            {% endif %}
+                                        {% endif %}
+                                    </ul>
+                                </td>
+                                {% endif %}
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                </div>
+            </form>
+        {% else %}
+            <p class="alert alert-info">Nenhum registro deste tipo gerado para esta auditoria.</p>
+        {% endif %}
+{% endif %}

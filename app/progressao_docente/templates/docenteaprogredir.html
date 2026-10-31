@@ -1,0 +1,143 @@
+{% extends super_template %}
+
+{% block content %}
+
+    {% box 'Dados do processo' %}
+        <dl class="definition-list compact flex">
+            <div class="list-item">
+                <dt>Servidor avaliado</dt>
+                <dd>{{ processo.avaliado }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Nível</dt>
+                <dd>{{ processo.nivel_atual }} para {{ processo.proximo_nivel }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Período inicial</dt>
+                <dd>{{ docente_a_progredir.data_inicio_contagem|format }} a {{ docente_a_progredir.get_datafim_normal|format }}</dd>
+            </div>
+            {% if dias_interrompem or observacoes_30_dias or dias_24_meses %}
+                <div class="list-item">
+                    <dt>Data final reajustada após afastamentos</dt>
+                    <dd>{{ docente_a_progredir.data_fim_contagem|format }}</dd>
+                </div>
+            {% endif %}
+            <div class="list-item">
+                <dt>Dias restantes</dt>
+                <dd>{{ docente_a_progredir.get_dias_restantes }}</dd>
+            </div>
+        </dl>
+    {% endbox %}
+
+    {% box 'Afastamentos que interferem no interstício' %}
+
+        <div class="tab-pane" data-title="Interrompem o tempo de serviço" data-tab="interrompem" data-counter="{{ dias_interrompem }}" data-hide-tab-on-counter-zero="true">
+            <div class="table-responsive">
+                <table>
+                    <caption>Afastamentos que interrompem o tempo de serviço</caption>
+                    <thead>
+                        <tr>
+                            <th>Afastamento</th>
+                            <th>Períodos</th>
+                            <th class="text-end">Dias</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for linha in interrompem %}
+                            {% include 'includes/linha_periodos_afastamento.html' %}
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="2">Total de dias:</td>
+                            <td>{{ dias_interrompem }}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+
+        <div class="tab-pane" data-title="Excederam 30 dias no ano" data-tab="30-dias" data-counter="{{ observacoes_30_dias|length }}" data-hide-tab-on-counter-zero="true">
+            <p class="alert alert-info"><strong>Informação:</strong> cada dia em que o total desses afastamentos nos 12 meses anteriores passou de 30 dias é acrescido ao fim do interstício. Os dias seguidos estão agrupados em períodos.</p>
+            <div class="table-responsive">
+                <table>
+                    <caption>Dias que extrapolaram 30 dias no período de um ano</caption>
+                    <thead>
+                        <tr>
+                            <th>Período afetado</th>
+                            <th class="text-end">Total acumulado em 12 meses</th>
+                            <th class="text-end">Dias</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for periodo in periodos_30_dias %}
+                            <tr>
+                                <td>{{ periodo.texto }}</td>
+                                <td class="text-end">{% if periodo.acumulado_min == periodo.acumulado_max %}{{ periodo.acumulado_max }}{% else %}{{ periodo.acumulado_min }} a {{ periodo.acumulado_max }}{% endif %} dias</td>
+                                <td class="text-end">{{ periodo.dias }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="2">Total de dias:</td>
+                            <td>{{ observacoes_30_dias|length }}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            <div class="table-responsive">
+                <table>
+                    <caption>Afastamentos considerados na contagem</caption>
+                    <thead>
+                        <tr>
+                            <th>Afastamento</th>
+                            <th>Períodos</th>
+                            <th class="text-end">Dias</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for linha in afastamentos_30_dias %}
+                            {% include 'includes/linha_periodos_afastamento.html' %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="tab-pane" data-title="Regra dos 24 meses" data-tab="24-meses" data-counter="{{ dias_24_meses }}">
+            <div class="alert alert-info">
+                <p><strong>Informação:</strong> conforme a <strong>alínea "b", inciso VIII do <a href="https://www.planalto.gov.br/ccivil_03/leis/l8112cons.htm#art102" target="_blank">art. 102 da Lei 8.112/90</a></strong>, as licenças para tratamento da própria saúde superiores ao limite de vinte e quatro meses, cumulativo ao longo do tempo de serviço público prestado à União, em cargo de provimento efetivo, <strong>não são consideradas como efetivo exercício</strong>.</p>
+            </div>
+            {% if regra_24_meses %}
+                <div class="table-responsive">
+                    <table>
+                        <caption>Dias de licença para tratamento de saúde além do limite de 24 meses</caption>
+                        <thead>
+                            <tr>
+                                <th>Afastamento</th>
+                                <th>Períodos</th>
+                                <th class="text-end">Dias</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for linha in regra_24_meses %}
+                                {% include 'includes/linha_periodos_afastamento.html' %}
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="2">Total de dias:</td>
+                                <td>{{ dias_24_meses }}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            {% else %}
+                <p class="alert alert-light">Nenhum dia de licença para tratamento de saúde além do limite de 24 meses.</p>
+            {% endif %}
+        </div>
+
+    {% endbox %}
+
+{% endblock %}

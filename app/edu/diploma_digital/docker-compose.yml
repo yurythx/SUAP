@@ -1,0 +1,113 @@
+##########################################################################
+# Este é um arquivo de exemplo de configuração do ambiente do RAP Conector #
+##########################################################################
+
+version: "3.5"
+
+services:
+
+  db:
+    image: postgres:12-alpine
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data
+    networks:
+      - rapnetwork
+    environment:
+      POSTGRES_DB: rapproddb
+      POSTGRES_USER: rapproduser
+      POSTGRES_PASSWORD: rapprodpwd
+
+  rapconector:
+    image: homolog-diploma.rnp.br/rap-conector-beta:0.24.11
+    ports:
+      - "80:80"
+    volumes:
+      - rapconector-data:/var/lib/rapconector/data
+    networks:
+      - rapnetwork
+    depends_on:
+      - db
+    environment:
+      # Porta de acesso à API do RAP Conector, ela deve ser a mesma da seção 'ports'.
+      API_PORT: 80
+      
+      # Timeout da resposta da API do RAP Conector ao cliente.
+      API_RESPONSE_TIMEOUT: 600000
+
+      # Diretório onde os arquivos processados pelo RAP Conector são armazenados.
+      # Este diretório deve ser configurado com o caminho definido pelo volume 'rapconector-data'.
+      RAP_DATA_STORAGE_DIR: /var/lib/rapconector/data
+
+      # Fuso horário usado pelo RAP Conector.
+      TIMEZONE: America/Recife
+
+      # [OPCIONAL] URL usada pelo Swagger para enviar as requisições de exemplo ao RAP Conector.
+      DOCUMENTATION_SERVER: http://localhost:80
+
+      # [OPCIONAL] Habilita/Desabilita a autorização com token JWT nas rotas do RAP Conector.
+      # Ao habilitar, use a rota de autenticação de usuário para obter o token de acesso.
+      RAP_USE_JWT_AUTHORIZATION: "false"
+
+      # [OPCIONAL] Habilita/Desabilita o registro e preservação no serviço de diplomas da RNP.
+      # Antes de habilitar é necessário notificar a equipe da RNP sobre o processo de integração.
+      RAP_SKIP_REGISTRATION: "false"
+
+      # [OPCIONAL] Habilita/Desabilita a validação e conversão automática de PDF para PDF/A.
+      # Para evitar problemas com o registro de documentos, mantenha sempre habilitado (true).
+      PDFA_DOC_VALIDATION: "true"
+
+      # [OPCIONAL] Habilita/Desabilita a validação das politicas de assinatura de documentos XML.
+      # Para evitar problemas com a assinaturas de documentos, mantenha sempre habilitado (true).
+      SIGN_POLICY_VALIDATION: "true"
+
+      # [OPCIONAL] URL para receber requisições do hook de notificação de atualizações de estado dos documentos.
+      NOTIFICATION_ENDPOINT: <URL com método POST para receber notificações>
+
+      # [OPCIONAL] Nível de logging do RAP Conector.
+      LOG_LEVEL: debug
+
+      # [OPCIONAL] Diretório de armazenamento dos arquivos de log do RAP Conector.
+      LOG_FILES_DIR: /var/log
+
+      # Configurações de conexão com o banco de dados usado pelo RAP Conector.
+      # DB_NAME, DB_USER e DB_PASS devem ter os mesmos valores definidos no serviço 'rapdatabase'.
+      # DB_TYPE não deve ser alterado e em breve será removido.
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: rapproddb
+      DB_USER: rapproduser
+      DB_PASS: rapprodpwd
+      DB_TYPE: postgres
+
+      # Configurações de conexão com o serviço de diploma digital da RNP.
+      # INSTITUTION_ID, RAP_API_USER_EMAIL e RAP_API_USER_PASS devem ser solicitados à RNP.
+      RAP_API_ADDRESS: https://homolog-diploma.rnp.br/rap/api/v1
+      RAP_API_USER_EMAIL: <user>
+      RAP_API_USER_PASS: <login>
+      INSTITUTION_ID: <client_id>
+
+      # Configurações de conexão com o provedor de assinaturas da RNP.
+      # RNP_PROVIDER_URL só é usado pelo RAP Conector quando o provedor da RNP for selecionado.
+      RAP_SIGN_PROVIDER: providerteste
+      RNP_PROVIDER_URL: https://homolog-diploma.rnp.br/hub
+
+  rapsign:
+    image: homolog-diploma.rnp.br/rap-sign-web:0.4.1
+    ports:
+      - "3000:3000"
+    networks:
+      - rapnetwork
+    depends_on:
+      - rapconector
+    environment:
+      # URL de acesso à API do RAP Conector.
+      API_URL: <DNS HTTPS do Conector>
+      # Ativação da função de downloag dos logs na aba "Sobre" do RAPSign. Esse funcionalidade só deve ser ativada durante períodos de investigação de problemas. 
+      DEBUG: "false"
+
+networks:
+  rapnetwork:
+
+volumes:
+  postgresql-data:
+  rapconector-data:

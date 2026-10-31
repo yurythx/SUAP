@@ -1,0 +1,289 @@
+{% extends super_template %}
+
+{% block extrahead %}
+<script>
+jQuery(document).ready(function() {
+	$("#rotulo_sala").hide();
+	checkboxes_dos_itens().click(function(){
+		$(this).closest('tr').toggleClass('highlight');
+		atualizarQtdItensMarcados();
+	});
+	$(".remover-rotulo").on('click', function(){
+		inventario_id = $(this).data("inventario-id");
+		rotulo_id = $(this).data("rotulo-id");
+		url = "/patrimonio/remover_rotulo/"+inventario_id+"/"+rotulo_id+"/";
+		$.get(url, function(data) {
+            $("#rotulo-"+inventario_id+"-"+rotulo_id).remove();
+        });
+	});
+});
+
+// Restrito aos checkboxes das linhas do resultado: os campos de "Critérios"
+// (entre eles o "Retirar rótulos nos itens marcados") estão no mesmo <form>,
+// e um seletor genérico de checkbox também os marcaria.
+function checkboxes_dos_itens() {
+    return $('form[name=rotulo_sala] input:checkbox[name=marcados]');
+}
+function itens_marcados() {
+    return checkboxes_dos_itens().filter(':checked');
+}
+function marcar_todos() {
+    var todos = checkboxes_dos_itens();
+    todos.prop('checked', true);
+    todos.closest('tr').addClass('highlight');
+    atualizarQtdItensMarcados();
+}
+function desmarcar_todos() {
+    var todos = checkboxes_dos_itens();
+    todos.prop('checked', false);
+    todos.closest('tr').removeClass('highlight');
+    atualizarQtdItensMarcados();
+}
+function alternar_rotulo_sala() {
+    if (itens_marcados().length) {
+        $("#rotulo_sala").show();
+    } else {
+        $("#rotulo_sala").hide();
+    }
+};
+function atualizarQtdItensMarcados() {
+    $("#qtdItensMarcados").html(itens_marcados().length);
+    alternar_rotulo_sala();
+};
+function bloquearCtrlJ(){   // Verificação das Teclas
+	var tecla=window.event.keyCode;   //Para controle da tecla pressionada
+	var ctrl=window.event.ctrlKey;    //Para controle da Tecla CTRL
+
+	if (ctrl && tecla==74){    //Evita teclar ctrl + j
+		event.keyCode=0;
+		event.returnValue=false;
+	}
+}
+</script>
+{% endblock %}
+
+{% block content %}
+
+{% if user_pode_editar %}
+    <p class="alert alert-info">Para alterações em lote, selecione o campus.</p>
+{% endif %}
+
+{% box "Filtros" class="{{ form_collapsed }}" %}
+    {% render_form form %}
+    <script>
+        document.getElementById('id_numero').onkeydown = function(){
+            bloquearCtrlJ()
+        }
+    </script>
+{% endbox %}
+
+{% if inventarios.exists %}
+    {% box "Resultado da Busca" %}
+	<form name="rotulo_sala" action="/patrimonio/inventario_adicionar_rotulo_sala/" method="post" enctype="multipart/form-data">
+		{% if form_edicao_lote %}
+			{% csrf_token %}
+		    <div class="options" id="rotulo_sala">
+				<h3>Critérios</h3>
+				<fieldset>
+					{% for p in form_rotulo_sala %}
+						<div class="form-row">
+                            <div class="field-box">
+							    {{ p.errors }}
+							    {{ p.label_tag }}
+							    {{ p }}
+                            </div>
+						</div>
+					{% endfor %}
+				</fieldset>
+				<div class="submit-row">
+					<input type="submit" class="btn success" value="Salvar" />
+				</div>
+		    </div>
+		{% endif %}
+
+		<ul class="action-bar">
+			<li><a class="btn" href="{{ url_csv|safe }}">Gerar CSV</a></li>
+			<li><a class="btn" href="{{ url_xls|safe }}">Gerar XLS</a></li>
+		</ul>
+
+		{% if form_edicao_lote %}
+		    <div class="options">
+		        Selecionar:
+		        <a href="#" id="marcar_todos" onclick="marcar_todos(); return false;">Todos</a> -
+		        <a href="#" id="desmarcar_todos" onclick="desmarcar_todos(); return false;">Nenhum</a>
+		        | Quantidade de itens marcados: <span id="qtdItensMarcados">0</span> <span>/ {{ inventarios.count }} </span>
+		    </div>
+		{% endif %}
+	    {% autopaginate inventarios opcao_visualizacao %}
+		{% paginate %}
+        <div class="table-responsive">
+	    <table>
+	        <thead>
+				<tr>
+					{% if form_edicao_lote %}
+	            		<th class="no-print">-</th>
+					{% endif %}
+                    <th class="no-print">Ações</th>
+                    <th>Número</th>
+                    <th>Descrição</th>
+                    {% if ver_sala %}
+                        <th>Sala</th>
+                    {% endif %}
+                    {% if ver_responsavel %}
+                        <th>Responsável</th>
+                    {% endif %}
+                    {% if ver_elemento_despesa %}
+                        <th>Elemento de Despesa</th>
+                    {% endif %}
+                    {% if ver_situacao %}
+                        <th>Situação</th>
+                    {% endif %}
+                    {% if ver_rotulo %}
+                        <th>Rótulos</th>
+                    {% endif %}
+                    {% if ver_estado_conservacao %}
+                        <th>Estado de Conservação</th>
+                    {% endif %}
+                    {% if ver_numeroserie %}
+                        <th>Número de Série</th>
+                    {% endif %}
+                    {% if ver_data_entrada %}
+                        <th>Data de Entrada</th>
+                    {% endif %}
+                    {% if ver_data_carga %}
+                        <th>Data de Carga</th>
+                    {% endif %}
+                    {% if ver_fornecedor %}
+                        <th>Fornecedor</th>
+                    {% endif %}
+                    {% if ver_valor %}
+                        <th>Valor Depreciado</th>
+                    {% endif %}
+                    {% if ver_valor_inicial %}
+                        <th>Valor da Aquisição</th>
+                    {% endif %}
+                    {% if ver_ultima_requisicao %}
+                        <th>Última Requisição</th>
+                    {% endif %}
+                    {% if ver_ultima_conferencia %}
+                        <th>Última Conferência</th>
+                    {% endif %}
+                    {% if ver_observacao %}
+                        <th>Observação</th>
+                    {% endif %}
+                </tr>
+			</thead>
+	        <tbody>
+	            {% for i in inventarios %}
+	                <tr>
+	                	{% if form_edicao_lote %}
+	                		<td class="no-print">
+					        	<input type="checkbox" name="marcados" value="{{ i.id }}">
+							</td>
+						{% endif %}
+                        <td class="no-print">{% icon "view" "{{ i.get_absolute_url }}" %}</td>
+                        <td><a href="{{ i.get_absolute_url }}">{{ i.numero }}</a></td>
+                        <td>{{ i.get_descricao }}</td>
+                        {% if ver_sala %}
+	                        <td>{{ i.sala|format }}</td>
+                        {% endif %}
+                        {% if ver_responsavel %}
+	                        <td>
+                                {{ i.get_carga_atual|format }}
+                                {% if i.get_carga_atual.setor %}
+                                    (<strong>{{ i.get_carga_atual.setor.uo.setor.sigla|format }}</strong>
+                                    {{ i.get_carga_atual.setor.sigla|format }})
+                                {% endif %}
+                            </td>
+                        {% endif %}
+                        {% if ver_elemento_despesa %}
+	                        <td> {{ i.entrada_permanente.categoria.codigo }} - {{ i.entrada_permanente.categoria.nome }}</td>
+                        {% endif %}
+                        {% if ver_situacao %}
+	                        <td> <span class="status status-{{ i.status|slugify }}">{{ i.status }}</span> </td>
+                        {% endif %}
+                        {% if ver_rotulo %}
+	                        <td>
+                                {% if i.rotulos.all %}
+                                    {% for rotulo in i.rotulos.all %}
+                                        <ul>
+                                            <li>{{ rotulo.nome }}</li>
+                                        </ul>
+                                    {% endfor %}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                        {% endif %}
+                        {% if ver_estado_conservacao %}
+	                        <td>
+                                {% if i.estado_conservacao %}
+				                    {{ i.get_estado_conservacao_display }}
+			                    {% else %}
+				                    -
+			                    {% endif %}
+                            </td>
+                        {% endif %}
+                        {% if ver_numeroserie %}
+	                        <td>{{ i.numero_serie|format }}</td>
+                        {% endif %}
+                        {% if ver_data_entrada %}
+	                        <td>{{ i.entrada_permanente.entrada.data|format }}</td>
+                        {% endif %}
+                        {% if ver_data_carga %}
+	                        <td>{{ i.get_data_carga }} </td>
+                        {% endif %}
+                        {% if ver_fornecedor %}
+	                        <td>{{ i.entrada_permanente.entrada.pessoa.nome }} </td>
+                        {% endif %}
+                        {% if ver_valor %}
+	                        <td>{{ i.valor|format_money_almox }}</td>
+                        {% endif %}
+                        {% if ver_valor_inicial %}
+	                        <td>{{ i.entrada_permanente.valor|format_money_almox }}</td>
+                        {% endif %}
+                        {% if ver_ultima_requisicao %}
+	                        <td>
+                                {% if i.get_ultima_requisicao %}
+                                    <dl>
+                                        <dt>Requisição:</dt>
+                                        <dd><a href="/patrimonio/requisicao/{{ i.get_ultima_requisicao.id }}/">#{{ i.get_ultima_requisicao.id }}</a></dd>
+                                        <dt>Destinatário:</dt>
+                                        <dd>{{ i.get_ultima_requisicao.vinculo_destino|format }}</dd>
+                                        <dt>Situação:</dt>
+                                        <dd>{{ i.get_ultima_requisicao.get_status|safe }}</dd>
+                                    </dl>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                        {% endif %}
+                        {% if ver_ultima_conferencia %}
+                            <td class="text-center">
+                                {% with ultima_conferencia=i.get_ultima_conferencia %}
+                                    {% if ultima_conferencia %}
+                                        <a target="_blank" href="/patrimonio/conferenciasala/{{ ultima_conferencia.conferencia.pk }}/">
+                                            Conferência {{ ultima_conferencia.conferencia.pk }}
+                                        </a>
+                                    <br>{{ ultima_conferencia.dh_coleta|format }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                {% endwith %}
+                            </td>
+                        {% endif %}
+                        {% if ver_observacao %}
+                            <td>{{ i.observacao|default:"-" }}</td>
+                        {% endif %}
+	                </tr>
+	            {% endfor %}
+	        </tbody>
+	    </table>
+        </div>
+	</form>
+	{% endbox %}
+{% elif form.is_bound %}
+	<p class="alert alert-warning">Nenhum item encontrado.</p>
+{% endif %}
+
+{% endblock %}

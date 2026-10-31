@@ -1,0 +1,97 @@
+{% extends super_template %}
+
+{# ============================================================================
+   Exemplo de referência do Design System do SUAP.
+   Tela de listagem fictícia: "Solicitações de material".
+   Monta-se SÓ com componentes/classes existentes (conferidos contra o scss).
+   View correspondente (padrão @rtr):
+
+       @rtr('exemplo/solicitacoes.html')
+       @login_required
+       def solicitacoes(request):
+           title = 'Solicitações de material'   # vira o <h2> da página
+           solicitacoes = Solicitacao.objects.all()
+           return locals()
+   ============================================================================ #}
+
+{% block object-status %}
+    <span class="status status-info">{{ solicitacoes.count }} no período</span>
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        <li><a class="btn success" href="{% url 'exemplo_adicionar' %}">{% icone "plus" %} Adicionar</a></li>
+        <li class="has-child">
+            <a class="btn" href="#">{% icone "list" %} Outras opções</a>
+            <ul>
+                <li><a href="{% url 'exemplo_exportar' %}">Exportar CSV</a></li>
+                <li><a class="popup" href="{% url 'exemplo_ajuda' %}">Ajuda</a></li>
+            </ul>
+        </li>
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+    <p class="alert alert-info">
+        <strong>Informação:</strong> exibindo apenas as solicitações do seu setor.
+    </p>
+
+    {% box "Resumo" extra="Atualizado agora" %}
+        <dl class="definition-list">
+            <dt>Setor:</dt>
+            <dd>{{ setor|default:"—" }}</dd>
+            <dt>Responsável:</dt>
+            <dd>{{ request.user.get_profile.nome_usual }}</dd>
+        </dl>
+    {% endbox %}
+
+    <div class="table-responsive">
+        <table>
+            <caption>Solicitações de material</caption>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Item</th>
+                    <th>Situação</th>
+                    <th class="text-end">Quantidade</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in solicitacoes %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td>{{ s.item }}</td>
+                        <td>
+                            {% if s.aprovada %}
+                                <span class="status status-success">Aprovada</span>
+                            {% elif s.negada %}
+                                <span class="status status-error">Negada</span>
+                            {% else %}
+                                <span class="status status-alert">Em análise</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">{{ s.quantidade }}</td>
+                        <td>
+                            {% icon "view" "{{ s.get_absolute_url }}" "Visualizar" %}
+                            {% icon "edit" "{{ s.get_editar_url }}" "Editar" %}
+                            {% icon "delete" "{{ s.get_remover_url }}" "Remover" %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr class="disabled">
+                        <td colspan="5">Nenhuma solicitação encontrada.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="4">Total:</td>
+                    <td>{{ total|default:0 }}</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+
+{% endblock %}

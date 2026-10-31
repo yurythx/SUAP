@@ -1,0 +1,91 @@
+{% extends super_template %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if inscricao.situacao_parecer == inscricao.PENDENTE_DOCUMENTACAO and perms.ae.pode_ver_comprovante_inscricao %}
+            <li><a href="/ae/adicionar_pendencia/{{ inscricao.pk }}/" class="btn success">Adicionar Pendência</a></li>
+        {% endif %}
+        {% if documentos.exists and mesmo_campus %}
+            <li><a href="/ae/informar_data_entrega_documentacao/?ids={{ inscricao.pk }}" class="btn success">Validar documentação</a></li>
+        {% endif %}
+    </ul>
+{% endblock %}
+{% block content %}
+    {% if documentos.exists %}
+        <dl>
+            <dt>Situação Atual:</dt>
+            <dd>{{ aluno.get_situacao_documentacao }}</dd>
+        </dl>
+        <div class="table-responsive">
+            <table>
+                <caption>Documentação do Aluno</caption>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Tipo do Documento</th>
+                        <th>Arquivo</th>
+                        <th>Data de Cadastro</th>
+                        <th>Situação</th>
+                        <th>Pendência</th>
+                        <th>Última Atualização</th>
+                        <th>Avaliação</th>
+                        <th class="no-print">Opções</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for documento in documentos %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td>
+                            <strong>{{ documento.tipo_arquivo }}</strong>:
+                            {% if documento.integrante_familiar.nome %}
+                                {{ documento.integrante_familiar.nome }}
+                            {% else %}
+                                {{ documento.aluno }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if documento.arquivo %}
+                                <a class="btn" href="{{ documento.arquivo.url }}"><span class="fas fa-download" aria-hidden="true"></span> Baixar Arquivo</a>
+                            {% endif %}
+                        </td>
+                        <td>{% if documento.cadastrado_por_vinculo %}{{ documento.cadastrado_por_vinculo.user|format }} em {{ documento.data_cadastro|format }}{% endif %}</td>
+                        <td>{{ documento.get_situacao|safe }}</td>
+                        <td>{{ documento.get_pendencia|safe }}</td>
+                        <td>{% if documento.pendencia_corrigida_por %}{{ documento.pendencia_corrigida_por.user|format }} em {{ documento.pendencia_corrigida_em|format }}{% else %}-{% endif %}</td>
+                        <td>{% if documento.avaliado_em %}{{ documento.avaliado_por.user|format }} em {{ documento.avaliado_em|format }}{% else %}-{% endif %}</td>
+                        <td class="no-print">
+                            <ul class="action-bar">
+                                {% if eh_assistente_social and documento.tem_inscricao_com_pendencia and documento.eh_ativa and not documento.inscricao_caracterizacao %}
+                                    {% if documento.pendente %}
+                                        <li><a class="btn primary" href="/ae/registrar_pendencia_documento/{{ documento.id }}/{{ inscricao.id }}/">Atualizar Pendência</a></li>
+                                    {% else %}
+                                        <li><a class="btn success" href="/ae/registrar_pendencia_documento/{{ documento.id }}/{{ inscricao.id }}/">Registrar Pendência</a></li>
+                                    {% endif %}
+                                {% endif %}
+                                {% if documento.pode_editar %}
+                                    <li><a class="btn success" href="/ae/corrigir_documento/{{ documento.id }}/{{ inscricao.id }}/">{% if documento.cadastrado_por_vinculo %}Corrigir{% else %}Cadastrar{% endif %} Documento</a></li>
+                                {% endif %}
+                                {% if eh_assistente_social and documento.historicodocumentoinscricaoaluno_set.exists %}
+                                    <li><a class="btn" href="/ae/ver_historico_documento/{{ documento.id }}/">Histórico do Documento</a></li>
+                                {% endif %}
+                                {% if eh_assistente_social and documento.inscricao_caracterizacao %}
+                                    {% if not documento.validado %}
+                                        <li><a class="btn success" href="/ae/validar_documento_inscricao/{{ documento.id }}/1/">Aprovar</a></li>
+                                    {% endif %}
+                                    {% if documento.validado or not documento.avaliado_em %}
+                                        <li><a class="btn danger" href="/ae/validar_documento_inscricao/{{ documento.id }}/2/">Reprovar</a></li>
+                                    {% endif %}
+                                {% endif %}
+                            </ul>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="alert alert-warning">Nenhum documento cadastrado.</p>
+    {% endif %}
+
+{% endblock %}

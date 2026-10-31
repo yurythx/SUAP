@@ -1,0 +1,134 @@
+{% extends super_template %}
+
+{% block content %}
+    <div class="search-and-filters">
+        {% render_form form %}
+    </div>
+    {% if projetos.exists %}
+        <h3>Projetos em avaliação</h3>
+        {% for projeto in projetos %}
+            <div class="general-box">
+                <div class="primary-info">
+                    <h4 class="title">
+                        <small>{{ forloop.counter }}</small>
+                        <a href="/projetos/projeto/{{ projeto.id }}/">{{ projeto.titulo }}</a>
+                    </h4>
+                    <ul class="action-bar">
+                        <li><a class="btn success" href="/projetos/selecionar_avaliadores_do_projeto/{{ projeto.id }}/?url={{ request.get_full_path }}">Selecionar avaliadores</a></li>
+                    </ul>
+                    <div class="extra-info">
+                        <div class="table-responsive">
+                            <table>
+                                <caption>Avaliadores</caption>
+                                <thead>
+                                    <tr>
+                                        <th>Avaliador</th>
+                                        <th>Dados pessoais</th>
+                                        <th>Dados gerais</th>
+                                        <th>Nota</th>
+                                        <th class="no-print">Opções</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for avaliador in projeto.get_avaliadores_indicados %}
+                                        <tr class="{% if not avaliador.ja_avaliou %}{% if avaliador.rejeitado %}error{% elif avaliador.aceito_em %}{% else %}highlight{% endif %}{% endif %}">
+                                            <td>
+                                                <h5>{{ avaliador.vinculo.pessoa.nome }}</h5>
+                                                {% if avaliador.vinculo.eh_servidor %}
+                                                    ({{ avaliador.vinculo.relacionamento.matricula }})
+                                                {% else %}
+                                                    (externo)
+                                                {% endif %}
+                                                <hr>
+                                                {% if avaliador.ja_avaliou %}
+                                                    <span class="status status-success">Já realizou avaliação</span>
+                                                {% elif avaliador.rejeitado %}
+                                                    <span class="status status-error">Rejeitou a indicação</span>
+                                                {% elif avaliador.aceito_em %}
+                                                    <span class="status status-info">Aceitou a indicação</span>
+                                                {% else %}
+                                                    <span class="status status-alert">Não realizou avaliação</span>
+                                                {% endif %}
+                                                <span class="status status-default">{{ avaliador.qtd_indicacoes_no_edital }} indicações neste edital</span>
+                                                {% if avaliador.rejeitado_automaticamente %}
+                                                    <span class="status status-error">Rejeitado automaticamente</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <dl class="definition-list">
+                                                    <dt>CPF</dt>
+                                                    <dd>{{ avaliador.vinculo.relacionamento.cpf|format }}</dd>
+                                                    <dt>Telefone</dt>
+                                                    <dd>{{ avaliador.get_telefone|format }}</dd>
+                                                </dl>
+                                            </td>
+                                            <td>
+                                                <dl class="definition-list">
+                                                    {% if avaliador.vinculo.eh_servidor and avaliador.vinculo.relacionamento.pessoa_fisica.orcid %}
+                                                        <dt>ORCID</dt><dd><a href="{{ avaliador.vinculo.relacionamento.pessoa_fisica.orcid }}">{{ avaliador.vinculo.relacionamento.pessoa_fisica.orcid }}</a></dd>
+                                                    {% endif %}
+                                                    {% if avaliador.vinculo.eh_servidor %}
+                                                        <dt>Campus</dt><dd>{{ avaliador.vinculo.setor.uo|format }}</dd>
+                                                    {% endif %}
+                                                    {% if avaliador.get_lattes %}
+                                                        <dt>Lattes</dt><dd>{{ avaliador.get_lattes|format }}</dd>
+                                                    {% endif %}
+                                                </dl>
+                                            </td>
+                                            <td>
+                                                {% if avaliador.ja_avaliou %}
+                                                    {{ avaliador.get_avaliacao.pontuacao|format }} pontos
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                            <td class="no-print">
+                                                <ul class="action-bar">
+                                                    {% if avaliador.ja_avaliou %}
+                                                        <li>
+                                                            <a href="/projetos/visualizar_ficha_avaliacao/{{ avaliador.get_avaliacao.id }}/" class="btn default">{% icone "eye" %} Ficha de avaliação</a>
+                                                        </li>
+                                                    {% endif %}
+                                                    {% if avaliador.rejeitado_automaticamente and not avaliador.ja_avaliou %}
+                                                        <li>
+                                                            <a href="/projetos/reenviar_convite_avaliador/{{ avaliador.id }}/" class="btn confirm" data-confirm="Tem certeza que deseja reenviar o convite?" title="Reenviar convite">
+                                                                {% icone "paper-plane" %}
+                                                                <span class="visually-hidden">Reenviar convite</span>
+                                                            </a>
+                                                        </li>
+                                                    {% endif %}
+                                                    <li>
+                                                        <a href="/projetos/remover_indicacao_avaliador/{{ avaliador.id }}/" class="btn danger ms-auto" data-confirm="Tem certeza que deseja excluir a indicação deste avaliador?" title="Remover indicação">
+                                                            {% icone "trash" %}
+                                                            <span class="visually-hidden">Remover indicação</span>
+                                                        </a>
+                                                    </li>
+                                                </ul>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <dl class="secondary-info">
+                    <div class="list-item">
+                        <dt>{% icone "user" %} Coordenador</dt>
+                        <dd>{{ projeto.vinculo_coordenador.pessoa.nome }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>{% icone "building" %} Campus</dt>
+                        <dd>{{ projeto.uo }}</dd>
+                    </div>
+                    <div class="list-item">
+                        <dt>{% icone "th" %} Área temática</dt>
+                        <dd>{{ projeto.area_tematica|format }}</dd>
+                    </div>
+                </dl>
+            </div>
+        {% endfor %}
+    {% else %}
+        <p class="alert alert-warning">Nenhum projeto pré-aprovado.</p>
+    {% endif %}
+{% endblock %}

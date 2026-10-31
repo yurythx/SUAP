@@ -1,0 +1,210 @@
+{% extends super_template %}
+
+{% block extracss %}
+    <style>
+        form fieldset .form-row label {
+            width: 250px;
+        }
+
+        form li {
+            margin-left: 250px;
+        }
+
+        .checkbutton.btn {
+            display: none !important;
+        }
+        .bg-box {
+            background-color: rgb(228, 182, 182);
+        }
+
+        .alert.alert-info.success {
+            background-color: #198754 !important;  /* Verde escuro */
+            color: #fff !important;                /* Texto branco */
+            padding: 10px !important;
+            border-radius: 5px !important;
+            text-align: left !important;           /* Alinhamento à esquerda */
+        }
+        .alert.alert-info.success::before {
+            content: none !important;  /* Remove o conteúdo do ícone */
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <h3 class="title">Perfil {{ segmento|safe }}</h3>
+    {% if message_avaliacao_progresso %}
+        <div class="alert alert-warning">
+            {{ message_avaliacao_progresso|safe }}
+        </div>
+    {% endif %}
+
+    {% if message_avaliacao_finalizada %}
+        <p class="alert alert-info success">{{ message_avaliacao_finalizada|striptags|safe|linebreaksbr }}</p>
+    {% else %}
+        <p class="alert alert-info">{{ texto_orientacoes|striptags|safe|linebreaksbr }}</p>
+    {% endif %}
+
+    <dl>
+        <dt>Percentual respondido:</dt>
+        <dd>{% progressbar percentual %}</dd>
+    </dl>
+
+    {% if tem_escala_padrao %}
+        {% box 'Tabela de referência' %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Padrão</th>
+                        <th>Definição</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr>
+                        <td>Desconheço</td>
+                        <td>Quando o respondente NÃO CONHECE o aspecto avaliado e, portanto, não considera pertinente
+                            opinar.
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>1</td>
+                        <td>Quando o aspecto avaliado NÃO EXISTE (embora devesse existir) na percepção do respondente.
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>2</td>
+                        <td>Quando o aspecto avaliado existe mas é INSUFICIENTE na percepção do respondente.</td>
+                    </tr>
+                    <tr>
+                        <td>3</td>
+                        <td>Quando o aspecto avaliado existe e é SUFICIENTE/REGULAR na percepção do respondente.</td>
+                    </tr>
+                    <tr>
+                        <td>4</td>
+                        <td>Quando o aspecto avaliado é existe e é MUITO BOM na percepção do respondente.</td>
+                    </tr>
+                    <tr>
+                        <td>5</td>
+                        <td>Quando o aspecto avaliado existe e é EXCELENTE na percepção do respondente.</td>
+                    </tr>
+                    <tr>
+                        <td>Não se aplica</td>
+                        <td>Quando o aspecto avaliado NÃO SE APLICA ao respondente e, portanto, não deve opinar.</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        {% endbox %}
+    {% endif %}
+
+    {% if form.non_field_errors %}
+        <ul class="errorlist">
+            {% for error in form.non_field_errors %}
+                <li>{{ error }}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    <form method="post" action="" class="long-form" id="salvarEFinalizarForm">
+        {% csrf_token %}
+        {% for objeto, eixos in iteracoes.items %}
+            {% if eixos %}
+                {% for eixo, dimensoes in eixos.items %}
+                    <div class="tab-pane" data-title="{{ forloop.counter }}.
+                            {{ eixo.descricao }}{% if eixo.texto_ajuda %}<span class="information hint hint-top" aria-label="{{ eixo.texto_ajuda }}">{% icone 'info-circle' %}</span>{% endif %}">
+                        {% for dimensao, macroprocessos in dimensoes.items %}
+                            <h4>{{ forloop.parentloop.counter }}.{{ forloop.counter }}.
+                                {{ dimensao.descricao }}{% if dimensao.texto_ajuda %}
+                                    <span class="information hint hint-top"
+                                          aria-label="{{ dimensao.texto_ajuda }}">{% icone "info-circle" %}</span>{% endif %}
+                            </h4>
+                            {% for macroprocesso, listas in macroprocessos.items %}
+                                <fieldset class="module aligned">
+                                    <h5>{{ forloop.parentloop.parentloop.counter }}.{{ forloop.parentloop.counter }}.{{ forloop.counter }}.
+                                        {{ macroprocesso.descricao }}{% if macroprocesso.texto_ajuda %}
+                                            <span class="information hint hint-top"
+                                                  aria-label="{{ macroprocesso.texto_ajuda }}">{% icone "info-circle" %}</span>{% endif %}
+                                    </h5>
+                                    {% for fields in listas %}
+                                        {% for field in fields %}
+                                            {% if forloop.first and field.aspecto %}
+                                                <strong>{{ field.aspecto }} - {{ field }}</strong>
+                                            {% endif %}
+                                            {% with form_field=form|getval:field.name %}
+                                                <div class="form-row {% if form_field.errors %}errors{% endif %}">
+                                                {% if not initial|getval:field.name and percentual >= 95 %}
+                                                    <div class="field-box bg-box">
+                                                {% else %}
+                                                    <div class="field-box">
+                                                {% endif %}
+                                            {% if form_field.errors %}
+                                                <ul class="errorlist">
+                                                    {% for error in form_field.errors %}
+                                                        <li>{{ error }}</li>
+                                                    {% endfor %}
+                                                </ul>
+                                            {% endif %}
+                                            <label {% if form_field.field.required %}class="required"{% endif %}
+                                                   for="{{ form_field.id_for_label }}"
+                                                   title="Preenchimento obrigatório">{{ form_field.label }}:
+                                                {% if field.texto_ajuda %}<span class="information hint hint-top"
+                                                                                aria-label="{{ field.texto_ajuda }}">{% icone "info-circle" %}</span>{% endif %}
+                                            </label>
+                                            {{ form_field }}
+                                            </div>
+                                            </div>
+                                            {% endwith %}
+                                        {% endfor %}
+                                    {% endfor %}
+                                </fieldset>
+                            {% endfor %}
+                        {% endfor %}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endfor %}
+        {% if respondente_indentificado and not eh_previsualizacao and not message_avaliacao_registrada %}
+            <div class="submit-row">
+                <input type="submit" value="Salvar e Continuar" class="default" name="_save">
+                {% if percentual == 100 %}
+                    <input type="button" value="Enviar respostas" class="default" name="_save_and_finalize"
+                           id="salvar_e_finalizar" onclick="return confirmAction()">
+                    {% block javascript %}
+                        <script type="text/javascript">
+
+                            function save_and_finalize() {
+                                var form = document.getElementById('salvarEFinalizarForm');
+
+                                var input = document.createElement('input');
+                                input.setAttribute('name', "_save_and_finalize");
+                                input.setAttribute('value', "Enviar");
+                                input.setAttribute('type', "hidden");
+
+                                form.appendChild(input);
+                                form.submit();
+                            }
+
+                            function confirmAction() {
+                                let confirmAction = confirm("Tem certeza que deseja enviar suas respostas? Você não poderá mais editar o questionário.");
+                                if (confirmAction) {
+                                    save_and_finalize();
+                                } else {
+                                    return false;
+                                }
+                            }
+                        </script>
+                    {% endblock %}
+                {% endif %}
+
+            </div>
+		<div class="action-bar">
+		        <a href="/avaliacao_integrada/remover_respostas_avaliacao/{{ token }}/" class="btn danger" data-confirm="Tem certeza que deseja cancelar sua avaliação? Todas as suas respostas serão apagadas e você precisará recomeçar.">{% icone "trash" %} Cancelar avaliação </a>
+		</div>
+        {% endif %}
+        {% if not respondente_indentificado %}
+            <div class="submit-row">
+                <input type="submit" value="Salvar e Finalizar" class="default" name="_save_and_finalize">
+            </div>
+        {% endif %}
+    </form>
+{% endblock %}

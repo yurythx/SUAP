@@ -1,0 +1,313 @@
+{% extends super_template %}
+
+{% block bodyclass %}large-action-bar{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if programa.get_tipo == programa.TIPO_ALIMENTACAO %}
+            <li><a href="/admin/ae/ofertaalimentacao/?campus={{ programa.instituicao.pk }}&dia_inicio__day={{ inicio_semana.day }}&dia_inicio__month={{ inicio_semana.month }}&dia_inicio__year={{ inicio_semana.year }}" class="btn primary">{% icone "edit" %} Gerenciar Oferta de Refeição</a></li>
+        {% endif %}
+        {% if perms.ae.change_programa %}
+            <li><a href="/ae/gerenciar_participacao/{{ programa.pk }}/" class="btn">{% icone "tasks" %} Gerenciar Participações</a></li>
+        {% endif %}   
+        {% if perms.ae.pode_detalhar_programa_todos or perms.ae.pode_detalhar_programa_campus %}
+            <li><a href="/ae/relatorio_erro_participacoes/?campus={{ programa.instituicao.pk }}" class="btn default">{% icone "list" %} Participações Conflitantes</a></li>
+        {% endif %}
+        {% if perms.ae.view_inscricao %}
+            <li><a href="/admin/ae/inscricao/?programa={{ programa.pk }}" class="btn default">{% icone "list" %} Inscrições</a></li>
+        {% endif %}
+        {% if programa.get_tipo == programa.TIPO_ALIMENTACAO %}
+            {% if perms.ae.view_solicitacaorefeicaoaluno %}
+                <li><a class="btn default" href="/ae/avaliar_solicitacao_refeicao/{{ programa.pk }}/">{% icone "list" %} Solicitações de Refeições</a></li>
+            {% endif %}
+            {% if perms.ae.pode_ver_relatorio_diario_refeicao %}
+                <li><a class="btn default" href="/ae/relatorio_semanal_refeitorio/{{ programa.pk }}/">{% icone "list" %} Relatório Semanal</a></li>
+            {% endif %}
+            <li><a class="btn default" href="/ae/liberar_participacao_alimentacao/{{ programa.pk }}/">{% icone "list" %} Participações Suspensas</a></li>
+        {% endif %}
+        {% if programa.get_tipo == programa.TIPO_TRANSPORTE or programa.get_tipo == programa.TIPO_TRABALHO or programa.tem_valor_financeiro %}
+            <li><a class="btn default" href="/ae/folha_pagamento/{{ programa.pk }}/">{% icone "money-bill-wave" %} Folha de Pagamento</a></li>
+        {% endif %}
+        {% if inscritos or query %}
+            <li><a class="btn default" href="/ae/tabela_disponibilidade/{{ programa.pk }}/">Tabela de Disponibilidade</a></li>
+        {% endif %}
+        {% if programa.exige_comprovante_pagamento or programa.exige_folha_frequencia and perms.ae.change_programa %}
+            <li><a class="btn success" href="/ae/gerar_pendencia_comprovantes_mensais/{{ programa.pk }}/">Gerar pendência de comprovantes mensais</a></li>
+        {% endif %}
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+    <div class="tab-pane" data-title="{{ box_title }}" data-counter="{{ inscritos.count }}">
+        <div class="search-and-filters">
+            {% render_form form %}
+        </div>
+
+        {% autopaginate inscritos 21 %}
+        {% paginate %}
+        <div class="card-container">
+            {% for inscrito in inscritos %}
+                {# No template pai é disponibilizado um inscrito proveniente da lista de inscritos no programa #}
+                <div class="card {% if inscrito.tem_pendencias %}error{% endif %}">
+                    <div class="photo">
+                        <img src="{{ inscrito.aluno.get_foto_75x100_url }}" title="{{ inscrito.aluno.pessoa_fisica.nome }}" alt="Foto de {{ inscrito.aluno.pessoa_fisica.nome }}" />
+                    </div>
+                    <h4>{{ inscrito.aluno.pessoa_fisica.nome }}</h4>
+                    <dl>
+                        <dt>Matrícula:</dt>
+                        {% if is_nutricionista %}
+                            <dd>{{ inscrito.aluno.matricula }}</dd>
+                        {% else %}
+                            <dd><a href="{{ inscrito.aluno.get_absolute_url }}">{{ inscrito.aluno.matricula }}</a></dd>
+                        {% endif %}
+                        <dt>Parecer:</dt>
+                        <dd>{{ inscrito.inscricao.situacao_parecer|format }}</dd>
+                        <dt>Entrada em:</dt>
+                        <dd>{{ inscrito.data_inicio|date:"d/m/Y" }}</dd>
+                        {% if inscrito.motivo_entrada and perms.ae.pode_ver_motivo_entrada %}
+                            <dt>Motivo da Entrada:</dt>
+                            <dd>{{ inscrito.motivo_entrada|linebreaks }}</dd>
+                        {% endif %}
+
+                        {% if inscrito.data_termino %}
+                            <dt>Saída em:</dt>
+                            <dd>{{ inscrito.data_termino|date:"d/m/Y" }}</dd>
+                            <dt>Motivo da Saída:</dt>
+                            <dd>{{ inscrito.motivo_termino|linebreaks }}</dd>
+                        {% endif %}
+
+                        {% if inscrito.programa.get_tipo == programa.TIPO_IDIOMA %}
+                            <dt>Idioma:</dt>
+                            <dd>{{ inscrito.sub_instance.idioma }}</dd>
+                            {% if inscrito.sub_instance.turma_selecionada %}
+                                <dt>Turma:</dt>
+                                <dd>{{ inscrito.sub_instance.turma_selecionada }}</dd>
+                            {% endif %}
+                        {% endif %}
+
+                        {% if inscrito.programa.get_tipo == programa.TIPO_TRABALHO %}
+                            <dt>Bolsa:</dt>
+                            <dd>{{ inscrito.sub_instance.bolsa_concedida }}</dd>
+                            {% if inscrito.sub_instance.ciencia_em %}
+                                <dt>Ciência em:</dt>
+                                <dd>{{ inscrito.sub_instance.ciencia_em|format }} por {{ inscrito.sub_instance.ciencia_por.user|format }}</dd>
+                            {% endif %}
+                        {% endif %}
+
+                        {% if inscrito.programa.get_tipo == programa.TIPO_TRANSPORTE %}
+                            <dt>Tipo:</dt>
+                            <dd>{{ inscrito.sub_instance.get_tipo_passe_concedido_display|format }}</dd>
+                            <dt>Valor:</dt>
+                            <dd>R$ {{ inscrito.sub_instance.valor_concedido }}</dd>
+                        {% endif %}
+
+                        {% if inscrito.programa.get_tipo == programa.TIPO_ALIMENTACAO %}
+                            {% if inscrito.sub_instance.solicitacao_atendida_cafe.valida %}
+                                <dt>Café da manhã:</dt>
+                                <dd>{{ inscrito.sub_instance.solicitacao_atendida_cafe }}</dd>
+                            {% endif %}
+                            {% if inscrito.sub_instance.solicitacao_atendida_almoco.valida %}
+                                <dt>Almoço:</dt>
+                                <dd>{{ inscrito.sub_instance.solicitacao_atendida_almoco }}</dd>
+                            {% endif %}
+                            {% if inscrito.sub_instance.solicitacao_atendida_janta.valida %}
+                                <dt>Jantar:</dt>
+                                <dd>{{ inscrito.sub_instance.solicitacao_atendida_janta }}</dd>
+                            {% endif %}
+                            {% if inscrito.sub_instance.categoria %}
+                                <dt>Categoria:</dt>
+                                <dd>{{ inscrito.sub_instance.categoria }}</dd>
+                            {% endif %}
+                        {% endif %}
+                        {% if not inscrito.programa.tipo %}
+                            {% for resposta in inscrito.get_respostas %}
+                                <dt>{{ resposta.pergunta }}:</dt>
+                                <dd>{{ resposta.valor_informado|format }}</dd>
+                            {% endfor %}
+                        {% endif %}
+                    </dl>
+
+                    <div class="content">
+                        {% if inscrito.tem_pendencias or programa.get_tipo == programa.TIPO_ALIMENTACAO and not inscrito.aluno.pessoa_fisica.template or inscrito.aluno.is_documentacao_expirada %}
+                            {{ inscrito.tem_pendencias|safe }}
+                            {% if programa.get_tipo == programa.TIPO_ALIMENTACAO and not inscrito.aluno.pessoa_fisica.template %}
+                                <p class="checklist error">Não possui digital cadastrada.</p>
+                            {% endif %}
+                            {% if inscrito.aluno.is_documentacao_expirada %}
+                                <p class="checklist error" title="Entregue em {{ inscrito.aluno.data_documentacao|format }}">Documentação expirada em {{ inscrito.aluno.get_expiracao_documentacao|format }}.</p>
+                            {% endif %}
+                        {% endif %}
+
+                        {% if inscrito.inscricao.prioritaria %}
+                            <div class="alert alert-warning">
+                                <h5>Prioridade</h5>
+                                <p>O aluno possui atendimento prioritário.</p>
+                            </div>
+                        {% endif %}
+
+                        <ul class="action-bar inside-container">
+                            {% if perms.ae.pode_revogar_participacao and not inscrito.data_termino %}
+                                <li><a class="btn warning popup" href="/ae/revogar_participacao/{{ inscrito.pk }}/"><span class="fas fa-calendar-check" aria-hidden="true"></span> Finalizar</a></li>
+                                <li><a class="btn primary popup" href="/ae/editar_participacao/{{ inscrito.pk }}/"><span class="fas fa-edit" aria-hidden="true"></span> Editar</a></li>
+                            {% endif %}
+                            {% if inscrito.part_alim_suspensa and pode_gerenciar_participacoes %}
+                                <li><a class="btn confirm" href="/ae/liberar_participacao_alimentacao/{{ programa.id }}/?libera={{ inscrito.sub_instance.id }}&origem=1"><span class="fas fa-sync-alt" aria-hidden="true"></span> Liberar Participação</a></li>
+                            {% endif %}
+                            {% if perms.ae.add_demandaalunoatendida and inscrito.programa.get_tipo == programa.TIPO_ALIMENTACAO and not inscrito.data_termino %}
+                            <li><a class="btn popup" href="/ae/registrar_atendimento/{{ inscrito.inscricao.pk }}/"><span class="fas fa-plus" aria-hidden="true"></span><span class="visually-hidden">Adicionar</span> Atendimento</a></li>
+                            {% endif %}
+                            {% if inscrito.faltas_justificadas.exists %}
+                                <li><a href="/admin/ae/historicofaltasalimentacao/?q={{ inscrito.aluno.matricula }}" class="btn default">{% icone "eye" %} Faltas Justificadas</a></li>
+                            {% endif %}
+                        </ul>
+                    </div>
+
+                    {% if inscrito.cadastrado_por or inscrito.atualizado_por or inscrito.finalizado_por %}
+                        <footer>
+                            {% if inscrito.cadastrado_por %}
+                                <p>Cadastrado por {{ inscrito.cadastrado_por }} em {{ inscrito.cadastrado_em|format }}</p>
+                            {% endif %}
+                            {% if inscrito.atualizado_por and inscrito.exibir_atualizacao %}
+                                <p>Última atualização por {{ inscrito.atualizado_por.user }} em {{ inscrito.atualizado_em|format }}</p>
+                            {% endif %}
+                            {% if inscrito.finalizado_por %}
+                                <p>Finalizada por {{ inscrito.finalizado_por.user }} em {{ inscrito.finalizado_em|format }}</p>
+                            {% endif %}
+                        </footer>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+        {% paginate %}
+
+        {% if not inscritos %}
+            <p class="alert alert-warning">A busca não retornou nenhum resultado.</p>
+        {% endif %}
+    </div>
+
+    {% if participacoes_futuras %}
+        <div class="tab-pane" data-title="Participações Futuras" data-counter="{{ participacoes_futuras.count }}">
+            <div class="card-container">
+            {% for inscrito in participacoes_futuras %}
+                <div class="card {% if inscrito.tem_pendencias %}error{% endif %}">
+                    <div class="photo">
+                        <img src="{{ inscrito.aluno.get_foto_75x100_url }}" title="{{ inscrito.aluno.pessoa_fisica.nome }}" alt="Foto de {{ inscrito.aluno.pessoa_fisica.nome }}" />
+                    </div>
+                    <h4>{{ inscrito.aluno.pessoa_fisica.nome }}</h4>
+                    <dl>
+                        <dt>Matrícula:</dt>
+                        {% if is_nutricionista %}
+                            <dd>{{ inscrito.aluno.matricula }}</dd>
+                        {% else %}
+                            <dd><a href="{{ inscrito.aluno.get_absolute_url }}">{{ inscrito.aluno.matricula }}</a></dd>
+                        {% endif %}
+
+                        <dt>Entrada em:</dt>
+                        <dd>{{ inscrito.data_inicio|date:"d/m/Y" }}</dd>
+                        {% if inscrito.motivo_entrada and perms.ae.pode_ver_motivo_entrada %}
+                            <dt>Motivo da Entrada:</dt>
+                            <dd>{{ inscrito.motivo_entrada|linebreaks }}</dd>
+                        {% endif %}
+
+                        {% if inscrito.data_termino %}
+                            <dt>Saída em:</dt>
+                            <dd>{{ inscrito.data_termino|date:"d/m/Y" }}</dd>
+                            <dt>Motivo da Saída:</dt>
+                            <dd>{{ inscrito.motivo_termino|linebreaks }}</dd>
+                        {% endif %}
+
+                        {% if inscrito.programa.get_tipo == programa.TIPO_IDIOMA %}
+                            <dt>Idioma:</dt>
+                            <dd>{{ inscrito.sub_instance.idioma }}</dd>
+                            {% if inscrito.sub_instance.turma_selecionada %}
+                                <dt>Turma:</dt>
+                                <dd>{{ inscrito.sub_instance.turma_selecionada }}</dd>
+                            {% endif %}
+                        {% endif %}
+
+                        {% if inscrito.programa.get_tipo == programa.TIPO_TRABALHO %}
+                            <dt>Bolsa:</dt>
+                            <dd>{{ inscrito.sub_instance.bolsa_concedida }}</dd>
+                        {% endif %}
+
+                        {% if inscrito.programa.get_tipo == programa.TIPO_TRANSPORTE %}
+                            <dt>Tipo:</dt>
+                            <dd>{{ inscrito.sub_instance.get_tipo_passe_concedido_display|format }}</dd>
+                            <dt>Valor:</dt>
+                            <dd>R$ {{ inscrito.sub_instance.valor_concedido }}</dd>
+                        {% endif %}
+
+                        {% if inscrito.programa.get_tipo == programa.TIPO_ALIMENTACAO %}
+                            {% if inscrito.sub_instance.solicitacao_atendida_cafe.valida %}
+                                <dt>Café da manhã:</dt>
+                                <dd>{{ inscrito.sub_instance.solicitacao_atendida_cafe }}</dd>
+                            {% endif %}
+                            {% if inscrito.sub_instance.solicitacao_atendida_almoco.valida %}
+                                <dt>Almoço:</dt>
+                                <dd>{{ inscrito.sub_instance.solicitacao_atendida_almoco }}</dd>
+                            {% endif %}
+                            {% if inscrito.sub_instance.solicitacao_atendida_janta.valida %}
+                                <dt>Jantar:</dt>
+                                <dd>{{ inscrito.sub_instance.solicitacao_atendida_janta }}</dd>
+                            {% endif %}
+                            {% if inscrito.sub_instance.categoria %}
+                                <dt>Categoria:</dt>
+                                <dd>{{ inscrito.sub_instance.categoria }}</dd>
+                            {% endif %}
+                        {% endif %}
+                    </dl>
+
+                    {% if inscrito.cadastrado_por or inscrito.atualizado_por or inscrito.finalizado_por %}
+                        <footer>
+                            {% if inscrito.cadastrado_por %}
+                                <p>Cadastrado por {{ inscrito.cadastrado_por }} em {{ inscrito.cadastrado_em|format }}</p>
+                            {% endif %}
+                            {% if inscrito.atualizado_por and inscrito.exibir_atualizacao %}
+                                <p>Última atualização por {{ inscrito.atualizado_por.user }} em {{ inscrito.atualizado_em|format }}</p>
+                            {% endif %}
+                            {% if inscrito.finalizado_por %}
+                                <p>Finalizada por {{ inscrito.finalizado_por.user }} em {{ inscrito.finalizado_em|format }}</p>
+                            {% endif %}
+                        </footer>
+                    {% endif %}
+                </div>
+            {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+
+    {% if not is_nutricionista %}
+        {% if programa.get_ultimos_atendimentos.exists %}
+            <div class="tab-pane" data-title="Últimos 15 Atendimentos">
+                {% if programa.demandas %}
+                    <dl>
+                        <dt>Atendimentos relacionados:</dt>
+                        <dd>{{ programa.demandas.all|join:", " }}</dd>
+                    </dl>
+                {% endif %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Aluno</th>
+                            <th>Tipo</th>
+                            <th>Data</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for atendimento in programa.get_ultimos_atendimentos|slice:"15" %}
+                            <tr>
+                                <td>{{ forloop.counter }}</td>
+                                <td>{{ atendimento.aluno.pessoa_fisica.nome }}<a href="/edu/aluno/{{ atendimento.aluno.matricula }}/"> ({{ atendimento.aluno.matricula }})</a></td>
+                                <td>{{ atendimento.demanda }}</td>
+                                <td>{{ atendimento.data|format }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+    {% endif %}
+
+{% endblock %}

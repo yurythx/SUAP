@@ -1,0 +1,51 @@
+server {
+    listen 80;
+    server_name suap.ifrn.edu.br;
+
+    client_max_body_size 100M;
+
+    access_log /var/opt/suap/deploy/logs/nginx/access.log;
+    error_log /var/opt/suap/deploy/logs/nginx/error.log;
+
+    location /static {
+        alias /var/opt/suap/static;
+    }
+
+    location /media {
+        alias /var/opt/suap/deploy/media;
+    }
+
+    location / {
+        proxy_pass_header Server;
+        proxy_set_header Host $http_host;
+        proxy_redirect off;
+        proxy_set_header X-Real_IP $remote_addr;
+        proxy_set_header X-Scheme $scheme;
+        proxy_connect_timeout 1200s;
+        proxy_send_timeout 1200s;
+        proxy_read_timeout 1200s;
+        proxy_pass http://localhost:8000/;
+    }
+}
+
+# Configuração necessária para os terminais acessarem os dados.
+# Os terminais precisam que os Web Services não estejam com SSL
+server { # os terminais java acessam a porta 8080
+    listen 8080;
+    server_name suap.ifrn.edu.br;
+
+	access_log /var/opt/suap/deploy/logs/nginx/access.log;
+    error_log /var/opt/suap/deploy/logs/nginx/error.log;
+
+    proxy_set_header Host $http_host;
+    proxy_redirect off;
+    proxy_buffering off;
+
+    location /static {
+        alias /var/opt/suap/static;
+    }
+
+    location / {
+         proxy_pass http://localhost:8000;
+    }
+}

@@ -1,0 +1,360 @@
+{% extends super_template %}
+
+{% block object-status %}
+    <span class="status status-info">FIC &lt; 160h</span>
+    {% if hoje < obj.data_inicio %}
+        <span class="status status-alert">Não iniciada</span>
+    {% elif hoje > obj.data_fim %}
+        <span class="status status-default">Encerrada</span>
+    {% else %}
+        <span class="status status-success">Em andamento</span>
+    {% endif %}
+    {% if obj.integracao_com_moodle %}
+        <span class="status status-info">Moodle</span>
+    {% endif %}
+    {% if obj.gerar_matricula %}
+        <span class="status status-default">Gera matrícula</span>
+    {% endif %}
+    {% if obj.autoinscricional %}
+        <span class="status status-info">Autoinscrição</span>
+    {% endif %}
+{% endblock %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        <li>
+            <a class="btn default" href="{{ obj.minicurso.get_absolute_url }}">{% icone "book" %} Visualizar minicurso</a>
+        </li>
+        {% if perms.edu.change_turmaminicurso and pode_realizar_acoes %}
+            <li>
+                <a class="btn primary" href="/admin/edu/turmaminicurso/{{ obj.pk }}/change/?minicurso={{ obj.minicurso.pk }}">{% icone "edit" %} Editar</a>
+            </li>
+        {% endif %}
+        {% if obj.integracao_com_moodle and pode_realizar_acoes %}
+            <li class="has-child">
+                <a class="btn" href="#">{% icone "graduation-cap" %} Moodle</a>
+                <ul>
+                    <li><a onclick="this.innerHTML='Sincronizando...'" href="?moodle=sincronizar">{% icone "sync" %} Exportar dados</a></li>
+                    <li><a onclick="this.innerHTML='Importando...'" href="?moodle=importar_notas">{% icone "download" %} Importar notas</a></li>
+                </ul>
+            </li>
+        {% endif %}
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+    {% box "Dados gerais" %}
+        <dl class="definition-list flex">
+            <div class="list-item flex-basis-50">
+                <dt>Curso</dt>
+                <dd><a href="{{ obj.minicurso.get_absolute_url }}">{% icone "book" %} {{ obj.minicurso.descricao }}</a></dd>
+            </div>
+            <div class="list-item">
+                <dt>Ano/Período letivo</dt>
+                <dd>{{ obj.ano_letivo }}.{{ obj.periodo_letivo }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Período de realização</dt>
+                <dd>{{ obj.data_inicio }} a {{ obj.data_fim }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Turno</dt>
+                <dd>{{ obj.turno|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Gera matrícula</dt>
+                <dd>{{ obj.gerar_matricula|format }}</dd>
+            </div>
+            <div class="list-item">
+                <dt>Integração com Moodle</dt>
+                <dd>{{ obj.integracao_com_moodle|format }}</dd>
+            </div>
+            {% if obj.url_moodle or obj.url_ambiente_virtual %}
+                <div class="list-item flex-basis-50">
+                    <dt>Ambiente virtual</dt>
+                    <dd>
+                        <a href="{{ obj.url_moodle|default:obj.url_ambiente_virtual }}" target="_blank" rel="noopener noreferrer">
+                            {% icone "external-link-alt" %} Acessar ambiente virtual
+                        </a>
+                    </dd>
+                </div>
+            {% endif %}
+            <div class="list-item">
+                <dt>Autoinstrucional</dt>
+                <dd>{{ obj.minicurso.autoinstrucional|format }}</dd>
+            </div>
+            {% if obj.minicurso.autoinstrucional %}
+                <div class="list-item">
+                    <dt>Tipo de curso autoinstrucional</dt>
+                    <dd>{{ obj.minicurso.get_tipo_curso_autoinstrucional_display|format }}</dd>
+                </div>
+                {% if obj.nota_minima %}
+                    <div class="list-item">
+                        <dt>Nota mínima para aprovação</dt>
+                        <dd>{{ obj.nota_minima }}</dd>
+                    </div>
+                {% endif %}
+                {% if obj.completude_minima %}
+                    <div class="list-item">
+                        <dt>Completude mínima</dt>
+                        <dd>{{ obj.completude_minima }}%</dd>
+                    </div>
+                {% endif %}
+            {% endif %}
+            {% if obj.autoinscricional %}
+                <div class="list-item flex-basis-100">
+                    <dt>Autoinscrição</dt>
+                    <dd>Permitida aos públicos configurados</dd>
+                </div>
+            {% endif %}
+        </dl>
+    {% endbox %}
+
+    <div class="tab-pane" data-title="Professores" data-counter="{{ obj.professorminicurso_set.count }}" data-tab="professores">
+        {% if perms.edu.change_minicurso and pode_realizar_acoes %}
+            <ul class="action-bar">
+                <li><a href="/edu/editar_professor_minicurso/{{ obj.pk }}/" class="btn success popup">{% icone "plus" %} Adicionar professor</a></li>
+            </ul>
+        {% endif %}
+        {% if obj.professorminicurso_set.exists %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Professores da turma</caption>
+                    <thead>
+                        <tr>
+                            {% if perms.edu.change_minicurso and pode_realizar_acoes %}
+                                <th class="no-print">Ações</th>
+                            {% endif %}
+                            <th>#</th>
+                            <th>Matrícula</th>
+                            <th>Nome</th>
+                            <th class="text-end">Carga horária (h/r)</th>
+                            <th class="text-end">Carga horária (h/a)</th>
+                            <th>Tipo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for pm in obj.professorminicurso_set.all %}
+                            <tr>
+                                {% if perms.edu.change_minicurso and pode_realizar_acoes %}
+                                    <td class="no-print">
+                                        {% icon "edit" "/edu/editar_professor_minicurso/{{ obj.pk }}/{{ pm.pk }}/" "Editar professor" "popup" %}
+                                        {% if perms.edu.delete_professorminicurso %}
+                                            {% icon "delete" "/comum/excluir/edu/professorminicurso/{{ pm.pk }}/" "Remover professor" "no-confirm popup" %}
+                                        {% endif %}
+                                    </td>
+                                {% endif %}
+                                <td>{{ forloop.counter }}</td>
+                                <td>
+                                    <a href="/edu/professor/{{ pm.professor.pk }}/">{{ pm.professor.get_matricula }}</a>
+                                </td>
+                                <td>{{ pm.professor.vinculo.pessoa.nome }}</td>
+                                <td class="text-end">{{ pm.carga_horaria|format }} horas</td>
+                                <td class="text-end">{{ pm.get_carga_horaria_ha|format }} horas</td>
+                                <td>Professor {% if pm.tipo_id %}({{ pm.tipo }}){% endif %}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Nenhum professor vinculado a esta turma.</p>
+        {% endif %}
+    </div>
+
+    <div class="tab-pane" data-title="Monitores" data-counter="{{ obj.monitorminicurso_set.count }}" data-tab="monitores">
+        {% if perms.edu.change_minicurso and pode_realizar_acoes %}
+            <ul class="action-bar">
+                <li><a href="/edu/editar_monitor_minicurso/{{ obj.pk }}/" class="btn success popup">{% icone "plus" %} Adicionar monitor</a></li>
+            </ul>
+        {% endif %}
+        {% if obj.monitorminicurso_set.exists %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Monitores da turma</caption>
+                    <thead>
+                        <tr>
+                            {% if perms.edu.change_minicurso and pode_realizar_acoes %}
+                                <th class="no-print">Ações</th>
+                            {% endif %}
+                            <th>#</th>
+                            <th>Matrícula</th>
+                            <th>Nome</th>
+                            <th class="text-end">Carga horária</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for mm in obj.monitorminicurso_set.all %}
+                            <tr>
+                                {% if perms.edu.change_minicurso and pode_realizar_acoes %}
+                                    <td class="no-print">
+                                        {% icon "edit" "/edu/editar_monitor_minicurso/{{ obj.pk }}/{{ mm.pk }}/" "Editar monitor" "popup" %}
+                                        {% if perms.edu.delete_monitorminicurso %}
+                                            {% icon "delete" "/comum/excluir/edu/monitorminicurso/{{ mm.pk }}/" "Remover monitor" "no-confirm popup" %}
+                                        {% endif %}
+                                    </td>
+                                {% endif %}
+                                <td>{{ forloop.counter }}</td>
+                                <td>
+                                    <a href="/edu/aluno/{{ mm.aluno.matricula }}/">{{ mm.aluno.matricula }}</a>
+                                </td>
+                                <td>{{ mm.aluno.get_nome }}</td>
+                                <td class="text-end">{{ mm.carga_horaria|format }} horas</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="alert alert-warning">Nenhum monitor vinculado a esta turma.</p>
+        {% endif %}
+    </div>
+
+    <div class="tab-pane" data-title="Participantes" data-counter="{{ participantes.count }}" data-tab="participantes">
+        {% if perms.edu.change_turmaminicurso and pode_realizar_acoes %}
+            <ul class="action-bar">
+                <li><a class="btn popup success" href="/edu/adicionar_participante_turma_minicurso/{{ obj.pk }}/">{% icone "plus" %} Adicionar participante</a></li>
+                <li><a class="btn popup" href="/edu/importar_participantes_turma_minicurso/{{ obj.pk }}/">{% icone "file-import" %} Importar participantes</a></li>
+                {% if possui_aluno_desvinculado %}
+                    <li><a class="btn" href="/edu/vincular_participantes_sem_turma_minicurso/{{ obj.pk }}/">{% icone "link" %} Vincular participantes sem turma</a></li>
+                {% endif %}
+            </ul>
+        {% endif %}
+        {% if participantes.exists %}
+            {% autopaginate participantes 100 %}
+            <form method="post" action="">
+                {% csrf_token %}
+                <div class="table-responsive">
+                    <table>
+                        <caption>Participantes da turma</caption>
+                        <thead>
+                            <tr>
+                                {% if perms.edu.change_turmaminicurso and pode_realizar_acoes %}
+                                    <th>
+                                        <input type="checkbox" id="checkall_participantes" title="Selecionar todos">
+                                    </th>
+                                {% endif %}
+                                {% if perms.edu.change_minicurso and pode_realizar_acoes %}
+                                    <th class="no-print">Ações</th>
+                                {% endif %}
+                                <th>CPF</th>
+                                <th>Nome</th>
+                                <th>E-mail</th>
+                                {% if obj.nota_minima %}
+                                    <th class="text-end">Nota</th>
+                                {% endif %}
+                                {% if obj.completude_minima %}
+                                    <th class="text-end">Completude (%)</th>
+                                {% endif %}
+                                <th>Situação</th>
+                                <th>Certificado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for participante in participantes %}
+                                <tr>
+                                    {% if perms.edu.change_turmaminicurso and pode_realizar_acoes %}
+                                        <td><input value="{{ participante.pk }}" name="cpfs" class="participante-check" type="checkbox"></td>
+                                    {% endif %}
+                                    {% if perms.edu.change_minicurso and pode_realizar_acoes %}
+                                        <td class="no-print">
+                                            {% icon "edit" "/edu/editar_participante_turma_minicurso/{{ participante.id }}/" "Editar participante" "popup" %}
+                                        </td>
+                                    {% endif %}
+                                    <td>{{ participante.aluno.pessoa_fisica.cpf }}</td>
+                                    <td>{{ participante.aluno.get_nome }} {% if obj.gerar_matricula %}({{ participante.aluno.matricula }}){% endif %}</td>
+                                    <td>{{ participante.aluno.email_notificacao|format }}</td>
+                                    {% if obj.nota_minima %}
+                                        <td class="text-end">{{ participante.nota|format }}</td>
+                                    {% endif %}
+                                    {% if obj.completude_minima %}
+                                        <td class="text-end">{{ participante.completude|format }}</td>
+                                    {% endif %}
+                                    <td>{{ participante.aluno.situacao|status }}</td>
+                                    <td>
+                                        {% if participante.aluno.is_concluido %}
+                                            <a href="/edu/autenticar_certificado_minicurso/?cpf={{ participante.aluno.pessoa_fisica.cpf }}&data_conclusao={{ obj.data_fim|format }}&codigo_turma={{ obj.pk }}&com_timbre=0" class="btn default popup" title="Imprimir certificado">
+                                                {% icone "print" %} Imprimir certificado
+                                            </a>
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="submit-row">
+                    {% if obj.data_fim <= hoje and perms.edu.change_turmaminicurso and pode_realizar_acoes %}
+                        <button type="button" class="btn primary" id="btn_enviar_certificados">{% icone "envelope" %} Enviar certificados selecionados</button>
+                    {% endif %}
+                    {% if not obj.integracao_com_moodle and perms.edu.change_turmaminicurso and pode_realizar_acoes %}
+                        <button type="button" class="btn success" id="btn_aprovar">{% icone "check" %} Aprovar selecionados</button>
+                        <button type="button" class="btn warning" id="btn_reprovar">{% icone "times" %} Reprovar selecionados</button>
+                    {% endif %}
+                    {% if perms.edu.delete_participanteturmaminicurso and pode_realizar_acoes %}
+                        <button type="button" class="btn danger no-confirm" id="btn_remover">{% icone "trash" %} Remover selecionados</button>
+                    {% endif %}
+                </div>
+            </form>
+            {% paginate %}
+            <script>
+                jQuery(function ($) {
+                    function obterIdsSelecionados() {
+                        return $("input.participante-check:checked").map(function () {
+                            return this.value;
+                        }).get().join("_");
+                    }
+
+                    $("#checkall_participantes").on("change", function () {
+                        $("input.participante-check").prop("checked", this.checked);
+                    });
+
+                    $("#btn_remover").on("click", function () {
+                        var ids = obterIdsSelecionados();
+                        if (!ids) {
+                            alert("Por favor, selecione ao menos um participante.");
+                            return;
+                        }
+                        $.fancybox.open({
+                            src: '/comum/excluir/edu/participanteturmaminicurso/' + ids + '/?_popup=1',
+                            type: 'iframe'
+                        });
+                    });
+
+                    $("#btn_aprovar").on("click", function () {
+                        var ids = obterIdsSelecionados();
+                        if (!ids) {
+                            alert("Por favor, selecione ao menos um participante.");
+                            return;
+                        }
+                        document.location.href = '/edu/aprovar_aluno_turma_minicurso/' + ids + '/';
+                    });
+
+                    $("#btn_reprovar").on("click", function () {
+                        var ids = obterIdsSelecionados();
+                        if (!ids) {
+                            alert("Por favor, selecione ao menos um participante.");
+                            return;
+                        }
+                        document.location.href = '/edu/reprovar_aluno_turma_minicurso/' + ids + '/';
+                    });
+
+                    $("#btn_enviar_certificados").on("click", function () {
+                        var ids = obterIdsSelecionados();
+                        if (!ids) {
+                            alert("Por favor, selecione ao menos um participante.");
+                            return;
+                        }
+                        document.location.href = '/edu/enviar_certificado_participacao_minicurso/{{ obj.pk }}/' + ids + '/';
+                    });
+                });
+            </script>
+        {% else %}
+            <p class="alert alert-warning">Nenhum participante cadastrado nesta turma.</p>
+        {% endif %}
+    </div>
+
+{% endblock %}

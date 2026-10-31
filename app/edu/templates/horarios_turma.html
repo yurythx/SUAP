@@ -1,0 +1,89 @@
+{% if not turnos.vazio %}
+    {% box 'Horários da Turma' %}
+        {% if obj.curso_campus.periodicidade == 1 %}
+            <div class="search-and-filters">
+                <div class="filter">
+                    <label>Alternar Semestre:</label>
+                    <select onchange="change_configuracao($(this).val())">
+                        <option {% if semestre == '1' %}selected{% endif %} value="1">{{ obj.ano_letivo }}.1</option>
+                        <option {% if semestre == '2' %}selected{% endif %} value="2">{{ obj.ano_letivo }}.2</option>
+                    </select>
+                </div>
+            </div>
+        {% endif %}
+        <ul class="action-bar">
+            <li>
+                <a class="btn" href="/edu/horarios_turma_pdf/{{ obj.pk }}?semestre={{ semestre }}">Imprimir</a>
+            </li>
+        </ul>
+        {% for turno in turnos %}
+            {% if not turno.vazio %}
+                <table>
+                    <caption>{{ turno.descricao }}</caption>
+                    <thead>
+                    <tr>
+                        <th> -</th>
+                        {% for dia_semana in turno.dias_semana %}
+                            <th width="13%" class="text-center">{{ dia_semana.1 }}</th>
+                        {% endfor %}
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for horario_aula in turno.horariosaulas %}
+                        <tr>
+                            <td><strong>{{ horario_aula }}</strong></td>
+                            {% for dia_semana in turno.dias_semana %}
+                                <td class="text-center parent">
+
+                                    {% for horarioauladiario in dia_semana.2 %}
+                                        {% if horario_aula == horarioauladiario.horario_aula %}
+
+                                            <a class="child" href="/edu/diario/{{ horarioauladiario.diario.pk }}"
+                                               title="{{ horarioauladiario.diario.componente_curricular.componente.descricao }}">
+                                                {{ horarioauladiario.diario.componente_curricular.componente.sigla }}
+                                            </a>
+                                            <br>
+                                            {% for professordiario in horarioauladiario.diario.professordiario_set.all %}
+                                                {{ professordiario.professor.vinculo.pessoa.nome_usual|format|normalizar }}
+                                                <br>
+                                            {% endfor %}
+
+                                        {% endif %}
+                                    {% endfor %}
+
+                                </td>
+                            {% endfor %}
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% endif %}
+            <script>
+                $('.parent .child:nth-of-type(2)').parent().addClass('status status-error false');
+            </script>
+        {% endfor %}
+    {% endbox %}
+    {% box 'Legenda' %}
+        <ul>
+            {% for diario in diarios_por_sigla %}
+                <li><a href="/edu/diario/{{ diario.pk }}/">{{ diario.componente_curricular.componente.sigla }}</a>
+                    - {{ diario.componente_curricular.componente.descricao_historico }}
+                    ({{ diario.get_locais_aula|default:"Local Não-definido"|format }}) {% if diario.segundo_semestre %}
+                        <span class="status status-alert">2º Semestre</span>{% endif %}</li>
+            {% endfor %}
+        </ul>
+    {% endbox %}
+{% else %}
+    {% box 'Horários da Turma' %}
+        <p class="alert alert-warning">Nenhum horário de aula definido para esta turma.</p>
+    {% endbox %}
+{% endif %}
+
+<script>
+
+    function change_configuracao(valor) {
+        var url = '/edu/turma/{{ obj.pk }}/?tab=horarios&semestre=' + valor;
+        document.location.href = url;
+    }
+
+</script>

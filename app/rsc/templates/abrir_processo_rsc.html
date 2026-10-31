@@ -1,0 +1,887 @@
+{% extends super_template %}
+
+{% load rsc_tags %}
+
+{% block extrahead %}
+    <link rel="stylesheet" href="/static/rsc/css/rsc-abrir-processo.css">
+    <script src="/static/arquivo/js/fileuploader.js"></script>
+    <script type="text/javascript" src="/static/arquivo/js/compatibility.js"></script>
+    <script type="text/javascript" src="/static/arquivo/js/pdf.js"></script>
+    <style>
+        .instrucoes_gerais li{
+            margin: 0;
+        }
+    </style>
+
+    <script>
+    $( document ).ready(function() {
+        iniciar_autosalvamento_campos_estaticos();
+
+        // Recarrega o quadro resumo via AJAX toda vez que a aba é exibida.
+        // A nav das abas é um <button> com data-bs-toggle="tab" (tabs.js), então
+        // usamos o evento shown.bs.tab em vez de um clique em <a>.
+        document.addEventListener('shown.bs.tab', function (event) {
+            if (event.target.getAttribute('data-bs-target') === '#quadro_resumo_pontuacao_requerida-tab-pane') {
+                preencher_quadro_resumo_pontuacao_requerida();
+            }
+        });
+    });
+
+    function iniciar_autosalvamento_campos_estaticos(){
+        var ids = ['id_data_conclusao_titulacao_rsc_pretendido',
+                   'id_data_exercio_carreira',
+                   'id_data_concessao_ultima_rt',
+                   'id_introducao_relatorio_descritivo',
+                   'itinerario_formacao_txt',
+                   'atuacao_docente_txt',
+                   'producao_cademica_txt',
+                   'prestacao_servicos_txt',
+                   'atividade_adm_txt',
+                   'titulos_homenagens_txt',
+                   'id_conclusao_relatorio_descritivo'
+                   ];
+
+        $.each(ids, function(index, value) {
+            $('#'+value).attr('onchange','Processa_Salvamento(\'Autosalvar\', {{ processo.id }}, \'{{ processo.tipo_rsc }}\', \'Aguardando envio para CPPD\')');
+        });
+    }
+
+    function onInitTabs(){
+        preencher_relatorio_descritivo();
+        $("a[data-tab='relatorio_descritivo']").on('click', function(){
+            preencher_relatorio_descritivo();
+        });
+
+        // O reload a cada acesso é feito via shown.bs.tab (ver $(document).ready).
+        preencher_quadro_resumo_pontuacao_requerida();
+
+        preencher_documentos_preliminares();
+    }
+
+    function preencher_relatorio_descritivo(){
+        $.get("/rsc/relatorio_descritivo/{{ processo.id }}/", function(data) {
+            $("div[data-tab='relatorio_descritivo']").html(data);
+        }).always(function() {
+            iniciar_autosalvamento_campos_estaticos();
+        });
+    }
+
+    function preencher_quadro_resumo_pontuacao_requerida(){
+        $("div[data-tab='quadro_resumo_pontuacao_requerida']").html('<p>Carregando...</p>');
+        $.get("/rsc/quadro_resumo_pontuacao_requerida/{{ processo.id }}/", function(data) {
+            $("div[data-tab='quadro_resumo_pontuacao_requerida']").html(data);
+        }).fail(function() {
+            $("div[data-tab='quadro_resumo_pontuacao_requerida']").html('<p class="errornote">Erro ao carregar o quadro resumo.</p>');
+        });
+    }
+
+    // Abre o accordion (box) indicado caso esteja colapsado.
+    function expandirSeColapsado(panelId){
+        var $panel = $('#' + panelId);
+        if ($panel.length && !$panel.hasClass('show')) {
+            $('[data-bs-target="#' + panelId + '"]').trigger('click');
+        }
+    }
+
+    // A partir do quadro resumo, leva o usuário até o arquivo com pendência na aba RSC.
+    function irParaItemComProblema(idCriterio, encryptedPk){
+        var $criterioPane = $('#criterio_' + idCriterio);
+        if (!$criterioPane.length) {
+            return false;
+        }
+
+        // 1. Ativa a aba RSC que contém o critério. Os panes RSC não têm data-tab:
+        // o tabs.js gera o id "tabN-tab-pane" e a nav-link aponta via data-bs-target.
+        var paneId = $criterioPane.closest('.tab-pane').attr('id');
+        if (paneId) {
+            $('.nav-tabs .nav-link[data-bs-target="#' + paneId + '"]').trigger('click');
+        }
+
+        // 2. Expande os boxes (accordion) da diretriz e do critério, se colapsados.
+        $criterioPane.parents('.accordion-collapse').each(function(){
+            expandirSeColapsado($(this).attr('id'));
+        });
+        expandirSeColapsado('criterio_' + idCriterio);
+
+        // 3. Após a troca de aba/expansão, rola até a linha do arquivo e a destaca.
+        setTimeout(function(){
+            var $alvo = $('.linha-arquivo-' + encryptedPk);
+            if (!$alvo.length) {
+                $alvo = $criterioPane;
+            }
+            $('html, body').animate({ scrollTop: $alvo.first().offset().top - 80 }, 400);
+            $alvo.addClass('rsc-item-destacado');
+            setTimeout(function(){ $alvo.removeClass('rsc-item-destacado'); }, 2500);
+        }, 400);
+
+        return false;
+    }
+
+    function preencher_documentos_preliminares(){
+        $.get("/rsc/documentos_preliminares/{{ processo.id }}/", function(data) {
+            $("div[data-tab='documentos_preliminares']").html(data);
+        });
+    }
+
+    function human_file_size(bytes, si) {
+        var thresh = si ? 1000 : 1024;
+        if(bytes < thresh) return bytes + ' B';
+        var units = si ? ['kB','MB','GB','TB','PB','EB','ZB','YB'] : ['KB','MB','GB','TB','PB','EB','ZB','YB'];
+        var u = -1;
+        do {
+            bytes /= thresh;
+            ++u;
+        } while(bytes >= thresh);
+        return bytes.toFixed(1)+' '+units[u];
+    };
+
+    function calcula_pontuacao_total_rsc(classe_tipo_rsc)   {
+
+        var teto_rsc = 100;
+
+        var pontuacao_total_rsc = 0;
+        $('span.'+classe_tipo_rsc).filter('.total_diretriz').each(function() {
+            var pontuacao_total = parseFloat($(this).html());
+            pontuacao_total_rsc += pontuacao_total;
+        });
+
+        if(pontuacao_total_rsc > teto_rsc) {
+            pontuacao_total_rsc = teto_rsc;
+        }
+
+        if(classe_tipo_rsc == "RSC-I") {
+            $("#rsc1").html(pontuacao_total_rsc.toFixed(2));
+            $("#rsc1hidden").val(pontuacao_total_rsc.toFixed(2));
+        } else if (classe_tipo_rsc == "RSC-II") {
+            $("#rsc2").html(pontuacao_total_rsc.toFixed(2));
+            $("#rsc2hidden").val(pontuacao_total_rsc.toFixed(2));
+        } else {
+            $("#rsc3").html(pontuacao_total_rsc.toFixed(2));
+            $("#rsc3hidden").val(pontuacao_total_rsc.toFixed(2));
+        }
+
+        // pontuação requerida (soma das RSCs)
+        var total_pontuacao_pretendida = parseFloat($("#rsc1hidden").val()) + parseFloat($("#rsc2hidden").val()) + parseFloat($("#rsc3hidden").val());
+        $("#pontuacao_requerida").html(total_pontuacao_pretendida.toFixed(2));
+    }
+
+    function calcula_pontuacao_total_diretriz(id_diretriz, teto){
+        teto = parseFloat(teto);
+        var pontuacao_total_diretriz = 0;
+        $(".diretriz_class_"+id_diretriz).each(function() {
+            var pontuacao_criterio = parseFloat($(this).html());
+            pontuacao_total_diretriz += pontuacao_criterio;
+        });
+        var obj = $('#total_diretriz_'+ id_diretriz);
+        obj.parent().parent().find('p.alert').remove();
+        if(pontuacao_total_diretriz > teto){
+            obj.parent().parent().prepend('<p class="alert alert-warning">Você já atingiu o teto da diretriz. Sua soma de pontos é de '+pontuacao_total_diretriz.toFixed(2)+' e o teto é de '+teto+' </p>');
+            pontuacao_total_diretriz = teto;
+        }
+        obj.html(pontuacao_total_diretriz.toFixed(2))
+    }
+
+    function calcula_pontuacao_total_criterio(id_criterio, teto_diretriz){
+        teto_diretriz = parseFloat(teto_diretriz);
+        var pontuacao_total_criterio = 0;
+        $(".criterio_class_"+id_criterio).each(function() {
+            var pontuacao_criterio = parseFloat($(this).html());
+            pontuacao_total_criterio += pontuacao_criterio;
+        });
+        if(pontuacao_total_criterio > teto_diretriz){
+            pontuacao_total_criterio = teto_diretriz;
+        }
+        $('#total_pontos_criterio_'+ id_criterio).html(pontuacao_total_criterio.toFixed(2));
+    }
+
+    function calcula_nota_pretendida(field_qtd, fator, arquivo_id, teto, id_diretriz, tipo_rsc, teto_diretriz, criterio_id, peso) {
+
+        if (field_qtd.value <= teto) {
+            nota =  parseFloat(field_qtd.value * fator * peso).toFixed(2);
+            $("span#pontuacao_arquivo_" + arquivo_id).html(nota);
+            $("#nota_" + arquivo_id).attr('value', nota);
+            var id_pontuacao_arquivo = field_qtd.id.replace('qtd', 'pontuacao_arquivo')
+            var classe_tipo_rsc = $(field_qtd).parent().parent().find("span#"+id_pontuacao_arquivo).attr("class").split(" ").pop();
+            calcula_pontuacao_total_diretriz(id_diretriz, teto_diretriz);
+            calcula_pontuacao_total_rsc(classe_tipo_rsc);
+            calcula_pontuacao_total_criterio(criterio_id, teto_diretriz);
+            Valida_qtds();
+        } else {
+            alert("O valor máximo de itens é: " +teto);
+            field_qtd.value = " ";
+        }
+    }
+
+    //sendAjax | Função genérica do processamento Ajax + Jquery + Json
+    function sendAjax(url, parametros, sucesso, erro) {
+        $.ajax({
+            type: "POST",
+            url: url,
+            data: parametros,
+            contentType: "application/json; charset=utf-8",
+            dataType: "json",
+            success: sucesso,
+            error: erro
+        });
+    }
+
+    function Excluir(id, msg, url, processo_id, teto_diretriz) {
+        var parametros = { "Id": "" };
+        parametros.Id = id;
+        if(teto_diretriz!=undefined){
+
+             var classes_span = $("#linha-" + id).find('span:last').attr('class').split(' ');
+             var criterio_id = classes_span[1].split('_').pop();
+             var criterio_span = $('span#total_pontos_criterio_'+criterio_id);
+
+             var diretriz_id = classes_span[0].split('_').pop();
+             var div_diretriz = $('div#'+diretriz_id);
+        }
+        if (confirm(msg)) {
+             sendAjax(url, JSON.stringify(parametros), function (retorno) {
+                 if (retorno.ok)
+                 {
+                    $(".linha-" + id).animate({ backgroundColor: "#fbc7c7" }, "slow").animate({ opacity: "hide" }, "slow", function () {
+                        $(this).remove();
+                        if(teto_diretriz!=undefined){
+                            calcula_pontuacao_total_criterio(criterio_id, teto_diretriz);
+                            calcula_pontuacao_total_diretriz(diretriz_id, teto_diretriz);
+                            calcula_pontuacao_total_rsc(classes_span[2]);
+                            Salvar_RSC(processo_id, true);
+                        }
+                        $('#data_referencia_retroatividade').html(retorno.data_referencia_retroatividade);
+                    })
+                 } else {
+                     alert(retorno.Mensagem)
+                 }
+             },
+             function (XMLHttpRequest, textStatus, errorThrown) {
+                 alert(retorno.Mensagem)
+             });
+        }
+    }
+
+    function valida_documentos_preliminares(){
+        if($('#arquivos_selecionados_data_conclusao_titulacao_rsc tbody').html().trim() === ''){
+            alert('Adicione um arquivo em Título que habilita ao RSC pretendido (mestrado, especialização ou graduação)');
+            return false;
+        }
+        if($('#arquivos_selecionados_data_exercio_carreira tbody').html().trim() === ''){
+            alert('Adicione um arquivo em Exercício na carreira de EBTT)');
+            return false;
+        }
+        return true;
+    }
+
+    function getUnique(inputArray){
+        var outputArray = [];
+        for (var i = 0; i < inputArray.length; i++) {
+            if ((jQuery.inArray(inputArray[i], outputArray)) == -1) {
+                outputArray.push(inputArray[i]);
+            }
+        }
+        return outputArray;
+    }
+
+    function Valida_datas(acao, rsc){
+        var rsc_error = [];
+
+        $('input[type=date]').each(function (item) {
+            var data = $(this).attr('id');
+
+        if ((acao == "salvar") || (acao == "Autosalvar")) {
+            if ((data != 'id_data_conclusao_titulacao_rsc_pretendido') && (data != 'id_data_exercio_carreira') && (data != 'id_data_concessao_ultima_rt')) {
+                if ($("#" + data).val() == '') {
+                    $("#" + data).css("border", "red solid 1px");
+                    rsc = $(this).closest('.tab-pane').attr('data-tab');
+                    rsc = rsc.replace('_', ' ');
+                    console.log()
+                    rsc_error.push(rsc);
+                } else {
+                    $("#" + data).css("border", "");
+                }
+            }
+        }else{
+            if ($("#" + data).val() == '') {
+                   if((rsc == 'RSC-I - docente') && (data != 'id_data_concessao_ultima_rt')) {
+                       $("#" + data).css("border", "red solid 1px");
+                       rsc = $(this).closest('.tab-pane').attr('data-tab');
+                       rsc = rsc.replace('_', ' ');
+                       rsc_error.push(rsc);
+                   }else if ((rsc == 'RSC-II - docente') || (rsc == 'RSC-III - docente'))  {
+                        $("#" + data).css("border", "red solid 1px");
+                       rsc = $(this).closest('.tab-pane').attr('data-tab');
+                       rsc = rsc.replace('_', ' ');
+                       rsc_error.push(rsc);
+                   }
+                }
+            else {
+                    $("#" + data).css("border", "");
+                }
+        }
+        });
+        return rsc_error;
+    }
+
+    function Valida_qtds(){
+        var rsc_error = [];
+         $(".integer-widget").each(function (item) {
+             var qtd = $(this).attr('id');
+             var data = qtd.replace('qtd','data');
+             if ($("#"+qtd).val() == '') {
+                 $("#"+qtd).css("border", "red solid 1px");
+                 $("#"+qtd).parents('.box:first').css("border", "red solid 1px");
+
+                 $("#"+qtd).parents('.box:first').children('div').show();
+                 id_box =  $("#"+qtd).parents('.box:first').attr('id');
+                 $('#'+id_box).attr('class', 'box');
+                 rsc = $(this).closest('.tab-pane').attr('data-tab');
+                 rsc_error.push(rsc);
+             } else {
+                 $("#"+qtd).css("border", "");
+                 if ($("#"+data).val() != '') {
+                     $("#"+qtd).parents('.box:first').css("border", "");
+                 }
+             }
+        });
+        return rsc_error;
+    }
+
+    function Valida_descricoes(){
+         var rsc_error = [];
+         $(".textarea_descricao").each(function (item) {
+             var descricao = $(this).attr('id');
+             var data = descricao.replace('qtd','descricao');
+             if ($("#"+descricao).val() == '') {
+                 $("#"+descricao).css("border", "red solid 1px");
+                 $("#"+descricao).parents('.box:first').css("border", "red solid 1px");
+                 $("#"+descricao).parents('.box:first').children('div').show();
+                 rsc = $(this).closest('.tab-pane').attr('data-tab');
+                 rsc_error.push(rsc);
+             } else {
+                 $("#"+descricao).css("border", "");
+                 if ($("#"+data).val() != ''){
+                     $("#"+descricao).parents('.box:first').css("border", "");
+                 }
+             }
+        });
+        return rsc_error;
+    }
+
+    function Salvar_RSC(processo_id, autoSalvamento){
+        $.ajax({
+                type: "POST",
+                url: '/rsc/salvar_processo_rsc/'+processo_id+'/',
+                data: $('#form_rsc').serialize(),
+                success: function (retorno) {
+                    if (retorno.ok) {
+                        if (autoSalvamento == "nao") {
+                            $('#error').fadeOut();
+
+                            $('#feedback_message').removeClass("d-none");
+                            $('#feedback_message').addClass("d-none");
+                            $('#feedback_message').html("Alterações salvas com sucesso.");
+                            $('#feedback_message').delay(5000).fadeOut(1500);
+                            $('#feedback_message').text();
+                        }else {
+                               $('#feedback_message').delay(5000).fadeOut(1500);
+                            $('#error').delay(5000).fadeOut(1500);
+                            $('#feedback_message').text();
+                        }
+                        $('#data_referencia_retroatividade').html(retorno.data_referencia_retroatividade);
+                    }else {
+                        //erro no salvamento
+                        $('#feedback_message').attr('class', 'errornote');
+                        $('#feedback_message').fadeOut();
+                        $('#feedback_message').fadeIn();
+                        $('#feedback_message').html(retorno.msg);
+                   }
+               }
+        });
+     }
+
+    function Salvar_Arquivo(arquivo_pk_crypto, arquivo_id, criterio_id, diretriz_id, teto_diretriz, classe_tipo_rsc){
+        var qtd = $('#qtd_' + arquivo_id).val();
+        var data = $('#data_' + arquivo_id).val();
+        var descricao = $('#descricao_' + arquivo_id).val();
+
+        if (!qtd || !data || !descricao || !descricao.trim()) {
+            alert('Para salvar este arquivo, preencha Quantidade, Data de Referência e Descrição.');
+            return false;
+        }
+
+        var parametros = {};
+        parametros['Arquivo_' + arquivo_id + '_qtd'] = qtd;
+        parametros['Arquivo_' + arquivo_id + '_data'] = data;
+        parametros['Arquivo_' + arquivo_id + '_descricao'] = descricao;
+
+        $.ajax({
+            type: "POST",
+            url: '/rsc/salvar_arquivo_rsc/' + arquivo_pk_crypto + '/',
+            data: parametros,
+            success: function (retorno) {
+                if (retorno.ok) {
+                    $('#pontuacao_arquivo_' + arquivo_id).html(retorno.pontuacao_arquivo);
+                    if (criterio_id != undefined) {
+                        calcula_pontuacao_total_criterio(criterio_id, teto_diretriz);
+                        calcula_pontuacao_total_diretriz(diretriz_id, teto_diretriz);
+                        calcula_pontuacao_total_rsc(classe_tipo_rsc);
+                    }
+                    $('#data_referencia_retroatividade').html(retorno.data_referencia_retroatividade);
+                    $('#feedback_message').attr('class', 'alert alert-success fixed');
+                    $('#feedback_message').html('Arquivo salvo com sucesso.');
+                    $('#feedback_message').fadeIn().delay(4000).fadeOut(1500);
+                } else {
+                    $('#error').attr('class', 'errornote');
+                    $('#error').html(retorno.msg);
+                    $('#error').fadeIn();
+                }
+            }
+        });
+        return false;
+    }
+
+
+    function Enviar_Processo_RSC(processo_id) {
+        if (confirm("Deseja enviar esse processo para avaliação?")) {
+            $('#link_enviar_cppd').click();
+        }
+    }
+
+    function Valida_Pontuacao(rsc_pretendido){
+        var pontuacao_rsc1 = $("#rsc1").html();
+        var pontuacao_rsc2 = $("#rsc2").html();
+        var pontuacao_rsc3 = $("#rsc3").html();
+        var retorno;
+
+        var soma_rscs = 0;
+        soma_rscs = parseFloat(pontuacao_rsc1*10 + pontuacao_rsc2*10 + pontuacao_rsc3*10)/10;
+
+        if (rsc_pretendido == 'RSC-I - docente'){
+            if ((pontuacao_rsc1 < 25) || (soma_rscs < 50)) {
+                retorno = false;
+            } else {
+                retorno = true;
+            }
+        }
+        if (rsc_pretendido == 'RSC-II - docente'){
+            if ((pontuacao_rsc2 < 25) || (soma_rscs < 50)) {
+                retorno = false;
+            }else{
+                retorno = true;
+            }
+        }
+        if (rsc_pretendido == 'RSC-III - docente'){
+            if ((pontuacao_rsc3 < 25) || (soma_rscs < 50)) {
+                retorno = false;
+            }else{
+                retorno = true;
+            }
+        }
+        return retorno;
+    }
+
+    function Processa_Salvamento(acao, processo_id, rsc_pretendido, status){
+        // Salvar/Autosalvar são tolerantes: gravam o que estiver preenchido, sem bloquear.
+        if (acao == "salvar") {
+            Salvar_RSC(processo_id, "nao");
+            return false;
+        }
+        if (acao == "Autosalvar") {
+            if (status != 'Aguardando avaliação CPPD') {
+                Salvar_RSC(processo_id, "sim");
+            }
+            return false;
+        }
+
+        // Envio à CPPD: aqui sim exige todos os arquivos completos.
+        var rsc_error = Valida_qtds();
+        rsc_error = rsc_error.concat(Valida_datas(acao, rsc_pretendido));
+        rsc_error = rsc_error.concat(Valida_descricoes());
+        rsc_error = getUnique(rsc_error.sort());
+
+        if (rsc_error.length > 0) {
+            $('#feedback_message').fadeOut();
+            $('#error').attr('class','errornote');
+            $('#error').html('Existe(m) erro(s) na(s) aba(s) ' + rsc_error);
+            $('#error').fadeOut();
+            $('#error').fadeIn();
+            return false;
+        }
+
+        if (Valida_Pontuacao(rsc_pretendido)) {
+            Salvar_RSC(processo_id);
+
+            var introducao = $('#id_introducao_relatorio_descritivo').val();
+            var consideracoes_finais = $('#id_conclusao_relatorio_descritivo').val();
+            var enviar = false;
+            if (introducao.trim() == "") {
+                alert("Você não preencheu a Introdução do relatório descritivo. Este campo é de preenchimento obrigatório!");
+            } else if (consideracoes_finais.trim() == "") {
+                alert("Você não preencheu a Considerações Finais do relatório descritivo. Este campo é de preenchimento obrigatório!");
+            } else {
+                enviar = true;
+            }
+            if (enviar && valida_documentos_preliminares()) {
+                Enviar_Processo_RSC(processo_id);
+            }
+        } else {
+            alert('Você não atingiu a pontuação mínima. A pontuação solicitada para o RSC pretendido não pode ser menor que 25 ou a soma das pontuações de RSC-I + RSC-II + RSC-III não podem ser menor que 50.');
+        }
+        return false;
+    }
+
+    function human_file_size(bytes, si) {
+        var thresh = si ? 1000 : 1024;
+        if(bytes < thresh) return bytes + ' B';
+        var units = si ? ['kB','MB','GB','TB','PB','EB','ZB','YB'] : ['KB','MB','GB','TB','PB','EB','ZB','YB'];
+        var u = -1;
+        do {
+            bytes /= thresh;
+            ++u;
+        } while(bytes >= thresh);
+        return bytes.toFixed(1)+' '+units[u];
+    }
+
+    function onCompleteUploadDataConclusaoTitulacaoRSC(uploader, id, fileName, responseJSON) {
+        var el = uploader._getItemByFileId(id);
+        var msn = "Deseja continuar?";
+        var url = "/rsc/excluir_arquivo_exigido_pdf/" + responseJSON.arquivo_pk_crypto + "/";
+        if (responseJSON.success) {
+            var templateRow = '' +
+                    '<tr id="linha-' + responseJSON.arquivo_pk_crypto + '" class="linha-' + responseJSON.arquivo_pk_crypto + '">' +
+                    '   <td>' +
+                    '       <a class="icon icon-view" href="/rsc/visualizar_arquivo_exigido_pdf/' + responseJSON.arquivo_pk_crypto + '" title="Visualizar o arquivo ' + fileName + '"><span class="visually-hidden">Visualizar</span></a>' +
+                    '       <a class="icon icon-delete" href="javascript:void(0);" onclick="Excluir(\'' + responseJSON.arquivo_pk_crypto + '\', \'' + msn + '\', \'' + url + '\',\'{{ processo.id }}\')"><span class="visually-hidden">Remover</span></a>' +
+                    '   </td>' +
+                    '   <td><a href="/rsc/visualizar_arquivo_exigido_pdf/' + responseJSON.arquivo_pk_crypto + '" title="Visualizar o arquivo ' + fileName + '">' + fileName + '</a></td>' +
+                    '   <td>' + human_file_size(responseJSON.tamanho) + '</td>' +
+                    '</tr>';
+            $("#arquivos_selecionados_data_conclusao_titulacao_rsc tbody").html(templateRow).fadeIn("slow");
+            $($(el).find('.qq-upload-result')[0]).html('<span class="true">Concluído</span>');
+            $(el).fadeOut("fast");
+        } else {
+            $($(el).find('.qq-upload-result')[0]).html('<span class="false">Ocorreu um erro.</span>');
+        }
+        $(el).find('.qq-progress')[0].remove();
+    }
+
+    function onCompleteUploadDataExercicioCarreira(uploader, id, fileName, responseJSON) {
+        var el = uploader._getItemByFileId(id);
+        var msn = "Deseja continuar?";
+        var url = "/rsc/excluir_arquivo_exigido_pdf/" + responseJSON.arquivo_pk_crypto + "/";
+        if (responseJSON.success) {
+            var templateRow = '' +
+                    '<tr id="linha-' + responseJSON.arquivo_pk_crypto + '" class="linha-' + responseJSON.arquivo_pk_crypto + '">' +
+                    '   <td>' +
+                    '       <a class="icon icon-view" href="/rsc/visualizar_arquivo_exigido_pdf/' + responseJSON.arquivo_pk_crypto + '" title="Visualizar o arquivo ' + fileName + '"><span class="visually-hidden">Visualizar</span></a>' +
+                    '       <a class="icon icon-delete no-confirm" href="javascript:void(0);" onclick="Excluir(\'' + responseJSON.arquivo_pk_crypto + '\', \'' + msn + '\', \'' + url + '\',\'{{ processo.id }}\')"><span class="visually-hidden">Remover</span></a>' +
+                    '   </td>' +
+                    '   <td><a href="/rsc/visualizar_arquivo_exigido_pdf/' + responseJSON.arquivo_pk_crypto + '" title="Visualizar o arquivo ' + fileName + '" target="_blank">' + fileName + '</a></td>' +
+                    '   <td>' + human_file_size(responseJSON.tamanho) + '</td>' +
+                    '</tr>';
+            $("#arquivos_selecionados_data_exercio_carreira tbody").html(templateRow).fadeIn("slow");
+            $($(el).find('.qq-upload-result')[0]).html('<span class="true">Concluído</span>');
+            $(el).fadeOut("fast");
+        } else {
+            $($(el).find('.qq-upload-result')[0]).html('<span class="false">Ocorreu um erro!</span>');
+        }
+        $(el).find('.qq-progress')[0].remove();
+    }
+
+    function onCompleteUploadDocumentosExigidos(uploader, id, fileName, responseJSON) {
+        var el = uploader._getItemByFileId(id);
+        var msn = "Deseja continuar?";
+        var url = "/rsc/excluir_arquivo_exigido_pdf/" + responseJSON.arquivo_pk_crypto + "/";
+        if (responseJSON.success) {
+            var templateRow = '' +
+                    '<tr id="linha-' + responseJSON.arquivo_pk_crypto + '" class="linha-' + responseJSON.arquivo_pk_crypto + '">' +
+                    '   <td>' +
+                    '       <a class="icon icon-view" href="/rsc/visualizar_arquivo_exigido_pdf/' + responseJSON.arquivo_pk_crypto + '" title="Visualizar o arquivo ' + fileName + '"><span class="visually-hidden">Visualizar</span></a>' +
+                    '       <a class="icon icon-delete no-confirm" href="javascript:void(0);" onclick="Excluir(\'' + responseJSON.arquivo_pk_crypto + '\', \'' + msn + '\', \'' + url + '\',\'{{ processo.id }}\')"><span class="visually-hidden">Remover</span></a>' +
+                    '   </td>' +
+                    '   <td><a href="/rsc/visualizar_arquivo_exigido_pdf/' + responseJSON.arquivo_pk_crypto + '" title="Visualizar o arquivo ' + fileName + '" target="_blank">' + fileName + '</a></td>' +
+                    '   <td>' + human_file_size(responseJSON.tamanho) + '</td>' +
+                    '</tr>';
+            $("#arquivos_selecionados_exigidos tbody").html(templateRow).fadeIn("slow");
+            $($(el).find('.qq-upload-result')[0]).html('<span class="true">Concluído</span>');
+            $(el).fadeOut("fast");
+        } else {
+            $($(el).find('.qq-upload-result')[0]).html('<span class="false">Ocorreu um erro!</span>');
+        }
+        $(el).find('.qq-progress')[0].remove();
+    }
+    </script>
+
+{% endblock %}
+
+{% block before_holder %}
+    <p id="feedback_message" class="alert alert-success fixed d-none"> Processo de RSC salvo com sucesso. </p>
+    <p id="error" class="d-none"> Por favor, corrija os erros abaixo. </p>
+{% endblock %}
+
+{% block content %}
+
+    <a hidden class="popup" id="link_enviar_cppd" href="/rsc/enviar_processo_rsc/{{ processo.pk }}/"></a>
+
+    <form id="form_rsc" action="" method="post">
+        {% csrf_token %}
+        {% if processo.servidor %}
+            {% box 'Identificação do Servidor' %}
+
+                <div class="table-responsive">
+                    <table class="info mt-1 mb-1">
+                        <caption class="hidden">Identificação do Servidor</caption>
+                        <tr>
+                            <td>Nome</td>
+                            <td>{{ processo.servidor.pessoa_fisica.nome }}</td>
+                            <td>Matrícula</td>
+                            <td colspan="3">{{ processo.servidor.matricula }}</td>
+                        </tr>
+                        <tr>
+                            <td>E-mail Institucional</td>
+                            <td><a href="mailto:{{ processo.servidor.email_institucional }}">{{ processo.servidor.email_institucional|format }}</a></td>
+                            <td>Cargo</td>
+                            <td colspan="3">{{ processo.servidor.cargo_emprego }}</td>
+                        </tr>
+                        <tr>
+                            <td>RSC Pretentido</td>
+                            <td>{{ title }}</td>
+                            <td>Pontuação Requerida</td>
+                            <td><span id="pontuacao_requerida">{{ processo.pontuacao_pretendida|format }}</span></td>
+                            <td>Data de Retroatividade Requerida</td>
+                            <td><span id="data_referencia_retroatividade">{{ processo.get_data_referencia_retroativa|format }}</span></td>
+                        </tr>
+                        <tr>
+                            <td>Situação do processo</td>
+                            <td colspan="5" id="status">{{ processo.get_status_display|status }}</td>
+                        </tr>
+                        {% if processo.ultima_validacao_processo and processo.ultima_validacao_processo.motivo_rejeicao %}
+                        <tr>
+                            <td>Descrição da Rejeição</td>
+                            <td colspan="5">
+                                {{ processo.ultima_validacao_processo.motivo_rejeicao }}
+                            </td>
+                        </tr>
+                        {% endif %}
+                        {% if processo.clonado and processo.clonearquivoerro_set.exists and processo.status == processo.STATUS_AGUARDANDO_ENVIO_CPPD %}
+                        <tr>
+                            <td>Problemas na clonagem</td>
+                            <td colspan="5">
+                                <div class="alert alert-danger">
+                                    <p><strong>Alguns arquivos não foram encontrados ou estão corrompidos. É necessário adicioná-los novamente ao processo.</strong></p>
+                                    <ul>
+                                        {% for e in processo.clonearquivoerro_set.all %}
+                                        <li>{{ e.nome_arquivo }}
+                                            <br />
+                                            <small>{{ e.get_localizacao }}</small>
+                                        </li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </table>
+                </div>
+
+            {% endbox %}
+
+            {% if mostrar_resumo_problemas %}
+                <div class="alert alert-danger">
+                    <p><strong>Resumo dos problemas:</strong></p>
+                    <ul>
+                        {% if processo.ultima_validacao_processo.titulacao_status and processo.ultima_validacao_processo.titulacao_status != 1 %}
+                        <li>
+                            Título que habilita ao RSC pretendido (mestrado, especialização ou graduação):
+                            {{ processo.ultima_validacao_processo.get_titulacao_status_display }}
+                        </li>
+                        {% endif %}
+                        {% if processo.ultima_validacao_processo.inicio_exercicio_status and processo.ultima_validacao_processo.inicio_exercicio_status != 1 %}
+                        <li>
+                            Exercício na carreira de EBTT:
+                            {{ processo.ultima_validacao_processo.get_inicio_exercicio_status_display }}
+                        </li>
+                        {% endif %}
+                        {% if processo.ultima_validacao_processo.ultima_concessao_rt_status and processo.ultima_validacao_processo.ultima_concessao_rt_status != 1 %}
+                        <li>
+                            Concessão da última RT:
+                            {{ processo.ultima_validacao_processo.get_ultima_concessao_rt_status_display }}
+                        </li>
+                        {% endif %}
+                        {% if processo.ultima_validacao_processo.formulario_pontuacao_status and processo.ultima_validacao_processo.formulario_pontuacao_status != 1 %}
+                        <li>
+                            Problemas na aba RSC-I, RSC-II ou RSC-III: é necessário verificar os arquivos antes de reenviar para a CPPD.
+                        </li>
+                        {% endif %}
+                        {% if processo.ultima_validacao_processo.relatorio_descritivo_status and processo.ultima_validacao_processo.relatorio_descritivo_status != 1 %}
+                        <li>
+                            Problemas no Relatório Descritivo: é necessário preencher os campos corretamente.
+                        </li>
+                        {% endif %}
+                    </ul>
+                </div>
+            {% endif %}
+
+            <div class="tab-pane" data-title="Instruções Gerais" data-tab="instrucoes_gerais">
+                {{ config.instrucoes_gerais|safe }}
+            </div>
+
+            <div class="tab-pane" data-title="Documentos Preliminares" data-tab="documentos_preliminares"></div>
+
+            {% for tipo_rsc in tipos_rsc %}
+                <div class="tab-pane" id="tab{{ forloop.counter }}" data-title="{{ tipo_rsc.nome }}">
+                    <span class="status status-info mb-4"><strong>Total no Grupo {{ tipo_rsc.nome }}: </strong>
+                        <span id="rsc{{ forloop.counter }}">
+                        {% if forloop.counter == 1 %}
+                        {{ processo.get_pontuacao_pretendida_rsc1 }}
+                        {% elif forloop.counter == 2 %}
+                        {{ processo.get_pontuacao_pretendida_rsc2 }}
+                        {% else %}
+                        {{ processo.get_pontuacao_pretendida_rsc3 }}
+                        {% endif %}
+                        </span>
+                    </span>
+
+                    <input type="hidden" id="rsc{{ forloop.counter }}hidden" name="rsc{{ forloop.counter }}" value="{% if forloop.counter == 1 %}
+                    {{ processo.get_pontuacao_pretendida_rsc1 }}
+                    {% elif forloop.counter == 2 %}
+                    {{ processo.get_pontuacao_pretendida_rsc2 }}
+                    {% else %}
+                    {{ processo.get_pontuacao_pretendida_rsc3 }}
+                    {% endif %}">
+
+                    {% for diretriz in tipo_rsc.diretrizes %}
+                        {% box "{{ diretriz.nome }}: {{ diretriz.descricao }}" boxid="diretriz_{{ diretriz.id }}" %}
+                            <dl>
+                                <dt>
+                                    Total: <span class="{{ tipo_rsc.nome }} total_diretriz" id="total_diretriz_{{ diretriz.id }}">{{ diretriz.total_ponto }}</span>
+                                </dt>
+                            </dl>
+                            {% if diretriz.criterio_set.all %}
+                                {% for criterio in diretriz.criterios %}
+                                    {% box "{{ criterio.numero }} - {{ criterio.nome }}" class="collapsed" boxid="criterio_{{ criterio.id }}" %}
+                                        <p class="alert alert-info">Pontos: <span id="total_pontos_criterio_{{ criterio.id }}">{{ criterio.total_ponto }}</span></p>
+                                        <p class="alert alert-warning">Permitido somente arquivos com extensão <strong>pdf</strong>.</p>
+
+                                        {% if processo.avaliado_pode_editar and eh_dono_processo %}
+                                            {% render_file_field processo criterio %}
+                                            <script>
+                                                function onCompleteUploadCriterio{{ criterio.id }}(uploader, id, fileName, responseJSON) {
+                                                    var el = uploader._getItemByFileId(id);
+
+                                                    var msn = "Deseja continuar?";
+                                                    var url = "/rsc/excluir_arquivo_pdf/" + responseJSON.arquivo_pk_crypto + "/";
+
+                                                    if(responseJSON.success) {
+                                                        $("#arquivos_selecionados{{ criterio.id }}").removeClass('d-none');
+                                                        hash_arquivo = "arquivo-"+ responseJSON.arquivo_pk_crypto;
+                                                        var templateRow =
+                                                                '<tr id="linha-arquivo-'+responseJSON.arquivo_pk_crypto+'" class="linha-arquivo-'+responseJSON.arquivo_pk_crypto+'">' +
+                                                                '    <td class="no-print" rowspan="3">' +
+                                                                '         <a class="icon icon-view" href="/rsc/visualizar_arquivo_pdf/'+responseJSON.arquivo_pk_crypto+'" title="Visualizar o arquivo '+fileName+'"><span class="visually-hidden">Visualizar</span></a>' +
+                                                                '         <a class="icon icon-delete" href="javascript:void(0);" onclick="Excluir(\''+hash_arquivo+'\', \''+msn+'\', \''+url+'\',\'{{ processo.id }}\',\'{{ diretriz.teto }}\')"><span class="visually-hidden">Remover</span></a>' +
+                                                                '    </td>' +
+                                                                '     <td rowspan="3">' +
+                                                                '         <a href="/rsc/visualizar_arquivo_pdf/'+responseJSON.arquivo_pk_crypto+'" title="Visualizar o arquivo '+fileName+'" target="_blank">'+fileName+'</a>' +
+                                                                '        ' + human_file_size(responseJSON.tamanho) +
+                                                                '     </td>' +
+                                                                '     <td>' +
+                                                                '         Quantidade: ({{ criterio.unidade }}): '+responseJSON.field_qtd +
+                                                                '     </td>' +
+                                                                '     <td rowspan="3">'+
+                                                                '         '+ responseJSON.field_nota +
+                                                                '         <span class="diretriz_class_{{ criterio.diretriz.id }} criterio_class_{{criterio.id }} {{ criterio.diretriz.tipo_rsc.nome }}" id="pontuacao_arquivo_'+responseJSON.arquivo_pk+'">0.0</span>' +
+                                                                '     </td>' +
+                                                                '</tr>' +
+                                                                '<tr class="linha-arquivo-'+responseJSON.arquivo_pk_crypto+'">' +
+                                                                '     <td>' +
+                                                                '        Data de referência : '+responseJSON.field_data +
+                                                                ' (00/00/0000)    </td>' +
+                                                                '</tr>' +
+                                                                '<tr class="linha-arquivo-'+responseJSON.arquivo_pk_crypto+'">' +
+                                                                '     <td>' +
+                                                                '         Descriçao: '+responseJSON.field_descricao+
+                                                                '         <div class="mt-2"><a class="btn success btn-sm" href="#" onclick="return Salvar_Arquivo(\''+responseJSON.arquivo_pk_crypto+'\', '+responseJSON.arquivo_pk+', {{ criterio.id }}, {{ criterio.diretriz.id }}, {{ criterio.diretriz.teto }}, \'{{ criterio.diretriz.tipo_rsc.nome }}\')" title="Salvar as informações deste arquivo">Salvar</a></div>' +
+                                                                '     </td>' +
+                                                                '</tr>';
+
+                                                        $(templateRow).prependTo("#arquivos_selecionados{{ criterio.id }} tbody").fadeIn("slow");
+                                                        $($(el).find('.qq-upload-result')[0]).html('<span class="true">Concluído</span>');
+                                                        $(el).fadeOut("fast");
+                                                    } else {
+                                                        $($(el).find('.qq-upload-result')[0]).html('<span class="false">Ocorreu um erro!</span>');
+                                                    }
+                                                    $(el).find('.qq-progress')[0].remove();
+                                                }
+                                            </script>
+                                        {% endif %}
+
+                                        <table id="arquivos_selecionados{{ criterio.id }}" {% if not criterio.arquivo_set.all.count %}class="d-none"{% endif %}>
+                                            <thead>
+                                                <tr>
+                                                    <th class="no-print">Ações</th>
+                                                    <th>Documento</th>
+                                                    <th>Informações</th>
+                                                    <th>Pontuação</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for arquivo in criterio.arquivos %}
+                                                    <tr id="linha-arquivo-{{ arquivo.encrypted_pk }}" class="linha-arquivo-{{ arquivo.encrypted_pk }}">
+                                                        <td class="no-print" rowspan="3">
+                                                            {% icon "view" "/rsc/visualizar_arquivo_pdf/{{ arquivo.encrypted_pk }}" "Visualizar o arquivo {{ arquivo.nome }}" %}
+                                                            {% if processo.avaliado_pode_editar and eh_dono_processo %}
+                                                                <a class="icon icon-delete no-confirm" onclick="Excluir('arquivo-{{ arquivo.encrypted_pk }}', 'Deseja continuar?', '/rsc/excluir_arquivo_pdf/{{ arquivo.encrypted_pk }}/', '{{ processo.id }}', {{ diretriz.teto }})" href="#" title="Excluir o arquivo {{ arquivo.nome }}"><span class="visually-hidden">Remover</span></a>
+                                                            {% endif %}
+                                                        </td>
+                                                            <td rowspan="3">
+                                                                <a href="/rsc/visualizar_arquivo_pdf/{{ arquivo.encrypted_pk }}" title="Visualizar o arquivo {{ arquivo.nome }}">{{ arquivo.nome }}</a>
+                                                            {{ arquivo.tamanho|human_file_size }}
+                                                            </td>
+                                                            <td>
+                                                                Quantidade ({{ criterio.unidade }}): {{ arquivo|render_qtd_itens }}
+                                                            </td>
+                                                            <td rowspan="3">
+                                                                {{ arquivo|render_nota_pretendida }}
+                                                                <span class="diretriz_class_{{ criterio.diretriz.id }} criterio_class_{{ criterio.id }} {{ criterio.diretriz.tipo_rsc.nome }}" id="pontuacao_arquivo_{{ arquivo.id }}">{{ arquivo.nota_pretendida }}</span>
+                                                            </td>
+                                                    </tr>
+                                                    <tr class="linha-arquivo-{{ arquivo.encrypted_pk }}">
+                                                            <td>
+                                                            Data de referência : {{ arquivo|render_data_referencia }} (00/00/0000)
+                                                            </td>
+                                                    </tr>
+                                                    <tr class="linha-arquivo-{{ arquivo.encrypted_pk }}">
+                                                            <td>
+                                                                <div>Descriçao:</div> {{ arquivo|render_descricao }}
+                                                                {% if processo.avaliado_pode_editar and eh_dono_processo %}
+                                                                    <div class="mt-2">
+                                                                        <a class="btn success btn-sm" href="#" onclick="return Salvar_Arquivo('{{ arquivo.encrypted_pk }}', {{ arquivo.id }}, {{ criterio.id }}, {{ criterio.diretriz.id }}, {{ criterio.diretriz.teto }}, '{{ criterio.diretriz.tipo_rsc.nome }}')" title="Salvar as informações deste arquivo">Salvar</a>
+                                                                    </div>
+                                                                {% endif %}
+                                                            </td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    {% endbox %}
+                                {% endfor %}
+                            {% endif %}
+                        {% endbox %}
+                    {% endfor %}
+                </div>
+            {% endfor %}
+
+            <div class="tab-pane" data-title="Relatório Descritivo" data-tab="relatorio_descritivo"></div>
+
+            <div class="tab-pane" data-title="Quadro Resumo da Pontuação Requerida" data-tab="quadro_resumo_pontuacao_requerida"></div>
+
+            {% if processo.avaliado_pode_editar or processo.avaliado_pode_ajustar and eh_dono_processo %}
+                <a href="#" onclick="Processa_Salvamento('enviar_cppd', '{{ processo.id }}', '{{ processo.tipo_rsc }}')" class="btn success" name="enviar_processo">Enviar para CPPD</a>
+                <a href="#" onclick="Processa_Salvamento('salvar', '{{ processo.id }}', '{{ processo.tipo_rsc }}')" class="btn success">Salvar</a>
+            {% endif %}
+
+        {% endif %}
+    </form>
+{% endblock %}

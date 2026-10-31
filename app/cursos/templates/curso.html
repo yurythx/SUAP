@@ -1,0 +1,305 @@
+{% extends super_template %}
+
+{% block action-bar %}
+<ul class="action-bar">
+    {% if pode_iniciar_curso %}
+        <li>
+            <a class="btn success" href="/cursos/curso/{{ curso.id }}/iniciar/">Iniciar Curso</a>
+        </li>
+    {% endif %}
+    {% if pode_ativar_desativar_detalhamento_atividade %}
+        <li>
+            <a class="btn warning confirm" href="/cursos/curso/{{ curso.id }}/ativar_desativar_detalhamento_atividade/">{{ ativar_desativar_detalhamento_atividade_label }}</a>
+        </li>
+    {% endif %}    
+    {% if perms.cursos.change_curso %}
+        <li>
+            <a class="btn primary" href="/admin/cursos/curso/{{ curso.id }}/">Editar Curso</a>
+        </li>
+    {% endif %}
+    {% if pode_informar_cadastro_folha %}
+        <li>
+            <a class="btn" href="javascript:void(0);" onclick="javascript:if(confirm('Deseja mesmo informar o cadastro em folha?')){$('#form_participantes').submit();}">Informar Cadastro em Folha</a>
+        </li>
+    {% endif %}
+    {% if pode_finalizar_curso %}
+        <li>
+            <a class="btn danger" href="/cursos/curso/{{ curso.id }}/finalizar/">Finalizar Curso</a>
+        </li>
+    {% endif %}
+</ul>
+{% endblock %}
+
+{% block object-status %}
+    {{ curso.get_situacao_display|status }}
+{% endblock %}
+
+{% block content %}
+    {% if not curso.participantes_detalhamento_atividade_ativado %}
+        <p class="alert alert-warning">O <strong>detalhamento das horas trabalhadas</strong> pelos participantes está <strong>desativado</strong> para este curso.</p>
+    {% endif %}
+
+    <dl class="definition-list flex">
+        <div class="list-item flex-basis-100">
+            <dt>Descrição</dt>
+            <dd>{{ curso.descricao }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Tipo</dt>
+            <dd>{{ curso.get_tipo_display }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Campus</dt>
+            <dd>{{ curso.campus.nome }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Ano Previsto da Atividade</dt>
+            <dd>{{ curso.ano_pagamento }}</dd>
+        </div>
+        {% if curso.edital %}
+            <div class="list-item">
+                <dt>Edital</dt>
+                <dd><a href="{{ curso.edital.url }}" class="btn">{% icone "download" %} Baixar</a></dd>
+            </div>
+        {% endif %}
+        {% if curso.processos.all %}
+            <div class="list-item flex-basis-100">
+                <dt>Processos Relacionados</dt>
+                <dd>
+                    {% with curso.processos.all as processos %}
+                        {% for p in processos %}
+                            <p><a href="{{ p.get_absolute_url }}">{{ p }}</a></p>
+                        {% endfor %}
+                    {% endwith %}
+                </dd>
+            </div>
+        {% endif %}
+        {% if curso.responsaveis.all %}
+            <div class="list-item">
+                <dt>Responsáveis</dt>
+                <dd>
+                    {% with curso.responsaveis.all as responsaveis %}
+                        {% for r in responsaveis %}
+                            <p>{{ r }}</p>
+                        {% endfor %}
+                    {% endwith %}
+                </dd>
+            </div>
+        {% endif %}
+    </dl>
+
+    {% box 'Participantes' badge=curso.participante_set.count %}
+        <ul class="action-bar">
+            {% if pode_gerenciar_participante %}
+                <li><a class="btn success popup" href="/cursos/add_participante/{{ curso.id }}/">Adicionar Participante</a></li>
+                {% if pode_liberar_participantes %}
+                    <li><a class="btn warning confirm" href="/cursos/liberar_participantes/{{ curso.id }}/">Liberar Participantes</a></li>
+                {% endif %}
+            {% endif %}
+            {% if pode_adicionar_horas_participante %}
+                <li><a class="btn warning confirm" href="/cursos/hora_prevista_to_hora_trabalhada/{{ curso.id }}/" 
+                    data-confirm="Esta ação irá utilizar as horas previstas e aplicá-las em horas trabalhadas. Além disso, o detalhamento das horas trabalhadas de TODOS os participantes voltará, se for o caso, à fase 'Aguardando Preenchimento'.">
+                        Preencher Horas Trabalhadas Automaticamente </a></li>
+            {% endif %}
+            {% if pode_imprimir_listagem %}
+                <li><a class="btn" href="/cursos/imprimir_listagem/{{ curso.id }}/">Imprimir</a></li>
+            {% endif %}
+        </ul>
+
+        {% if curso.participante_set.exists %}
+            <form method="post" action="/cursos/curso/{{ curso.id }}/informar_cadastro_folha/" id="form_participantes">
+                {% csrf_token %}
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                {% if pode_informar_cadastro_folha %}
+                                    <th class="no-print">#</th>
+                                {% endif %}
+                                {% if pode_gerenciar_participante or pode_adicionar_horas_participante %}
+                                    <th class="no-print">Ações</th>
+                                {% endif %}
+                                <th>Servidor</th>
+                                <th>Atividade</th>
+                                <th>Mês Previsto da Atividade</th>
+                                <th>Mês/Ano de Pagamento</th>
+                                <th>Horas Disponíveis</th>
+                                <th>Horas Previstas</th>
+                                <th>Horas Trabalhadas</th>
+                                <th>Valor da Atividade</th>
+                                <th>Horas x Valor</th>
+                                <th>Situação</th>
+                                <th>Detalhamento das Horas Trabalhadas</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for participante in curso.get_participantes %}
+                                <tr>
+                                    {% if pode_informar_cadastro_folha %}
+                                        <td class="no-print">
+                                            <input type="checkbox" name="add_participante" checked="checked" value="{{ participante.id }}">
+                                        </td>
+                                    {% endif %}
+                                    {% if pode_gerenciar_participante or pode_adicionar_horas_participante %}
+                                        <td class="no-print">
+                                            {% if curso.pode_remover_participante %}
+                                                {% icon "edit" "/cursos/editar_participante/{{ participante.id }}/" "Editar Participante" "popup" %}
+                                                {% icon "delete" "/cursos/remover_participante/{{ participante.id }}/" %}
+                                            {% elif pode_adicionar_horas_participante %}
+                                                <a class="btn success popup" href="/cursos/adicionar_horas/{{ participante.id }}/">Adicionar Horas</a>
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                    {% endif %}
+                                    <td>
+                                        {% if pode_visualizar_participantes or participante.servidor == servidor_logado %}
+                                            <a href="/cursos/participante/{{ participante.id }}/">{{ participante.servidor }}</a>
+                                        {% else %}
+                                            {{ participante.servidor }}
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ participante.atividade }}</td>                                    
+
+                                    <!-- a partir desse ponto, as informações podem ser mascaradas -->
+                                    {% if pode_visualizar_participantes or participante.servidor == servidor_logado %}
+                                        <td>{{ participante.atividade_mes_display }}</td>
+                                        <td>
+                                            {% if pode_mudar_situacao_curso_concurso and participante.mes_pagamento %}
+                                                {% icon "edit" "/cursos/editar_mes_pagamento/{{ participante.id }}/" "Editar" "popup" %}
+                                            {% endif %}
+                                            {{ participante.mes_ano_pagamento|format }}
+                                        </td>
+                                        <td align="right">{{ participante.horas_disponiveis_ano|format }}</td>
+                                        <td align="right">{{ participante.horas_prevista|format }}</td>
+                                        <td align="right">{{ participante.horas_trabalhada|format }}</td>
+                                        <td align="right">{{ participante.atividade.valor_hora|format }}</td>
+                                        <td align="right">{{ participante.valor_total|format }}</td>
+                                        <td align="center">{{ participante.get_situacao_html }}</td>
+                                        <td align="center">{{ participante.get_situacao_detalhamento_display_html }}</td>
+                                    {% else %}
+                                        <td>*</td>
+                                        <td>*</td>
+                                        <td align="right">*</td>
+                                        <td align="right">*</td>
+                                        <td align="right">*</td>
+                                        <td align="right">*</td>
+                                        <td align="right">*</td>
+                                        <td align="center">*</td>
+                                        <td align="center">*</td>
+                                    {% endif %}
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                {% if pode_informar_cadastro_folha %}
+                                    <td>-</td>
+                                {% endif %}
+                                {% if pode_gerenciar_participante or pode_adicionar_horas_participante %}
+                                    <td>-</td>
+                                {% endif %}
+                                <td>-</td>
+                                <td>-</td>
+                                <td>-</td>
+                                <td>-</td>
+                                <td>-</td>
+                                <td>{{ horas_previstas_total|format }}</td>
+                                <td>{{ horas_trabalhadas_total|format }}</td>
+                                <td>-</td>
+                                <td>{{ valor_total|format }}</td>
+                                <td>-</td>
+                                <td>-</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </form>
+        {% else %}
+            <p class="alert alert-warning">Nenhuma hora trabalhada registrada.</p>
+        {% endif %}
+    {% endbox %}
+
+    {% if curso.tem_participante_pendente %}
+        {% box "Participantes com Pendência de Pagamento" %}
+            <p class="alert alert-warning">
+                <strong>Atenção:</strong> A realização dos pagamentos dos pendentes será de acordo com a folha corrente.
+            </p>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Servidor</th>
+                            <th>Atividade</th>
+                            <th>Mês da Atividade</th>
+                            <th>Horas Disponíveis</th>
+                            <th>Horas Previstas</th>
+                            <th>Horas Trabalhadas</th>
+                            <th>Valor da Atividade</th>
+                            <th>Horas x Valor</th>
+                            <th>Situação</th>
+                            <th>Detalhamento das Horas Trabalhadas</th>
+                            <th>Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for participante in curso.participantes_com_pendencia %}
+                            <tr>
+                                <td>
+                                    {% if pode_visualizar_participantes or participante.servidor == servidor_logado %}
+                                        <a href="/cursos/participante/{{ participante.id }}/">{{ participante.servidor }}</a>
+                                    {% else %}
+                                        {{ participante.servidor }}
+                                    {% endif %}
+                                </td>
+                                <td>{{ participante.atividade }}</td>                                
+
+                                <!-- a partir desse ponto, as informações podem ser mascaradas -->
+                                {% if pode_visualizar_participantes or participante.servidor == servidor_logado %}
+                                    <td>{{ participante.atividade_mes_display }}</td>
+                                    <td align="right">{{ participante.horas_disponiveis_ano|format }}</td>
+                                    <td align="right">{{ participante.horas_prevista|format }}</td>
+                                    <td align="right">{{ participante.horas_trabalhada|format }}</td>
+                                    <td align="right">{{ participante.atividade.valor_hora|format }}</td>
+                                    <td align="right">{{ participante.valor_total|format }}</td>
+                                    <td align="center">{{ participante.get_situacao_html }}</td>
+                                    <td align="center">{{ participante.get_situacao_detalhamento_display_html }}</td>
+                                {% else %}
+                                    <td>*</td>
+                                    <td align="right">*</td>
+                                    <td align="right">*</td>
+                                    <td align="right">*</td>
+                                    <td align="right">*</td>
+                                    <td align="right">*</td>
+                                    <td align="center">*</td>
+                                    <td align="center">*</td>
+                                {% endif %}                                
+
+                                <td>
+                                    <ul class="action-bar">
+                                        <li><a class="btn warning confirm" href="/cursos/realizar_pagamento_participante_pendente/{{ participante.id }}/">Realizar Pagamento</a></li>
+                                    </ul>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td>-</td>
+                            <td>-</td>
+                            <td>-</td>
+                            <td>-</td>
+                            <td>{{ horas_previstas_total_pendentes|format }}</td>
+                            <td>{{ horas_trabalhadas_total_pendentes|format }}</td>
+                            <td>-</td>
+                            <td>{{ valor_total_pendentes|format }}</td>
+                            <td>-</td>
+                            <td>-</td>
+                            <td>-</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        {% endbox %}
+    {% endif %}
+{% endblock %}

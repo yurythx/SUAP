@@ -1,0 +1,119 @@
+{% extends super_template %}
+{% block extrahead %}
+    <script>
+        $(document).ready(function() {
+            verificar_ambiente_homologacao();
+            $('select[name=ambiente_homologacao]').on('change', function(){
+                verificar_ambiente_homologacao();
+            });
+            
+            // Atualizar módulos (tags) quando área de atuação é selecionada
+            var area_field = $('select[name=area]');
+            if (area_field.length) {
+                // Salvar seleção atual de tags
+                var salvarSelecaoTags = function() {
+                    var tags_selecionadas = [];
+                    $('input[name="tags"]:checked').each(function() {
+                        tags_selecionadas.push($(this).val());
+                    });
+                    return tags_selecionadas;
+                };
+                
+                // Restaurar seleção de tags
+                var restaurarSelecaoTags = function(tags_selecionadas) {
+                    tags_selecionadas.forEach(function(tag_id) {
+                        $('input[name="tags"][value="' + tag_id + '"]').prop('checked', true);
+                    });
+                };
+                
+                area_field.on('change', function() {
+                    var area_id = $(this).val();
+                    if (area_id) {
+                        var tags_selecionadas = salvarSelecaoTags();
+                        
+                        // Fazer requisição AJAX para obter as tags da área
+                        $.ajax({
+                            url: '/demandas/ajax/get_tags_area/',
+                            data: {
+                                'area_id': area_id
+                            },
+                            dataType: 'json',
+                            success: function(data) {
+                                // Encontrar o container de tags/módulos de diferentes formas
+                                var tags_container = $('input[name="tags"]').first().parent().parent();
+                                
+                                // Se não encontrar, tentar outras abordagens
+                                if (!tags_container.length || !tags_container.is('ul')) {
+                                    tags_container = $('input[name="tags"]').closest('ul');
+                                }
+                                
+                                if (!tags_container.length) {
+                                    // Última tentativa: procurar pela label Módulos
+                                    var modulos_label = $('label:contains("Módulos")');
+                                    if (modulos_label.length) {
+                                        tags_container = modulos_label.closest('.form-row').find('ul');
+                                    }
+                                }
+                                
+                                if (tags_container.length) {
+                                    tags_container.empty();
+                                    if (data.tags && data.tags.length > 0) {
+                                        $.each(data.tags, function(index, tag) {
+                                            var li = $('<li></li>');
+                                            var label = $('<label></label>');
+                                            var checkbox = $('<input type="checkbox" name="tags">');
+                                            checkbox.attr('value', tag.id);
+                                            checkbox.attr('id', 'id_tags_' + tag.id);
+                                            label.append(checkbox);
+                                            label.append(' ' + tag.nome);
+                                            li.append(label);
+                                            tags_container.append(li);
+                                        });
+                                        // Restaurar seleção anterior se existir
+                                        restaurarSelecaoTags(tags_selecionadas);
+                                    } else {
+                                        tags_container.append('<li style="list-style: none;">Nenhum módulo disponível para esta área.</li>');
+                                    }
+                                } else {
+                                    console.warn('Container de módulos não encontrado no DOM.');
+                                }
+                            },
+                            error: function(xhr, status, error) {
+                                console.error('Erro ao carregar módulos da área selecionada:', error);
+                            }
+                        });
+                    } else {
+                        // Se nenhuma área foi selecionada, limpar os módulos
+                        var tags_container = $('input[name="tags"]').closest('ul');
+                        if (tags_container.length) {
+                            tags_container.empty();
+                            tags_container.append('<li style="list-style: none;">Selecione uma área de atuação primeiro.</li>');
+                        }
+                    }
+                });
+                
+                // Trigger inicial se já houver uma área selecionada
+                if (area_field.val()) {
+                    area_field.trigger('change');
+                }
+            }
+        });
+        function verificar_ambiente_homologacao() {
+            let ambiente_homologacao = $('select[name=ambiente_homologacao]');
+            let url_validacao = $('div.url_validacao');
+            let senha_homologacao = $('div.senha_homologacao');
+            if(ambiente_homologacao.val()){
+                url_validacao.hide();
+                senha_homologacao.hide();
+            } else {
+                url_validacao.show();
+                senha_homologacao.show();
+            }
+        }
+    </script>
+{% endblock %}
+{% block content %}
+    <h3>{{ sub_title }}</h3>
+    {% if alerta %}<p>{{ alerta }}</p>{% endif %}
+    {% render_form form %}
+{% endblock %}

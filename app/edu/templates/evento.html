@@ -1,0 +1,282 @@
+{% extends super_template %}
+
+{% block extrahead %}
+    <script>
+        // Marca todos
+        document.addEventListener("change", function (e) {
+            if (e.target.matches("thead input[type='checkbox']")) {
+                const table = e.target.closest("table");
+                const checks = table.querySelectorAll("tbody input[type='checkbox']");
+                checks.forEach(c => c.checked = e.target.checked);
+            }
+        });
+
+        function enviarEmailParticipantesSelecionados(evento) {
+            var inputs = $("input[name='cpfs']");
+            var pks = [];
+            for (u = 0; u < inputs.length; u++) {
+                if (inputs[u].checked) {
+                    pks.push(inputs[u].value);
+                }
+            }
+
+            pks = pks.join("_");
+            if (pks.length > 0) {
+                pks = pks + "/";
+            }
+
+            if (pks.length == 0) {
+                alert('Por favor, selecione o(s) participantes(s) para o qual deseja enviar o Certificado por email.');
+            }
+            else {
+                document.location.href = "/edu/enviar_certificado_participacao_evento/" + evento + "/" + pks;
+            }
+        }
+    </script>
+{% endblock %}
+
+{% block content %}
+    {% box "Informações do Evento/Palestra" %}
+        <table class="info">
+            <tr>
+                <td>Título</td>
+                <td>{{ obj.titulo }}</td>
+            </tr>
+            <tr>
+                <td>Descrição</td>
+                <td>{{ obj.descricao }}</td>
+            </tr>
+            <tr>
+                <td>Tipo</td>
+                <td>{{ obj.get_tipo }}</td>
+            </tr>
+            <tr>
+                <td>Campus</td>
+                <td>{{ obj.uo }}</td>
+            </tr>
+            <tr>
+                <td>Data de Realização</td>
+                <td>{{ obj.data }}</td>
+            </tr>
+            <tr>
+                <td>Modelo do Certificado de Participação</td>
+                <td>
+                    <a href="{{ obj.modelo_certificado_participacao.url }}">{{ obj.modelo_certificado_participacao }}</a>
+                    <a class="popup btn primary" href="/edu/modelo_certificado_evento/{{ obj.pk }}/Participante/">Editar</a>
+                </td>
+            </tr>
+            <tr>
+                <td>Modelo do Certificado de Palestrante</td>
+                <td>
+                    <a href="{{ obj.modelo_certificado_palestrante.url }}">{{ obj.modelo_certificado_palestrante }}</a>
+                	<a class="popup btn primary" href="/edu/modelo_certificado_evento/{{ obj.pk }}/Palestrante/">{% if obj.modelo_certificado_palestrante %}Editar {% else %}Adicionar {% endif %}</a>
+                </td>
+            </tr>
+            <tr>
+                <td>Modelo do Certificado de Convidado</td>
+                <td>
+                    <a href="{{ obj.modelo_certificado_convidado.url }}">{{ obj.modelo_certificado_convidado }}</a>
+                    <a class="popup btn primary" href="/edu/modelo_certificado_evento/{{ obj.pk }}/Convidado/">{% if obj.modelo_certificado_convidado %}Editar {% else %}Adicionar {% endif %}</a>
+                </td>
+            </tr>
+        </table>
+    {% endbox %}
+
+    {% box "Participantes ({{ obj.get_participantes.count }}) " %}
+        <ul class="action-bar">
+            <li><a class="btn popup success" href="/edu/adicionar_participante_evento/{{ obj.pk }}/Participante/">Adicionar Participante</a></li>
+            <li><a href="/edu/importar_participantes_evento/{{ obj.pk }}/Participante/" class="btn success">Importar Participantes</a></li>
+            {% if obj.modelo_certificado_participacao %}
+                <li><button class="btn" onclick="enviarEmailParticipantesSelecionados({{ obj.pk }});">Notificar Participantes Selecionados</button></li>
+            {% endif %}
+        </ul>
+        {% if obj.get_participantes.exists %}
+	    	<p class="alert alert-info">Participantes com vínculo de aluno, servidor ou prestador de serviço são notificados através dos emails institucionais e pessoais já cadastrados no SUAP. A edição de nome e email só é permitida para participantes sem vínculo.</p>
+            <form method="post" action="">
+                {% csrf_token %}
+                <table>
+                    <thead>
+                    <tr>
+                        <th class="no-print">
+                            <input type="checkbox">
+                        </th>
+                        <th>CPF</th>
+                        <th>Nome</th>
+                        <th>E-mail</th>
+                        <th>Vínculo</th>
+                        <th class="no-print">Ações</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for participante_evento in obj.get_participantes.all %}
+                        <tr>
+                            <td class="no-print"><input value="{{ participante_evento.pk }}" name="cpfs" type="checkbox"></td>
+                            <td>{{ participante_evento.participante.pessoa.pessoafisica.cpf }}</td>
+                            <td>{{ participante_evento.participante.pessoa.pessoafisica.nome_registro }}</td>
+                            <td>{{ participante_evento.participante.pessoa.pessoafisica.email }} <br />{{ participante_evento.participante.email_notificacao }}</td>
+                            <td>{{ participante_evento.get_tipo_pessoa }}</td>
+                            <td class="no-print">
+                                <ul class="action-bar">
+                                    {% if obj.modelo_certificado_participacao %}
+                                        <li>
+                                            <a class="btn" href="/edu/imprimir_certificado_participacao_evento/{{ participante_evento.pk }}/">Imprimir certificado</a>
+                                        </li>
+                                    {% endif %}
+                                    <li>
+                                        <a href="/edu/alterar_vinculo_participante_evento/{{ participante_evento.pk }}/" class="btn primary popup">Alterar Vínculo</a>
+                                    </li>
+									{% if not participante_evento.participante.pessoa.pessoafisica.eh_aluno and not participante_evento.participante.pessoa.pessoafisica.eh_servidor and not participante_evento.participante.pessoa.pessoafisica.eh_prestador %}
+                                        <li>
+                                            <a href="/edu/editar_participante_evento/{{ participante_evento.pk }}/" class="btn primary popup">Editar</a>
+                                        </li>
+                                    {% else %}
+                                        <li>
+                                            <a href="{{ participante_evento.participante.pessoa.pessoafisica.get_absolute_url }}" class="btn primary">Visualizar</a>
+                                        </li>
+                                    {% endif %}
+                                </ul>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                <div class="submit-row">
+                    <input class="confirm" type="submit" value="Remover Participantes Selecionados"
+                           data-confirm="Você tem certeza que deseja remover o(s) participante(s) selecionado(s)?"/>
+                </div>
+            </form>
+        {% else %}
+            <p class="alert alert-warning">Nenhum participante cadastrado.</p>
+        {% endif %}
+    {% endbox %}
+    
+    {% box "Palestrantes ({{ obj.get_palestrantes.count }}) " %}
+    	<ul class="action-bar">
+            <li><a class="btn popup success" href="/edu/adicionar_participante_evento/{{ obj.pk }}/Palestrante/">Adicionar Palestrante</a></li>
+            <li><a href="/edu/importar_participantes_evento/{{ obj.pk }}/Palestrante/" class="btn success">Importar Palestrantes</a></li>
+            {% if obj.modelo_certificado_palestrante %}
+                <li><button class="btn" onclick="enviarEmailParticipantesSelecionados({{ obj.pk }});">Notificar palestrantes selecionados</button></li>
+            {% endif %}
+        </ul>
+        {% if obj.get_palestrantes.exists %}
+	    	<p class="alert alert-info">Palestrantes com vínculo de aluno, servidor ou prestador de serviço são notificados através dos emails institucionais e pessoais já cadastrados no SUAP. A edição de nome e email só é permitida para palestrantes sem vínculo.</p>
+        	<form method="post" action="">
+                {% csrf_token %}
+                <table>
+                    <thead>
+                    <tr>
+                        <th class="no-print">
+                            <input type="checkbox">
+                        </th>
+                        <th>CPF</th>
+                        <th>Nome</th>
+                        <th>E-mail</th>
+                        <th>Vínculo</th>
+                        <th class="no-print">Ações</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for participante_evento in obj.get_palestrantes.all %}
+                        <tr>
+                            <td class="no-print"><input value="{{ participante_evento.pk }}" name="cpfs" type="checkbox"></td>
+                            <td>{{ participante_evento.participante.pessoa.pessoafisica.cpf }}</td>
+                            <td>{{ participante_evento.participante.pessoa.pessoafisica.nome_registro }}</td>
+                            <td>{{ participante_evento.participante.pessoa.pessoafisica.email }} <br />{{ participante_evento.participante.email_notificacao }}</td>
+                            <td>{{ participante_evento.get_tipo_pessoa }}</td>
+                            <td class="no-print">
+                                <ul class="action-bar">
+                                    {% if obj.modelo_certificado_palestrante %}
+                                        <li><a class="btn" href="/edu/imprimir_certificado_participacao_evento/{{ participante_evento.pk }}/">Imprimir certificado</a></li>
+                                    {% endif %}
+									<li>
+                                        <a href="/edu/alterar_vinculo_participante_evento/{{ participante_evento.pk }}/" class="btn primary popup">Alterar Vínculo</a>
+                                    </li>
+                                    {% if not participante_evento.participante.pessoa.pessoafisica.eh_aluno and not participante_evento.participante.pessoa.pessoafisica.eh_servidor and not participante_evento.participante.pessoa.pessoafisica.eh_prestador %}
+                                    <li>
+                                        <a href="/edu/editar_participante_evento/{{ participante_evento.pk }}/" class="btn primary popup">Editar</a>
+                                    </li>
+                                    {% else %}
+                                    <li>
+                                        <a href="{{ participante_evento.participante.pessoa.pessoafisica.get_absolute_url }}" class="btn primary">Visualizar</a>
+                                    </li>
+                                    {% endif %}
+                                </ul>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                <div class="submit-row">
+                    <input class="confirm" type="submit" value="Remover Palestrantes Selecionados" data-confirm="Você tem certeza que deseja remover o(s) palestrante(s) selecionado(s)?"/>
+                </div>
+            </form>
+        {% else %}
+            <p class="alert alert-warning">Nenhum palestrante cadastrado.</p>
+        {% endif %}
+    {% endbox %}
+    
+    {% box "Convidados ({{ obj.get_convidados.count }}) " %}
+    	<ul class="action-bar">
+            <li><a class="btn popup success" href="/edu/adicionar_participante_evento/{{ obj.pk }}/Convidado/">Adicionar Convidado</a></li>
+            <li><a href="/edu/importar_participantes_evento/{{ obj.pk }}/Convidado/" class="btn success">Importar Convidados</a></li>
+            {% if obj.modelo_certificado_convidado %}
+                <li><button class="btn" onclick="enviarEmailParticipantesSelecionados({{ obj.pk }});">Notificar convidados selecionados</button></li>
+            {% endif %}
+        </ul>
+        {% if obj.get_convidados.exists %}
+        	<p class="alert alert-info">Convidados com vínculo de aluno, servidor ou prestador de serviço são notificados através dos emails institucionais e pessoais já cadastrados no SUAP. A edição de nome e email só é permitida para convidados sem vínculo.</p>
+        	<form method="post" action="">
+                {% csrf_token %}
+                <table>
+                    <thead>
+                    <tr>
+                        <th class="no-print">
+                            <input type="checkbox">
+                        </th>
+                        <th>CPF</th>
+                        <th>Nome</th>
+                        <th>E-mail</th>
+                        <th>Vínculo</th>
+                        <th class="no-print">Ações</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for participante_evento in obj.get_convidados.all %}
+                        <tr>
+                            <td class="no-print"><input value="{{ participante_evento.pk }}" name="cpfs" type="checkbox"></td>
+                            <td>{{ participante_evento.participante.pessoa.pessoafisica.cpf }}</td>
+                            <td>{{ participante_evento.participante.pessoa.pessoafisica.nome_registro }}</td>
+                            <td>{{ participante_evento.participante.pessoa.pessoafisica.email }} <br />{{ participante_evento.participante.email_notificacao }}</td>
+                            <td>{{ participante_evento.get_tipo_pessoa }}</td>
+                            <td class="no-print">
+                                <ul class="action-bar">
+                                    {% if obj.modelo_certificado_convidado %}
+                                        <li><a class="btn" href="/edu/imprimir_certificado_participacao_evento/{{ participante_evento.pk }}/">Imprimir certificado</a></li>
+                                    {% endif %}
+									<li>
+                                        <a href="/edu/alterar_vinculo_participante_evento/{{ participante_evento.pk }}/" class="btn primary popup">Alterar Vínculo</a>
+                                    </li>
+                                    {% if not participante_evento.participante.pessoa.pessoafisica.eh_aluno and not participante_evento.participante.pessoa.pessoafisica.eh_servidor and not participante_evento.participante.pessoa.pessoafisica.eh_prestador %}
+                                    <li>
+                                        <a href="/edu/editar_participante_evento/{{ participante_evento.pk }}/" class="btn primary popup">Editar</a>
+                                    </li>
+                                    {% else %}
+                                    <li>
+                                        <a href="{{ participante_evento.participante.pessoa.pessoafisica.get_absolute_url }}" class="btn primary">Visualizar</a>
+                                    </li>
+                                    {% endif %}
+                                </ul>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                <div class="submit-row">
+                    <input class="confirm" type="submit" value="Remover Convidados Selecionados" data-confirm="Você tem certeza que deseja remover o(s) convidado(s) selecionado(s)?"/>
+                </div>
+            </form>
+        {% else %}
+            <p class="alert alert-warning">Nenhum convidado cadastrado.</p>
+        {% endif %}
+    {% endbox %}
+{% endblock %}

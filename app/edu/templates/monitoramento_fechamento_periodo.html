@@ -1,0 +1,80 @@
+{% extends super_template %}
+
+
+
+{% block extrahead %}
+    <script src="/static/djtools/graficos/highcharts.js"></script>
+    <script src="/static/djtools/graficos/exporting.js"></script>
+{% endblock %}
+
+{% block content %}
+
+    {% box 'Filtros' %}
+        {% render_form form %}
+    {% endbox %}
+
+    {% if form %}
+        {% box 'Fechamento do Período dos Alunos ({{ matriculas_periodos.count }} alunos)' %}
+
+
+            {% if matriculas_periodos.exists %}
+                {% for grafico in graficos %}
+                    <script>
+                        {{ grafico | safe }}
+                    </script>
+                    <div id="{{ grafico.id }}"></div>
+                {% endfor %}
+
+                {% autopaginate matriculas_periodos 25 %}
+
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Matrícula</th>
+                        <th>Aluno</th>
+                        <th>Curso</th>
+                        <th>Diretoria</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+
+                    {% if agrupamento == 'Data de Fechamento Período' %}
+                        {% regroup matriculas_periodos by turma.calendario_academico.data_fechamento_periodo as matriculas_periodos_agrupados %}
+                    {% else %}
+                        {% regroup matriculas_periodos by aluno.curso_campus as matriculas_periodos_agrupados %}
+                    {% endif %}
+
+                    {% for item_matricula_periodo in matriculas_periodos_agrupados %}
+
+                        <tr>
+                            <td colspan="5">
+                                <strong>{{ item_matricula_periodo.grouper }}</strong>
+                            </td>
+                        </tr>
+
+                        {% for matricula_periodo in item_matricula_periodo.list %}
+
+                            <tr>
+                                <td>
+                                    <a href="{{ matricula_periodo.aluno.get_absolute_url }}">{{ matricula_periodo.aluno.matricula }}</a>
+                                </td>
+                                <td>{{ matricula_periodo.aluno.get_nome }}</td>
+                                <td>{{ matricula_periodo.aluno.curso_campus }}</td>
+                                <td>{{ matricula_periodo.aluno.curso_campus.diretoria }}</td>
+                            </tr>
+                        {% endfor %}
+                    {% endfor %}
+                    </tbody>
+                </table>
+
+                {% paginate %}
+
+            {% else %}
+                <p class="alert alert-info">O período de todos os alunos encontram-se devidamente fechados nos respectivos
+                    prazos.</p>
+            {% endif %}
+
+        {% endbox %}
+    {% endif %}
+
+{% endblock %}

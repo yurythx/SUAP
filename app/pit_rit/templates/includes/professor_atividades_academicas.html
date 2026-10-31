@@ -1,0 +1,796 @@
+<style>
+    .subtotal {
+        width: 11%;
+    }
+</style>
+
+<ul class="action-bar">
+    <li><a class="btn success" href="/pit_rit/relatar_atividade_docente/{{ pit.pk }}/">Preencher Relatório</a></li>
+    <li><a class="btn default" href="/pit_rit/plano_atividade_docente_pdf/{{ pit.pk }}/?ano-periodo={{ periodo_letivo_atual.ano }}.{{ periodo_letivo_atual.periodo }}">Imprimir Plano</a></li>
+    {% if pit.get_percentual_preenchimento_relatorio %}
+        <li><a class="btn default" href="/pit_rit/relatorio_atividade_docente_pdf/{{ pit.pk }}/?ano-periodo={{ periodo_letivo_atual.ano }}.{{ periodo_letivo_atual.periodo }}">Imprimir Relatório</a></li>
+    {% endif %}
+</ul>
+
+{% if pit %}
+    <div class="boxes infos sm mb-5">
+        <div class="box-item">
+            <p class="stat">{{ ch_total_semanal|format }}h/a ({{ ch_total_semanal|hora_relogio|format }} h/r)</p>
+            <p class="title">C.H. Total Semanal</p>
+        </div>
+    </div>
+{% endif %}
+
+<div class="search-and-filters">
+    <div class="filter">
+        <form id="form_periodo_letivo">
+            <div class="filter">
+                <label>Período:</label>
+                <select id="select_ano_periodo" name="ano-periodo"
+                        onchange="if( window.location.search.indexOf('ano-periodo') !=-1){ window.location.search = window.location.search.substring(0,window.location.search.indexOf('ano-periodo'))+'ano-periodo='+document.getElementById('select_ano_periodo').value +  window.location.search.substring(window.location.search.indexOf('ano-periodo')+18) } else { window.location.search = window.location.search + '&ano-periodo=' + document.getElementById('select_ano_periodo').value }">
+                    {% for tupla in periodo_letivo_atual.get_periodos %}
+                        <option {% if periodo_letivo_atual.ano == tupla.0 and periodo_letivo_atual.periodo == tupla.1 %}
+                            selected="selected" {% endif %}>{{ tupla.0 }}.{{ tupla.1 }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if not pit and not configuracoes_ativas %}
+    <p class="alert alert-warning">Nenhuma configuração de atividade docente cadastrada para o
+        período {{ periodo_letivo_atual.ano }}.{{ periodo_letivo_atual.periodo }}.</p>
+{% else %}
+    <p class="alert alert-info">
+        <strong>Atenção:</strong> A carga horária das atividades segue as regras da <a
+            href="{{ pit.configuracao.portaria_normativa.url }}">PORTARIA NORMATIVA</a> vigente
+        em {{ periodo_letivo_atual.ano }}/{{ periodo_letivo_atual.periodo }} e será contabilizada após o deferimento das
+        mesmas.
+    </p>
+
+    {% if ch_total_semanal < ha_semanal %}
+        <p class="alert alert-danger">
+            <strong>Atenção:</strong> CH total semanal inferior à {{ ha_semanal }} h/a.
+        </p>
+    {% endif %}
+    {% if ch_semanal_manutencao_ensino < ha_minima_semanal %}
+        <p class="alert alert-danger">
+            <strong>Atenção:</strong> CH semanal de regência não pode ser inferior a {{ ha_minima_semanal }} h/a.
+        </p>
+    {% endif %}
+    {% if not pit.relatos_ensino or not pit.relatos_pesquisa or not pit.relatos_extensao or not pit.relatos_gestao %}
+        <p class="alert alert-warning">
+            <strong>Atenção:</strong> O relatório semestral de atividades ainda não foi preenchido. Clique no botão
+            "Preencher Relatório" abaixo para fazer isso.
+        </p>
+    {% endif %}
+
+    {% box '1. Atividades de Ensino' %}
+        <table>
+            <caption>REGÊNCIA - CURSOS REGULARES</caption>
+            {% if vinculos_diarios_regulares %}
+            <thead>
+                <tr>
+                    <th>Diário</th>
+                    <th>Disciplina/Componente</th>
+                    <th>Diário Dividido</th>
+                    <th>Local</th>
+                    <th>Modalidade de Ensino</th>
+                    <th>Horário</th>
+                    <th class="text-center">Nº de Alunos</th>
+                    <th class="text-center">CH Semanal</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for professor_diario in vinculos_diarios_regulares %}
+                <tr>
+                    <td>
+                        {% if eh_proprio_professor %}
+                            <a href="/edu/meu_diario/{{ professor_diario.diario.pk }}/1/">{{ professor_diario.diario.pk }}</a>
+                        {% else %}
+                            <a href="/edu/diario/{{ professor_diario.diario.pk }}/">{{ professor_diario.diario.pk }}</a>
+                        {% endif %}
+                    </td>
+                    <td>{{ professor_diario.diario.componente_curricular.componente.descricao }}</td>
+                    <td>
+                        {% if professor_diario.diario.get_professores.count > 1 %}
+                            <span class="status status-success">Sim ({{ professor_diario.get_percentual_ch }}%)</span>
+                        {% else %}
+                            <span class="status status-error">Não</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ professor_diario.diario.local_aula|format }}</td>
+                    <td>{{ professor_diario.diario.turma.curso_campus.modalidade }}</td>
+                    <td>{{ professor_diario.diario.get_horario_aulas|format }}</td>
+                    <td class="text-center">{{ professor_diario.diario.get_alunos_ativos.count }}</td>
+                    <td class="text-center">
+                        {{ professor_diario|method:"get_qtd_creditos_efetiva"|call:pit.periodo_letivo|format }}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td class="text-end" colspan="7">Subtotal</td>
+                    <td class="text-center subtotal">{{ ch_semanal_diarios|format }} h/a</td>
+                </tr>
+            </tfoot>
+            {% else %}
+                <tr>
+                    <td colspan="8">
+                        <p class="alert alert-warning">Nenhuma disciplina ministrada neste ano/período.</p>
+                    </td>
+                </tr>
+            {% endif %}
+        </table>
+
+        <table class="mt-2">
+            <caption>REGÊNCIA - CURSOS COM CARGA HORÁRIA >= 160</caption>
+            {% if vinculos_diarios_fics %}
+            <thead>
+                <tr>
+                    <th>Diário</th>
+                    <th>Disciplina/Componente</th>
+                    <th>Diário Dividido</th>
+                    <th>Local</th>
+                    <th>Modalidade de Ensino</th>
+                    <th>Horário</th>
+                    <th class="text-center">Nº de Alunos</th>
+                    <th class="text-center">CH Semanal</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for professor_diario in vinculos_diarios_fics %}
+                <tr>
+                    <td>
+                        {% if eh_proprio_professor %}
+                            <a href="/edu/meu_diario/{{ professor_diario.diario.pk }}/1/">{{ professor_diario.diario.pk }}</a>
+                        {% else %}
+                            <a href="/edu/diario/{{ professor_diario.diario.pk }}/">{{ professor_diario.diario.pk }}</a>
+                        {% endif %}
+                    </td>
+                    <td>{{ professor_diario.diario.componente_curricular.componente.descricao }}</td>
+                    <td>
+                        {% if professor_diario.diario.get_professores.count > 1 %}
+                            <span class="status status-success">Sim</span>
+                        {% else %}
+                            <span class="status status-error">Não</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ professor_diario.diario.local_aula|format }}</td>
+                    <td>{{ professor_diario.diario.turma.curso_campus.modalidade }}</td>
+                    <td>{{ professor_diario.diario.get_horario_aulas|format }}</td>
+                    <td class="text-center">{{ professor_diario.diario.get_alunos_ativos.count }}</td>
+                    <td class="text-center">{{ professor_diario.diario.componente_curricular.componente.ch_qtd_creditos|format }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td class="text-end" colspan="7">Subtotal</td>
+                    <td class="text-center subtotal">{{ ch_semanal_diarios_fic|format }} h/a</td>
+                </tr>
+            </tfoot>
+            {% else %}
+                <tr>
+                    <td colspan="8">
+                        <p class="alert alert-warning">Nenhuma disciplina ministrada neste ano/período.</p>
+                    </td>
+                </tr>
+            {% endif %}
+        </table>
+
+        <table class="mt-2">
+            <caption>REGÊNCIA - CURSOS COM CARGA HORÁRIA < 160</caption>
+            {% if vinculos_turmas_minicurso %}
+            <thead>
+                <tr>
+                    <th>Turma</th>
+                    <th>Disciplina/Componente</th>
+                    <th>Modalidade de Ensino</th>
+                    <th class="text-center">Nº de Alunos</th>
+                    <th class="text-center">CH Semanal</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for professor_minicurso in vinculos_turmas_minicurso %}
+                <tr>
+                    <td>
+                        <a href="/edu/turma_minicurso/{{ professor_minicurso.turma_minicurso.pk }}/">{{ professor_minicurso.turma_minicurso.pk }}</a>
+                    </td>
+                    <td>{{ professor_minicurso.turma_minicurso.minicurso.descricao }}</td>
+                    <td>{{ professor_minicurso.turma_minicurso.minicurso.modalidade }}</td>
+                    <td class="text-center">{{ professor_minicurso.turma_minicurso.participantes.count }}</td>
+                    <td class="text-center">{{ professor_minicurso.get_carga_horaria_semanal_ha|format }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td class="text-end" colspan="4">Subtotal</td>
+                    <td class="text-center subtotal">{{ ch_semanal_minicursos|format }} h/a</td>
+                </tr>
+            </tfoot>
+            {% else %}
+                <tr>
+                    <td colspan="5">
+                        <p class="alert alert-warning">Nenhuma turma ministrada neste ano/período.</p>
+                    </td>
+                </tr>
+            {% endif %}
+        </table>
+
+        <table class="mt-2">
+            <caption>PREPARAÇÃO E MANUTENÇÃO DO ENSINO</caption>
+            <tfoot>
+                <tr>
+                    <td class="text-end" colspan="7">Subtotal</td>
+                    <td class="text-center subtotal">{{ ch_semanal_manutencao_ensino|format }} h/a</td>
+                </tr>
+            </tfoot>
+        </table>
+
+        <form id="deferir_atividades_ensino_form" action="/pit_rit/deferir_todas_atividade_docente/{{ pit.pk }}/0/"
+              method="post"
+              class="mt-5">
+            {% csrf_token %}
+            {% if pode_editar_plano_atividade %}
+                <ul class="action-bar mt-2">
+                    {% if perms.pit_rit.add_atividadedocente %}
+                        <li><a href="/pit_rit/adicionar_atividade_docente/{{ pit.pk }}/0/" class="btn success popup">Adicionar
+                            Atividade de Apoio ao Ensino</a></li>
+                    {% endif %}
+                    {% if perms.pit_rit.deferir_atividadedocente %}
+                        <li><input type="submit" class="btn">Deferir atividades</input></li>
+                    {% endif %}
+                </ul>
+            {% endif %}
+
+            <div class="table-responsive">
+            <table>
+                <caption>APOIO AO ENSINO</caption>
+                <thead>
+                    <tr>
+                        <th class="no-print">
+                            {% if pode_editar_plano_atividade %}
+                                <input type="checkbox"
+                                    onchange="var is = this.parentNode.parentNode.parentNode.parentNode.getElementsByTagName('input');for(var ensino=0;ensino< is.length; ensino++) is[ensino].checked = this.checked">
+                            {% endif %}
+                        </th>
+                        <th class="no-print field-get_acoes">Ações</th>
+                        <th>Descrição da Atividade</th>
+                        <th>Tipo Atividade</th>
+                        <th>Local</th>
+                        <th>Horário</th>
+                        <th class="text-center">Nº de Alunos</th>
+                        <th class="text-center">CH Semanal</th>
+                        <th>Deferido</th>
+                        <th class="no-print">Opções</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% if diarios_especiais.exists or atividades_ensino.exists %}
+                    {% for diario_especial in diarios_especiais %}
+                        <tr>
+                            <td colspan="2" class="no-print">-</td>
+                            <td><a href="/edu/diarioespecial/{{ diario_especial.pk }}/">{{ diario_especial.componente.descricao }}</a></td>
+                            <td>Atividade Específica de Ensino</td>
+                            <td>{{ diario_especial.sala|format }}</td>
+                            <td>{{ diario_especial.get_horario_aulas|format }}</td>
+                            <td class="text-center">{{ diario_especial.participantes.count }}</td>
+                            <td class="text-center">{{ diario_especial.ch_qtd_creditos }}</td>
+                            <td class="text-center">-</td>
+                            <td class="no-print text-center">-</td>
+                        </tr>
+                    {% endfor %}
+                    {% for atividade in atividades_ensino %}
+                        <tr>
+                            <td class="no-print">
+                                {% if pode_editar_plano_atividade %}
+                                    {% if perms.pit_rit.deferir_atividadedocente and atividade.is_aguardando_deferimento %}
+                                        <input value="{{ atividade.pk }}" name="atividades_docentes" type="checkbox"/>
+                                    {% endif %}
+                                {% endif %}
+                            </td>
+                            <td class="no-print">
+                                {% if pode_editar_plano_atividade %}
+                                    {% if perms.pit_rit.add_atividadedocente and not atividade.deferida or perms.pit_rit.deferir_atividadedocente %}
+                                        {% icon "edit" "/pit_rit/adicionar_atividade_docente/{{ pit.pk }}/0/{{ atividade.pk }}/" "Editar" "popup" %}
+                                        {% icon "delete" "/comum/excluir/pit_rit/atividadedocente/{{ atividade.pk }}/" "Remover" "no-confirm popup" %}
+                                    {% endif %}
+                                {% endif %}
+                                {% if atividade.comprovante %}
+                                    <a href="{{ atividade.comprovante.url }}" class="btn default">{% icone "file-pdf" %} Comprovante da Atividade</a>
+                                {% endif %}
+                            </td>
+                            <td>{{ atividade.descricao }}</td>
+                            <td>{{ atividade.tipo_atividade }}</td>
+                            <td>{{ atividade.sala|format }}</td>
+                            <td>
+                                {% if perms.pit_rit.add_atividadedocente and atividade.tipo_atividade.exige_horario and not atividade.deferida %}
+                                    {% if atividade.get_horario_aulas %}
+                                        {% if pit.deferida %}{{ atividade.get_horario_aulas|format }}{% else %}
+                                            <a class="popup"
+                                               href="/pit_rit/definir_horario_atividade_docente/{{ atividade.pk }}/">{{ atividade.get_horario_aulas|format }}</a>
+                                        {% endif %}
+                                    {% else %}
+                                        <a class="btn popup"
+                                           href="/pit_rit/definir_horario_atividade_docente/{{ atividade.pk }}/">Definir
+                                            Horário</a>
+                                    {% endif %}
+                                {% else %}
+                                    {{ atividade.get_horario_aulas|format }}
+                                {% endif %}
+                            </td>
+                            <td class="text-center">-</td>
+                            <td class="text-center">{{ atividade.ch_aula_efetiva|format }}</td>
+                            <td>{{ atividade.deferida|format }}</td>
+                            <td class="no-print">
+                                {% if pode_editar_plano_atividade %}
+                                    {% if perms.pit_rit.deferir_atividadedocente and atividade.is_aguardando_deferimento or perms.pit_rit.deferir_atividadedocente and atividade.deferida %}
+                                        <ul class="action-bar">
+                                            <li class="has-child">
+                                                <a class="btn" href="#">Avaliar</a>
+                                                <ul>
+                                                    <li><a href="/pit_rit/deferir_indeferir_atividade_docente/{{ atividade.pk }}/?acao=1&ano-periodo={{ periodo_letivo_atual.ano }}.{{ periodo_letivo_atual.periodo }}">Deferir</a></li>
+                                                    <li><a href="/pit_rit/deferir_indeferir_atividade_docente/{{ atividade.pk }}/?acao=0&ano-periodo={{ periodo_letivo_atual.ano }}.{{ periodo_letivo_atual.periodo }}">Indeferir</a></li>
+                                                </ul>
+                                            </li>
+                                        </ul>
+                                    {% endif %}
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="10">
+                            <p class="alert alert-warning text-center">Nenhuma atividade de ensino neste ano/período.</p>
+                        </td>
+                    </tr>
+                {% endif %}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td class="text-end" colspan="9">Subtotal</td>
+                        <td class="text-center subtotal">{{ ch_semanal_atividades_ensino|format }} h/a</td>
+                    </tr>
+                </tfoot>
+            </table>
+            </div>
+        </form>
+    {% endbox %}
+
+    {% box '2. Atividades de Pesquisa e Inovação' %}
+        <form id="deferir_atividades_pesquisa_form" action="/pit_rit/deferir_todas_atividade_docente/{{ pit.pk }}/1/"
+              method="post">
+            {% csrf_token %}
+            {% if pode_editar_plano_atividade %}
+                <ul class="action-bar">
+                    {% if perms.pit_rit.add_atividadedocente %}
+                        <li><a href="/pit_rit/adicionar_atividade_docente/{{ pit.pk }}/1/" class="btn success popup">Adicionar
+                            Atividade de Pesquisa e Inovação</a></li>
+                    {% endif %}
+                    {% if perms.pit_rit.deferir_atividadedocente %}
+                        <li><input type="submit" class="btn">Deferir atividades</input></li>
+                    {% endif %}
+                </ul>
+            {% endif %}
+
+            <table>
+                <caption>PESQUISA E INOVAÇÃO</caption>
+                <thead>
+                    <tr>
+                        <th>{% if pode_editar_plano_atividade %}<input type="checkbox"
+                                                                       onchange="var is = this.parentNode.parentNode.parentNode.parentNode.getElementsByTagName('input');for(var pesquisa=0;pesquisa< is.length; pesquisa++) is[pesquisa].checked = this.checked">{% endif %}
+                        </th>
+                        <th>Descrição da Atividade</th>
+                        <th>Tipo Atividade</th>
+                        <th>Horário</th>
+                        <th class="text-center">CH Semanal</th>
+                        <th>Deferido</th>
+                        <th class="no-print">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for atividade in atividades_pesquisa %}
+                    <tr>
+                        <td>
+                            {% if pode_editar_plano_atividade %}
+                                {% if perms.pit_rit.deferir_atividadedocente and atividade.is_aguardando_deferimento %}
+                                    <input value="{{ atividade.pk }}" name="atividades_docentes" type="checkbox" />
+                                {% endif %}
+                                {% if perms.pit_rit.add_atividadedocente and not atividade.deferida or perms.pit_rit.deferir_atividadedocente %}
+                                    {% icon "edit" "/pit_rit/adicionar_atividade_docente/{{ pit.pk }}/1/{{ atividade.pk }}/" "Editar" "popup" %}
+                                    {% icon "delete" "/comum/excluir/pit_rit/atividadedocente/{{ atividade.pk }}/" "Remover" "no-confirm popup" %}
+                                {% endif %}
+                            {% endif %}
+                            {% if atividade.comprovante %}
+                                <a href="{{ atividade.comprovante.url }}" class="btn default">{% icone "file-pdf" %} Comprovante da Atividade</a>
+                            {% endif %}
+                        </td>
+                        <td>{{ atividade.descricao }}</td>
+                        <td>{{ atividade.tipo_atividade }}</td>
+                        <td>
+                            {% if perms.pit_rit.add_atividadedocente and atividade.tipo_atividade.exige_horario and not atividade.deferida %}
+                                {% if atividade.get_horario_aulas %}
+                                    {% if pit.deferida %}{{ atividade.get_horario_aulas|format }}{% else %}
+                                        <a class="popup"
+                                           href="/pit_rit/definir_horario_atividade_docente/{{ atividade.pk }}/">{{ atividade.get_horario_aulas|format }}</a>
+                                    {% endif %}
+                                {% else %}
+                                    <a class="btn popup"
+                                       href="/pit_rit/definir_horario_atividade_docente/{{ atividade.pk }}/">Definir
+                                        Horário</a>
+                                {% endif %}
+                            {% else %}
+                                {{ atividade.get_horario_aulas|format }}
+                            {% endif %}
+                        </td>
+                        <td class="text-center">{{ atividade.ch_aula_efetiva|format }}</td>
+                        <td>{{ atividade.deferida|format }}</td>
+                        <td class="no-print">
+                            {% if pode_editar_plano_atividade %}
+                                {% if perms.pit_rit.deferir_atividadedocente and atividade.is_aguardando_deferimento or perms.pit_rit.deferir_atividadedocente and atividade.deferida %}
+                                    <ul class="action-bar">
+                                        <li class="has-child">
+                                            <a class="btn" href="#"> Avaliar </a>
+                                            <ul>
+                                                <li><a href="/pit_rit/deferir_indeferir_atividade_docente/{{ atividade.pk }}/?acao=1&ano-periodo={{ periodo_letivo_atual.ano }}.{{ periodo_letivo_atual.periodo }}">Deferir</a></li>
+                                                <li><a href="/pit_rit/deferir_indeferir_atividade_docente/{{ atividade.pk }}/?acao=0&ano-periodo={{ periodo_letivo_atual.ano }}.{{ periodo_letivo_atual.periodo }}">Indeferir</a></li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                {% endif %}
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7">
+                            <p class="alert alert-warning">Nenhuma atividade de pesquisa neste ano/período.</p>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td class="text-end" colspan="6">Subtotal</td>
+                        <td class="text-center subtotal">{{ ch_semanal_atividades_pesquisa|format }} h/a</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </form>
+    {% endbox %}
+
+    {% box '3. Atividades de Extensão' %}
+        <form id="deferir_atividades_extensao_form" action="/pit_rit/deferir_todas_atividade_docente/{{ pit.pk }}/2/"
+              method="post">
+            {% csrf_token %}
+            {% if pode_editar_plano_atividade %}
+                <ul class="action-bar">
+                    {% if perms.pit_rit.add_atividadedocente %}
+                        <li><a href="/pit_rit/adicionar_atividade_docente/{{ pit.pk }}/2/" class="btn success popup">Adicionar
+                            Atividade de Extensão</a></li>
+                    {% endif %}
+                    {% if perms.pit_rit.deferir_atividadedocente %}
+                        <li><input type="submit" class="btn">Deferir atividades</input></li>
+                    {% endif %}
+                </ul>
+            {% endif %}
+
+            <table>
+                <caption>EXTENSÃO</caption>
+                <thead>
+                    <tr>
+                        <th>{% if pode_editar_plano_atividade %}<input type="checkbox"
+                                                                       onchange="var is = this.parentNode.parentNode.parentNode.parentNode.getElementsByTagName('input');for(var i=0;i< is.length;i++) is[i].checked = this.checked"/>{% endif %}
+                        </th>
+                        <th>Descrição da Atividade</th>
+                        <th>Tipo Atividade</th>
+                        <th>Horário</th>
+                        <th class="text-center">CH Semanal</th>
+                        <th>Deferido</th>
+                        <th class="no-print">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for atividade in atividades_extensao %}
+                    <tr>
+                        <td>
+                            {% if pode_editar_plano_atividade %}
+                                {% if perms.pit_rit.deferir_atividadedocente and atividade.is_aguardando_deferimento %}
+                                    <input value="{{ atividade.pk }}" name="atividades_docentes" type="checkbox"/>
+                                {% endif %}
+                                {% if perms.pit_rit.add_atividadedocente and not atividade.deferida or perms.pit_rit.deferir_atividadedocente %}
+                                    {% icon "edit" "/pit_rit/adicionar_atividade_docente/{{ pit.pk }}/2/{{ atividade.pk }}/" "Editar" "popup" %}
+                                    {% icon "delete" "/comum/excluir/pit_rit/atividadedocente/{{ atividade.pk }}/" "Remover" "no-confirm popup" %}
+                                {% endif %}
+                            {% endif %}
+                            {% if atividade.comprovante %}
+                                <a href="{{ atividade.comprovante.url }}" class="btn default">{% icone "file-pdf" %} Comprovante da Atividade</a>
+                            {% endif %}
+                        </td>
+                        <td>{{ atividade.descricao }}</td>
+                        <td>{{ atividade.tipo_atividade }}</td>
+                        <td>
+                            {% if perms.pit_rit.add_atividadedocente and atividade.tipo_atividade.exige_horario and not atividade.deferida %}
+                                {% if atividade.get_horario_aulas %}
+                                    {% if pit.deferida %}{{ atividade.get_horario_aulas|format }}{% else %}
+                                        <a class="popup"
+                                           href="/pit_rit/definir_horario_atividade_docente/{{ atividade.pk }}/">{{ atividade.get_horario_aulas|format }}</a>
+                                    {% endif %}
+                                {% else %}
+                                    <a class="btn popup"
+                                       href="/pit_rit/definir_horario_atividade_docente/{{ atividade.pk }}/">Definir
+                                        Horário</a>
+                                {% endif %}
+                            {% else %}
+                                {{ atividade.get_horario_aulas|format }}
+                            {% endif %}
+                        </td>
+                        <td class="text-center">{{ atividade.ch_aula_efetiva|format }}</td>
+                        <td>{{ atividade.deferida|format }}</td>
+                        <td class="no-print">
+                            {% if pode_editar_plano_atividade %}
+                                {% if perms.pit_rit.deferir_atividadedocente and atividade.is_aguardando_deferimento or perms.pit_rit.deferir_atividadedocente and atividade.deferida %}
+                                    <ul class="action-bar">
+                                        <li class="has-child">
+                                            <a class="btn" href="#"> Avaliar </a>
+                                            <ul>
+                                                <li><a href="/pit_rit/deferir_indeferir_atividade_docente/{{ atividade.pk }}/?acao=1&ano-periodo={{ periodo_letivo_atual.ano }}.{{ periodo_letivo_atual.periodo }}">Deferir</a></li>
+                                                <li><a href="/pit_rit/deferir_indeferir_atividade_docente/{{ atividade.pk }}/?acao=0&ano-periodo={{ periodo_letivo_atual.ano }}.{{ periodo_letivo_atual.periodo }}">Indeferir</a></li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                {% endif %}
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7">
+                            <p class="alert alert-warning">Nenhuma atividade de extensão neste ano/período.</p>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td class="text-end" colspan="6">Subtotal</td>
+                        <td class="text-center subtotal">{{ ch_semanal_atividades_extensao|format }} h/a</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </form>
+    {% endbox %}
+
+    {% box '4. Atividades de Gestão e Representação Institucional' %}
+        <form id="deferir_atividades_gestao_form" action="/pit_rit/deferir_todas_atividade_docente/{{ pit.pk }}/3/"
+              method="post">
+            {% csrf_token %}
+            {% if pode_editar_plano_atividade %}
+                <ul class="action-bar">
+                    {% if perms.pit_rit.add_atividadedocente %}
+                        <li><a href="/pit_rit/adicionar_atividade_docente/{{ pit.pk }}/3/" class="btn success popup">Adicionar
+                            Atividade de Gestão/Representação</a></li>
+                    {% endif %}
+                    {% if perms.pit_rit.deferir_atividadedocente %}
+                        <li><input type="submit" class="btn">Deferir atividades</input></li>
+                    {% endif %}
+                </ul>
+            {% endif %}
+            <table>
+                <caption>ATIVIDADES DE GESTÃO E REPRESENTAÇÃO INSTITUCIONAL</caption>
+                <thead>
+                    <tr>
+                        <th>{% if pode_editar_plano_atividade %}<input type="checkbox"
+                                                                       onchange="var is = this.parentNode.parentNode.parentNode.parentNode.getElementsByTagName('input');for(var gestao=0;gestao< is.length; gestao++) is[gestao].checked = this.checked">{% endif %}
+                        </th>
+                        <th>Descrição da Atividade</th>
+                        <th>Tipo Atividade</th>
+                        <th>Horário</th>
+                        <th class="text-center">CH Semanal</th>
+                        <th>Deferido</th>
+                        <th class="no-print">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for atividade in atividades_gestao %}
+                    <tr>
+                        <td>
+                            {% if pode_editar_plano_atividade %}
+                                {% if perms.pit_rit.deferir_atividadedocente and atividade.is_aguardando_deferimento %}
+                                    <input value="{{ atividade.pk }}" name="atividades_docentes" type="checkbox"/>
+                                {% endif %}
+                                {% if perms.pit_rit.add_atividadedocente and not atividade.deferida or perms.pit_rit.deferir_atividadedocente %}
+                                    {% icon "edit" "/pit_rit/adicionar_atividade_docente/{{ pit.pk }}/3/{{ atividade.pk }}/" "Editar" "popup" %}
+                                    {% icon "delete" "/comum/excluir/pit_rit/atividadedocente/{{ atividade.pk }}/" "Remover" "no-confirm popup" %}
+                                {% endif %}
+                            {% endif %}
+                            {% if atividade.comprovante %}
+                                <a href="{{ atividade.comprovante.url }}" class="btn default">{% icone "file-pdf" %} Comprovante da Atividade</a>
+                            {% endif %}
+                        </td>
+                        <td>{{ atividade.descricao }}</td>
+                        <td>{{ atividade.tipo_atividade }}</td>
+                        <td>
+                            {% if perms.pit_rit.add_atividadedocente and atividade.tipo_atividade.exige_horario and not atividade.deferida %}
+                                {% if atividade.get_horario_aulas %}
+                                    {% if pit.deferida %}{{ atividade.get_horario_aulas|format }}{% else %}
+                                        <a class="popup"
+                                           href="/pit_rit/definir_horario_atividade_docente/{{ atividade.pk }}/">{{ atividade.get_horario_aulas|format }}</a>
+                                    {% endif %}
+                                {% else %}
+                                    <a class="btn popup"
+                                       href="/pit_rit/definir_horario_atividade_docente/{{ atividade.pk }}/">Definir Horário</a>
+                                {% endif %}
+                            {% else %}
+                                {{ atividade.get_horario_aulas|format }}
+                            {% endif %}
+                        </td>
+                        <td class="text-center">{{ atividade.ch_aula_efetiva|format }}</td>
+                        <td>{{ atividade.deferida|format }}</td>
+                        <td class="no-print text-center">
+                            {% if pode_editar_plano_atividade %}
+                                {% if perms.pit_rit.deferir_atividadedocente and atividade.is_aguardando_deferimento or perms.pit_rit.deferir_atividadedocente and atividade.deferida %}
+                                    <ul class="action-bar">
+                                        <li class="has-child">
+                                            <a class="btn" href="#">Avaliar</a>
+                                            <ul>
+                                                <li><a href="/pit_rit/deferir_indeferir_atividade_docente/{{ atividade.pk }}/?acao=1&ano-periodo={{ periodo_letivo_atual.ano }}.{{ periodo_letivo_atual.periodo }}">Deferir</a></li>
+                                                <li><a href="/pit_rit/deferir_indeferir_atividade_docente/{{ atividade.pk }}/?acao=0&ano-periodo={{ periodo_letivo_atual.ano }}.{{ periodo_letivo_atual.periodo }}">Indeferir</a></li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                {% endif %}
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7">
+                            <p class="alert alert-warning">Nenhuma atividade de gestão neste ano/período.</p>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td class="text-end" colspan="6">Subtotal</td>
+                        <td class="text-center subtotal">{{ ch_semanal_atividades_gestao|format }} h/a</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </form>
+    {% endbox %}
+
+    {% box '5. Atividades de Coordenação/Direção' %}
+        <form id="deferir_atividades_coordenacao_form" action="/pit_rit/deferir_todas_atividade_docente/{{ pit.pk }}/3/"
+              method="post">
+            {% csrf_token %}
+            {% if pode_editar_plano_atividade %}
+                <ul class="action-bar">
+                    {% if perms.pit_rit.add_atividadedocente %}
+                        <li><a href="/pit_rit/adicionar_atividade_docente/{{ pit.pk }}/4/" class="btn success popup">Adicionar
+                            Atividade de Coordenação/Direção</a></li>
+                    {% endif %}
+                    {% if perms.pit_rit.deferir_atividadedocente %}
+                        <li><input type="submit" class="btn">Deferir atividades</input></li>
+                    {% endif %}
+                </ul>
+            {% endif %}
+
+            <table>
+                <caption>ATIVIDADES DE COORDENAÇÃO/DIREÇÃO</caption>
+                <thead>
+                    <tr>
+                        <th>{% if pode_editar_plano_atividade %}<input type="checkbox"
+                                                                       onchange="var is = this.parentNode.parentNode.parentNode.parentNode.getElementsByTagName('input');for(var coordenacao=0;coordenacao< is.length; coordenacao++) is[coordenacao].checked = this.checked"/>{% endif %}
+                        </th>
+                        <th>Descrição da Atividade</th>
+                        <th>Tipo Atividade</th>
+                        <th>Horário</th>
+                        <th class="text-center">CH Semanal</th>
+                        <th>Deferido</th>
+                        <th class="no-print">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for atividade in atividades_cargo_funcao %}
+                    <tr>
+                        <td>
+                            {% if pode_editar_plano_atividade %}
+                                {% if perms.pit_rit.deferir_atividadedocente and atividade.is_aguardando_deferimento %}
+                                    <input value="{{ atividade.pk }}" name="atividades_docentes" type="checkbox" />
+                                {% endif %}
+                                {% if perms.pit_rit.add_atividadedocente and not atividade.deferida or perms.pit_rit.deferir_atividadedocente %}
+                                    {% icon "edit" "/pit_rit/adicionar_atividade_docente/{{ pit.pk }}/4/{{ atividade.pk }}/" "Editar" "popup" %}
+                                    {% icon "delete" "/comum/excluir/pit_rit/atividadedocente/{{ atividade.pk }}/" "Remover" "no-confirm popup" %}
+                                {% endif %}
+                            {% endif %}
+                            {% if atividade.comprovante %}
+                                <a href="{{ atividade.comprovante.url }}" class="btn default">{% icone "file-pdf" %} Comprovante da Atividade</a>
+                            {% endif %}
+                        </td>
+                        <td>{{ atividade.descricao }}</td>
+                        <td>{{ atividade.tipo_atividade }}</td>
+                        <td>
+                            {% if perms.pit_rit.add_atividadedocente and atividade.tipo_atividade.exige_horario and not atividade.deferida %}
+                                {% if atividade.get_horario_aulas %}
+                                    {% if pit.deferida %}{{ atividade.get_horario_aulas|format }}{% else %}
+                                        <a class="popup"
+                                           href="/pit_rit/definir_horario_atividade_docente/{{ atividade.pk }}/">{{ atividade.get_horario_aulas|format }}</a>
+                                    {% endif %}
+                                {% else %}
+                                    <a class="btn popup"
+                                       href="/pit_rit/definir_horario_atividade_docente/{{ atividade.pk }}/">Definir
+                                        Horário</a>
+                                {% endif %}
+                            {% else %}
+                                {{ atividade.get_horario_aulas|format }}
+                            {% endif %}
+                        </td>
+                        <td class="text-center">{{ atividade.ch_aula_efetiva|format }}</td>
+                        <td>{{ atividade.deferida|format }}</td>
+                        <td class="no-print text-center">
+                            {% if pode_editar_plano_atividade %}
+                                {% if perms.pit_rit.deferir_atividadedocente and atividade.is_aguardando_deferimento or perms.pit_rit.deferir_atividadedocente and atividade.deferida %}
+                                    <ul class="action-bar">
+                                        <li class="has-child">
+                                            <a class="btn" href="#">Avaliar</a>
+                                            <ul>
+                                                <li><a href="/pit_rit/deferir_indeferir_atividade_docente/{{ atividade.pk }}/?acao=1&ano-periodo={{ periodo_letivo_atual.ano }}.{{ periodo_letivo_atual.periodo }}">Deferir</a></li>
+                                                <li><a href="/pit_rit/deferir_indeferir_atividade_docente/{{ atividade.pk }}/?acao=0&ano-periodo={{ periodo_letivo_atual.ano }}.{{ periodo_letivo_atual.periodo }}">Indeferir</a></li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                {% endif %}
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7">
+                            <p class="alert alert-warning">Nenhuma atividade de coordenação/direação neste ano/período.</p>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td class="text-end" colspan="6">Subtotal</td>
+                        <td class="text-center subtotal">{{ ch_semanal_atividades_cargo_funcao|format }} h/a</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </form>
+    {% endbox %}
+
+    {% if historico_funcoes %}
+        {% box '6. Histórico de Funções' %}
+            <table>
+                <caption>HISTÓRICO DE FUNÇÕES</caption>
+                <thead>
+                    <tr>
+                        <th>Função</th>
+                        <th>Atividade</th>
+                        <th>Data de Início</th>
+                        <th>Data de Término</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for historico_funcao in historico_funcoes %}
+                    <tr>
+                        <td>{{ historico_funcao.funcao_display }}</td>
+                        <td>{{ historico_funcao.atividade.nome }}</td>
+                        <td>{{ historico_funcao.data_inicio_funcao }}</td>
+                        <td>{{ historico_funcao.data_fim_funcao|format }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% endbox %}
+    {% endif %}
+{% endif %}

@@ -1,0 +1,109 @@
+{% extends super_template %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if exibir_botao_executar %}
+            <li><a class="btn popup" href="/edu/meus_relatorios/3">Executar consulta salva anteriormente</a></li>
+        {% endif %}
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+    <div id="formbox">
+        {% render_form form %}
+    </div>
+
+    <div id="resultadobox">
+        {% if professores.filtros %}
+            <script>
+                $('#formbox').hide();
+            </script>
+            {% box "Filtros" %}
+
+                <ul class="action-bar">
+                    <li><a class="btn" href="/edu/relatorio_professor/">Limpar filtros</a></li>
+                    <li><a class="btn" href="#" onclick="javascript:$('#formbox').toggle();javascript:$('#resultadobox').toggle();">Alterar filtros</a></li>
+                </ul>
+
+                <dl class="definition-list flex">
+                    {% for filtro in filtros %}
+                    <div class="list-item">
+                        <dt>{{ filtro.chave }}</dt>
+                        <dd>{{ filtro.valor|format }}</dd>
+                    </div>
+                    {% endfor %}
+                </dl>
+            {% endbox %}
+
+            {% box "Resultado da Pesquisa ({{ professores.count }} professores)" %}
+                {% if professores.exists %}
+                    {% autopaginate professores 25 %}
+
+                    <ul class="action-bar">
+                        <li><a class="btn success popup" data-reload-on-close="false"
+                               href="/edu/salvar_relatorio/3/{{ query_string }}/">Salvar consulta</a></li>
+                        <li><a class="btn confirm"
+                               href="/edu/relatorio_professor/?{{ request.META.QUERY_STRING }}&imprimir=1"
+                               data-confirm="Apenas os três primeiro campos selecionados serão exibidos neste relatório. Para exibir todos selecione a opção 'Exportar para XLS'">Imprimir em PDF</a></li>
+                        <li><a class="btn" href="/edu/relatorio_professor/?{{ request.META.QUERY_STRING }}&xls=1">Exportar para XLS</a></li>
+                    </ul>
+
+                    {% regroup professores by vinculo.setor.uo.nome as professores_agrupados %}
+
+                    {% for item_professor in professores_agrupados %}
+                        <div class="table-responsive">
+                        <table class="mb-2">
+                            <caption>{{ item_professor.grouper }}</caption>
+                            <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Matrícula</th>
+                                <th>Nome</th>
+                                {% for campo in campos_exibicao %}
+                                    {% for label in form.EXIBICAO_CHOICES %}
+                                        {% if label.0 == campo %}
+                                            <th>{{ label.1 }}</th>
+                                        {% endif %}
+                                    {% endfor %}
+                                {% endfor %}
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for professor in item_professor.list %}
+                                {{ professor|set_periodo_letivo_referencia:form.cleaned_data.periodo_letivo }}
+                                {{ professor|set_ano_letivo_referencia:form.cleaned_data.ano_letivo }}
+                                <tr>
+                                    <td>{% index_paginacao %}</td>
+                                    <td>{% if perms.edu.view_professor %}
+                                        <a href="/edu/professor/{{ professor.pk }}/">{{ professor.get_matricula }}</a>{% else %}
+                                        {{ professor.get_matricula }}{% endif %}</td>
+                                    <td>{{ professor.vinculo.pessoa.nome }}</td>
+                                    {% for campo in campos_exibicao %}
+                                        <td>{{ professor|getattrr:campo|format }}</td>
+                                    {% endfor %}
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                        </div>
+                    {% endfor %}
+                    {% paginate %}
+
+                {% else %}
+                    <p class='alert alert-warning'>Nenhum professor encontrado.</p>
+                {% endif %}
+
+
+            {% endbox %}
+
+
+
+
+
+
+        {% endif %}
+    </div>
+
+
+{% endblock %}

@@ -1,0 +1,197 @@
+{# ─────────────────────────────────────────────────────────────────────── #}
+{# SEÇÃO 1 — Identificação do Servidor                                     #}
+{# ─────────────────────────────────────────────────────────────────────── #}
+{% box '1. Identificação do Servidor' %}
+    <dl class="definition-list flex">
+        <div class="list-item">
+            <dt>Nome</dt>
+            <dd>{{ processo.vinculo.pessoa.nome|default:"-" }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>SIAPE</dt>
+            <dd>{{ servidor.matricula|default:"-" }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Cargo</dt>
+            <dd>{{ servidor.cargo_emprego|default:"-" }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Data de ingresso na IFE</dt>
+            <dd>{{ servidor.data_inicio_exercicio_na_instituicao|date:"d/m/Y"|default:"-" }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Nível de Classificação</dt>
+            <dd>{{ servidor.cargo_classe|default:"-" }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Lotação</dt>
+            <dd>{{ processo.vinculo.setor|default:"-" }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Função/Encargo (se houver)</dt>
+            <dd>{{ servidor.funcao_exercicio|default:servidor.funcao|default:"-" }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>E-mail</dt>
+            <dd>{{ servidor.email|default:"-" }}</dd>
+        </div>
+    </dl>
+{% endbox %}
+
+{# ─────────────────────────────────────────────────────────────────────── #}
+{# SEÇÃO 2 — Informações do Requerimento                                   #}
+{# ─────────────────────────────────────────────────────────────────────── #}
+{% box '2. Informações do Requerimento' %}
+    <dl class="definition-list flex">
+        <div class="list-item">
+            <dt>Nível de RSC pretendido</dt>
+            <dd>RSC-{{ processo.nivel_requisitado.ordem_romana }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Pontuação mínima necessária</dt>
+            <dd>{{ pontos_minimos|format }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Pontuação total (itens + saldo anterior)</dt>
+            <dd>
+                <span class="js-total-pontos">{{ total_pontos|format }}</span>
+                {% if saldo_anterior %}
+                    <small class="rsc-pontuacao-detalhe">({{ total_pontos_itens|format }} dos itens + {{ saldo_anterior|format }} de saldo)</small>
+                {% endif %}
+            </dd>
+        </div>
+        <div class="list-item">
+            <dt>Quantidade de critérios específicos utilizados</dt>
+            <dd><span class="js-itens-preenchidos">{{ itens_preenchidos }}</span></dd>
+        </div>
+        <div class="list-item">
+            <dt>Pontuação total excedente (banco de pontos)</dt>
+            <dd>{{ pontuacao_excedente|format }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Saldo de pontuação de concessão anterior</dt>
+            <dd>{{ processo.saldo_pontuacao_anterior|format|default:"0,00" }}</dd>
+        </div>
+        <div class="list-item">
+            <dt>Nº do processo de concessão anterior (se houver)</dt>
+            <dd>{{ processo.processo_anterior.pk|default:"-" }}</dd>
+        </div>
+    </dl>
+{% endbox %}
+
+{# ─────────────────────────────────────────────────────────────────────── #}
+{# SEÇÃO 3 — Memorial e Descrição das Atividades por Requisito Legal       #}
+{# ─────────────────────────────────────────────────────────────────────── #}
+{% box '3. Memorial e Descrição das Atividades por Requisito Legal' %}
+    <p class="alert alert-light">
+        Itens organizados conforme os requisitos do Art. 3º do Decreto (incisos I a VI),
+        com documentos comprobatórios anexados.
+    </p>
+
+    <div class="rsc-memorial-texto">
+        <h4 class="mt-3">Introdução</h4>
+        {% if pode_editar_preenchimento %}
+            <textarea class="js-memorial-campo rsc-textarea-full{% if not memorial.introducao %} rsc-campo-invalido{% endif %}" data-campo="introducao" rows="8" placeholder="Apresente a introdução do seu memorial (trajetória, contexto de atuação, síntese das contribuições)...">{{ memorial.introducao }}</textarea>
+            <span class="rsc-autosave-status js-memorial-status" data-campo="introducao"></span>
+        {% else %}
+            <p class="rsc-pre-wrap">{{ memorial.introducao|default:"—" }}</p>
+        {% endif %}
+    </div>
+
+    {% for grupo in grupos_requisito %}
+    <h4 class="mt-4">{{ grupo.label }}</h4>
+    {% if grupo.requisito.descricao %}
+        <p class="text-muted small mb-2">{{ grupo.requisito.descricao }}</p>
+    {% endif %}
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th class="rsc-th-num">Nº</th>
+                    <th>Critério Específico</th>
+                    <th class="rsc-th-unit">Unidade</th>
+                    <th class="text-end rsc-th-pts-un">Pts/un.</th>
+                    <th class="text-end rsc-th-pts">Pts obtidos</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for linha in grupo.linhas %}
+                <tr>
+                    <td rowspan="2">{{ linha.item.numero }}</td>
+                    <td>{{ linha.item.titulo }}</td>
+                    <td>{{ linha.quantidade_efetiva|format }} <span class="hint hint--top" aria-label="{{ linha.item.unidade_medida }}">{% icone "question-circle" %}</span></td>
+                    <td class="text-end">{{ linha.item.pontuacao_unidade|format }}</td>
+                    <td class="text-end"><strong>{{ linha.pontuacao_total|format }}</strong></td>
+                </tr>
+                {% if linha.anexos %}
+                <tr class="rsc-memorial-docs-row">
+                    <td colspan="4">
+                        <div class="rsc-memorial-docs-titulo">Documentos comprobatórios</div>
+                        <ol class="rsc-memorial-docs-lista">
+                            {% for anexo in linha.anexos %}
+                                <li>
+                                    <div class="rsc-memorial-doc-item">
+                                        <span class="rsc-memorial-doc-item__desc">
+                                            {% if anexo.descricao %}
+                                                {{ anexo.descricao }}
+                                            {% else %}
+                                                <span class="false">(Sem descrição informada)</span>
+                                            {% endif %}
+                                        </span>
+                                        <span class="rsc-memorial-doc-item__medidas">
+                                            <span class="rsc-memorial-doc-item__qtd">Qtd: {{ anexo.quantidade_no_item|format }}</span>
+                                            <span class="rsc-memorial-doc-item__pts">{{ anexo.pontos_no_item|format }} pts</span>
+                                        </span>
+                                    </div>
+                                </li>
+                            {% endfor %}
+                        </ol>
+                    </td>
+                </tr>
+                {% endif %}
+            {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="4" class="text-end fw-bold">Subtotal</td>
+                    <td class="text-end fw-bold">{{ grupo.subtotal_pontos|format }}</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+    {% empty %}
+        <div class="alert alert-warning" role="alert">
+            Nenhum item preenchido. Preencha os critérios na aba <strong>Formulário</strong>.
+        </div>
+    {% endfor %}
+
+    {% if grupos_requisito %}
+        <h4 class="my-3">Resumo de pontuação</h4>
+        <dl class="definition-list mt-3">
+            <dt>Total (Critério I + II + III + IV + V + VI)</dt>
+            <dd><span class="js-total-pontos">{{ total_pontos|format }}</span></dd>
+        </dl>
+    {% endif %}
+{% endbox %}
+
+{# ─────────────────────────────────────────────────────────────────────── #}
+{# SEÇÃO 4 — Conclusão do Servidor                                         #}
+{# ─────────────────────────────────────────────────────────────────────── #}
+{% box '4. Conclusão do Servidor' %}
+    <div class="rsc-memorial-texto">
+        {% if pode_editar_preenchimento %}
+            <textarea class="js-memorial-campo rsc-textarea-full{% if not memorial.conclusao %} rsc-campo-invalido{% endif %}" data-campo="conclusao" rows="8" placeholder="Escreva a conclusão do seu memorial...">{{ memorial.conclusao }}</textarea>
+            <span class="rsc-autosave-status js-memorial-status" data-campo="conclusao"></span>
+        {% elif memorial.conclusao %}
+            <p class="rsc-pre-wrap">{{ memorial.conclusao }}</p>
+        {% endif %}
+    </div>
+
+    <p>
+        À vista das informações apresentadas, totalizo
+        <strong class="js-total-pontos">{{ total_pontos|format }}</strong> pontos
+        e atendo aos critérios legais e regulamentares para o nível
+        <strong>RSC-{{ processo.nivel_requisitado.ordem_romana }}</strong> do RSC-PCCTAE.
+        Solicito a análise pela CRSC-PCCTAE.
+    </p>
+{% endbox %}

@@ -1,0 +1,176 @@
+{% extends super_template %}
+{% load static %}
+{% load rsc_tae_extras %}
+
+{% block extracss %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static 'rsc_tae/css/rsc-tae.css' %}">
+{% endblock %}
+
+{% block content %}
+{% box 'Deliberação da CRSC — Item com Divergência' %}
+
+<div class="table-responsive mb-3">
+    <table>
+        <caption>INFORMAÇÕES DO ANEXO</caption>
+        <tr>
+            <td><strong>Critério</strong></td>
+            <td>{{ anexo.rol_saber_competencia.titulo }}</td>
+        </tr>
+        <tr>
+            <td><strong>Arquivo</strong></td>
+            <td>
+                <a href="{{ anexo.arquivo.url }}" target="_blank" rel="noopener noreferrer">
+                    {{ anexo.nome_exibicao }}
+                </a>
+            </td>
+        </tr>
+        <tr>
+            <td><strong>{% if anexo.rol_saber_competencia.item_temporal %}Período declarado{% else %}Pontuação declarada{% endif %}</strong></td>
+            <td>
+                {% if anexo.rol_saber_competencia.item_temporal %}
+                    {{ anexo.pontuacao|meses_para_anos }} ano(s)
+                    <span class="text-muted">(período: {{ anexo.periodo_display }})</span>
+                {% else %}
+                    {{ anexo.pontuacao|format }} unidade(s)
+                {% endif %}
+            </td>
+        </tr>
+    </table>
+</div>
+
+{% if avaliacoes %}
+<div class="table-responsive mb-3">
+    <table>
+        <caption>AVALIAÇÕES DOS AVALIADORES AUXILIARES</caption>
+        <thead>
+            <tr>
+                <th>Avaliador</th>
+                <th class="text-center">Situação</th>
+                <th class="text-center">Unid. validadas</th>
+                <th>Observação</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for av in avaliacoes %}
+            <tr>
+                <td>{{ av.avaliador_vinculo }}</td>
+                <td class="text-center">
+                    {% if av.situacao == 2 %}
+                        <span class="status status-success">Deferido</span>
+                    {% elif av.situacao == 3 %}
+                        <span class="status status-error">Indeferido</span>
+                    {% else %}
+                        <span class="status status-default">Pendente</span>
+                    {% endif %}
+                </td>
+                <td class="text-center">
+                    {% if av.situacao == 2 %}
+                        {% if anexo.rol_saber_competencia.item_temporal %}
+                            {{ av.pontuacao_validada|meses_para_anos }} ano(s)
+                            {% if av.pontuacao_validada != anexo.pontuacao %}
+                                <span class="text-muted">(declarado: {{ anexo.pontuacao|meses_para_anos }} ano(s))</span>
+                            {% endif %}
+                        {% else %}
+                            {{ av.pontuacao_validada|format }}
+                            {% if av.pontuacao_validada != anexo.pontuacao %}
+                                <span class="text-muted">(declarado: {{ anexo.pontuacao|format }})</span>
+                            {% endif %}
+                        {% endif %}
+                    {% elif av.situacao == 3 %}
+                        0
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
+                <td>
+                    {% if av.observacao %}
+                        {{ av.observacao }}
+                    {% else %}
+                        <span class="text-muted">—</span>
+                    {% endif %}
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+    <p class="text-muted">Nenhuma avaliação registrada para este item.</p>
+{% endif %}
+
+<div class="alert alert-info mb-3">
+    <strong>Deliberações registradas: {{ status_item.total }} de {{ status_item.quantidade_necessaria }}.</strong>
+    Ao atingir {{ status_item.quantidade_necessaria }}, a nota final é a pontuação mais votada. Em caso de empate, o presidente da comissão registra o voto de desempate.
+    {% if cota_categoria.categoria %}
+        <br>
+        Cota da categoria {{ cota_categoria.categoria }} neste item: {{ cota_categoria.usados }} de {{ cota_categoria.limite }} utilizada(s).
+    {% endif %}
+</div>
+
+{% if aguardando_desempate %}
+<div class="alert alert-warning mb-3">
+    <strong>Empate.</strong> A votação empatou — aguardando o voto de desempate do presidente da comissão.
+</div>
+{% endif %}
+
+{% if votos %}
+<div class="table-responsive mb-3">
+    <table>
+        <caption>VOTOS DOS MEMBROS DA COMISSÃO</caption>
+        <thead>
+            <tr>
+                <th>Membro</th>
+                <th class="text-center">Voto</th>
+                <th class="text-center">Unid.</th>
+                <th>Justificativa</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for v in votos %}
+            <tr>
+                <td>{{ v.deliberado_por_vinculo.pessoa.nome|default:v.deliberado_por_vinculo }}</td>
+                <td class="text-center">
+                    {% if v.decisao == 2 %}
+                        <span class="status status-success">Deferir</span>
+                    {% else %}
+                        <span class="status status-error">Indeferir</span>
+                    {% endif %}
+                    {% if v.desempate %}<span class="status status-info">Desempate</span>{% endif %}
+                </td>
+                <td class="text-center">
+                    {% if anexo.rol_saber_competencia.item_temporal %}
+                        {{ v.pontuacao_efetiva|meses_para_anos }} ano(s)
+                    {% else %}
+                        {{ v.pontuacao_efetiva|format }}
+                    {% endif %}
+                </td>
+                <td>{{ v.justificativa|default:"—" }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% if aguardando_desempate and not eh_presidente %}
+    <p class="text-muted">Somente o presidente da comissão pode registrar o voto de desempate deste item.</p>
+{% elif pode_votar %}
+    {% if is_desempate %}
+        <h3>Voto de desempate do presidente</h3>
+        <p class="text-muted">Sua decisão define a nota final deste item, encerrando o empate.</p>
+    {% else %}
+        <h3>{% if meu_voto %}Atualizar meu voto{% else %}Registrar meu voto{% endif %}</h3>
+    {% endif %}
+    <form method="post" action="">
+        {% csrf_token %}
+        {% render_form form submit_label=False %}
+    </form>
+{% elif impedimento_voto %}
+    <div class="alert alert-warning mb-3">
+        <strong>Você não pode deliberar este item.</strong> {{ impedimento_voto }}
+    </div>
+{% endif %}
+
+{% endbox %}
+{% endblock %}

@@ -1,0 +1,394 @@
+{% extends super_template %}
+
+{% block extrahead %}
+<script type="text/javascript" src="/static/arquivo/js/pdf.js"></script>
+
+<script>
+    function toggleDataValidada(radio, id_obj){
+        var obj = $(radio)
+        var obj_hidden = $('#'+id_obj)
+        var obj_img = obj.parent().next().next().next().next().find('span.status');
+        var obj_status = obj.parent().next().next().next().next().find('input:hidden');
+
+        if (obj.is(':radio')) {
+            obj_img = obj.parent().next().next().find('span.status');
+            obj_status = obj.parent().next().next().find('input:hidden');
+        }
+
+        if (obj.val() != 1){
+            obj_img.text('Não validada');
+            obj_img.removeClass('status-success');
+            obj_img.addClass('status-error');
+            obj_status.val(obj.val());
+
+            if (obj.val() == 2) {
+                obj_hidden.removeAttr('disabled');
+                // mudando status 
+                $('input[type="date"]').change(function(){
+                    var obj_img = $(this).parent().next().next().find('span.status')
+                    var obj_status = $(this).parent().next().next().find('input:hidden')
+                    
+                    if($(this).val() == ''){
+                        obj_img.text('Não validada');
+                        obj_img.removeClass('status-success');
+                        obj_img.addClass('status-error');
+                        obj_status.val(obj.val());
+                    }else{
+                        obj_img.text('Validada');
+                        obj_img.addClass('status-success');
+                        obj_img.removeClass('status-error');
+                        obj_status.val(obj.val());
+                    }
+                    toggleShowButton();
+                });
+            }else{
+                obj_hidden.val('');
+                obj_hidden.attr('disabled','disabled');
+                obj_img.text('Não validada');
+                obj_img.removeClass('status-success');
+                obj_img.addClass('status-error');
+                obj_status.val(obj.val());
+            }
+        }else{
+
+            obj_img.text('Validada');
+            obj_img.addClass('status-success');
+            obj_img.removeClass('status-error');
+            obj_hidden.val('');
+            obj_hidden.attr('disabled','disabled');
+            obj_status.val(obj.val());
+        }
+
+        // verificando botões de ação
+        toggleShowButton();
+    }
+
+    function toggleShowButton(){
+        var radio_pontuacao = $('input[name=formulario_pontuacao]:checked');
+        var radio_relatorio = $('input[name=relatorio_descritivo]:checked');
+
+        var graduacao_ebtt = $('select[name=graduacao_ebtt]')
+        var data_graduacao_ebtt_validada = $('#id_data_graduacao_ebtt_validada')
+
+        var titulacao = $('select[name=titulacao]')
+        var data_conclusao_titulacao_validada = $('#id_data_conclusao_titulacao_validada')
+
+        var progressao = $('select[name=progressao]')
+        var data_progressao_validada = $('#id_data_progressao_validada')
+
+        var avaliacao_desempenho = $('select[name=avaliacao_desempenho]')
+        var data_avaliacao_desempenho_validada = $('#id_data_avaliacao_desempenho_validada')
+
+        $('#btn_aceitar').attr('style', 'display:inline-block');
+        $('#btn_devolver').attr('style', 'display:inline-block');
+
+        // checando os documentos obrigatórios
+        if (graduacao_ebtt.val() != 1){
+            $('#btn_aceitar').attr('style', 'display:none');
+            if (graduacao_ebtt.val() == 2 && data_graduacao_ebtt_validada.val() != ''){
+                $('#btn_aceitar').attr('style', 'display:inline-block');
+            }
+        }
+        if (titulacao.val() != 1){
+            $('#btn_aceitar').attr('style', 'display:none');
+            if (titulacao.val() == 2 && data_conclusao_titulacao_validada.val() != ''){
+                $('#btn_aceitar').attr('style', 'display:inline-block');
+            }
+        }
+        if (progressao.val() != 1){
+            $('#btn_aceitar').attr('style', 'display:none');
+            if (progressao.val() == 2 && data_progressao_validada.val() != ''){
+                $('#btn_aceitar').attr('style', 'display:inline-block');
+            }
+        }
+        if (avaliacao_desempenho.val() != 1){
+            $('#btn_aceitar').attr('style', 'display:none');
+            if (avaliacao_desempenho.val() == 2 && data_avaliacao_desempenho_validada.val() != ''){
+                $('#btn_aceitar').attr('style', 'display:inline-block');
+            }
+        }
+
+        // checando formulário de pontuação e relatório descritivo
+        if (radio_pontuacao != undefined && radio_pontuacao.val() == 0){
+            $('#btn_aceitar').attr('style', 'display:none');
+        }
+        if(radio_relatorio.val() == 0){
+            $('#btn_aceitar').attr('style', 'display:none');	
+        }
+    }
+
+    function validaData() {
+        var retorno = true
+        $('input[type="date"]').each(function() {
+            obj = $(this)
+            if (obj.attr('disabled') != 'disabled' && obj.val() == '') {
+                $('#' + obj.attr('id')).css('border', 'red solid 1px');
+                var text = obj.parent().prev().html().replace(':', '').toLowerCase();
+                alert('A ' + text + ' deve ser preenchida.');
+                retorno = false;
+                return retorno;
+            } else {
+                $('#' + obj.attr('id')).css('border', '');
+            }
+        });
+        return retorno;
+    }
+
+    function validaDescricao(acao) {
+        var descricao = $('#id_motivo_rejeicao')
+        var btn_aceitar = $('#btn_aceitar')
+        if(btn_aceitar.css('display') == 'none'){
+            // se entrou aqui, é necessário adicionar uma descrição para rejeitar o devolver o processo para o avaliado
+            if (descricao.val().trim() == ''){
+                alert('O "motivo de rejeição/devolução/ou alteração de data" deve ser preenchido.');
+                return false
+            }
+            return true
+        }else{
+            // é necessário verificar se a data dos documentos obrigatórios foram alteradas, se sim, é necessário preencher o motivo
+            var retorno = true
+            $('input[type="date"]').each(function(index) {
+                if ($( this ).prop('disabled') == false && descricao.val().trim() == ''){
+                    alert('Necessário preencher "motivo de rejeição/devolução/ou alteração de data" quando uma data é alterada pela CPPD.');
+                    retorno = false
+                }
+            });
+            return retorno
+        }
+    }
+
+    function processarValidacao(acao, processo_id) {
+        if (validaData() && validaDescricao(acao)) {
+            if (confirm("Tem certeza que deseja " + acao + " este processo?")) {
+                var url = '/professor_titular/validar_processo_titular/' + processo_id + '/';
+                $.ajax({
+                    type : "POST",
+                    url : url,
+                    data : $('#form_validacao').serialize() + '&acao=' + acao,
+                    success : function(retorno) {
+                        alert(retorno.msg);
+                        if (retorno.ok) {
+                            location.href = retorno.url;
+                        }
+                    }
+                })
+            }
+        }
+    }
+</script>
+
+{% endblock %}
+
+{% block content %}
+
+<form id="form_validacao" action="" method="post">
+    
+    <ul class="action-bar">
+        <li><a id="btn_aceitar" href="javascript:void(0);" onclick="javascript:processarValidacao('aceitar', {{ processo.id }});" class="btn success" style="display:none">{{ btn_aceitar }}</a></li>
+        <li><a id="btn_devolver" href="javascript:void(0);" onclick="javascript:processarValidacao('devolver', {{ processo.id }});" class="btn warning" >{{ btn_devolver }}</a></li>
+        <li><a id="btn_rejeitar" href="javascript:void(0);" onclick="javascript:processarValidacao('rejeitar', {{ processo.id }});" class="btn danger no-confirm">{{ btn_rejeitar }}</a></li>
+    </ul>
+    
+    {% csrf_token %}
+    {{ form.processo }}
+	
+	{% box 'Diploma de graduação para ingresso no cargo de professor de EBTT ' %}
+        <table class="info">
+            <tr>
+                <td>Documento:</td>
+                <td colspan="7"><a href="/professor_titular/visualizar_arquivo_exigido_pdf/{{ processo.get_arquivo_graduacao_ebtt.encrypted_id }}" target="blank">Baixe o arquivo</a></td>
+            </tr>
+            <tr>
+                <td>Data:</td>
+                <td>{{ processo.data_graduacao_EBTT }}</td>
+                <td>A data condiz com o arquivo anexado?</td>
+                <td>
+                    <select name="graduacao_ebtt" value="1" onchange="toggleDataValidada(this, 'id_data_graduacao_ebtt_validada')">
+                        <option value="">--selecione--</option>
+                        {% for k,v in choice_validacao_arquivo %}
+                        <option value="{{ k }}">{{ v }}</option>
+                        {% endfor %}
+                    </select>
+                </td>
+                <td>Data da Graduação para Ingresso no Cargo de Professor de EBTT</td>
+                <td>{{ form.data_graduacao_ebtt_validada }}</td>
+                <td>Situação:</td>
+                <td width="10%">
+                	<span class="status status-error" id="imagem_graduacao_ebtt_status">Não validada</span>
+                	<input type="hidden" name="graduacao_ebtt_status" value="0">
+                </td>
+            </tr>
+        </table>
+    {% endbox %}
+	
+    {% box 'Título que habilita a classe titular (Doutorado)' %}
+        <table class="info">
+        	<tr>
+                <td>Documento:</td>
+                <td colspan="7"><a href="/professor_titular/visualizar_arquivo_exigido_pdf/{{ processo.get_arquivo_titulacao.encrypted_id }}" target="blank">Baixe o arquivo</a></td>
+            </tr>
+            <tr>
+                <td>Data:</td>
+                <td>{{ processo.data_concessao_titulacao_doutor }}</td>
+                <td>A data condiz com o arquivo anexado?</td>
+                <td>
+                    <select name="titulacao" value="1" onchange="toggleDataValidada(this, 'id_data_conclusao_titulacao_validada')">
+                        <option value="">--selecione--</option>
+                        {% for k,v in choice_validacao_arquivo %}
+                        <option value="{{ k }}">{{ v }}</option>
+                        {% endfor %}
+                    </select>
+                </td>
+                <td>Data de conclusão validada</td>
+                <td>{{ form.data_conclusao_titulacao_validada }}</td>
+                <td>Situação:</td>
+                <td width="10%">
+                    <span class="status status-error" id="imagem_titulacao_status">Não validada</span>
+                    <input type="hidden" name="titulacao_status" value="0">
+                </td>
+            </tr>
+        </table>
+    {% endbox %}
+
+    {% box 'Progressão ou enquadramento no nível D-IV-4' %}
+        <table class="info">
+        	<tr>
+                <td>Documento:</td>
+                <td colspan="7"><a href="/professor_titular/visualizar_arquivo_exigido_pdf/{{ processo.get_arquivo_progressao.encrypted_id }}" target="blank">Baixe o arquivo</a></td>
+            </tr>
+            <tr>
+                <td>Data:</td>
+                <td>{{ processo.data_progressaoD404 }}</td>
+                <td>A data condiz com o arquivo anexado?</td>
+                <td>
+                    <select name="progressao" value="1" onchange="toggleDataValidada(this, 'id_data_progressao_validada')">
+                        <option value="">--selecione--</option>
+                        {% for k,v in choice_validacao_arquivo %}
+                        <option value="{{ k }}">{{ v }}</option>
+                        {% endfor %}
+                    </select>
+                </td>
+                <td>Data progressão validada</td>
+                <td>{{ form.data_progressao_validada }}</td>
+                <td>Situação:</td>
+                <td width="10%">
+                	<span class="status status-error" id="imagem_progressao_status">Não validada</span>
+                    <input type="hidden" name="progressao_status" value="0">
+                </td>
+                </tr>
+        </table>
+    {% endbox %}
+
+    {% box 'Termo de Avaliação de Desempenho' %}
+        <table class="info">
+        	 <tr>
+                <td>Documento:</td>
+                <td colspan="7"><a href="/professor_titular/visualizar_arquivo_exigido_pdf/{{ processo.get_arquivo_avaliacao_desempenho.encrypted_id }}" target="blank">Baixe o arquivo</a></td>
+            </tr>
+                <tr>
+                    <td>Data:</td>
+                    <td>{{ processo.data_avaliacao_desempenho }}</td>
+                    <td>A data condiz com o arquivo anexado?</td>
+                    <td>
+                        <select name="avaliacao_desempenho" value="1" onchange="toggleDataValidada(this, 'id_data_avaliacao_desempenho_validada')">
+                            <option value="">--selecione--</option>
+                            {% for k,v in choice_validacao_arquivo %}
+                            <option value="{{ k }}">{{ v }}</option>
+                            {% endfor %}
+                        </select>
+                    </td>
+                    <td>Data do termo de avaliação de desempenho validada</td>
+                    <td>{{ form.data_avaliacao_desempenho_validada }}</td>
+
+                    <td>Situação:</td>
+                    <td width="10%">
+                    	<span class="status status-error" id="imagem_avaliacao_desempenho_status">Não validada</span>
+                    	<input type="hidden" name="avaliacao_desempenho_status" value="0">
+                    </td>
+                </tr>
+        </table>
+    {% endbox %}
+
+    {% box 'Formulário de Pontuação' %}
+        <table class="info">
+        	<tr>
+                <td>Documento:</td>
+                <td><a href="/professor_titular/formulario_pontuacao_pdf/{{ processo.id }}" target="blank">Baixe o arquivo</a></td>
+                <td>O formulário de pontuação está preenchido de forma correta?</td>
+                 <td>
+                    <input type="radio" name="formulario_pontuacao" value="1" onchange="toggleDataValidada(this)" id="formulario_pontuacao1"> <label for="formulario_pontuacao1">Sim</label> 
+                    <input type="radio" name="formulario_pontuacao" value="0" onchange="toggleDataValidada(this)" id="formulario_pontuacao0"> <label for="formulario_pontuacao0">Não</label>
+                </td>
+                <td>Situação:</td>
+                <td width="10%">
+                    <span class="status status-error" id="imagem_formulario_pontuacao_status">Não validada</span>
+                    <input type="hidden" name="formulario_pontuacao_status" value="0">
+                </td>
+            </tr>
+        </table>
+    {% endbox %}
+
+    {% box 'Relatório Descritivo' %}
+        <table class="info">
+            <tr>
+                <td>Relatório:</td>
+                <td><a href="/professor_titular/relatorio_descritivo_pdf/{{ processo.id }}" target="blank">Baixe o arquivo</a></td>
+                <td>O relatório descritivo condiz com a norma?</td>
+                <td>
+                    <input type="radio" name="relatorio_descritivo" value="1" onchange="toggleDataValidada(this)" id="relatorio_descritivo1"> <label for="relatorio_descritivo1">Sim</label> 
+                    <input type="radio" name="relatorio_descritivo" value="0" onchange="toggleDataValidada(this)" id="relatorio_descritivo0"> <label for="relatorio_descritivo0">Não</label>
+                </td>
+                <td>Situação:</td>
+                <td width="10%">
+                    <span class="status status-error" id="imagem_relatorio_resumido_status">Não validada</span>
+                    <input type="hidden" name="relatorio_descritivo_status" value="0">
+                </td>
+            </tr>
+        </table>
+    {% endbox %}
+
+    {% box 'Motivo da Rejeição' %}
+        <table>
+            <tbody>
+                <tr><td>Descreva aqui o motivo da rejeição:</td></tr>
+                <tr><td>{{ form.motivo_rejeicao }}</td></tr>
+            </tbody>
+        </table>
+    {% endbox %}
+    
+	{% if validacoes_processo.exists %}
+		{% box 'Histórico de Validação' %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Validador</th>
+                        <th>Data de Validação</th>
+                        <th>Data do Titulo Doutor</th>
+                        <th>Data de Graduação no Ingresso na Carreira EBTT</th>
+                        <th>Data de progressão D404</th>
+                        <th>Data de Avaliação de Desempenho</th>
+                        <th>Ação</th>
+                        <th>Decrição do Motivo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for validacao in validacoes_processo %}
+                        <tr>
+                            <td>{{ validacao.validador }}</td>
+                            <td>{{ validacao.data }}</td>
+                            <td>{{ validacao.data_conclusao_titulacao_validada|format }}</td>
+                            <td>{{ validacao.data_graduacao_ebtt_validada|format }}</td>
+                            <td>{{ validacao.data_progressao_validada|format }}</td>
+                            <td>{{ validacao.data_avaliacao_desempenho_validada|format }}</td>
+                            <td>{{ validacao.get_acao_display }}</td>
+                            <td>{{ validacao.motivo_rejeicao }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endbox %}
+	{% endif %}
+
+</form>
+
+{% endblock %}

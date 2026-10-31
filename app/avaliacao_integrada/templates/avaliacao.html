@@ -1,0 +1,331 @@
+{% extends super_template %}
+{% load static %}
+{% block action-bar %}
+    <ul class="action-bar">
+        <li>
+            <a class="btn primary"
+               href="/admin/avaliacao_integrada/avaliacao/{{ obj.pk }}/">Editar</a>
+        </li>
+    </ul>
+{% endblock %}
+{% block content %}
+    {% box "Dados gerais" %}
+        <table class="info">
+            <tr>
+                <td>Tipos</td>
+                <td>
+                    {% if obj.tipos.exists %}
+                        <ul>
+                            {% for item in obj.tipos.all %}<li>{{ item }}</li>{% endfor %}
+                        </ul>
+                    {% else %}
+                        Nenhum
+                    {% endif %}
+                </td>
+                <td>Ano de Referência</td>
+                <td>{{ obj.ano|format }}</td>
+                <td>Período</td>
+                <td>{{ obj.data_inicio|format }} - {{ obj.data_termino|format }}</td>
+            </tr>
+            <tr>
+                <td>Descrição</td>
+                <td colspan="5">{{ obj.descricao|format|linebreaksbr }}</td>
+            </tr>
+            <tr>
+                <td>Link de Compartilhamento</td>
+                {% if obj.possui_segmento_sociedade_civil %}
+                    <td colspan="5">
+                        <div id="link_avaliacao_externa">{{ url_to_share|format }}</div>
+                        <a href="#" class="botao-copiar">
+                            <i class="fas fa-copy"></i> Copiar
+                        </a>
+                    </td>
+                {% else %}
+                    <td colspan="5">Avaliação sem segmento para público externo sociedade civil.</td>
+                {% endif %}
+            </tr>
+        </table>
+    {% endbox %}
+    {% box "Detalhamento" %}
+        <table class="info">
+            <tr>
+                <td>Segmentos Respondentes</td>
+                <td>
+                    <ul class="tags">
+                        {% for item in obj.segmentos.all %}
+                            <li>{{ item }}</li>
+                        {% empty %}
+                            <li>Nenhum</li>
+                        {% endfor %}
+                    </ul>
+                </td>
+            </tr>
+            <tr>
+                <td>Áreas de Vinculação</td>
+                <td>
+                    <ul class="tags">
+                        {% for item in obj.areas_vinculacao.all %}
+                            <li>{{ item }}</li>
+                        {% empty %}
+                            <li>Todas</li>
+                        {% endfor %}
+                    </ul>
+                </td>
+            </tr>
+            <tr>
+                <td>Modalidades</td>
+                <td>
+                    <ul class="tags">
+                        {% for item in obj.modalidades.all %}
+                            <li>{{ item }}</li>
+                        {% empty %}
+                            <li>Todas</li>
+                        {% endfor %}
+                    </ul>
+                </td>
+            </tr>
+            <tr>
+                <td>Campi</td>
+                <td>
+                    <ul class="tags">
+                        {% for uo in obj.uos.all %}
+                            <li>{{ uo.sigla }}</li>
+                        {% empty %}
+                            <li>Todos</li>
+                        {% endfor %}
+                    </ul>
+                </td>
+            </tr>
+        </table>
+    {% endbox %}
+    <div class="tab-pane ajax-rendered"
+         data-title="Público-Alvo"
+         data-tab="respondentes"
+         data-counter="{{ respondentes.count }}">
+        {% if qsv_servidores_sem_area %}
+            <div class="alert alert-danger">
+                <p>
+                    <strong>Atenção:</strong> Existem {{ qsv_servidores_sem_area|length }} servidores
+                    de {{ setores_sem_areas|length }} setores sem áreas de vinculação associada.
+                </p>
+                <ol>
+                    <li>A associação de setores com áreas de vinculação é obrigatória para o reprocessamento do público-alvo.</li>
+                    <li>Os botões para reprocessar público alvo foram omitidos até que se resolva essa pendências .</li>
+                    <li>
+                        Para resolver, faz-se necessário editar o cadastro dos setores com pedências e informar as áreas de vinculação.
+                    </li>
+                </ol>
+            </div>
+            {% box 'Setores com pendências' %}
+                {#<span class="information hint hint-top" aria-label="Cliqui no link do setor abaixo para exibir a lista de servidores.">{% icone "info-circle" %}</span>#}
+                <ol class="numbered-list">
+                    {% for id, setor in setores_sem_areas.items %}
+                        <li class="list-item">
+                            <a class="popup"
+                               href="/avaliacao_integrada/avaliacao/{{ obj.id }}/setores_sem_areas_de_vinculacao">{{ setor.sigla|format }}</a>
+                        </li>
+                    {% endfor %}
+                </ol>
+            {% endbox %}
+        {% else %}
+            <ul class="action-bar">
+                {% if pode_enviar_email_lembrete %}
+                    <li>
+                        <a href="{% url 'avaliacao_enviar_email' obj.pk %}"
+                           class="btn default popup">Enviar lembrete por e-mail</a>
+                    </li>
+                {% endif %}
+                {% if pode_gerar_publico_alvo %}
+                    <li>
+                        <a href="?identificar_respondentes"
+                           class="btn confirm"
+                           data-confirm="Você tem certeza que deseja reprocessar o público-alvo desta avaliação?">Reprocessar
+                        Público-Alvo</a>
+                    </li>
+                {% endif %}
+                {% if pode_reprocessar_publico_alvo_com_exclusao %}
+                    <li>
+                        <a class="btn warning confirm"
+                           href="?excluir_e_identificar_respondentes"
+                           data-confirm="Você tem certeza que deseja reprocessar o público-alvo desta avaliação? Esta ação é IRREVERSÍVEL, ao confirmar, TODAS as avaliações já respondidas serão APAGADAS.">Reprocessar
+                        Público-Alvo e Respostas</a>
+                    </li>
+                {% endif %}
+            </ul>
+        {% endif %}
+        {% if obj.respondente_set.exists %}
+            <div class="search-and-filters">
+                <form id="changelist-search" method="get">
+                    <div class="filter">
+                        <div class="filter">
+                            <input type="hidden" name="tab" value="respondentes">
+                            <label>Buscar:</label>
+                            <input type="text"
+                                   size="40"
+                                   name="q"
+                                   value="{{ q }}"
+                                   id="q"
+                                   class="search-query">
+                            <input type="submit" value="Ir">
+                        </div>
+                    </div>
+                    <div class="filter">
+                        <label>Segmento:</label>
+                        <select name="segmento_selecionado"
+                                onchange="$('#changelist-search').submit();">
+                            <option {% if not segmento_selecionado %}selected="selected"{% endif %}
+                                    value="">Todos</option>
+                            {% for segmento in segmentos %}
+                                <option {% if segmento_selecionado == segmento.pk|stringformat:"i" %}selected="selected"{% endif %}
+                                        value="{{ segmento.pk }}">{{ segmento }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="filter">
+                        <label>Campus:</label>
+                        <select name="uo_selecionada" onchange="$('#changelist-search').submit();">
+                            <option {% if not uo_selecionada %}selected="selected"{% endif %} value="">Todos</option>
+                            {% for uo in uos %}
+                                <option {% if uo_selecionada == uo.pk|stringformat:"i" %}selected="selected"{% endif %}
+                                        value="{{ uo.pk }}">{{ uo }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </form>
+                <script>document.getElementById("q").focus();</script>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Identificação</th>
+                        <th>Campus</th>
+                        <th>Segmento</th>
+                        <th>% Respondido</th>
+                        <th>Enviado</th>
+                        <th class="no-print">Opções</th>
+                    </tr>
+                </thead>
+                {% autopaginate respondentes 50 %}
+                {% for respondente in respondentes %}
+                    <tbody>
+                        <tr>
+                            <td>
+                                {% if pode_ver_dados_identificaveis %}
+                                    {{ respondente.nome|format }}
+                                </td>
+                            {% else %}
+                                Anônimo
+                            {% endif %}
+                            <td>
+                                {% if pode_ver_dados_identificaveis %}
+                                    {{ respondente.identificacao|format }}
+                                {% else %}
+                                    ---
+                                {% endif %}
+                            </td>
+                            <td>{{ respondente.uo.sigla|format }}</td>
+                            <td>{{ respondente.segmento|format }}</td>
+                            <td>{% progressbar respondente.percentual_resposta|format %}</td>
+                            <td>{{ respondente.finalizado|format }}</td>
+                            <td>
+                                {% if pode_visualizar_questionario_terceiros %}
+                                    <a href="/avaliacao_integrada/questionario/{{ respondente.pk }}/"
+                                       class="btn default">{% icone "eye" %} Visualizar questionário</a>
+                                </td>
+                            {% endif %}
+                        </tr>
+                    </tbody>
+                {% endfor %}
+            </table>
+            {% paginate %}
+        {% else %}
+            <p class="alert alert-warning">
+                Ainda não há respondentes aptos para a avaliação. Reprocesse o público-alvo para atualizar os resultados.
+            </p>
+        {% endif %}
+    </div>
+    {% if pode_ver_quadro_resumo %}
+        <div class="tab-pane ajax-rendered"
+             data-title="Resumo"
+             data-tab="quadro_resumo">
+            {% if perms.avaliacao_integrada.pode_exportar_respostas %}
+                <div class="toolbar">
+                    <a class="btn disabled"
+                       aria-disabled="true"
+                       id="qr-export"
+                       data-export-href="{% url 'avaliacao_quadro_resumo_xlsx' obj.pk %}">Exportar Resumo (XLSX)</a>
+                </div>
+            {% endif %}
+            <div id="qr-status"
+                 class="alert alert-info"
+                 role="status"
+                 aria-live="polite">
+                Preparando o quadro-resumo… Os blocos aparecerão à medida que forem ficando prontos.
+            </div>
+            <div class="quadro-resumo-bloco"
+                 id="qr-finalizados"
+                 aria-busy="true"
+                 data-url="{% url 'avaliacao_quadro_resumo_bloco' obj.pk 'finalizados' %}">
+                <div class="placeholder">Carregando “Finalizados”...</div>
+            </div>
+            <div class="quadro-resumo-bloco"
+                 id="qr-parciais-100"
+                 aria-busy="true"
+                 data-url="{% url 'avaliacao_quadro_resumo_bloco' obj.pk 'parciais_100' %}">
+                <div class="placeholder">Carregando “Respondido 100% mas não enviados”...</div>
+            </div>
+            <div class="quadro-resumo-bloco"
+                 id="qr-parciais"
+                 aria-busy="true"
+                 data-url="{% url 'avaliacao_quadro_resumo_bloco' obj.pk 'parciais' %}">
+                <div class="placeholder">Carregando “Parciais”...</div>
+            </div>
+            <div class="quadro-resumo-bloco"
+                 id="qr-nao-respondidos"
+                 aria-busy="true"
+                 data-url="{% url 'avaliacao_quadro_resumo_bloco' obj.pk 'nao_respondidos' %}">
+                <div class="placeholder">Carregando “Não Respondidos”...</div>
+            </div>
+        </div>
+        <script src="{% static 'avaliacao_integrada/js/quadro_resumo.js' %}"
+                charset="utf-8"></script>
+    {% endif %}
+{% endblock %}
+{% block extrascripts %}
+    <script>
+        function copiarParaClipboard() {
+            // Seleciona o campo de texto
+            var copiaTexto = document.getElementById("url-to-share");
+
+            // Seleciona o texto dentro do campo
+            copiaTexto.select();
+            copiaTexto.setSelectionRange(0, 99999);  // Para dispositivos móveis
+
+            // Copia o texto selecionado para a área de transferência
+            document.execCommand("copy");
+
+            // Exibe uma mensagem de confirmação
+            document.getElementById("mensagem").innerText = "Texto copiado para a área de transferência!";
+        }
+        // Função genérica para copiar o conteúdo de um elemento com base no ID
+        function copiarConteudo(id) {
+            var elemento = document.getElementById(id);
+            var tempInput = document.createElement('textarea');
+            tempInput.value = elemento.textContent;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+        }
+
+        var botoesCopiar = document.querySelectorAll('.botao-copiar');
+        botoesCopiar.forEach(function(botao) {
+            botao.addEventListener('click', function(event) {
+                event.preventDefault();
+                var idElemento = this.previousElementSibling.id;
+                copiarConteudo(idElemento);
+            });
+        });
+    </script>
+{% endblock %}

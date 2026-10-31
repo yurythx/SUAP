@@ -1,0 +1,378 @@
+{% comment %}
+    context:
+        avaliar_frequencia_in_popup = True/False
+        avaliar_frequencia_in_popup_reload_on_close = True/False
+        avaliar_frequencia_in_popup_reload_on_success = True/False
+        avaliar_frequencia_in_popup_callback = "js_fn_name"
+        ocultar_exportar_para_xls = True/False
+{% endcomment %}
+
+<ul class="action-bar">
+    {% if not ocultar_exportar_para_xls %}
+        <li><a href="{{ request.get_full_path }}&xls=1" class="btn">{% icone "file-excel" %} Exportar para XLS</a></li>
+    {% endif %}    
+    <li><button class="btn mostrarTodasObservacoes" data-state="hidden">{% icone "expand-alt" %}&nbsp;&nbsp;<span class="text">Exibir</span> todas as Observações</button></li>
+</ul>
+
+<div id="frequencias_pessoa_{{ relatorio.funcionario.pk }}">
+    {% if relatorio.dias %}
+        {% if ha_saldos_no_periodo and relatorio.funcionario.pk == request.user.get_vinculo.relacionamento.pk and not relatorio.funcionario.eh_docente %}
+            <p class="alert alert-warning">
+                <strong>Atenção:</strong> Há saldos de carga horária neste período. Você pode <a
+                    href='/ponto/informar_compensacao_v2/{{ data_inicio|date:"dmY" }}/{{ data_fim|date:"dmY" }}/'>Informar
+                Compensação</a>.
+            </p>
+        {% endif %}
+
+        {% comment %}
+        <!-- {% if relatorio.eh_chefe_periodo and not relatorio.funcionario.eh_liberado_controle_frequencia and relatorio.funcionario.pk != request.user.get_vinculo.relacionamento.pk %} -->
+        {% endcomment %}
+
+        {% if relatorio.eh_chefe_periodo and not relatorio.eh_liberado_controle_frequencia and relatorio.funcionario.pk != request.user.get_vinculo.relacionamento.pk %}
+            {% if relatorio.tem_horarios_excedentes or relatorio.tem_horarios_inferiores %}
+                <form
+                    action="/ponto/adicionar_abono_inconsistencia_frequencia_lote/"
+                    method="GET"
+                    id="frequencias_pessoa_avaliar_lote_{{ relatorio.funcionario.pk }}">
+                </form>
+
+                <p class="alert alert-info">Para <strong>avaliar em lote</strong>, você pode marcar abaixo todas as datas em que houver frequências excedentes ou inferiores à carga horária a ser cumprida.</p>
+
+                <div class="submit-row">
+                    {% if relatorio.tem_horarios_excedentes %}
+                        <button class="btn marcar_todas_frequencias" data-table="frequencias_pessoa_{{ relatorio.funcionario.pk }}" data-checkbox="frequencias_dias" data-type="excedente"
+                            onclick="marcar_todas_frequencias('excedente')" type="button">
+                            Marcar Registros com Duração Excedente
+                        </button>
+                    {% endif %}
+                    {% if relatorio.tem_horarios_inferiores %}
+                        <button class="btn marcar_todas_frequencias" data-table="frequencias_pessoa_{{ relatorio.funcionario.pk }}" data-checkbox="frequencias_dias" data-type="inferior"
+                            onclick="marcar_todas_frequencias('inferior')" type="button">
+                            Marcar Registros com Duração Inferior
+                        </button>
+                    {% endif %}
+
+                    <input class="btn success ms-auto" type="button" value="Avaliar Frequência em Lote"
+                        onclick="avaliar_frequencia_em_lote()">
+                </div>
+            {% endif %}
+        {% endif %}
+
+        <div class="table-responsive">
+            <table id="tabela-frequencias">
+                <caption>Frequências de {{ relatorio.funcionario }}</caption>
+                <thead>
+                    <tr>
+                        {% if relatorio.eh_chefe_periodo %}
+                            {% comment %}
+                            <!-- {% if not relatorio.funcionario.eh_liberado_controle_frequencia %} -->
+                            {% endcomment %}
+                            {% if not relatorio.eh_liberado_controle_frequencia %}
+                                {% if relatorio.funcionario.pk != request.user.get_vinculo.relacionamento.pk %}
+                                    <th rowspan="2"></th>
+                                {% endif %}
+                            {% endif %}
+                        {% endif %}
+                        <th rowspan="2">Data</th>
+                        <th colspan="{% if not relatorio.funcionario.eh_docente %}3{% else %}2{% endif %}" class="text-center">Frequências</th>
+                        <th rowspan="2">Situação</th>
+                        <th 
+                            rowspan="2"
+                            {% if not mostrar_texto_observacoes %}
+                                class="no-print"
+                            {% endif %}
+                        >
+                            Observações
+                        </th>
+                        <th rowspan="2" class="no-print text-end">Opções</th>
+                    </tr>
+                    <tr>
+                        <th>Registros</th>
+                        <th>Detalhes</th>
+                        {% if not relatorio.funcionario.eh_docente %}
+                            <th>Compensações</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for f in relatorio.dias %}
+                        <tr id="frequencia-{{ f.dia|date:'Y-m-d' }}">
+                            {% comment %}
+                            <!-- {% if relatorio.eh_chefe_periodo and not relatorio.funcionario.eh_liberado_controle_frequencia and relatorio.funcionario.pk != request.user.get_vinculo.relacionamento.pk %} -->
+                            {% endcomment %}
+                            {% if relatorio.eh_chefe_periodo and not relatorio.eh_liberado_controle_frequencia and relatorio.funcionario.pk != request.user.get_vinculo.relacionamento.pk %}
+                                <td class="text-center">
+                                    {% if f.pode_abonar_dia and not f.liberado and f.dia < now.date %}
+                                        {% if f.informacoes_registro %}                                        
+                                            {% if f.acao_abono_inconsistencia == 'inferior' %}
+                                                <input type="checkbox" name="frequencias_dias" class="inferior"
+                                                    onclick="select_checkbox(this)"
+                                                    value="{{ relatorio.funcionario.matricula }}_{{ f.dia|date:'dmY' }}"/>
+                                            {% elif f.acao_abono_inconsistencia == 'excedente' %}
+                                                <input type="checkbox" name="frequencias_dias" class="excedente"
+                                                    onclick="select_checkbox(this)"
+                                                    value="{{ relatorio.funcionario.matricula }}_{{ f.dia|date:'dmY' }}"/>
+                                            {% else %}
+                                                <input type="checkbox" name="frequencias_dias"
+                                                    onclick="select_checkbox(this)"
+                                                    value="{{ relatorio.funcionario.matricula }}_{{ f.dia|date:'dmY' }}"/>
+                                            {% endif %}
+                                        {% endif %}
+                                    {% endif %}
+                                </td>
+                            {% endif %}
+                            <td>
+                                <p><a name="{{ relatorio.funcionario.matricula }}{{ f.dia }}"></a><strong class="letter-spaced">{{ f.dia|format }}</strong></p>
+                                <p class="text-nowrap">{{ f.dia|date:"l" }}</p>
+                            </td>
+                            <td>
+                                {% include "includes/frequencias_registros.html" %}
+                            </td>
+                            <td>
+                                <dl>
+                                    {% include "includes/frequencias_duracao.html" %}
+                                    {% include "includes/frequencias_ch.html" %}
+                                </dl>
+                            </td>
+                            {% if not relatorio.funcionario.eh_docente %}
+                                <td>
+                                    {% include "includes/frequencias_compensacoes.html" %}
+                                </td>
+                            {% endif %}
+                            <td>
+                                {% include "includes/frequencias_observacoes.html" %}
+                            </td>
+                            <td 
+                                {% if not mostrar_texto_observacoes %}
+                                    class="no-print"
+                                {% endif %}
+                            >
+                                {% include "includes/frequencias_observacoes_pessoais.html" %}
+                                {% include "includes/frequencias_observacoes_chefia.html" %}
+                                {% include "includes/frequencias_observacoes_documentos.html" %}
+                                {% include "includes/frequencias_observacoes_abonos_parciais.html" %}
+                                {% include "includes/frequencias_observacoes_revisoes_abonos_chefia.html" %}
+                            </td>
+                            <td class="no-print">
+                                <ul class="action-bar">
+                                    {% comment %}
+                                    <!-- {% if f.pode_abonar_dia and not relatorio.funcionario.eh_liberado_controle_frequencia and relatorio.funcionario.pk != request.user.get_vinculo.relacionamento.pk and f.dia < now.date and f.pode_abonar_dia and not f.liberado %} -->
+                                    {% endcomment %}
+                                    {% if f.pode_abonar_dia and not relatorio.eh_liberado_controle_frequencia and relatorio.funcionario.pk != request.user.get_vinculo.relacionamento.pk and f.dia < now.date and not f.liberado %}
+                                        {% if f.informacoes_registro %}
+                                            {% if f.abonos_chefia %}
+                                                <li><a href='/ponto/editar_abonos_chefia/{{ relatorio.funcionario.matricula }}/{{ f.dia|date:"dmY" }}/'
+                                                    class="btn primary {% if avaliar_frequencia_in_popup %}popup{% endif %}"
+                                                    data-reload-on-close="{% if avaliar_frequencia_in_popup_reload_on_close %}true{% else %}false{% endif %}"
+                                                    data-callback-after-close="{{ avaliar_frequencia_in_popup_callback }}">
+                                                    {% icone "edit" %} Editar Avaliação</a></li>
+                                                <li><a
+                                                    href='/ponto/adicionar_abono_inconsistencia_frequencia/{{ relatorio.funcionario.matricula }}/{{ f.dia|date:"dmY" }}/{% if avaliar_frequencia_in_popup_reload_on_success %}?_popup_success_reload=1{% endif %}'
+                                                    class="btn {% if avaliar_frequencia_in_popup %}popup{% endif %}"
+                                                    data-reload-on-close="{% if avaliar_frequencia_in_popup_reload_on_close %}true{% else %}false{% endif %}"
+                                                    data-callback-after-close="{{ avaliar_frequencia_in_popup_callback }}">
+                                                    {% icone "plus" %} Adicionar mais uma Avaliação</a></li>
+                                            {% else %}
+                                                <li><a
+                                                    href='/ponto/adicionar_abono_inconsistencia_frequencia/{{ relatorio.funcionario.matricula }}/{{ f.dia|date:"dmY" }}/{% if avaliar_frequencia_in_popup_reload_on_success %}?_popup_success_reload=1{% endif %}'
+                                                    class="btn {% if avaliar_frequencia_in_popup %}popup{% endif %}"
+                                                    data-reload-on-close="{% if avaliar_frequencia_in_popup_reload_on_close %}true{% else %}false{% endif %}"
+                                                    data-callback-after-close="{{ avaliar_frequencia_in_popup_callback }}">
+                                                    {% icone "star" %} Avaliar Frequência</a></li>
+                                            {% endif %}
+                                        {% endif %}
+                                    {% endif %}
+                                    {% if relatorio.funcionario.pk == request.user.get_vinculo.relacionamento.pk and not f.abonos_chefia %}
+                                        {% if not f.abonos_chefia %}
+                                            <li><a class="btn success popup"
+                                            href='/ponto/observacao_adicionar/{{ f.dia|date:"dmY" }}/'>{% icone "plus" %}
+                                                <span class="visually-hidden">Adicionar</span> Observação</a></li>
+                                            {% if f.dia <= hoje %}
+                                                <li><a class="btn popup"
+                                                    href="/ponto/documento_anexar/{{ f.dia|date:'dmY' }}/add/">{% icone "paperclip" %}
+                                                    Anexar <span class="visually-hidden">Documento</span></a></li>
+                                            {% endif %}
+                                        {% endif %}
+                                    {% endif %}
+
+                                    {% if relatorio.funcionario.pk == request.user.get_vinculo.relacionamento.pk %}
+                                        {% if f.pode_solicitar_abono_parcial %}
+                                            <li>
+                                                <a
+                                                    class="btn success popup"
+                                                    href='/ponto/solicitar_abono_parcial_etapa_1/?data_aplicacao={{f.dia|date:"Y-m-d" }}&next_url=..'
+                                                    title="Solicitar Abono Parcial"
+                                                >
+                                                    {% icone "plus" %} Solicitar abono parcial
+                                                </a>
+                                            </li>
+                                        {% endif %}
+
+                                        {% if f.pode_solicitar_revisao_abono_chefia %}
+                                            <li>
+                                                <a
+                                                    class="btn warning popup"
+                                                    href='/ponto/solicitar_revisao_abono_chefia/{{ f.dia|date:"dmY" }}/'
+                                                    title="Solicitar Revisão de Abono de Chefia"
+                                                >
+                                                    {% icone "plus" %} Solicitar revisão de abono de chefia
+                                                </a>
+                                            </li>
+                                        {% endif %}
+                                    {% endif %}
+
+                                    {% if f.compensacao.is_debito or f.compensacao.is_saldo %}
+                                        <li><a href="/ponto/detalhar_compensacao/{{ relatorio.funcionario.matricula }}/{{ f.dia|date:'dmY' }}/" class="btn default popup">
+                                            {% icone "eye" %} Detalhamento de Compensações
+                                        </a></li>
+                                    {% endif %}
+                                </ul>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <p class="obs mt-4">{{ relatorio.dias|length }} dia{{ relatorio.dias|pluralize:'s' }} exibido{{ relatorio.dias|pluralize:'s' }} / {{ relatorio.qtd_dias_periodo }} dia{{ relatorio.qtd_dias_periodo|pluralize:'s' }} do período</p>
+
+        {% comment %}
+        <!-- {% if relatorio.eh_chefe_periodo and not relatorio.funcionario.eh_liberado_controle_frequencia and relatorio.funcionario.pk != request.user.get_vinculo.relacionamento.pk %} -->
+        {% endcomment %}
+        {% if relatorio.eh_chefe_periodo and not relatorio.eh_liberado_controle_frequencia and relatorio.funcionario.pk != request.user.get_vinculo.relacionamento.pk %}
+            {% if relatorio.tem_horarios_excedentes or relatorio.tem_horarios_inferiores %}
+                <p class="alert alert-info">Para <strong>avaliar em lote</strong>, você pode marcar abaixo todas as datas em que houver frequências excedentes ou inferiores à carga horária a ser cumprida.</p>
+                <div class="submit-row">
+                    {% if relatorio.tem_horarios_excedentes %}
+                        <button class="btn marcar_todas_frequencias" data-table="frequencias_pessoa_{{ relatorio.funcionario.pk }}" data-checkbox="frequencias_dias" data-type="excedente"
+                            onclick="marcar_todas_frequencias('excedente')" type="button">
+                            Marcar Registros com Duração Excedente
+                        </button>
+                    {% endif %}
+                    {% if relatorio.tem_horarios_inferiores %}
+                        <button class="btn marcar_todas_frequencias" data-table="frequencias_pessoa_{{ relatorio.funcionario.pk }}" data-checkbox="frequencias_dias" data-type="inferior"
+                            onclick="marcar_todas_frequencias('inferior')" type="button">
+                            Marcar Registros com Duração Inferior
+                        </button>
+                    {% endif %}
+
+                    <input class="btn success ms-auto" type="button" value="Avaliar Frequência em Lote"
+                        onclick="avaliar_frequencia_em_lote()"/>
+                </div>
+            {% endif %}
+        {% endif %}
+    {% else %}
+        <p class="alert alert-warning">Nenhuma frequência{% if so_inconsistentes %} inconsistente{% endif %} encontrada.</p>
+    {% endif %}
+</div>
+
+<script>
+    jQuery(document).ready(function() {
+        $(".mostrarTodasObservacoes").on('click', function() {
+            let state = $(this).data('state');
+            let icones = $(".mostrarObservacoes").find("span.fas");
+            $(this).find("span.fas").toggleClass("fa-expand-alt").toggleClass("fa-compress-alt");
+            if (state == "hidden") {
+                $(this).find("span.text").html("Esconder");
+                jQuery("ul.comments").removeClass("d-none");
+                $(icones).each(function() {
+                    if ($(this).hasClass("fa-expand-alt")) {
+                        $(this).removeClass("fa-expand-alt").addClass("fa-compress-alt");
+                    }
+                });
+                $(this).data('state', 'on');
+            } else {
+                $(this).find("span.text").html("Exibir");
+                jQuery("ul.comments").addClass("d-none");
+                $(icones).each(function() {
+                    if (!$(this).hasClass("fa-expand-alt")) {
+                        $(this).addClass("fa-expand-alt").removeClass("fa-compress-alt");
+                    }
+                });
+                $(this).data('state', 'hidden');
+            }
+        });
+
+        jQuery(".mostrarObservacoes").on('click', function() {
+            jQuery(this).next("ul.comments").toggleClass("d-none");
+            jQuery(this).find("span.fas").toggleClass("fa-expand-alt").toggleClass("fa-compress-alt");
+
+            let anchor = $(this).data('anchor');
+            $([document.documentElement, document.body]).animate({
+                scrollTop: $("#" + anchor).offset().top
+            }, 600);
+        });
+    });
+
+    function marcar_todas_frequencias(tipo) {
+        var objeto = $(".marcar_todas_frequencias");
+        var table = objeto.data("table");
+        var checkbox = objeto.data("checkbox");
+        var type = tipo;
+        var checkboxes = $('#' + table + ' input[name=' + checkbox + '].' + type);
+        var buttons = $("#" + table + " .marcar_todas_frequencias[data-type='" + type + "']");
+
+        buttons.toggleClass("active");
+        var active = objeto.hasClass("active");
+
+        if (active) {
+            $("#" + table + " .marcar_todas_frequencias").attr("disabled", "disabled");
+            buttons.removeAttr("disabled");
+            $('#' + table + ' input[name=' + checkbox + ']').removeAttr('checked');
+            checkboxes.prop("checked", true);
+            checkboxes.parent().parent().addClass('selected');
+
+            var text = buttons[0].textContent.replace('Marcar', 'Desmarcar');
+
+        } else {
+            $("#" + table + " .marcar_todas_frequencias").removeAttr("disabled");
+            checkboxes.prop("checked", false);
+            checkboxes.parent().parent().removeClass('selected');
+            var text = buttons[0].textContent.replace('Desmarcar', 'Marcar');
+        }
+        buttons.text(text);
+    }
+
+    function select_checkbox(el_checkbox) {
+        var active = $(el_checkbox).is(':checked');
+
+        if (active) {
+            $(el_checkbox).parent().parent().addClass('selected');
+        } else {
+            $(el_checkbox).parent().parent().removeClass('selected');
+        }
+    }
+
+    function avaliar_frequencia_em_lote() {
+        let href = "/ponto/adicionar_abono_inconsistencia_frequencia_lote/?{% if avaliar_frequencia_in_popup_reload_on_success %}_popup_success_reload=1&{% endif %}";
+        let frequencias_dias = [];
+
+        $("input[name=frequencias_dias]").each((_, checkbox) => {
+            if ($(checkbox).is(':checked')) {
+                frequencias_dias.push("frequencias_dias=" + $(checkbox).val());
+            }
+        });
+
+        if (frequencias_dias.length > 0) {
+            clearFeedbackMessage();
+
+            href = href + frequencias_dias.join('&');
+            let open_in_popup = "{{ avaliar_frequencia_in_popup }}" === "True";
+
+            if (open_in_popup == true) {
+                let link = document.createElement('a');
+                link.href = href;
+
+                $(link).data("reload-on-close", "{% if avaliar_frequencia_in_popup_reload_on_close %}true{% else %}false{% endif %}");
+                $(link).data("callback-after-close", "{{ avaliar_frequencia_in_popup_callback }}");
+
+                openLinkInPopup(link);
+            } else {
+                window.location = href;
+            }
+        } else {
+            goToPageTop('fast');
+            showFeedbackMessage('Selecione um ou mais registros de frequências.', 'error');
+        }
+    }
+</script>

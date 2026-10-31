@@ -1,0 +1,216 @@
+{% extends super_template %}
+
+{% block action-bar %}
+    <ul class="action-bar">
+        {% if pode_iniciar_avaliacao %}
+        <li><a href="/progressao_docente/iniciar_avaliacao/{{ processo.pk }}/" class="btn success confirm">Iniciar Avaliação</a></li>
+        {% endif %}
+        {% if pode_finalizar_processo %}
+        <li><a href="/progressao_docente/finalizar/{{ processo.pk }}/" class="btn success confirm">Finalizar</a></li>
+        {% endif %}
+        {% if pode_gerar_processo_eletronico %}
+            <li class="has-child">
+                <a href="#" class="btn primary">Documentos</a>
+                <ul>
+                    <li><a href="/progressao_docente/imprimir_processo/{{ processo.pk }}/" class="btn primary">Resumo do Processo</a></li>
+                </ul>
+            </li>
+            {% if not processo.processo_eletronico %}
+            <li><a href="/progressao_docente/gerar_processo_eletronico/{{ processo.pk }}/" class="btn primary confirm">Gerar Processo Eletrônico</a></li>
+            {% endif %}
+        {% endif %}
+        {% if pode_notificar_responsaveis %}
+        <li><a href="/progressao_docente/enviar_notificacao/{{ processo.pk }}/" class="btn success">Enviar Notificação</a></li>
+        {% endif %}
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+    {% include "includes/informacao_processo.html" %}
+
+    {% if processo.pode_acelerar and processo.tipo_aceleracao %}
+        {% box "Aceleração" %}
+            <div class="table-responsive">
+                <table>
+                    <caption>Informações de aceleração de progressão</caption>
+                    <thead>
+                        <tr>
+                            <th>Aceleração Desejada</th>
+                            <th>Avaliação</th>
+                            <th class="no-print">Opções</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>{{ processo.get_tipo_aceleracao_display|format }}</td>
+                            <td>
+                                {% if processo.validacao_aceleracao %}
+                                    {{ processo.get_validacao_aceleracao_display|format }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td class="no-print" style="width: 1%;">
+                                {% if processo.validacao_aceleracao %}
+                                    <a class="btn default popup" href="{{ processo.arquivo_aceleracao.url }}">
+                                        {% icone "eye" %} Visualizar
+                                    </a>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        {% endbox %}
+    {% endif %}
+
+    {% if processo.ids_afastamentos_utilizados %}
+        {% if processo.afastamentos_interrompem_tempo_servico %}
+            {% box 'Afastamentos que interrompem o tempo de serviço' class='collapsed' %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Código</th>
+                            <th>Sigla</th>
+                            <th>Nome</th>
+                            <th>Data de Início</th>
+                            <th>Data de Termino</th>
+                            <th>Dias</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for afastamento in processo.afastamentos_interrompem_tempo_servico.afastamentos %}
+                        <tr>
+                            <td>{{ afastamento.codigo }}</td>
+                            <td>{{ afastamento.sigla }}</td>
+                            <td>{{ afastamento.nome }}</td>
+                            <td>{{ afastamento.data_inicio }}</td>
+                            <td>{{ afastamento.data_termino }}</td>
+                            <td>{{ afastamento.dias_afastamento }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="6">Total de Dias: {{ processo.afastamentos_interrompem_tempo_servico.total_dias }}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            {% endbox %}
+        {% endif %}
+
+        {% if processo.afastamentos_efetivo_exercicio_30_dias %}
+            {% box 'Afastamentos que extrapolaram 30 dias no período de um ano' class='collapsed' %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Qtde. de Dias</th>
+                            <th>Dia</th>
+                            <th>Afastamento</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for afastamento in processo.afastamentos_efetivo_exercicio_30_dias.observacoes %}
+                        <tr>
+                            <td>{{ afastamento.qtd_dias }}º</td>
+                            <td>{{ afastamento.data_afetada }}</td>
+                            <td>
+                                <ul>
+                                {% for i in afastamento.lista_afastamentos %}
+                                    <li>{{ i.afastamento }}</li>
+                                {% endfor %}
+                                </ul>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="3">Total de Dias: {{ processo.afastamentos_efetivo_exercicio_30_dias.observacoes|length }}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            {% endbox %}
+        {% endif %}
+
+        {% if afastamento_regra_24_meses %}
+            {% box 'Licença saúde superior a 24 meses' %}
+                <div class="alert alert-info">
+                    <p><strong>Informação:</strong></p>
+                    <ul>
+                        <li>Conforme <strong>alínea "b", inciso VIII do <a href="https://www.planalto.gov.br/ccivil_03/leis/l8112cons.htm#art102" target="blank">Art. 102 da Lei 8.112/90</a></strong>, as licenças para tratamento da própria saúde superiores ao limite de vinte e quatro meses, cumulativo ao longo do tempo de serviço público prestado à União, em cargo de provimento efetivo <strong>não são considerados como efetivo exercício</strong>.</li>
+                    </ul>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Afastamento</th>
+                            <th>Dias</th>
+                            <th>Total de Dias</th>
+                        </tr>
+                    </thead>
+                    {% for k, v in afastamento_regra_24_meses.items %}
+                    <tr>
+                        <td>{{ k }}</td>
+                        <td>{{ v }}</td>
+                        <td>{{ v|length }}</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            {% endbox %}
+        {% endif %}
+
+    {% endif %}
+
+    {% box 'Avaliações' badge=avaliacoes|length %}
+        {% if pode_adicionar_avaliacao %}
+            <ul class="action-bar">
+                <li><a href="/admin/progressao_docente/avaliacao/add/?p={{ processo.pk }}" class="btn success popup">Adicionar Avaliação</a></li>
+            </ul>
+        {% endif %}
+
+        {% if avaliacoes %}
+            {% for avaliacao in avaliacoes %}
+                <div class="general-box">
+                    <div class="primary-info">
+                        <div class="status-info-container">
+                            {{ avaliacao.get_situacao_display|status }}
+                        </div>
+
+                        <h4><small>{{ forloop.counter }}</small> Avaliação - {{ avaliacao.formulario.nome }}</h4>
+
+                        {% if avaliacao.pode_editar_avaliacao or avaliacao.pode_remover_avaliacao %}
+                            <ul class="action-bar">
+                                <li class="has-child"><a href="#" class="btn"><span class="fas fa-configuracao" aria-hidden="true"></span>Ações</a>
+                                    <ul>
+                                        {% if avaliacao.pode_editar_avaliacao %}
+                                            <li><a href="/admin/progressao_docente/avaliacao/{{ avaliacao.pk }}/change/" class="popup">Editar</a></li>
+                                        {% endif %}
+                                        {% if avaliacao.pode_remover_avaliacao %}
+                                            <li><a href="/admin/progressao_docente/avaliacao/{{ avaliacao.pk }}/delete/" class="popup">Remover</a></li>
+                                        {% endif %}
+                                        <li><a href="/progressao_docente/formulario/{{ avaliacao.formulario.pk }}/ver/" class="popup">Detalhar</a></li>
+                                    </ul>
+                                </li>
+                            </ul>
+                        {% endif %}
+
+                        <div class="extra-info">
+                            {% include "includes/informacoes_cabecalho_avaliacao.html" %}
+                            {% include "includes/informacoes_avaliacao.html" %}
+                        </div>
+                    </div>
+
+                    {% include "includes/informacoes_rodape_avaliacao.html" %}
+                </div>
+            {% endfor %}
+        {% else %}
+            <p class="alert alert-warning">Nenhuma avaliação cadastrada até o momento.</p>
+        {% endif %}
+
+    {% endbox %}
+
+{% endblock %}
