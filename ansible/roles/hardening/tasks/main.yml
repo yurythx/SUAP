@@ -1,16 +1,5 @@
 ---
-- name: Instalar UFW, fail2ban e AppArmor
-  ansible.builtin.apt:
-    name:
-      - ufw
-      - fail2ban
-      - apparmor
-      - apparmor-utils
-    state: present
-    update_cache: true
-    cache_valid_time: 3600
-
-- name: Endurecer SSH (sem root e sem senha)
+- name: Endurecer SSH
   ansible.builtin.copy:
     dest: /etc/ssh/sshd_config.d/99-suap.conf
     owner: root
@@ -21,7 +10,6 @@
       PasswordAuthentication {{ ssh_password_authentication }}
       PubkeyAuthentication yes
       KbdInteractiveAuthentication no
-      ChallengeResponseAuthentication no
       UsePAM yes
       X11Forwarding no
       AllowTcpForwarding no
@@ -31,26 +19,41 @@
       LoginGraceTime 30
   notify: reload ssh
 
+- name: UFW presente
+  ansible.builtin.stat:
+    path: /usr/sbin/ufw
+  register: suap_ufw
+
 - name: Política UFW default deny incoming
   community.general.ufw:
     direction: incoming
     policy: deny
+  when: suap_ufw.stat.exists
 
 - name: Política UFW default allow outgoing
   community.general.ufw:
     direction: outgoing
     policy: allow
+  when: suap_ufw.stat.exists
 
 - name: Liberar portas TCP no UFW
   community.general.ufw:
     rule: allow
-    port: "{{ item }}"
+    port: "{{ item.port }}"
     proto: tcp
-  loop: "{{ ufw_allowed_tcp_ports }}"
+    from_ip: "{{ item.from | default(omit) }}"
+  loop: "{{ ufw_rules }}"
+  when: suap_ufw.stat.exists
 
 - name: Habilitar UFW
   community.general.ufw:
     state: enabled
+  when: suap_ufw.stat.exists
+
+- name: fail2ban presente
+  ansible.builtin.stat:
+    path: /usr/bin/fail2ban-client
+  register: suap_fail2ban
 
 - name: Configurar fail2ban para SSH
   ansible.builtin.copy:
@@ -72,12 +75,14 @@
       logpath = %(sshd_log)s
       maxretry = 5
   notify: restart fail2ban
+  when: suap_fail2ban.stat.exists
 
 - name: Garantir fail2ban ativo
   ansible.builtin.service:
     name: fail2ban
     state: started
     enabled: true
+  when: suap_fail2ban.stat.exists
 
 - name: Desabilitar serviços desnecessários quando existirem
   ansible.builtin.service:

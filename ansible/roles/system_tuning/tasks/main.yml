@@ -7,6 +7,7 @@
     sysctl_file: /etc/sysctl.d/99-suap.conf
     reload: true
   loop: "{{ sysctl_settings | dict2items }}"
+  failed_when: false
 
 - name: Configurar limites de file descriptors
   ansible.builtin.copy:
@@ -15,33 +16,16 @@
     group: root
     mode: "0644"
     content: |
-      * soft nofile 1048576
-      * hard nofile 1048576
-      root soft nofile 1048576
-      root hard nofile 1048576
+      * soft nofile 65536
+      * hard nofile 65536
+      root soft nofile 65536
+      root hard nofile 65536
 
-- name: Instalar utilitários de operação
-  ansible.builtin.apt:
-    name:
-      - htop
-      - iotop
-      - sysstat
-      - unattended-upgrades
-      - qemu-guest-agent
-    state: present
-    update_cache: true
-    cache_valid_time: 3600
-
-- name: Garantir qemu-guest-agent ativo
-  ansible.builtin.service:
-    name: qemu-guest-agent
-    state: started
-    enabled: true
-
-- name: Criar arquivo de swap (homolog 4GB RAM)
+- name: Criar arquivo de swap extra
   ansible.builtin.command:
     cmd: fallocate -l {{ swap_size_gb | default(4) }}G /swapfile
     creates: /swapfile
+  when: suap_extra_swap | bool
 
 - name: Permissões do swapfile
   ansible.builtin.file:
@@ -49,6 +33,7 @@
     owner: root
     group: root
     mode: "0600"
+  when: suap_extra_swap | bool
 
 - name: Formatar swapfile
   ansible.builtin.command:
@@ -58,6 +43,7 @@
   register: suap_mkswap
   changed_when: suap_mkswap.rc == 0 and 'UUID' in (suap_mkswap.stdout | default(''))
   failed_when: false
+  when: suap_extra_swap | bool
 
 - name: Ativar swap
   ansible.builtin.command:
@@ -65,9 +51,11 @@
   register: suap_swapon
   changed_when: suap_swapon.rc == 0
   failed_when: false
+  when: suap_extra_swap | bool
 
 - name: Persistência do swap no fstab
   ansible.builtin.lineinfile:
     path: /etc/fstab
     line: "/swapfile none swap sw 0 0"
     state: present
+  when: suap_extra_swap | bool

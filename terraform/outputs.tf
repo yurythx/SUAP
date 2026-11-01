@@ -3,6 +3,7 @@ output "containers" {
     for name, c in proxmox_virtual_environment_container.suap : name => {
       vmid      = c.vm_id
       ip        = local.containers[name].ip
+      lan_ip    = local.containers[name].lan_ip
       memory_mb = local.containers[name].memory
       cores     = local.containers[name].cores
     }

@@ -11,8 +11,8 @@ O dia a dia segue a branch `homologacao`. `main` guarda a versão aceita e `prod
 ```text
 app/                 # Fonte oficial SUAP (manage.py na raiz)
 terraform/           # VM Proxmox (8 vCPU, 16 GB, 160 GB)
-ansible/             # hardening + Docker + sync/deploy
-compose/             # Compose de produção + Dockerfile (uv) + overlay settings
+ansible/             # LXC: Nginx, Gunicorn, Celery, PostgreSQL e Redis
+compose/             # desenho antigo de host único; o site.yml não usa este caminho
 ```
 
 ## Pré-requisitos

@@ -38,6 +38,12 @@ resource "proxmox_virtual_environment_container" "suap" {
     bridge = var.bridge
   }
 
+  network_interface {
+    name     = "eth1"
+    bridge   = var.lan_bridge
+    firewall = false
+  }
+
   initialization {
     hostname = each.key
 
@@ -45,6 +51,12 @@ resource "proxmox_virtual_environment_container" "suap" {
       ipv4 {
         address = "${each.value.ip}/${var.network_cidr_prefix}"
         gateway = var.gateway
+      }
+    }
+
+    ip_config {
+      ipv4 {
+        address = "${each.value.lan_ip}/${var.lan_cidr_prefix}"
       }
     }
 
@@ -65,11 +77,17 @@ resource "proxmox_virtual_environment_container" "suap" {
   }
 
   lifecycle {
-    ignore_changes = [initialization[0].user_account]
+    ignore_changes  = [initialization[0].user_account]
+    prevent_destroy = true
 
     precondition {
       condition     = local.total_memory_mb <= var.memory_budget_mb
       error_message = "Soma de RAM dos LXC (${local.total_memory_mb} MB) excede o orçamento de ${var.memory_budget_mb} MB."
+    }
+
+    precondition {
+      condition     = !(var.environment == "producao" && var.vmid_base == 2100)
+      error_message = "Produção não usa o VMID 2100 nem o state da homologação. Aplique o tfvars de produção só num diretório com state novo."
     }
   }
 }

@@ -1,43 +1,55 @@
 ---
-- name: Implantar host SUAP (IFRS) — tuning, hardening, Docker e deploy
-  hosts: suap
-  become: true
-  gather_facts: true
-
-  pre_tasks:
-    - name: Garantir pacotes base do controlado
-      ansible.builtin.apt:
-        name:
-          - python3
-          - python3-apt
-          - rsync
-          - ca-certificates
-          - curl
-        state: present
-        update_cache: true
-        cache_valid_time: 3600
-
-    - name: Validar presença do código-fonte local ./app no controlador
-      ansible.builtin.stat:
-        path: "{{ suap_local_app_src }}/manage.py"
-      delegate_to: localhost
-      become: false
-      register: suap_manage_py
-
-    - name: Falhar se ./app não for a raiz do SUAP oficial
+- name: Recusar inventário incompleto
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Produção só aplica com IP real e state próprio
       ansible.builtin.assert:
         that:
-          - suap_manage_py.stat.exists
-        fail_msg: >-
-          Código-fonte ausente ou mal posicionado.
-          Exigido: ./app/manage.py (fonte IFRN na raiz de app/).
+          - ansible_host is not search('PREENCHER')
+          - suap_app_ip is not search('PREENCHER')
+          - suap_internal_cidr is not search('PREENCHER')
+          - redis_bind_ip is not search('PREENCHER')
+        fail_msg: Preencha os IPs e a rede deste ambiente antes de aplicar o Ansible.
 
+- name: Ajuste de sistema
+  hosts: all
+  become: true
   roles:
     - role: system_tuning
       tags: [system, tuning]
+
+- name: SSH, firewall e fail2ban
+  hosts: all
+  become: true
+  roles:
     - role: hardening
       tags: [security, hardening]
-    - role: docker
-      tags: [docker, runtime]
-    - role: suap_deploy
-      tags: [suap, deploy, app]
+
+- name: PostgreSQL
+  hosts: suap_db
+  become: true
+  roles:
+    - role: postgres
+      tags: [postgres, db]
+
+- name: Redis
+  hosts: suap_redis
+  become: true
+  roles:
+    - role: redis
+      tags: [redis]
+
+- name: Gunicorn, Celery e código
+  hosts: suap_app
+  become: true
+  roles:
+    - role: suap_runtime
+      tags: [suap, app]
+
+- name: Nginx de ingresso
+  hosts: suap_lb
+  become: true
+  roles:
+    - role: nginx_lb
+      tags: [nginx, lb]

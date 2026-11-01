@@ -1,0 +1,89 @@
+# Produção. NÃO passar este arquivo no diretório terraform/ da homologação:
+# aquele state é o das LXC que já estão no ar (VMID a partir de 2100).
+#
+# Copie o módulo para um diretório vazio, com state vazio, preencha os IPs e
+# só então: terraform apply -var-file=producao.tfvars
+# O hardware abaixo é maior que o da homologação de propósito.
+
+environment      = "producao"
+vmid_base        = 3100
+memory_budget_mb = 65536
+
+proxmox_endpoint  = "https://192.168.29.51:8006/"
+proxmox_insecure  = true
+proxmox_api_token = "terraform-prov@pve!terraform-token=UUID"
+proxmox_node      = "pve"
+datastore_id      = "local-lvm"
+template_debian13 = "local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst"
+
+bridge           = "PREENCHER-BRIDGE"
+lan_bridge       = "PREENCHER-BRIDGE-LAN"
+gateway          = "PREENCHER-GATEWAY"
+dns_servers = ["192.168.0.101", "1.1.1.1"]
+dns_domain  = "suap.rondonopolis.mt.gov.br"
+
+ssh_public_key_path = "~/.ssh/id_ed25519_sei_homolog.pub"
+root_password       = "DEFINIR_SENHA_FORTE"
+
+containers = {
+  "ansible-ctl" = {
+    ip          = "PREENCHER-IP-CTL"
+    lan_ip      = "PREENCHER-IP-LAN-CTL"
+    description = "Nó de controle Ansible (SUAP produção)"
+    template    = "local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst"
+    cores       = 2
+    memory      = 2048
+    swap        = 1024
+    disk        = 20
+    keyctl      = false
+    order       = 6
+  }
+  "suap-lb" = {
+    ip          = "PREENCHER-IP-LB"
+    lan_ip      = "PREENCHER-IP-LAN-LB"
+    description = "Nginx — ingresso da produção"
+    template    = "local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst"
+    cores       = 2
+    memory      = 2048
+    swap        = 1024
+    disk        = 20
+    keyctl      = false
+    order       = 5
+  }
+  "suap-app" = {
+    ip          = "PREENCHER-IP-APP"
+    lan_ip      = "PREENCHER-IP-LAN-APP"
+    description = "SUAP app — Gunicorn + Celery + Beat"
+    template    = "local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst"
+    cores       = 8
+    memory      = 32768
+    swap        = 8192
+    disk        = 80
+    keyctl      = false
+    order       = 4
+  }
+  "suap-db" = {
+    ip          = "PREENCHER-IP-DB"
+    lan_ip      = "PREENCHER-IP-LAN-DB"
+    description = "PostgreSQL 17"
+    template    = "local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst"
+    cores       = 4
+    memory      = 16384
+    swap        = 4096
+    disk        = 200
+    keyctl      = false
+    order       = 1
+  }
+  "suap-redis" = {
+    ip          = "PREENCHER-IP-REDIS"
+    lan_ip      = "PREENCHER-IP-LAN-REDIS"
+    description = "Redis 8 — sessao, cache e fila"
+    template    = "local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst"
+    cores       = 2
+    memory      = 8192
+    swap        = 2048
+    disk        = 20
+    keyctl      = false
+    order       = 2
+  }
+}

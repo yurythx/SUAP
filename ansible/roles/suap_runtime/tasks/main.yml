@@ -1,0 +1,124 @@
+---
+- name: Usuário de execução
+  ansible.builtin.user:
+    name: suap
+    system: true
+    create_home: false
+    shell: /usr/sbin/nologin
+
+- name: Diretórios graváveis
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: suap
+    group: suap
+    mode: "0750"
+  loop:
+    - "{{ suap_code_dir }}/deploy/media"
+    - "{{ suap_code_dir }}/deploy/logs"
+    - /var/log/suap
+
+- name: Conteúdo gravável pelo serviço
+  ansible.builtin.file:
+    path: "{{ item }}"
+    owner: suap
+    group: suap
+    recurse: true
+  loop:
+    - "{{ suap_code_dir }}/deploy/media"
+    - "{{ suap_code_dir }}/deploy/logs"
+    - /var/log/suap
+
+- name: Código legível pelo usuário suap
+  ansible.builtin.file:
+    path: "{{ item }}"
+    mode: "0755"
+  loop:
+    - /opt/suap
+    - "{{ suap_code_dir }}"
+    - "{{ suap_code_dir }}/.venv"
+
+- name: Ambiente lido pelo serviço
+  ansible.builtin.file:
+    path: "{{ suap_code_dir }}/.env"
+    owner: root
+    group: suap
+    mode: "0640"
+
+- name: Interpretador fora do home do root
+  ansible.builtin.shell: |
+    set -euo pipefail
+    cfg="{{ suap_code_dir }}/.venv/pyvenv.cfg"
+    home=$(awk -F ' = ' '/^home = / { print $2 }' "$cfg")
+    prefix=$(dirname "$home")
+    case "$prefix" in
+      /root/*)
+        rm -rf /opt/suap/cpython
+        cp -a "$prefix" /opt/suap/cpython
+        sed -i "s|$prefix|/opt/suap/cpython|g" "$cfg"
+        echo COPIED
+        ;;
+    esac
+  args:
+    executable: /bin/bash
+  register: suap_cpython_move
+  changed_when: "'COPIED' in suap_cpython_move.stdout"
+
+- name: Conferir que o usuário suap executa o interpretador
+  ansible.builtin.command:
+    argv:
+      - runuser
+      - -u
+      - suap
+      - --
+      - "{{ suap_code_dir }}/.venv/bin/python"
+      - -c
+      - print(1)
+  changed_when: false
+
+- name: Unidades systemd
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - suap-gunicorn.service
+    - suap-celery.service
+    - suap-celery-beat.service
+  notify: restart suap
+
+- name: Compose antigo parado
+  ansible.builtin.systemd:
+    name: suap-compose.service
+    enabled: false
+    state: stopped
+  failed_when: false
+
+- name: Serviços ativos
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+  loop:
+    - suap-gunicorn.service
+    - suap-celery.service
+    - suap-celery-beat.service
+
+- name: Cópia do backup fora do banco
+  ansible.builtin.copy:
+    dest: /usr/local/sbin/suap-backup-pull.sh
+    owner: root
+    group: root
+    mode: "0755"
+    content: "{{ lookup('file', playbook_dir + '/../scripts/suap-backup-pull.sh') }}"
+
+- name: Cron da cópia
+  ansible.builtin.copy:
+    dest: /etc/cron.d/suap-backup
+    owner: root
+    group: root
+    mode: "0644"
+    content: "{{ lookup('file', playbook_dir + '/../scripts/cron-suap-backup-pull') }}"

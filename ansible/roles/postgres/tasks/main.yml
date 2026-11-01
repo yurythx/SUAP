@@ -1,0 +1,49 @@
+---
+- name: Localizar o PostgreSQL
+  ansible.builtin.shell: ls -d /etc/postgresql/*/main | head -1
+  args:
+    executable: /bin/bash
+  register: suap_pg_main
+  changed_when: false
+
+- name: Ajuste de memória do PostgreSQL
+  ansible.builtin.copy:
+    dest: "{{ suap_pg_main.stdout }}/conf.d/suap.conf"
+    owner: postgres
+    group: postgres
+    mode: "0644"
+    content: |
+      shared_buffers = {{ postgres_shared_buffers }}
+      effective_cache_size = {{ postgres_effective_cache_size }}
+      work_mem = {{ postgres_work_mem }}
+      maintenance_work_mem = {{ postgres_maintenance_work_mem }}
+  notify: restart postgresql
+
+- name: Escuta do PostgreSQL
+  ansible.builtin.lineinfile:
+    path: "{{ suap_pg_main.stdout }}/postgresql.conf"
+    regexp: '^#?listen_addresses\s*='
+    line: "listen_addresses = '*'"
+  notify: restart postgresql
+
+- name: Acesso da rede interna
+  ansible.builtin.lineinfile:
+    path: "{{ suap_pg_main.stdout }}/pg_hba.conf"
+    line: "host all all {{ suap_internal_cidr }} scram-sha-256"
+  notify: restart postgresql
+
+- name: Backup diário
+  ansible.builtin.copy:
+    dest: /usr/local/sbin/suap-backup.sh
+    owner: root
+    group: root
+    mode: "0755"
+    content: "{{ lookup('file', playbook_dir + '/../scripts/suap-backup.sh') }}"
+
+- name: Cron do backup
+  ansible.builtin.copy:
+    dest: /etc/cron.d/suap-backup
+    owner: root
+    group: root
+    mode: "0644"
+    content: "{{ lookup('file', playbook_dir + '/../scripts/cron-suap-backup') }}"

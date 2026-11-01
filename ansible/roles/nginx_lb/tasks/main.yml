@@ -1,0 +1,43 @@
+---
+- name: Nginx presente
+  ansible.builtin.stat:
+    path: /usr/sbin/nginx
+  register: suap_nginx_bin
+
+- name: Nginx ausente
+  ansible.builtin.fail:
+    msg: Nginx não está instalado. O proxy apt desta rede corrompe hashes; instale o pacote fora do playbook.
+  when: not suap_nginx_bin.stat.exists
+
+- name: Site do ingresso
+  ansible.builtin.template:
+    src: suap.conf.j2
+    dest: /etc/nginx/sites-available/suap
+    owner: root
+    group: root
+    mode: "0644"
+  notify: reload nginx
+
+- name: Site habilitado
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/suap
+    dest: /etc/nginx/sites-enabled/suap
+    state: link
+
+- name: Sem site padrão
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: reload nginx
+
+- name: Estáticos
+  ansible.builtin.file:
+    path: /var/www/suap-static
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Conferir configuração
+  ansible.builtin.command: nginx -t
+  changed_when: false
