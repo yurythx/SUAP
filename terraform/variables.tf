@@ -146,10 +146,10 @@ variable "containers" {
     "suap-app" = {
       ip          = "192.168.110.20"
       lan_ip      = "192.168.29.120"
-      description = "SUAP app — Gunicorn + Celery + Beat"
+      description = "SUAP app — Gunicorn"
       template    = "local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst"
       cores       = 2
-      memory      = 5632
+      memory      = 4096
       swap        = 2048
       disk        = 40
       keyctl      = false
@@ -178,6 +178,18 @@ variable "containers" {
       disk        = 8
       keyctl      = false
       order       = 2
+    }
+    "suap-worker" = {
+      ip          = "192.168.110.50"
+      lan_ip      = "192.168.29.150"
+      description = "SUAP worker — Celery e Beat"
+      template    = "local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst"
+      cores       = 1
+      memory      = 1536
+      swap        = 1024
+      disk        = 20
+      keyctl      = false
+      order       = 3
     }
   }
 }

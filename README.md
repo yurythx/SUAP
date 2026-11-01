@@ -2,7 +2,7 @@
 
 Base oficial **IFRN COSINF 4.0.5** (Django 5.2 / Python 3.14). Com `DISABLE_EDU=True` a parte acadêmica fica inacessível (menu, página inicial e URL) e os módulos administrativos seguem no ar. Os apps de ensino permanecem instalados porque o SUAP oficial não sobe sem eles.
 
-A instância publicada da Prefeitura Municipal de Rondonópolis está em cinco LXC no Proxmox (balanceador, aplicação, banco, Redis e controle). Esse conjunto é a homologação (`hmlsuap.rondonopolis.mt.gov.br`). A produção (`suap.rondonopolis.mt.gov.br`) ainda não tem máquina. O relato do deploy, do corte acadêmico e do cadastro está em [docs/implantacao-prefeitura.md](docs/implantacao-prefeitura.md). O Compose desta pasta é um desenho alternativo de host único; a instância no ar usa Gunicorn em systemd.
+A instância publicada da Prefeitura Municipal de Rondonópolis está em seis LXC no Proxmox (balanceador, aplicação, fila, banco, Redis e controle). Esse conjunto é a homologação (`hmlsuap.rondonopolis.mt.gov.br`). A produção (`suap.rondonopolis.mt.gov.br`) ainda não tem máquina. O relato do deploy, do corte acadêmico e do cadastro está em [docs/implantacao-prefeitura.md](docs/implantacao-prefeitura.md). O Compose desta pasta é um desenho alternativo de host único; a instância no ar usa Gunicorn em systemd.
 
 O dia a dia segue a branch `homologacao`. `main` guarda a versão aceita e `producao` recebe o merge quando houver o que publicar. As três começam no mesmo commit.
 
@@ -11,7 +11,7 @@ O dia a dia segue a branch `homologacao`. `main` guarda a versão aceita e `prod
 ```text
 app/                 # Fonte oficial SUAP (manage.py na raiz)
 terraform/           # VM Proxmox (8 vCPU, 16 GB, 160 GB)
-ansible/             # LXC: Nginx, Gunicorn, Celery, PostgreSQL e Redis
+ansible/             # LXC: Nginx, Gunicorn, Celery em máquina própria, PostgreSQL e Redis
 compose/             # desenho antigo de host único; o site.yml não usa este caminho
 ```
 

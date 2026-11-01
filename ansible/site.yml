@@ -8,6 +8,7 @@
         that:
           - ansible_host is not search('PREENCHER')
           - suap_app_ip is not search('PREENCHER')
+          - suap_worker_ip is not search('PREENCHER')
           - suap_internal_cidr is not search('PREENCHER')
           - redis_bind_ip is not search('PREENCHER')
         fail_msg: Preencha os IPs e a rede deste ambiente antes de aplicar o Ansible.
@@ -40,7 +41,88 @@
     - role: redis
       tags: [redis]
 
-- name: Gunicorn, Celery e código
+- name: Código no worker
+  hosts: ansible-ctl
+  gather_facts: false
+  tasks:
+    - name: Aguardar SSH do worker
+      ansible.builtin.wait_for:
+        host: "{{ suap_worker_ip }}"
+        port: 22
+        timeout: 180
+
+    - name: Enviar interpretador e código uma vez
+      ansible.builtin.shell: |
+        set -euo pipefail
+        chave=/root/.ssh/id_ed25519_sei_homolog
+        ssh_cmd=(ssh -i "$chave" -o StrictHostKeyChecking=accept-new)
+        if "${ssh_cmd[@]}" "root@{{ suap_worker_ip }}" test -x /opt/suap/src/.venv/bin/celery; then
+          echo PRESENT
+          exit 0
+        fi
+        "${ssh_cmd[@]}" "root@{{ suap_worker_ip }}" mkdir -p /opt/suap
+        "${ssh_cmd[@]}" "root@{{ suap_app_ip }}" tar -C /opt/suap --exclude=src/deploy/logs -cf - cpython src \
+          | "${ssh_cmd[@]}" "root@{{ suap_worker_ip }}" tar -C /opt/suap -xf -
+        echo COPIED
+      args:
+        executable: /bin/bash
+      register: suap_code_copy
+      changed_when: "'COPIED' in suap_code_copy.stdout"
+
+    - name: Garantir rsync no worker
+      ansible.builtin.shell: |
+        set -euo pipefail
+        chave=/root/.ssh/id_ed25519_sei_homolog
+        ssh_cmd=(ssh -i "$chave" -o StrictHostKeyChecking=accept-new)
+        if "${ssh_cmd[@]}" "root@{{ suap_worker_ip }}" command -v rsync >/dev/null; then
+          echo PRESENT
+          exit 0
+        fi
+        "${ssh_cmd[@]}" "root@{{ suap_app_ip }}" cat /usr/bin/rsync \
+          | "${ssh_cmd[@]}" "root@{{ suap_worker_ip }}" "cat > /usr/bin/rsync && chmod 755 /usr/bin/rsync"
+        echo COPIED
+      args:
+        executable: /bin/bash
+      register: suap_rsync_copy
+      changed_when: "'COPIED' in suap_rsync_copy.stdout"
+
+    - name: Enviar bibliotecas LDAP da aplicação
+      ansible.builtin.shell: |
+        set -euo pipefail
+        chave=/root/.ssh/id_ed25519_sei_homolog
+        ssh_cmd=(ssh -i "$chave" -o StrictHostKeyChecking=accept-new)
+        if "${ssh_cmd[@]}" "root@{{ suap_worker_ip }}" test -e /usr/local/lib/libldap-2.5.so.0; then
+          echo PRESENT
+          exit 0
+        fi
+        "${ssh_cmd[@]}" "root@{{ suap_worker_ip }}" mkdir -p /usr/local/lib /etc/ld.so.conf.d
+        "${ssh_cmd[@]}" "root@{{ suap_app_ip }}" tar -C / -cf - usr/local/lib/liblber-2.5.so.0 usr/local/lib/liblber-2.5.so.0.1.8 usr/local/lib/libldap-2.5.so.0 usr/local/lib/libldap-2.5.so.0.1.8 etc/ld.so.conf.d/local-openldap.conf | "${ssh_cmd[@]}" "root@{{ suap_worker_ip }}" tar -C / -xf -
+        "${ssh_cmd[@]}" "root@{{ suap_worker_ip }}" ldconfig
+        echo COPIED
+      args:
+        executable: /bin/bash
+      register: suap_ldap_copy
+      changed_when: "'COPIED' in suap_ldap_copy.stdout"
+
+- name: Celery e Beat
+  hosts: suap_worker
+  become: true
+  pre_tasks:
+    - name: Ler chave de mídia da aplicação
+      ansible.builtin.slurp:
+        src: /root/.ssh/suap_backup.pub
+      delegate_to: suap-app
+      register: suap_media_key
+
+    - name: Autorizar a aplicação a sincronizar a mídia
+      ansible.builtin.authorized_key:
+        user: root
+        key: "{{ suap_media_key.content | b64decode }}"
+  roles:
+    - role: suap_runtime
+      tags: [suap, worker]
+
+- name: Gunicorn
   hosts: suap_app
   become: true
   roles:

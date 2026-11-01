@@ -16,6 +16,11 @@
   loop:
     - "{{ suap_code_dir }}/deploy/media"
     - "{{ suap_code_dir }}/deploy/logs"
+    - "{{ suap_code_dir }}/deploy/logs/email"
+    - "{{ suap_code_dir }}/deploy/logs/gunicorn"
+    - "{{ suap_code_dir }}/deploy/logs/history"
+    - "{{ suap_code_dir }}/deploy/logs/nginx"
+    - "{{ suap_code_dir }}/deploy/logs/supervisor"
     - /var/log/suap
 
 - name: Conteúdo gravável pelo serviço
@@ -76,17 +81,14 @@
       - print(1)
   changed_when: false
 
-- name: Unidades systemd
+- name: Unidades deste papel
   ansible.builtin.template:
     src: "{{ item }}.j2"
     dest: "/etc/systemd/system/{{ item }}"
     owner: root
     group: root
     mode: "0644"
-  loop:
-    - suap-gunicorn.service
-    - suap-celery.service
-    - suap-celery-beat.service
+  loop: "{{ suap_units }}"
   notify: restart suap
 
 - name: Compose antigo parado
@@ -96,16 +98,22 @@
     state: stopped
   failed_when: false
 
+- name: Parar serviços do outro papel
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: false
+    state: stopped
+    daemon_reload: true
+  loop: "{{ suap_disable_units }}"
+  failed_when: false
+
 - name: Serviços ativos
   ansible.builtin.systemd:
     name: "{{ item }}"
     enabled: true
     state: started
     daemon_reload: true
-  loop:
-    - suap-gunicorn.service
-    - suap-celery.service
-    - suap-celery-beat.service
+  loop: "{{ suap_units }}"
 
 - name: Cópia do backup fora do banco
   ansible.builtin.copy:
@@ -114,6 +122,7 @@
     group: root
     mode: "0755"
     content: "{{ lookup('file', playbook_dir + '/../scripts/suap-backup-pull.sh') }}"
+  when: suap_backup_pull | bool
 
 - name: Cron da cópia
   ansible.builtin.copy:
@@ -122,3 +131,23 @@
     group: root
     mode: "0644"
     content: "{{ lookup('file', playbook_dir + '/../scripts/cron-suap-backup-pull') }}"
+  when: suap_backup_pull | bool
+
+- name: Sincronismo da mídia com a fila
+  ansible.builtin.copy:
+    dest: /usr/local/sbin/suap-media-sync.sh
+    owner: root
+    group: root
+    mode: "0755"
+    content: "{{ lookup('file', playbook_dir + '/../scripts/suap-media-sync.sh') }}"
+  when: suap_media_sync | bool
+
+- name: Cron da mídia
+  ansible.builtin.copy:
+    dest: /etc/cron.d/suap-media-sync
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      * * * * * root /usr/local/sbin/suap-media-sync.sh {{ suap_worker_ip }}
+  when: suap_media_sync | bool
