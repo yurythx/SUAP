@@ -6,15 +6,15 @@ A base é o SUAP IFRN COSINF 4.0.5 (Django 5.2, Python 3.14). O uso nesta prefei
 
 ## Domínios e branches
 
-O nome de homologação é `hmlsuap.rondonopolis.mt.gov.br`. O de produção é `suap.rondonopolis.mt.gov.br`. O acesso que funciona hoje continua sendo `http://192.168.29.110`, porque o vhost desses nomes no proxy reverso `192.168.0.218` entra numa etapa seguinte. O exemplo desse vhost está em `scripts/nginx/proxy-reverso.conf.example`.
+O nome de homologação é `hmlsuap.rondonopolis.mt.gov.br`. O de produção é `suap.rondonopolis.mt.gov.br`. Desde 4 de novembro de 2026 o nome de homologação responde em HTTPS no proxy `192.168.0.218`, com certificado Let's Encrypt, e o balanceador interno continua em `http://192.168.29.110`. O artigo com as medidas e o cadastro está em `docs/artigo-implantacao-suap-prefeitura.md`. O exemplo de vhost está em `scripts/nginx/proxy-reverso.conf.example`.
 
 As branches `main`, `homologacao` e `producao` nascem do mesmo commit. O trabalho do dia a dia fica em `homologacao`. Quando uma versão é aceita, ela segue `homologacao` → `main` → `producao`. A diferença entre os ambientes é o `.env` do servidor (`scripts/env/homologacao.env.example` e `scripts/env/producao.env.example`), não o código. Não há máquina de produção.
 
-O Nginx do `suap-lb` aceita o hostname de homologação, confia no `X-Forwarded-For` vindo de `192.168.0.218` e repassa `Host` e `X-Forwarded-Proto` para o Gunicorn. Enquanto o proxy falar HTTP, a aplicação trata a requisição como HTTP. Quando o proxy passar a terminar TLS e enviar `X-Forwarded-Proto: https`, o Django reconhece a origem segura.
+O Nginx do `suap-lb` aceita o hostname de homologação, confia no `X-Forwarded-For` vindo de `192.168.0.218` e repassa `Host` e `X-Forwarded-Proto` para o Gunicorn. O proxy termina TLS e envia `X-Forwarded-Proto: https`, e o Django trata a origem como segura.
 
 ## O que está no ar
 
-Endereço em uso: `http://192.168.29.110`. O nome público previsto da homologação é `https://hmlsuap.rondonopolis.mt.gov.br`.
+Endereço público: `https://hmlsuap.rondonopolis.mt.gov.br`. O balanceador interno continua em `http://192.168.29.110`.
 
 O login exibe o selo **PMR**. A hierarquia tem **33 setores** (a raiz Prefeitura Municipal de Rondonópolis e as 32 unidades enviadas). Há **501 servidores** ativos. A sigla da instituição e a raiz da árvore de setores são `PMR`. O estado gravado é MT e o domínio institucional é `rondonopolis.mt.gov.br`.
 
@@ -50,6 +50,7 @@ No Proxmox, cada máquina desta implantação é um **container LXC** Debian 13,
 | suap-app | 192.168.110.20 | Gunicorn | 23.0.0, Python 3.14.10 |
 | suap-db | 192.168.110.30 | PostgreSQL | 17.11 (Debian 13) |
 | suap-redis | 192.168.110.40 | Redis | 8.0.2 |
+| suap-worker | 192.168.110.50 | Celery worker e beat | fila `geral` |
 
 A rede interna é `192.168.110.0/24`, na ponte `vmbr1`. O Proxmox faz NAT dessa rede para a ponte externa (`scripts/pve-vmbr1-nat.sh`). O endereço que os navegadores usam é `192.168.29.110`, no balanceador.
 
@@ -65,7 +66,7 @@ No `suap-app` o único serviço da aplicação é `suap-gunicorn.service`:
 - 2 workers, 2 threads, timeout de 120 segundos
 - usuário do serviço: root
 
-Celery worker e Celery beat constam da descrição do LXC no Terraform e do Compose, e não têm unit systemd nesta instância.
+Celery worker e Celery beat rodam no `suap-worker` (`suap-celery.service` e `suap-celery-beat.service`), com `ExecStartPre=+/sbin/ldconfig` para achar o `libldap`. No `suap-app` essas units ficam desligadas. O Gunicorn permanece só na aplicação.
 
 O arquivo `compose/docker-compose.prod.yml` descreve outro desenho: um host com Nginx, Gunicorn, Celery, PostgreSQL 18 e Redis 7 em Docker. O Ansible em `ansible/site.yml` instalaria esse Compose. Esse caminho não é o que está publicado. O endereço `192.168.100.50`, usado em exemplos do Compose, não responde a partir da rede de operação.
 
@@ -202,7 +203,7 @@ Daqui em diante, `migrate` aplica só migração nova, de código que ainda não
 
 ### Backup, banco, Redis e Celery
 
-O `suap-db` gera um dump às 02:30 e guarda sete dias em `/var/backups/suap`. Às 03:10 o `suap-app` puxa esse arquivo para o próprio `/var/backups/suap`, fora do disco do banco. O PostgreSQL ficou com `shared_buffers` de 512 MB e `effective_cache_size` de 1536 MB, na medida dos 2,5 GB do container. O Redis tem teto de 768 MB, recusa gravar quando enche e persiste com AOF. Celery worker e beat sobem com o Gunicorn: a fila é `geral` e o worker usa um processo, porque a máquina tem dois CPUs e o Gunicorn já ocupa dois workers.
+O `suap-db` gera um dump às 02:30 e guarda sete dias em `/var/backups/suap`. Às 03:10 o `suap-app` puxa esse arquivo para o próprio `/var/backups/suap`, fora do disco do banco. O PostgreSQL ficou com `shared_buffers` de 512 MB e `effective_cache_size` de 1536 MB, na medida dos 2,5 GB do container. O Redis tem teto de 768 MB, recusa gravar quando enche e persiste com AOF. A fila é `geral`. O worker de homologação usa um processo, no LXC `suap-worker`, separado dos dois workers do Gunicorn.
 
 ### Passaporte obrigatório no PostgreSQL
 
@@ -226,6 +227,5 @@ O grupo `Servidor` normalmente é atribuído no login. Na importação ele é gr
 
 - Logo da prefeitura no lugar da marca do IFRN.
 - Impedir de fato a assinatura de quem veio como “Colaborador (Básico sem Assinatura)”.
-- Publicar `hmlsuap.rondonopolis.mt.gov.br` no proxy `192.168.0.218`, com certificado. Até lá o acesso real é `http://192.168.29.110`.
 - Troca obrigatória de senha no primeiro acesso, depois que o e-mail e o nome público funcionarem.
 - Gunicorn com usuário próprio, escutando só na rede interna.
